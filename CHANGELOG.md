@@ -2,6 +2,77 @@
 
 All notable Beat changes are tracked here. Dates use local project dates.
 
+## 0.2.2 - 2026-07-29
+
+### Added
+
+- Added a global diagnostic log with per-session clear and snapshot-save actions.
+- Added project-local recovery autosave capture alongside validated timestamped
+  `.beat` backups.
+- Added expanded Lumen and Aurum instruments, modulation, preview, performance,
+  and stress-test coverage.
+- Added shared per-route Linear, Ease In, Ease Out, and S-Curve modulation
+  remapping for Lumen and Aurum with prepared native evaluation.
+- Added five Lumen-only prepared harmonic-domain wavetable warps with cached
+  native tables, browser preview parity, schema-gated persistence, and factory
+  patch coverage.
+- Added block-prepared Legacy, Aether, Lumen, and Aurum scalar render kernels
+  with compact active-source indices and route-lane masks.
+- Added a native-SIMD accumulation path for full 16-voice Lumen wavetable
+  unison, with an exact scalar fallback for smaller unison widths.
+- Added Lumen v16 per-LFO octave-rate keytracking with exact zero-default
+  migration, browser/native parity, project persistence, and factory coverage.
+- Added Aurum browser-audition expression snapshots and a verified deterministic
+  precedence contract across manual values, direct automation, macros, and
+  pressure/modulation routes.
+- Added a real audio-segment waveform and transport editor with source-trim
+  seeking, fades, gain, looping, and project-engine preview routing.
+- Added deterministic sample-level editor/project playback parity coverage for
+  expressive Lumen MIDI clips and trimmed audio clips with track effects.
+- Added per-slot Lumen audio-library wavemap resynthesis with Full, Transient,
+  Sustain, and bounded Manual analysis windows.
+- Added an independently editable Aurum Macro 2 source with browser/native
+  operator-destination coverage.
+- Added reproducible two-minute piano-rock and disco-funk cover-study projects
+  reconstructed from user-supplied recordings, with editable Lumen MIDI,
+  sample drums, source-matched harmony/forms, and review WAVs.
+
+### Changed
+
+- Consolidated compatible Nodemap CV sources into one CV Source picker while
+  preserving node identity, connections, and shared parameters when switching
+  types.
+- Limited the generic import workflow to supported audio files and labeled it
+  explicitly as `Import Audio`.
+- Refined Home recents, audio and instrument libraries, export review, timeline
+  automation, segment looping, recording, mixer controls, and startup feedback.
+- Renamed the Lumus product surface and active engine terminology to Lumen.
+
+### Fixed
+
+- Fixed project opening from Finder and Recent Projects across cold and warm app
+  launches, including queued native document-open delivery.
+- Fixed severe Aurum voice-render bottlenecks caused by repeated inner-loop
+  envelope, tuning, panning, and inactive-routing calculations.
+- Hardened export rendering and project recovery around structural validation,
+  atomic file replacement, missing assets, and recoverable backups.
+- Fixed sampler audition and waveform-preview routing, audio-preview resets,
+  automation-point selection and dragging, and shared knob/slider interaction.
+- Hardened MIDI note selection and aligned MIDI, drum, and drumpad editor
+  playback with the project engine, including sampler routing, note curves,
+  automation, gain, transpose, looping, and global-transport exclusivity.
+- Fixed native one-shot preview lifecycle cleanup so synth release tails and
+  sampler auditions return automatically to paused safety silence.
+- Added rectangular and additive drum-grid selection with modifier dragging,
+  select-all, Escape clearing, and accessible selected-cell state.
+- Updated DAW and Nodemap verification for the Lumen v16 capability bank and
+  the consolidated CV Source picker compatibility aliases.
+
+### Removed
+
+- Removed AI training controls, automatic runners, native training IPC, and
+  runtime training events until the feature is intentionally redesigned.
+
 ## 0.2.0 - 2026-07-04
 
 ### Added

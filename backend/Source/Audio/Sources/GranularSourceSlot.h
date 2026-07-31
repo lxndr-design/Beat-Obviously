@@ -141,12 +141,12 @@ namespace beat
                     const float b = source->audio->getSample(ch, index + 1);
                     return a + (b - a) * fraction;
                 };
-                const float phase = (float) grain.age / (float) std::max(1, grain.length - 1);
-                const float window = 0.5f - 0.5f * std::cos(juce::MathConstants<float>::twoPi * phase);
+                const float window = 0.5f - 0.5f * grain.windowCos;
                 frame.left += read(0) * window * grain.gain * grain.leftPan;
                 frame.right += read(1) * window * grain.gain * grain.rightPan;
                 grain.position += grain.rate;
                 ++grain.age;
+                advanceGrainWindow(grain);
                 ++grainTelemetry.grainSamples;
                 ++baseTelemetry.renderedVoiceSamples;
                 if (grain.age >= grain.length || grain.position >= source->audio->getNumSamples() - 1)
@@ -177,7 +177,49 @@ namespace beat
 
     private:
         struct Emitter { bool active {}; uint64_t noteId {}; int midiNote {}; float velocity {}; int countdown {}; uint32_t random {}; };
-        struct Grain { bool active {}; double position {}; double rate {}; double semitones {}; int age {}; int length {}; float gain {}; float leftPan {}; float rightPan {}; };
+        struct Grain
+        {
+            bool active {};
+            double position {};
+            double rate {};
+            double semitones {};
+            int age {};
+            int length {};
+            float gain {};
+            float leftPan {};
+            float rightPan {};
+            float windowCos { 1.0f };
+            float windowSin { 0.0f };
+            float windowStepCos { 1.0f };
+            float windowStepSin { 0.0f };
+        };
+
+        static void configureGrainWindow(Grain& grain) noexcept
+        {
+            const float denominator = (float) std::max(1, grain.length - 1);
+            const float phase = juce::MathConstants<float>::twoPi * (float) grain.age / denominator;
+            const float step = juce::MathConstants<float>::twoPi / denominator;
+            grain.windowCos = std::cos(phase);
+            grain.windowSin = std::sin(phase);
+            grain.windowStepCos = std::cos(step);
+            grain.windowStepSin = std::sin(step);
+        }
+
+        static void advanceGrainWindow(Grain& grain) noexcept
+        {
+            if (grain.age >= grain.length)
+                return;
+            if ((grain.age & 255) == 0)
+            {
+                configureGrainWindow(grain);
+                return;
+            }
+            const float nextCos = grain.windowCos * grain.windowStepCos
+                - grain.windowSin * grain.windowStepSin;
+            grain.windowSin = grain.windowSin * grain.windowStepCos
+                + grain.windowCos * grain.windowStepSin;
+            grain.windowCos = nextCos;
+        }
 
         bool rejectNote() noexcept { ++baseTelemetry.rejectedNoteEvents; return false; }
         static bool isFiniteSource(const ImmutableGranularSource& candidate) noexcept
@@ -214,6 +256,7 @@ namespace beat
                     const float phase = (float) grain.age / (float) std::max(1, grain.length);
                     grain.length = std::clamp((int) std::round(grain.length * scale), 8, 192000);
                     grain.age = std::clamp((int) std::round(phase * grain.length), 0, grain.length - 1);
+                    configureGrainWindow(grain);
                 }
             }
             grainLength = std::clamp((int) std::round(prepared.sampleRate * source->grainMilliseconds * 0.001), 8, 192000);
@@ -243,8 +286,16 @@ namespace beat
                 const double semitones = (double) (emitter.midiNote - source->rootNote) + source->pitchSemitones;
                 const double rate = pitchRate(semitones);
                 const float pan = randomBipolar(emitter.random) * source->stereoSpread;
-                *found = { true, start, rate, semitones, 0, grainLength, emitter.velocity,
-                           std::sqrt(0.5f * (1.0f - pan)), std::sqrt(0.5f * (1.0f + pan)) };
+                *found = {};
+                found->active = true;
+                found->position = start;
+                found->rate = rate;
+                found->semitones = semitones;
+                found->length = grainLength;
+                found->gain = emitter.velocity;
+                found->leftPan = std::sqrt(0.5f * (1.0f - pan));
+                found->rightPan = std::sqrt(0.5f * (1.0f + pan));
+                configureGrainWindow(*found);
                 ++grainTelemetry.grainsStarted;
             }
         }

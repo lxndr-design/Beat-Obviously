@@ -10,6 +10,8 @@ namespace beat::ipc
     namespace kind
     {
         // App lifecycle
+        constexpr const char* APP_SHELL_READY     = "app.shellReady";
+        constexpr const char* APP_STARTUP_STAGE   = "app.startupStage";
         constexpr const char* APP_READY           = "app.ready";
 
         // Transport
@@ -30,6 +32,7 @@ namespace beat::ipc
         constexpr const char* PROJECT_RECENT_LIST = "project.recentList";
         constexpr const char* PROJECT_RECENT_REMOVE = "project.recentRemove";
         constexpr const char* PROJECT_REVEAL_FILE = "project.revealFile";
+        constexpr const char* PROJECT_DUPLICATE_FILE = "project.duplicateFile";
         constexpr const char* PROJECT_CHOOSE_EXPORT_FOLDER = "project.chooseExportFolder";
         constexpr const char* PROJECT_INSPECT_DOCUMENT = "project.inspectDocument";
         constexpr const char* PROJECT_REPAIR_DOCUMENT = "project.repairDocument";
@@ -50,6 +53,10 @@ namespace beat::ipc
         constexpr const char* ENGINE_APPLY_PROJECT = "engine.applyProject";
         constexpr const char* ENGINE_UPDATE_SEG   = "engine.updateSegment";
         constexpr const char* ENGINE_SET_PARAMETER = "engine.setParameter";
+        constexpr const char* ENGINE_PREVIEW_MIDI_NOTE = "engine.previewMidiNote";
+        constexpr const char* ENGINE_STOP_MIDI_PREVIEW = "engine.stopMidiPreview";
+        constexpr const char* ENGINE_PREVIEW_AUDIO_SEGMENT = "engine.previewAudioSegment";
+        constexpr const char* ENGINE_STOP_AUDIO_PREVIEW = "engine.stopAudioPreview";
 
         // Instruments
         constexpr const char* INSTRUMENT_SAVE     = "instrument.save";
@@ -68,6 +75,7 @@ namespace beat::ipc
         constexpr const char* AUDIO_DELETE        = "audio.delete";
         constexpr const char* AUDIO_REVEAL        = "audio.reveal";
         constexpr const char* AUDIO_WAVEFORM      = "audio.waveform";
+        constexpr const char* AUDIO_PREVIEW_DATA  = "audio.previewData";
         constexpr const char* AUDIO_STEMS_START   = "audio.stemsStart";
         constexpr const char* AUDIO_STEMS_STATUS  = "audio.stemsStatus";
         constexpr const char* AUDIO_STEMS_CANCEL  = "audio.stemsCancel";
@@ -91,10 +99,11 @@ namespace beat::ipc
         // EQ
         constexpr const char* EQ_SET_AUTOMATION   = "eq.setAutomation";
 
-        // Local AI training
-        constexpr const char* TRAINING_RUN        = "training.run";
-
         // Misc
+        constexpr const char* DIAGNOSTICS_READ_LOG = "diagnostics.readLog";
+        constexpr const char* DIAGNOSTICS_CLEAR_LOG = "diagnostics.clearLog";
+        constexpr const char* DIAGNOSTICS_SAVE_LOG = "diagnostics.saveLog";
+        constexpr const char* DIAGNOSTICS_WRITE = "diagnostics.write";
         constexpr const char* PING                = "ping";
 
         // Inbound events (C++ → JS)
@@ -107,7 +116,6 @@ namespace beat::ipc
         constexpr const char* EV_RENDER_TIMING    = "engine.renderTiming";
         constexpr const char* EV_DEVICE_CHANGED   = "audio.deviceChanged";
         constexpr const char* EV_SYNTH_EXPRESSION_ACTIVITY = "synth.expressionActivity";
-        constexpr const char* EV_TRAINING_STATUS  = "training.status";
         constexpr const char* EV_EXPORT_PROGRESS  = "project.exportProgress";
         constexpr const char* EV_LOG              = "log";
     }

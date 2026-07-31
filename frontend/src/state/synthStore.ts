@@ -8,6 +8,7 @@ import type {
   InstrumentTaxonomyAssignment,
   ManagedSfzAssetConfig,
   ManagedGranularAssetConfig,
+  ModulationRemapCurve,
   SynthPatchSnapshot,
   SynthPatchMacroDefinition,
   TrackEffect,
@@ -24,14 +25,17 @@ import { normalizeTrackEffectChain } from "./effects";
 import { taxonomyAssignmentForInstrumentId } from "./instrumentTaxonomy";
 
 export const SYNTH_PATCH_SCHEMA_VERSION = 5;
-export const LUMUS_PATCH_SCHEMA_VERSION = 10;
-const LEGACY_LUMUS_PATCH_SCHEMA_VERSIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9] as const;
-const LUMUS_ARPEGGIATOR_KEYS = ["c", "cSharp", "d", "dSharp", "e", "f", "fSharp", "g", "gSharp", "a", "aSharp", "b"] as const;
-const LUMUS_ARPEGGIATOR_SCALES = ["chromatic", "major", "naturalMinor", "majorPentatonic", "blues"] as const;
+export const LUMEN_PATCH_SCHEMA_VERSION = 16;
+const LEGACY_LUMEN_PATCH_SCHEMA_VERSIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15] as const;
+const LUMEN_ARPEGGIATOR_KEYS = ["c", "cSharp", "d", "dSharp", "e", "f", "fSharp", "g", "gSharp", "a", "aSharp", "b"] as const;
+const LUMEN_ARPEGGIATOR_SCALES = ["chromatic", "major", "naturalMinor", "majorPentatonic", "blues"] as const;
 export const SYNTH_PARAMETER_NAMESPACE = "synth";
 export const SYNTH_INSTRUMENT_TYPE = "wavetable-synth";
-export const LUMUS_PARAMETER_NAMESPACE = "lumus";
-export const LUMUS_INSTRUMENT_TYPE = "lumus-hybrid-synth";
+export const LUMEN_PARAMETER_NAMESPACE = "lumen";
+export const LUMEN_INSTRUMENT_TYPE = "lumen-hybrid-synth";
+export const LEGACY_LUMUS_PARAMETER_NAMESPACE = "lumus";
+export const LEGACY_LUMUS_INSTRUMENT_TYPE = "lumus-hybrid-synth";
+export const LEGACY_LUMUS_FACTORY_ID_PREFIX = "factory.lumus-";
 export const DEFAULT_CUSTOM_WAVETABLE_ID = "user.custom";
 
 export type WavetableId =
@@ -70,35 +74,38 @@ export interface WavemapManualRange {
 
 export type OscillatorKey = string;
 export interface SynthOscillatorDefinition { id: OscillatorKey; name: string }
-export type LumusSourceMode = "wavetable" | "sample" | "multisample" | "granular";
-export type LumusSourceSlotId = "a" | "b" | "c";
-export interface LumusSampleSlotMetadata {
-  schemaVersion: 1;
+export type LumenSourceMode = "wavetable" | "sample" | "multisample" | "granular";
+export type LumenSourceSlotId = "a" | "b" | "c";
+export type LumenSamplePlaybackDirection = "forward" | "reverse";
+export interface LumenSampleSlice { id: string; startRatio: number; endRatio: number }
+export interface LumenSampleSlotMetadata {
+  schemaVersion: 2;
   zones: AetherSampleZoneConfig[];
+  slices: LumenSampleSlice[];
   managedSfz?: ManagedSfzAssetConfig;
 }
-export interface LumusGranularSlotMetadata {
+export interface LumenGranularSlotMetadata {
   schemaVersion: 1;
   managedAsset?: ManagedGranularAssetConfig;
 }
-export interface LumusSourceRackDescriptor {
+export interface LumenSourceRackDescriptor {
   schemaVersion: 2;
   slots: [
-    { id: "a"; mode: LumusSourceMode },
-    { id: "b"; mode: LumusSourceMode },
-    { id: "c"; mode: LumusSourceMode },
+    { id: "a"; mode: LumenSourceMode },
+    { id: "b"; mode: LumenSourceMode },
+    { id: "c"; mode: LumenSourceMode },
   ];
 }
-export interface LumusClipStep {
-  enabled: boolean;
+export interface LumenClipNote {
+  startStep: number;
   pitchOffset: number;
   lengthSteps: number;
   velocity: number;
 }
-export interface LumusClipMetadata {
-  schemaVersion: 1;
+export interface LumenClipMetadata {
+  schemaVersion: 2;
   lengthSteps: number;
-  steps: LumusClipStep[];
+  notes: LumenClipNote[];
 }
 export type OscillatorParamSuffix =
   | "enabled"
@@ -200,17 +207,17 @@ export type SynthParameterId =
   | "aether.mpe.masterChannel"
   | "aether.mpe.firstMemberChannel"
   | "aether.mpe.lastMemberChannel"
-  | "lumus.arp.enabled"
-  | "lumus.arp.mode"
-  | "lumus.arp.rate"
-  | "lumus.arp.gate"
-  | "lumus.arp.swing"
-  | "lumus.arp.octaves"
-  | "lumus.arp.key"
-  | "lumus.arp.scale"
-  | "lumus.clip.enabled"
-  | "lumus.clip.rate"
-  | "lumus.clip.swing"
+  | "lumen.arp.enabled"
+  | "lumen.arp.mode"
+  | "lumen.arp.rate"
+  | "lumen.arp.gate"
+  | "lumen.arp.swing"
+  | "lumen.arp.octaves"
+  | "lumen.arp.key"
+  | "lumen.arp.scale"
+  | "lumen.clip.enabled"
+  | "lumen.clip.rate"
+  | "lumen.clip.swing"
   | "amp.level"
   | "amp.pan"
   | "maxVoices"
@@ -245,6 +252,7 @@ export type SynthParameterId =
   | "lfo.1.retrigger"
   | "lfo.1.oneShot"
   | "lfo.1.bipolar"
+  | "lfo.1.keytrackRate"
   | "lfo.2.enabled"
   | "lfo.2.rate"
   | "lfo.2.sync"
@@ -256,7 +264,8 @@ export type SynthParameterId =
   | "lfo.2.retrigger"
   | "lfo.2.oneShot"
   | "lfo.2.bipolar"
-  | `lfo.${3 | 4 | 5 | 6 | 7 | 8 | 9 | 10}.${"enabled" | "rate" | "sync" | "syncedRate" | "smoothing" | "randomPhase" | "shape" | "phase" | "retrigger" | "oneShot" | "bipolar"}`
+  | "lfo.2.keytrackRate"
+  | `lfo.${3 | 4 | 5 | 6 | 7 | 8 | 9 | 10}.${"enabled" | "rate" | "sync" | "syncedRate" | "smoothing" | "randomPhase" | "shape" | "phase" | "retrigger" | "oneShot" | "bipolar" | "keytrackRate"}`
   | "macro.1"
   | "macro.2"
   | "macro.3"
@@ -343,6 +352,7 @@ export interface SynthModulationRoute {
   amount: number;
   bipolar: boolean;
   enabled: boolean;
+  curve?: ModulationRemapCurve;
 }
 
 export interface SynthModulationSummary {
@@ -410,9 +420,9 @@ export interface SynthEnvelopeEditorSummary {
 }
 
 export interface SynthDraftPatch {
-  schemaVersion: typeof SYNTH_PATCH_SCHEMA_VERSION | typeof LUMUS_PATCH_SCHEMA_VERSION;
-  instrumentType: typeof SYNTH_INSTRUMENT_TYPE | typeof LUMUS_INSTRUMENT_TYPE;
-  namespace: typeof SYNTH_PARAMETER_NAMESPACE | typeof LUMUS_PARAMETER_NAMESPACE;
+  schemaVersion: typeof SYNTH_PATCH_SCHEMA_VERSION | typeof LUMEN_PATCH_SCHEMA_VERSION;
+  instrumentType: typeof SYNTH_INSTRUMENT_TYPE | typeof LUMEN_INSTRUMENT_TYPE;
+  namespace: typeof SYNTH_PARAMETER_NAMESPACE | typeof LUMEN_PARAMETER_NAMESPACE;
   name: string;
   taxonomy?: InstrumentTaxonomyAssignment;
   parameters: Record<SynthParameterId, SynthParameterValue> & Record<string, SynthParameterValue>;
@@ -427,10 +437,10 @@ export interface SynthDraftPatch {
     wavemaps?: Record<string, WavemapDefinition>;
     customWavetables?: Record<string, CustomWavetableDefinition>;
     oscillators: SynthOscillatorDefinition[];
-    lumusSourceRack?: LumusSourceRackDescriptor;
-    lumusSampleSlots?: Partial<Record<LumusSourceSlotId, LumusSampleSlotMetadata>>;
-    lumusGranularSlots?: Partial<Record<LumusSourceSlotId, LumusGranularSlotMetadata>>;
-    lumusClip?: LumusClipMetadata;
+    lumenSourceRack?: LumenSourceRackDescriptor;
+    lumenSampleSlots?: Partial<Record<LumenSourceSlotId, LumenSampleSlotMetadata>>;
+    lumenGranularSlots?: Partial<Record<LumenSourceSlotId, LumenGranularSlotMetadata>>;
+    lumenClip?: LumenClipMetadata;
     sampleSlot1Zones: AetherSampleZoneConfig[];
     managedSfz?: ManagedSfzAssetConfig;
     managedGranular?: ManagedGranularAssetConfig;
@@ -497,7 +507,7 @@ const DEFAULT_ADDED_OSCILLATOR_PARAMETERS: Record<OscillatorParamSuffix, SynthPa
   fxSend1: 0, fxSend2: 0,
 };
 
-const DEFAULT_LUMUS_SAMPLE_PARAMETERS: Record<string, SynthParameterValue> = {
+const DEFAULT_LUMEN_SAMPLE_PARAMETERS: Record<string, SynthParameterValue> = {
   enabled: false,
   audioFileId: "",
   rootNote: 60,
@@ -509,22 +519,27 @@ const DEFAULT_LUMUS_SAMPLE_PARAMETERS: Record<string, SynthParameterValue> = {
   "loop.enabled": false,
   "loop.start": 0,
   "loop.end": 1,
+  direction: "forward",
+  playbackRate: 1,
+  loopMode: "forward",
+  releaseTailMs: 4,
+  selectedSliceId: "",
   fxSend1: 0,
   fxSend2: 0,
 };
 
-const DEFAULT_LUMUS_GRANULAR_PARAMETERS: Record<string, SynthParameterValue> = {
+const DEFAULT_LUMEN_GRANULAR_PARAMETERS: Record<string, SynthParameterValue> = {
   enabled: false, builtinSource: "", rootNote: 60, level: 0.7, route: "filter",
   position: 0.5, positionSpread: 0.1, grainMilliseconds: 80, densityHz: 12,
   pitchSemitones: 0, stereoSpread: 0.5, randomSeed: 1, fxSend1: 0, fxSend2: 0,
 };
 
-function lumusSampleParameterId(slot: LumusSourceSlotId, suffix: string): SynthParameterId {
-  return `lumus.source.${slot}.sample.${suffix}` as SynthParameterId;
+function lumenSampleParameterId(slot: LumenSourceSlotId, suffix: string): SynthParameterId {
+  return `lumen.source.${slot}.sample.${suffix}` as SynthParameterId;
 }
 
-function lumusGranularParameterId(slot: LumusSourceSlotId, suffix: string): SynthParameterId {
-  return `lumus.source.${slot}.granular.${suffix}` as SynthParameterId;
+function lumenGranularParameterId(slot: LumenSourceSlotId, suffix: string): SynthParameterId {
+  return `lumen.source.${slot}.granular.${suffix}` as SynthParameterId;
 }
 
 function oscillatorIdForIndex(index: number): string {
@@ -546,15 +561,15 @@ function normalizeOscillatorDefinitions(value: unknown): SynthOscillatorDefiniti
   return unique;
 }
 
-function normalizeLumusOscillatorDefinitions(value: unknown): SynthOscillatorDefinition[] {
+function normalizeLumenOscillatorDefinitions(value: unknown): SynthOscillatorDefinition[] {
   const supplied = normalizeOscillatorDefinitions(value);
   const nameFor = (id: "a" | "b" | "c") =>
     supplied.find((entry) => entry.id === id)?.name ?? `Source ${id.toUpperCase()}`;
   return (["a", "b", "c"] as const).map((id) => ({ id, name: nameFor(id) }));
 }
 
-function normalizeLumusSourceRack(value: unknown, patchVersion: unknown, legacySampleEnabled: boolean): LumusSourceRackDescriptor {
-  const canonical: LumusSourceRackDescriptor = {
+function normalizeLumenSourceRack(value: unknown, patchVersion: unknown, legacySampleEnabled: boolean): LumenSourceRackDescriptor {
+  const canonical: LumenSourceRackDescriptor = {
     schemaVersion: 2,
     slots: [
       { id: "a", mode: "wavetable" },
@@ -564,15 +579,15 @@ function normalizeLumusSourceRack(value: unknown, patchVersion: unknown, legacyS
   };
   if (patchVersion === 1 || patchVersion === 2) {
     if (legacySampleEnabled)
-      throw new SynthPatchIdentityError("lumus.migration.source-conflict", "An older Lumus patch with an active auxiliary sample requires an explicit source assignment before migration.");
+      throw new SynthPatchIdentityError("lumen.migration.source-conflict", "An older Lumen patch with an active auxiliary sample requires an explicit source assignment before migration.");
     if (patchVersion === 1 && value === undefined) return canonical;
     if (!isRecord(value) || value.schemaVersion !== 1 || !Array.isArray(value.slots))
-      throw new SynthPatchIdentityError("lumus.source-rack.malformed", "Legacy Lumus source-rack data is malformed.");
+      throw new SynthPatchIdentityError("lumen.source-rack.malformed", "Legacy Lumen source-rack data is malformed.");
   } else if (!isRecord(value) || value.schemaVersion !== 2 || !Array.isArray(value.slots)) {
-    throw new SynthPatchIdentityError("lumus.source-rack.malformed", "Lumus v3+ requires source-rack schema 2.");
+    throw new SynthPatchIdentityError("lumen.source-rack.malformed", "Lumen v3+ requires source-rack schema 2.");
   }
   if (value.slots.length !== canonical.slots.length)
-    throw new SynthPatchIdentityError("lumus.source-rack.capacity", "Lumus requires exactly three source slots.");
+    throw new SynthPatchIdentityError("lumen.source-rack.capacity", "Lumen requires exactly three source slots.");
   for (let index = 0; index < canonical.slots.length; index += 1) {
     const slot = value.slots[index];
     const numericPatchVersion = typeof patchVersion === "number" ? patchVersion : 0;
@@ -585,92 +600,140 @@ function normalizeLumusSourceRack(value: unknown, patchVersion: unknown, legacyS
           && (!supportsSample || slot.mode !== "sample")
           && (!supportsMultisample || slot.mode !== "multisample")
           && (!supportsGranular || slot.mode !== "granular")))
-      throw new SynthPatchIdentityError("lumus.source-rack.slot-invalid", `Invalid Lumus source slot at index ${index}.`);
-    canonical.slots[index].mode = slot.mode as LumusSourceMode;
+      throw new SynthPatchIdentityError("lumen.source-rack.slot-invalid", `Invalid Lumen source slot at index ${index}.`);
+    canonical.slots[index].mode = slot.mode as LumenSourceMode;
   }
   return canonical;
 }
 
-function normalizeLumusSampleSlots(
+function normalizeLumenSampleSlots(
   value: unknown,
   patchVersion: unknown,
   legacyMetadata: Record<string, unknown>,
-): Record<LumusSourceSlotId, LumusSampleSlotMetadata> {
-  const empty = (): LumusSampleSlotMetadata => ({ schemaVersion: 1, zones: [] });
+): Record<LumenSourceSlotId, LumenSampleSlotMetadata> {
+  const empty = (): LumenSampleSlotMetadata => ({ schemaVersion: 2, zones: [], slices: [] });
   if (patchVersion === 1 || patchVersion === 2) return { a: empty(), b: empty(), c: empty() };
   if (patchVersion === 3) return {
     a: empty(),
     b: empty(),
     c: {
-      schemaVersion: 1 as const,
+      schemaVersion: 2 as const,
       zones: normalizeAetherSampleZones(legacyMetadata.sampleSlot1Zones),
+      slices: [],
       managedSfz: normalizeManagedSfz(legacyMetadata.managedSfz),
     },
   };
   if (!isRecord(value))
-    throw new SynthPatchIdentityError("lumus.sample-slots.malformed", "Lumus v4 requires independent sample metadata for A, B, and C.");
-  const result: Record<LumusSourceSlotId, LumusSampleSlotMetadata> = { a: empty(), b: empty(), c: empty() };
+    throw new SynthPatchIdentityError("lumen.sample-slots.malformed", "Lumen v4 requires independent sample metadata for A, B, and C.");
+  const result: Record<LumenSourceSlotId, LumenSampleSlotMetadata> = { a: empty(), b: empty(), c: empty() };
   for (const slot of ["a", "b", "c"] as const) {
     const entry = value[slot];
-    if (!isRecord(entry) || entry.schemaVersion !== 1)
-      throw new SynthPatchIdentityError("lumus.sample-slot.invalid", `Invalid Lumus sample metadata for Slot ${slot.toUpperCase()}.`);
+    const legacy = Number(patchVersion) < 14;
+    if (!isRecord(entry) || (legacy ? entry.schemaVersion !== 1 && entry.schemaVersion !== 2 : entry.schemaVersion !== 2))
+      throw new SynthPatchIdentityError("lumen.sample-slot.invalid", `Invalid Lumen sample metadata for Slot ${slot.toUpperCase()}.`);
+    const slices = legacy ? [] : (() => {
+      if (!Array.isArray(entry.slices) || entry.slices.length > 16)
+        throw new SynthPatchIdentityError("lumen.sample-slices.invalid", `Invalid Lumen sample slices for Slot ${slot.toUpperCase()}.`);
+      const ids = new Set<string>();
+      return entry.slices.map((slice, index) => {
+        if (!isRecord(slice) || typeof slice.id !== "string" || !slice.id.trim() || slice.id.length > 64 || ids.has(slice.id))
+          throw new SynthPatchIdentityError("lumen.sample-slice.id-invalid", `Invalid Lumen sample slice ${index + 1} for Slot ${slot.toUpperCase()}.`);
+        const startRatio = Number(slice.startRatio);
+        const endRatio = Number(slice.endRatio);
+        if (!Number.isFinite(startRatio) || !Number.isFinite(endRatio)
+            || startRatio < 0 || endRatio > 1 || endRatio <= startRatio)
+          throw new SynthPatchIdentityError("lumen.sample-slice.range-invalid", `Invalid Lumen sample slice range for Slot ${slot.toUpperCase()}.`);
+        ids.add(slice.id);
+        return { id: slice.id, startRatio, endRatio };
+      });
+    })();
     result[slot] = {
-      schemaVersion: 1,
+      schemaVersion: 2,
       zones: normalizeAetherSampleZones(entry.zones),
+      slices,
       managedSfz: normalizeManagedSfz(entry.managedSfz),
     };
   }
   return result;
 }
 
-function normalizeLumusGranularSlots(value: unknown, patchVersion: unknown): Record<LumusSourceSlotId, LumusGranularSlotMetadata> {
-  const empty = (): LumusGranularSlotMetadata => ({ schemaVersion: 1 });
+function normalizeLumenGranularSlots(value: unknown, patchVersion: unknown): Record<LumenSourceSlotId, LumenGranularSlotMetadata> {
+  const empty = (): LumenGranularSlotMetadata => ({ schemaVersion: 1 });
   if (patchVersion === 1 || patchVersion === 2 || patchVersion === 3 || patchVersion === 4)
     return { a: empty(), b: empty(), c: empty() };
   if (!isRecord(value))
-    throw new SynthPatchIdentityError("lumus.granular-slots.malformed", "Lumus v5 requires independent granular metadata for A, B, and C.");
-  const result: Record<LumusSourceSlotId, LumusGranularSlotMetadata> = { a: empty(), b: empty(), c: empty() };
+    throw new SynthPatchIdentityError("lumen.granular-slots.malformed", "Lumen v5 requires independent granular metadata for A, B, and C.");
+  const result: Record<LumenSourceSlotId, LumenGranularSlotMetadata> = { a: empty(), b: empty(), c: empty() };
   for (const slot of ["a", "b", "c"] as const) {
     const entry = value[slot];
     if (!isRecord(entry) || entry.schemaVersion !== 1)
-      throw new SynthPatchIdentityError("lumus.granular-slot.invalid", `Invalid Lumus granular metadata for Slot ${slot.toUpperCase()}.`);
+      throw new SynthPatchIdentityError("lumen.granular-slot.invalid", `Invalid Lumen granular metadata for Slot ${slot.toUpperCase()}.`);
     result[slot] = { schemaVersion: 1, managedAsset: normalizeManagedGranular(entry.managedAsset) };
   }
   return result;
 }
 
-function emptyLumusClip(): LumusClipMetadata {
+function emptyLumenClip(): LumenClipMetadata {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     lengthSteps: 16,
-    steps: Array.from({ length: 16 }, () => ({ enabled: false, pitchOffset: 0, lengthSteps: 1, velocity: 1 })),
+    notes: [],
   };
 }
 
-function normalizeLumusClip(value: unknown, patchVersion: unknown): LumusClipMetadata {
-  if (typeof patchVersion !== "number" || patchVersion < 10) return emptyLumusClip();
-  if (!isRecord(value) || value.schemaVersion !== 1 || !Number.isInteger(value.lengthSteps))
-    throw new SynthPatchIdentityError("lumus.clip.malformed", "Lumus v10 requires clip schema 1 with an integer length.");
+function normalizeLumenClip(value: unknown, patchVersion: unknown): LumenClipMetadata {
+  if (typeof patchVersion !== "number" || patchVersion < 10) return emptyLumenClip();
+  if (!isRecord(value) || !Number.isInteger(value.lengthSteps))
+    throw new SynthPatchIdentityError("lumen.clip.malformed", "Lumen clips require versioned metadata with an integer length.");
   const lengthSteps = Number(value.lengthSteps);
-  if (lengthSteps < 1 || lengthSteps > 32 || !Array.isArray(value.steps) || value.steps.length !== lengthSteps)
-    throw new SynthPatchIdentityError("lumus.clip.capacity", "Lumus clips require exactly 1 through 32 bounded steps.");
-  const steps = value.steps.map((step, index): LumusClipStep => {
-    if (!isRecord(step)
-        || typeof step.enabled !== "boolean"
-        || !Number.isInteger(step.pitchOffset)
-        || !Number.isInteger(step.lengthSteps)
-        || typeof step.velocity !== "number"
-        || !Number.isFinite(step.velocity))
-      throw new SynthPatchIdentityError("lumus.clip.step-malformed", `Invalid Lumus clip step ${index + 1}.`);
-    const pitchOffset = Number(step.pitchOffset);
-    const noteLength = Number(step.lengthSteps);
-    if (pitchOffset < -48 || pitchOffset > 48
-        || noteLength < 1 || noteLength > lengthSteps - index
-        || step.velocity <= 0 || step.velocity > 1)
-      throw new SynthPatchIdentityError("lumus.clip.step-range", `Out-of-range Lumus clip step ${index + 1}.`);
-    return { enabled: step.enabled, pitchOffset, lengthSteps: noteLength, velocity: step.velocity };
+  if (lengthSteps < 1 || lengthSteps > 32)
+    throw new SynthPatchIdentityError("lumen.clip.capacity", "Lumen clips require a length from 1 through 32 steps.");
+
+  if (patchVersion === 10) {
+    if (value.schemaVersion !== 1 || !Array.isArray(value.steps) || value.steps.length !== lengthSteps)
+      throw new SynthPatchIdentityError("lumen.clip.malformed", "Lumen v10 requires clip schema 1 with exactly lengthSteps entries.");
+    const notes: LumenClipNote[] = [];
+    value.steps.forEach((step, index) => {
+      if (!isRecord(step)
+          || typeof step.enabled !== "boolean"
+          || !Number.isInteger(step.pitchOffset)
+          || !Number.isInteger(step.lengthSteps)
+          || typeof step.velocity !== "number"
+          || !Number.isFinite(step.velocity))
+        throw new SynthPatchIdentityError("lumen.clip.step-malformed", `Invalid Lumen clip step ${index + 1}.`);
+      const pitchOffset = Number(step.pitchOffset);
+      const noteLength = Number(step.lengthSteps);
+      if (pitchOffset < -48 || pitchOffset > 48
+          || noteLength < 1 || noteLength > lengthSteps - index
+          || step.velocity <= 0 || step.velocity > 1)
+        throw new SynthPatchIdentityError("lumen.clip.step-range", `Out-of-range Lumen clip step ${index + 1}.`);
+      if (step.enabled) notes.push({ startStep: index, pitchOffset, lengthSteps: noteLength, velocity: step.velocity });
+    });
+    return { schemaVersion: 2, lengthSteps, notes };
+  }
+
+  if (value.schemaVersion !== 2 || !Array.isArray(value.notes) || value.notes.length > 64)
+    throw new SynthPatchIdentityError("lumen.clip.notes-capacity", "Lumen v11 clips require schema 2 with at most 64 notes.");
+  const notes = value.notes.map((note, index): LumenClipNote => {
+    if (!isRecord(note)
+        || !Number.isInteger(note.startStep)
+        || !Number.isInteger(note.pitchOffset)
+        || !Number.isInteger(note.lengthSteps)
+        || typeof note.velocity !== "number"
+        || !Number.isFinite(note.velocity))
+      throw new SynthPatchIdentityError("lumen.clip.note-malformed", `Invalid Lumen clip note ${index + 1}.`);
+    const startStep = Number(note.startStep);
+    const pitchOffset = Number(note.pitchOffset);
+    const noteLength = Number(note.lengthSteps);
+    if (startStep < 0 || startStep >= lengthSteps
+        || pitchOffset < -48 || pitchOffset > 48
+        || noteLength < 1 || noteLength > lengthSteps - startStep
+        || note.velocity <= 0 || note.velocity > 1)
+      throw new SynthPatchIdentityError("lumen.clip.note-range", `Out-of-range Lumen clip note ${index + 1}.`);
+    return { startStep, pitchOffset, lengthSteps: noteLength, velocity: note.velocity };
   });
-  return { schemaVersion: 1, lengthSteps, steps };
+  notes.sort((left, right) => left.startStep - right.startStep || left.pitchOffset - right.pitchOffset);
+  return { schemaVersion: 2, lengthSteps, notes };
 }
 
 export class HybridSourceMigrationError extends Error {
@@ -1359,6 +1422,7 @@ const EXTRA_LFO_DEFAULTS = (() => {
     values[`${prefix}.retrigger` as ExtraLfoParameterId] = true;
     values[`${prefix}.oneShot` as ExtraLfoParameterId] = false;
     values[`${prefix}.bipolar` as ExtraLfoParameterId] = true;
+    values[`${prefix}.keytrackRate` as ExtraLfoParameterId] = 0;
   }
   return values;
 })();
@@ -1369,7 +1433,7 @@ const EXTRA_LFO_LABELS = (() => {
     const prefix = `lfo.${index}`;
     for (const [suffix, label] of [["enabled", "Enabled"], ["rate", "Rate"], ["sync", "Sync"], ["syncedRate", "Sync Rate"], ["smoothing", "Smoothing"],
       ["randomPhase", "Random"], ["shape", "Shape"], ["phase", "Phase"], ["retrigger", "Retrigger"],
-      ["oneShot", "One-Shot"], ["bipolar", "Bipolar"]] as const) {
+      ["oneShot", "One-Shot"], ["bipolar", "Bipolar"], ["keytrackRate", "Key Rate"]] as const) {
       values[`${prefix}.${suffix}` as ExtraLfoParameterId] = `LFO ${index} ${label}`;
     }
   }
@@ -1493,17 +1557,17 @@ export const DEFAULT_SYNTH_PARAMETERS: Record<SynthParameterId, SynthParameterVa
   "aether.mpe.masterChannel": 1,
   "aether.mpe.firstMemberChannel": 2,
   "aether.mpe.lastMemberChannel": 16,
-  "lumus.arp.enabled": false,
-  "lumus.arp.mode": "up",
-  "lumus.arp.rate": "1/16",
-  "lumus.arp.gate": 0.75,
-  "lumus.arp.swing": 0,
-  "lumus.arp.octaves": 1,
-  "lumus.arp.key": "c",
-  "lumus.arp.scale": "chromatic",
-  "lumus.clip.enabled": false,
-  "lumus.clip.rate": "1/16",
-  "lumus.clip.swing": 0,
+  "lumen.arp.enabled": false,
+  "lumen.arp.mode": "up",
+  "lumen.arp.rate": "1/16",
+  "lumen.arp.gate": 0.75,
+  "lumen.arp.swing": 0,
+  "lumen.arp.octaves": 1,
+  "lumen.arp.key": "c",
+  "lumen.arp.scale": "chromatic",
+  "lumen.clip.enabled": false,
+  "lumen.clip.rate": "1/16",
+  "lumen.clip.swing": 0,
   "amp.level": 0.8,
   "amp.pan": 0,
   maxVoices: 16,
@@ -1541,6 +1605,7 @@ export const DEFAULT_SYNTH_PARAMETERS: Record<SynthParameterId, SynthParameterVa
   "lfo.1.retrigger": true,
   "lfo.1.oneShot": false,
   "lfo.1.bipolar": true,
+  "lfo.1.keytrackRate": 0,
   "lfo.2.enabled": false,
   "lfo.2.rate": 0.5,
   "lfo.2.sync": true,
@@ -1552,6 +1617,7 @@ export const DEFAULT_SYNTH_PARAMETERS: Record<SynthParameterId, SynthParameterVa
   "lfo.2.retrigger": true,
   "lfo.2.oneShot": false,
   "lfo.2.bipolar": true,
+  "lfo.2.keytrackRate": 0,
   "macro.1": 0,
   "macro.2": 0,
   "macro.3": 0,
@@ -1679,17 +1745,17 @@ export const SYNTH_PARAMETER_LABELS: Record<SynthParameterId, string> = {
   "aether.mpe.masterChannel": "MPE Master Channel",
   "aether.mpe.firstMemberChannel": "MPE First Member Channel",
   "aether.mpe.lastMemberChannel": "MPE Last Member Channel",
-  "lumus.arp.enabled": "Lumus Arpeggiator Enabled",
-  "lumus.arp.mode": "Lumus Arpeggiator Mode",
-  "lumus.arp.rate": "Lumus Arpeggiator Rate",
-  "lumus.arp.gate": "Lumus Arpeggiator Gate",
-  "lumus.arp.swing": "Lumus Arpeggiator Swing",
-  "lumus.arp.octaves": "Lumus Arpeggiator Octaves",
-  "lumus.arp.key": "Lumus Arpeggiator Key",
-  "lumus.arp.scale": "Lumus Arpeggiator Scale",
-  "lumus.clip.enabled": "Lumus Clip Enabled",
-  "lumus.clip.rate": "Lumus Clip Rate",
-  "lumus.clip.swing": "Lumus Clip Swing",
+  "lumen.arp.enabled": "Lumen Arpeggiator Enabled",
+  "lumen.arp.mode": "Lumen Arpeggiator Mode",
+  "lumen.arp.rate": "Lumen Arpeggiator Rate",
+  "lumen.arp.gate": "Lumen Arpeggiator Gate",
+  "lumen.arp.swing": "Lumen Arpeggiator Swing",
+  "lumen.arp.octaves": "Lumen Arpeggiator Octaves",
+  "lumen.arp.key": "Lumen Arpeggiator Key",
+  "lumen.arp.scale": "Lumen Arpeggiator Scale",
+  "lumen.clip.enabled": "Lumen Clip Enabled",
+  "lumen.clip.rate": "Lumen Clip Rate",
+  "lumen.clip.swing": "Lumen Clip Swing",
   "amp.level": "Amp Level",
   "amp.pan": "Amp Pan",
   maxVoices: "Max Voices",
@@ -1729,6 +1795,7 @@ export const SYNTH_PARAMETER_LABELS: Record<SynthParameterId, string> = {
   "lfo.1.retrigger": "LFO 1 Retrigger",
   "lfo.1.oneShot": "LFO 1 One-Shot",
   "lfo.1.bipolar": "LFO 1 Bipolar",
+  "lfo.1.keytrackRate": "LFO 1 Key Rate",
   "lfo.2.enabled": "LFO 2 Enabled",
   "lfo.2.rate": "LFO 2 Rate",
   "lfo.2.sync": "LFO 2 Sync",
@@ -1740,6 +1807,7 @@ export const SYNTH_PARAMETER_LABELS: Record<SynthParameterId, string> = {
   "lfo.2.retrigger": "LFO 2 Retrigger",
   "lfo.2.oneShot": "LFO 2 One-Shot",
   "lfo.2.bipolar": "LFO 2 Bipolar",
+  "lfo.2.keytrackRate": "LFO 2 Key Rate",
   "macro.1": "Macro 1",
   "macro.2": "Macro 2",
   "macro.3": "Macro 3",
@@ -1820,6 +1888,7 @@ export function createDefaultSynthDraft(): SynthDraftPatch {
         amount: 0.35,
         bipolar: true,
         enabled: true,
+        curve: "linear",
       },
       {
         id: "route_2",
@@ -1828,6 +1897,7 @@ export function createDefaultSynthDraft(): SynthDraftPatch {
         amount: 0.3,
         bipolar: false,
         enabled: true,
+        curve: "linear",
       },
     ],
     effects: { filters: [] },
@@ -1847,11 +1917,11 @@ export function createDefaultSynthDraft(): SynthDraftPatch {
 }
 
 /**
- * Lumus starts from Aether's verified parameter set but has an independent
- * product identity and namespace. Future Lumus schema revisions must preserve
- * this boundary rather than changing Aether patches in place.
+ * Lumen starts from Aether's verified parameter set but has an independent
+ * product boundary. New patches use the Lumen identity; the normalizer below
+ * accepts the previous Lumus identity without mutating the persisted source.
  */
-export function createDefaultLumusDraft(): SynthDraftPatch {
+export function createDefaultLumenDraft(): SynthDraftPatch {
   const draft = createDefaultSynthDraft();
   const parameters = { ...draft.parameters };
   for (const [suffix, value] of Object.entries(DEFAULT_ADDED_OSCILLATOR_PARAMETERS))
@@ -1868,39 +1938,39 @@ export function createDefaultLumusDraft(): SynthDraftPatch {
   parameters["osc.c.unison.detune"] = 0.12;
   parameters["osc.c.unison.spread"] = 0.5;
   for (const slot of ["a", "b", "c"] as const)
-    for (const [suffix, value] of Object.entries(DEFAULT_LUMUS_SAMPLE_PARAMETERS))
-      parameters[lumusSampleParameterId(slot, suffix)] = value;
+    for (const [suffix, value] of Object.entries(DEFAULT_LUMEN_SAMPLE_PARAMETERS))
+      parameters[lumenSampleParameterId(slot, suffix)] = value;
   for (const slot of ["a", "b", "c"] as const)
-    for (const [suffix, value] of Object.entries(DEFAULT_LUMUS_GRANULAR_PARAMETERS))
-      parameters[lumusGranularParameterId(slot, suffix)] = value;
-  parameters["lumus.arp.enabled"] = false;
-  parameters["lumus.arp.mode"] = "up";
-  parameters["lumus.arp.rate"] = "1/16";
-  parameters["lumus.arp.gate"] = 0.75;
-  parameters["lumus.arp.swing"] = 0;
-  parameters["lumus.arp.octaves"] = 1;
-  parameters["lumus.arp.key"] = "c";
-  parameters["lumus.arp.scale"] = "chromatic";
-  parameters["lumus.clip.enabled"] = false;
-  parameters["lumus.clip.rate"] = "1/16";
-  parameters["lumus.clip.swing"] = 0;
+    for (const [suffix, value] of Object.entries(DEFAULT_LUMEN_GRANULAR_PARAMETERS))
+      parameters[lumenGranularParameterId(slot, suffix)] = value;
+  parameters["lumen.arp.enabled"] = false;
+  parameters["lumen.arp.mode"] = "up";
+  parameters["lumen.arp.rate"] = "1/16";
+  parameters["lumen.arp.gate"] = 0.75;
+  parameters["lumen.arp.swing"] = 0;
+  parameters["lumen.arp.octaves"] = 1;
+  parameters["lumen.arp.key"] = "c";
+  parameters["lumen.arp.scale"] = "chromatic";
+  parameters["lumen.clip.enabled"] = false;
+  parameters["lumen.clip.rate"] = "1/16";
+  parameters["lumen.clip.swing"] = 0;
   return {
     ...draft,
-    schemaVersion: LUMUS_PATCH_SCHEMA_VERSION,
-    instrumentType: LUMUS_INSTRUMENT_TYPE,
-    namespace: LUMUS_PARAMETER_NAMESPACE,
-    name: "Lumus Init",
+    schemaVersion: LUMEN_PATCH_SCHEMA_VERSION,
+    instrumentType: LUMEN_INSTRUMENT_TYPE,
+    namespace: LUMEN_PARAMETER_NAMESPACE,
+    name: "Lumen Init",
     parameters,
     metadata: {
       ...draft.metadata,
       icon: "ph:sparkle",
-      tags: ["lumus", "hybrid"],
+      tags: ["lumen", "hybrid"],
       oscillators: [
         { id: "a", name: "Source A" },
         { id: "b", name: "Source B" },
         { id: "c", name: "Source C" },
       ],
-      lumusSourceRack: {
+      lumenSourceRack: {
         schemaVersion: 2,
         slots: [
           { id: "a", mode: "wavetable" },
@@ -1908,17 +1978,71 @@ export function createDefaultLumusDraft(): SynthDraftPatch {
           { id: "c", mode: "wavetable" },
         ],
       },
-      lumusSampleSlots: {
-        a: { schemaVersion: 1, zones: [] },
-        b: { schemaVersion: 1, zones: [] },
-        c: { schemaVersion: 1, zones: [] },
+      lumenSampleSlots: {
+        a: { schemaVersion: 2, zones: [], slices: [] },
+        b: { schemaVersion: 2, zones: [], slices: [] },
+        c: { schemaVersion: 2, zones: [], slices: [] },
       },
-      lumusGranularSlots: {
+      lumenGranularSlots: {
         a: { schemaVersion: 1 }, b: { schemaVersion: 1 }, c: { schemaVersion: 1 },
       },
-      lumusClip: emptyLumusClip(),
+      lumenClip: emptyLumenClip(),
     },
   };
+}
+
+/**
+ * Aether remains a frozen source format. Lumen conversion always creates a new
+ * v16 draft, carries the source's musical state forward, and keeps Lumen-only
+ * sources and performance tools inactive until the user enables them.
+ */
+export function cloneAetherDraftAsLumen(source: Instrument | SynthDraftPatch, name?: string): SynthDraftPatch {
+  const aether = "id" in source ? synthDraftFromInstrument(source) : normalizeSynthDraftPatch(source);
+  if (aether.instrumentType !== SYNTH_INSTRUMENT_TYPE || aether.namespace !== SYNTH_PARAMETER_NAMESPACE)
+    throw new SynthPatchIdentityError("lumen.clone.source-not-aether", "Only an Aether patch can be cloned as Lumen.");
+
+  const lumen = createDefaultLumenDraft();
+  const sourceOscillators = new Map(aether.metadata.oscillators.map((oscillator) => [oscillator.id, oscillator.name]));
+  return normalizeSynthDraftPatch({
+    ...lumen,
+    name: name?.trim() || `${aether.name} Lumen`,
+    taxonomy: structuredClone(aether.taxonomy),
+    parameters: {
+      ...lumen.parameters,
+      ...structuredClone(aether.parameters),
+      "osc.c.enabled": false,
+      "lumen.arp.enabled": false,
+      "lumen.clip.enabled": false,
+    },
+    modulation: structuredClone(aether.modulation),
+    effects: structuredClone(aether.effects),
+    metadata: {
+      ...structuredClone(lumen.metadata),
+      tags: [...new Set([...aether.metadata.tags, "lumen", "hybrid", "aether-clone"])].slice(0, 16),
+      macros: structuredClone(aether.metadata.macros),
+      wavemaps: structuredClone(aether.metadata.wavemaps),
+      customWavetables: structuredClone(aether.metadata.customWavetables),
+      oscillators: [
+        { id: "a", name: sourceOscillators.get("a") ?? "Source A" },
+        { id: "b", name: sourceOscillators.get("b") ?? "Source B" },
+        { id: "c", name: "Source C" },
+      ],
+      sampleSlot1Zones: structuredClone(aether.metadata.sampleSlot1Zones),
+      managedSfz: structuredClone(aether.metadata.managedSfz),
+      managedGranular: structuredClone(aether.metadata.managedGranular),
+    },
+  });
+}
+
+export function canCloneAetherInstrumentAsLumen(instrument: Instrument): boolean {
+  if (instrument.aurum || instrument.nodeGraph || instrument.waveform === "sample") return false;
+  if (instrument.kind !== "synth" && instrument.kind !== "wavetable" && instrument.kind !== "hybrid") return false;
+  const type = instrument.synthPatch?.instrumentType;
+  const namespace = instrument.synthPatch?.namespace;
+  return type !== LUMEN_INSTRUMENT_TYPE
+    && namespace !== LUMEN_PARAMETER_NAMESPACE
+    && (type === undefined || type === SYNTH_INSTRUMENT_TYPE)
+    && (namespace === undefined || namespace === SYNTH_PARAMETER_NAMESPACE);
 }
 
 function parameterPatch(id: SynthParameterId, value: SynthParameterValue): Record<string, SynthParameterValue> {
@@ -1932,8 +2056,9 @@ function parameterPatch(id: SynthParameterId, value: SynthParameterValue): Recor
 }
 
 export function normalizeSynthDraftPatch(input: Partial<SynthDraftPatch> | SynthPatchSnapshot): SynthDraftPatch {
-  const isLumus = validateSynthPatchIdentity(input);
-  const base = isLumus ? createDefaultLumusDraft() : createDefaultSynthDraft();
+  input = canonicalizeLegacyLumusPatch(input);
+  const isLumen = validateSynthPatchIdentity(input);
+  const base = isLumen ? createDefaultLumenDraft() : createDefaultSynthDraft();
   const parameters: SynthDraftPatch["parameters"] = { ...base.parameters };
 
   if (isRecord(input.parameters)) {
@@ -1964,34 +2089,83 @@ export function normalizeSynthDraftPatch(input: Partial<SynthDraftPatch> | Synth
     inheritUnison("detune", parameters["unison.detune"]);
     inheritUnison("spread", parameters["unison.spread"]);
   }
-  if (isLumus && input.schemaVersion === 3) {
-    for (const suffix of Object.keys(DEFAULT_LUMUS_SAMPLE_PARAMETERS))
-      parameters[lumusSampleParameterId("c", suffix)] = parameters[`aether.sample.1.${suffix}`]
-        ?? DEFAULT_LUMUS_SAMPLE_PARAMETERS[suffix];
+  const supportsLumenSpectralWarp = isLumen && Number(input.schemaVersion) >= 15;
+  const warpOscillators: readonly ("a" | "b" | "c")[] = isLumen ? ["a", "b", "c"] : ["a", "b"];
+  for (const oscillator of warpOscillators) {
+    const id = `osc.${oscillator}.warpMode` as SynthParameterId;
+    const mode = parameters[id];
+    if (typeof mode !== "string" || !isWavetableWarpMode(mode)
+        || (isSpectralWavetableWarpMode(mode) && !supportsLumenSpectralWarp))
+      parameters[id] = "shape";
   }
-  if (isLumus && Number(input.schemaVersion) < 8)
-    parameters["lumus.arp.swing"] = 0;
-  if (isLumus && Number(input.schemaVersion) < 9) {
-    parameters["lumus.arp.key"] = "c";
-    parameters["lumus.arp.scale"] = "chromatic";
-  } else if (isLumus) {
-    const key = String(parameters["lumus.arp.key"]);
-    const scale = String(parameters["lumus.arp.scale"]);
-    if (!LUMUS_ARPEGGIATOR_KEYS.includes(key as (typeof LUMUS_ARPEGGIATOR_KEYS)[number]))
-      throw new SynthPatchIdentityError("lumus.arp.key-invalid", `Unsupported Lumus arpeggiator key: ${key}.`);
-    if (!LUMUS_ARPEGGIATOR_SCALES.includes(scale as (typeof LUMUS_ARPEGGIATOR_SCALES)[number]))
-      throw new SynthPatchIdentityError("lumus.arp.scale-invalid", `Unsupported Lumus arpeggiator scale: ${scale}.`);
+  if (!isLumen || Number(input.schemaVersion) < 16) {
+    for (let index = 1; index <= 10; index += 1)
+      parameters[`lfo.${index}.keytrackRate` as SynthParameterId] = 0;
   }
-  if (isLumus && Number(input.schemaVersion) < 10) {
-    parameters["lumus.clip.enabled"] = false;
-    parameters["lumus.clip.rate"] = "1/16";
-    parameters["lumus.clip.swing"] = 0;
-  } else if (isLumus) {
-    const clipRate = String(parameters["lumus.clip.rate"]);
+  if (isLumen && input.schemaVersion === 3) {
+    for (const suffix of Object.keys(DEFAULT_LUMEN_SAMPLE_PARAMETERS))
+      parameters[lumenSampleParameterId("c", suffix)] = parameters[`aether.sample.1.${suffix}`]
+        ?? DEFAULT_LUMEN_SAMPLE_PARAMETERS[suffix];
+  }
+  if (isLumen && Number(input.schemaVersion) < 8)
+    parameters["lumen.arp.swing"] = 0;
+  if (isLumen && Number(input.schemaVersion) < 9) {
+    parameters["lumen.arp.key"] = "c";
+    parameters["lumen.arp.scale"] = "chromatic";
+  } else if (isLumen) {
+    const key = String(parameters["lumen.arp.key"]);
+    const scale = String(parameters["lumen.arp.scale"]);
+    if (!LUMEN_ARPEGGIATOR_KEYS.includes(key as (typeof LUMEN_ARPEGGIATOR_KEYS)[number]))
+      throw new SynthPatchIdentityError("lumen.arp.key-invalid", `Unsupported Lumen arpeggiator key: ${key}.`);
+    if (!LUMEN_ARPEGGIATOR_SCALES.includes(scale as (typeof LUMEN_ARPEGGIATOR_SCALES)[number]))
+      throw new SynthPatchIdentityError("lumen.arp.scale-invalid", `Unsupported Lumen arpeggiator scale: ${scale}.`);
+  }
+  if (isLumen && Number(input.schemaVersion) < 10) {
+    parameters["lumen.clip.enabled"] = false;
+    parameters["lumen.clip.rate"] = "1/16";
+    parameters["lumen.clip.swing"] = 0;
+  } else if (isLumen) {
+    const clipRate = String(parameters["lumen.clip.rate"]);
     if (!["1/4", "1/8", "1/16", "1/32"].includes(clipRate))
-      throw new SynthPatchIdentityError("lumus.clip.rate-invalid", `Unsupported Lumus clip rate: ${clipRate}.`);
-    if (parameters["lumus.clip.enabled"] === true && parameters["lumus.arp.enabled"] === true)
-      throw new SynthPatchIdentityError("lumus.performance-mode.conflict", "Lumus Clip and Arpeggiator cannot be enabled together.");
+      throw new SynthPatchIdentityError("lumen.clip.rate-invalid", `Unsupported Lumen clip rate: ${clipRate}.`);
+    if (parameters["lumen.clip.enabled"] === true && parameters["lumen.arp.enabled"] === true)
+      throw new SynthPatchIdentityError("lumen.performance-mode.conflict", "Lumen Clip and Arpeggiator cannot be enabled together.");
+  }
+  if (isLumen) {
+    for (const slot of ["a", "b", "c"] as const) {
+      const directionId = lumenSampleParameterId(slot, "direction");
+      const playbackRateId = lumenSampleParameterId(slot, "playbackRate");
+      const loopModeId = lumenSampleParameterId(slot, "loopMode");
+      const releaseTailId = lumenSampleParameterId(slot, "releaseTailMs");
+      if (Number(input.schemaVersion) < 14)
+        parameters[lumenSampleParameterId(slot, "selectedSliceId")] = "";
+      if (Number(input.schemaVersion) < 12) {
+        parameters[directionId] = "forward";
+        parameters[playbackRateId] = 1;
+      } else {
+        const direction = String(parameters[directionId] ?? "forward");
+        if (direction !== "forward" && direction !== "reverse")
+          throw new SynthPatchIdentityError("lumen.sample.direction-invalid", `Unsupported Lumen Sample direction for Slot ${slot.toUpperCase()}: ${direction}.`);
+        parameters[directionId] = direction;
+        const playbackRate = Number(parameters[playbackRateId]);
+        parameters[playbackRateId] = Number.isFinite(playbackRate)
+          ? Math.max(0.25, Math.min(4, playbackRate))
+          : 1;
+      }
+      if (Number(input.schemaVersion) < 13) {
+        parameters[loopModeId] = "forward";
+        parameters[releaseTailId] = 4;
+        continue;
+      }
+      const loopMode = String(parameters[loopModeId] ?? "forward");
+      if (loopMode !== "forward" && loopMode !== "pingPong")
+        throw new SynthPatchIdentityError("lumen.sample.loop-mode-invalid", `Unsupported Lumen Sample loop mode for Slot ${slot.toUpperCase()}: ${loopMode}.`);
+      parameters[loopModeId] = loopMode;
+      const releaseTailMs = Number(parameters[releaseTailId]);
+      parameters[releaseTailId] = Number.isFinite(releaseTailMs)
+        ? Math.max(1, Math.min(2000, releaseTailMs))
+        : 4;
+    }
   }
 
   const mpeMaster = clampMidiChannel(Number(parameters["aether.mpe.masterChannel"]));
@@ -2010,6 +2184,18 @@ export function normalizeSynthDraftPatch(input: Partial<SynthDraftPatch> | Synth
     : base.modulation;
   const effects = normalizeTrackEffectChain(input.effects);
   const inputMetadata: Record<string, unknown> = isRecord(input.metadata) ? input.metadata : {};
+  const lumenSampleSlots = isLumen
+    ? normalizeLumenSampleSlots(inputMetadata.lumenSampleSlots, input.schemaVersion, inputMetadata)
+    : undefined;
+  if (isLumen && lumenSampleSlots) {
+    for (const slot of ["a", "b", "c"] as const) {
+      const parameterId = lumenSampleParameterId(slot, "selectedSliceId");
+      const selected = String(parameters[parameterId] ?? "");
+      if (selected && !lumenSampleSlots[slot].slices.some((slice) => slice.id === selected))
+        throw new SynthPatchIdentityError("lumen.sample-slice.selection-invalid", `Unknown Lumen sample slice for Slot ${slot.toUpperCase()}: ${selected}.`);
+      parameters[parameterId] = selected;
+    }
+  }
   const wavemaps = normalizeWavemapMetadata(inputMetadata.wavemaps, inputMetadata.customWavetables);
   const inputTaxonomy = isRecord(input.taxonomy) ? taxonomyAssignmentForInstrumentId(String(input.taxonomy.instrumentId ?? "")) : undefined;
 
@@ -2033,22 +2219,18 @@ export function normalizeSynthDraftPatch(input: Partial<SynthDraftPatch> | Synth
       macros: normalizeMacroDefinitions(inputMetadata.macros),
       wavemaps,
       customWavetables: wavemaps,
-      oscillators: isLumus
-        ? normalizeLumusOscillatorDefinitions(inputMetadata.oscillators)
+      oscillators: isLumen
+        ? normalizeLumenOscillatorDefinitions(inputMetadata.oscillators)
         : normalizeOscillatorDefinitions(inputMetadata.oscillators),
-      ...(isLumus ? { lumusSourceRack: normalizeLumusSourceRack(
-        inputMetadata.lumusSourceRack,
+      ...(isLumen ? { lumenSourceRack: normalizeLumenSourceRack(
+        inputMetadata.lumenSourceRack,
         input.schemaVersion,
         input.parameters?.["aether.sample.1.enabled"] === true,
-      ), lumusSampleSlots: normalizeLumusSampleSlots(
-        inputMetadata.lumusSampleSlots,
+      ), lumenSampleSlots, lumenGranularSlots: normalizeLumenGranularSlots(
+        inputMetadata.lumenGranularSlots,
         input.schemaVersion,
-        inputMetadata,
-      ), lumusGranularSlots: normalizeLumusGranularSlots(
-        inputMetadata.lumusGranularSlots,
-        input.schemaVersion,
-      ), lumusClip: normalizeLumusClip(
-        inputMetadata.lumusClip,
+      ), lumenClip: normalizeLumenClip(
+        inputMetadata.lumenClip,
         input.schemaVersion,
       ) } : {}),
       sampleSlot1Zones: normalizeAetherSampleZones(inputMetadata.sampleSlot1Zones),
@@ -2056,6 +2238,67 @@ export function normalizeSynthDraftPatch(input: Partial<SynthDraftPatch> | Synth
       managedGranular: normalizeManagedGranular(inputMetadata.managedGranular),
     },
   };
+}
+
+/**
+ * Read-only compatibility adapter for projects created before the Lumen
+ * internal-identity migration. New normalized patches never write Lumus keys.
+ */
+function canonicalizeLegacyLumusPatch(
+  input: Partial<SynthDraftPatch> | SynthPatchSnapshot,
+): Partial<SynthDraftPatch> | SynthPatchSnapshot {
+  const legacyType = input.instrumentType === LEGACY_LUMUS_INSTRUMENT_TYPE;
+  const legacyNamespace = input.namespace === LEGACY_LUMUS_PARAMETER_NAMESPACE;
+  const inputParameters: Record<string, unknown> | undefined = isRecord(input.parameters) ? input.parameters : undefined;
+  const inputMetadata: Record<string, unknown> | undefined = isRecord(input.metadata) ? input.metadata : undefined;
+  const hasLegacyParameters = inputParameters
+    ? Object.keys(inputParameters).some((id) => id.startsWith(`${LEGACY_LUMUS_PARAMETER_NAMESPACE}.`))
+    : false;
+  const hasLegacyMetadata = inputMetadata
+    ? ["lumusSourceRack", "lumusSampleSlots", "lumusGranularSlots", "lumusClip"]
+        .some((key) => Object.prototype.hasOwnProperty.call(inputMetadata, key))
+    : false;
+  if (!legacyType && !legacyNamespace && !hasLegacyParameters && !hasLegacyMetadata) return input;
+
+  const parameters: Record<string, SynthParameterValue> | undefined = inputParameters ? {} : undefined;
+  if (inputParameters && parameters) {
+    for (const [id, value] of Object.entries(inputParameters)) {
+      const canonicalId = id.startsWith(`${LEGACY_LUMUS_PARAMETER_NAMESPACE}.`)
+        ? `${LUMEN_PARAMETER_NAMESPACE}.${id.slice(LEGACY_LUMUS_PARAMETER_NAMESPACE.length + 1)}`
+        : id;
+      if (canonicalId !== id && Object.prototype.hasOwnProperty.call(inputParameters, canonicalId)) continue;
+      if (isSynthParameterValue(value)) parameters[canonicalId] = value;
+    }
+  }
+
+  const metadata: Record<string, unknown> | undefined = inputMetadata ? { ...inputMetadata } : undefined;
+  if (metadata && inputMetadata) {
+    const aliases = [
+      ["lumusSourceRack", "lumenSourceRack"],
+      ["lumusSampleSlots", "lumenSampleSlots"],
+      ["lumusGranularSlots", "lumenGranularSlots"],
+      ["lumusClip", "lumenClip"],
+    ] as const;
+    for (const [legacyKey, canonicalKey] of aliases) {
+      if (!Object.prototype.hasOwnProperty.call(metadata, canonicalKey)
+          && Object.prototype.hasOwnProperty.call(inputMetadata, legacyKey))
+        metadata[canonicalKey] = inputMetadata[legacyKey];
+      delete metadata[legacyKey];
+    }
+    if (Array.isArray(metadata.tags)) {
+      metadata.tags = [...new Set(metadata.tags
+        .filter((tag): tag is string => typeof tag === "string")
+        .map((tag) => tag === "lumus" ? "lumen" : tag === "lumus-test-bank" ? "lumen-test-bank" : tag))];
+    }
+  }
+
+  return {
+    ...input,
+    instrumentType: legacyType ? LUMEN_INSTRUMENT_TYPE : input.instrumentType,
+    namespace: legacyNamespace ? LUMEN_PARAMETER_NAMESPACE : input.namespace,
+    ...(parameters ? { parameters } : {}),
+    ...(metadata ? { metadata } : {}),
+  } as Partial<SynthDraftPatch> | SynthPatchSnapshot;
 }
 
 export class SynthPatchIdentityError extends Error {
@@ -2069,8 +2312,8 @@ function validateSynthPatchIdentity(input: Partial<SynthDraftPatch> | SynthPatch
   const type = input.instrumentType;
   const namespace = input.namespace;
   if (type === undefined) {
-    if (namespace === LUMUS_PARAMETER_NAMESPACE)
-      throw new SynthPatchIdentityError("lumus.identity.type-missing", "A Lumus namespace requires the Lumus instrument type.");
+    if (namespace === LUMEN_PARAMETER_NAMESPACE)
+      throw new SynthPatchIdentityError("lumen.identity.type-missing", "The lumen namespace requires the Lumen instrument type.");
     if (namespace !== undefined && namespace !== SYNTH_PARAMETER_NAMESPACE)
       throw new SynthPatchIdentityError("synth.identity.namespace-unknown", `Unsupported synth namespace: ${String(namespace)}`);
     return false;
@@ -2080,12 +2323,12 @@ function validateSynthPatchIdentity(input: Partial<SynthDraftPatch> | SynthPatch
       throw new SynthPatchIdentityError("aether.identity.namespace-mismatch", "Aether patches must use the synth namespace.");
     return false;
   }
-  if (type === LUMUS_INSTRUMENT_TYPE) {
-    if (namespace !== LUMUS_PARAMETER_NAMESPACE)
-      throw new SynthPatchIdentityError("lumus.identity.namespace-mismatch", "Lumus patches must use the lumus namespace.");
-    if (!LEGACY_LUMUS_PATCH_SCHEMA_VERSIONS.includes(input.schemaVersion as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8)
-        && input.schemaVersion !== LUMUS_PATCH_SCHEMA_VERSION)
-      throw new SynthPatchIdentityError("lumus.schema.unsupported", `Expected Lumus schema 1 through ${LUMUS_PATCH_SCHEMA_VERSION}, received ${String(input.schemaVersion)}.`);
+  if (type === LUMEN_INSTRUMENT_TYPE) {
+    if (namespace !== LUMEN_PARAMETER_NAMESPACE)
+      throw new SynthPatchIdentityError("lumen.identity.namespace-mismatch", "Lumen patches must use the lumen namespace.");
+    if (!LEGACY_LUMEN_PATCH_SCHEMA_VERSIONS.includes(input.schemaVersion as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15)
+        && input.schemaVersion !== LUMEN_PATCH_SCHEMA_VERSION)
+      throw new SynthPatchIdentityError("lumen.schema.unsupported", `Expected Lumen schema 1 through ${LUMEN_PATCH_SCHEMA_VERSION}, received ${String(input.schemaVersion)}.`);
     return true;
   }
   throw new SynthPatchIdentityError("synth.identity.type-unknown", `Unsupported synth instrument type: ${String(type)}`);
@@ -2485,14 +2728,14 @@ function formatSignedAmount(value: number): string {
 }
 
 export function synthDraftToInstrumentPatch(draft: SynthDraftPatch): Partial<Instrument> {
-  const lumusCMode = draft.instrumentType === LUMUS_INSTRUMENT_TYPE
-    ? draft.metadata.lumusSourceRack?.slots[2]?.mode ?? "wavetable"
+  const lumenCMode = draft.instrumentType === LUMEN_INSTRUMENT_TYPE
+    ? draft.metadata.lumenSourceRack?.slots[2]?.mode ?? "wavetable"
     : null;
-  const samplePrefix = lumusCMode === null ? "aether.sample.1" : "lumus.source.c.sample";
+  const samplePrefix = lumenCMode === null ? "aether.sample.1" : "lumen.source.c.sample";
   const sampleParam = (suffix: string) => `${samplePrefix}.${suffix}` as SynthParameterId;
-  const sampleMetadata = lumusCMode === null
+  const sampleMetadata = lumenCMode === null
     ? { zones: draft.metadata.sampleSlot1Zones, managedSfz: draft.metadata.managedSfz }
-    : draft.metadata.lumusSampleSlots?.c ?? { zones: [] };
+    : draft.metadata.lumenSampleSlots?.c ?? { zones: [], slices: [] };
   const wavetable = wavetableFromDraft(draft, "a");
   const oscA = oscillatorFromDraft(draft, "a", wavetable);
   const oscB = oscillatorFromDraft(draft, "b", wavetableFromDraft(draft, "b"));
@@ -2540,7 +2783,7 @@ export function synthDraftToInstrumentPatch(draft: SynthDraftPatch): Partial<Ins
         id,
         name,
         ...oscillatorFromDraft(draft, id, wavetableFromDraft(draft, id)),
-        ...(id === "c" && lumusCMode === "sample" ? { enabled: false } : {}),
+        ...(id === "c" && lumenCMode === "sample" ? { enabled: false } : {}),
       })),
       sub: {
         enabled: false,
@@ -2559,7 +2802,7 @@ export function synthDraftToInstrumentPatch(draft: SynthDraftPatch): Partial<Ins
       },
       sampleSlot1: {
         schemaVersion: 5,
-        enabled: (lumusCMode === null || lumusCMode === "sample")
+        enabled: (lumenCMode === null || lumenCMode === "sample")
           && getBooleanParam(draft, sampleParam("enabled"))
           && (Boolean(getStringParam(draft, sampleParam("audioFileId")))
             || sampleMetadata.zones.length > 0
@@ -2574,6 +2817,14 @@ export function synthDraftToInstrumentPatch(draft: SynthDraftPatch): Partial<Ins
         loopEnabled: getBooleanParam(draft, sampleParam("loop.enabled")),
         loopStartRatio: clamp01(getNumberParam(draft, sampleParam("loop.start"))),
         loopEndRatio: clamp01(getNumberParam(draft, sampleParam("loop.end"))),
+        ...(lumenCMode !== null ? {
+          direction: getStringParam(draft, sampleParam("direction")) === "reverse" ? "reverse" as const : "forward" as const,
+          playbackRate: Math.max(0.25, Math.min(4, getNumberParam(draft, sampleParam("playbackRate")))),
+          loopMode: getStringParam(draft, sampleParam("loopMode")) === "pingPong" ? "pingPong" as const : "forward" as const,
+          releaseTailMs: Math.max(1, Math.min(2000, getNumberParam(draft, sampleParam("releaseTailMs")))),
+          selectedSliceId: getStringParam(draft, sampleParam("selectedSliceId")),
+          slices: (sampleMetadata as LumenSampleSlotMetadata).slices,
+        } : {}),
         fxSends: [clamp01(getNumberParam(draft, sampleParam("fxSend1"))), clamp01(getNumberParam(draft, sampleParam("fxSend2")))],
         zones: sampleMetadata.zones,
         ...(sampleMetadata.managedSfz ? { managedSfz: sampleMetadata.managedSfz } : {}),
@@ -2628,6 +2879,7 @@ export function synthDraftToInstrumentPatch(draft: SynthDraftPatch): Partial<Ins
     lfoPhase: getNumberParam(draft, "lfo.1.phase"),
     lfoRetrigger: getBooleanParam(draft, "lfo.1.retrigger"),
     lfoOneShot: getBooleanParam(draft, "lfo.1.oneShot"),
+    lfoKeytrackRate: getNumberParam(draft, "lfo.1.keytrackRate"),
     lfo2Waveform: lfoWaveformFromDraft(draft, 2),
     lfo2RateHz: getNumberParam(draft, "lfo.2.rate"),
     lfo2Sync: draft.parameters["lfo.2.sync"] === true,
@@ -2638,6 +2890,7 @@ export function synthDraftToInstrumentPatch(draft: SynthDraftPatch): Partial<Ins
     lfo2Phase: getNumberParam(draft, "lfo.2.phase"),
     lfo2Retrigger: getBooleanParam(draft, "lfo.2.retrigger"),
     lfo2OneShot: getBooleanParam(draft, "lfo.2.oneShot"),
+    lfo2KeytrackRate: getNumberParam(draft, "lfo.2.keytrackRate"),
     lfoPositionBipolar: routeBipolar(draft, "lfo.1", "osc.a.position", true),
     lfoPitchBipolar: routeBipolar(draft, "lfo.1", "osc.a.fine", true),
     lfoFilterBipolar: routeBipolar(draft, "lfo.1", "filter.cutoff", true),
@@ -2898,6 +3151,7 @@ export function synthDraftFromInstrument(instrument: Instrument): SynthDraftPatc
   draft.parameters["lfo.1.phase"] = instrument.lfoPhase ?? 0;
   draft.parameters["lfo.1.retrigger"] = instrument.lfoRetrigger ?? true;
   draft.parameters["lfo.1.oneShot"] = instrument.lfoOneShot ?? false;
+  draft.parameters["lfo.1.keytrackRate"] = instrument.lfoKeytrackRate ?? 0;
   draft.parameters["lfo.2.enabled"] = instrument.lfo2Enabled ?? false;
   draft.parameters["lfo.2.rate"] = instrument.lfo2RateHz ?? 0.5;
   draft.parameters["lfo.2.sync"] = instrument.lfo2Sync ?? false;
@@ -2908,6 +3162,7 @@ export function synthDraftFromInstrument(instrument: Instrument): SynthDraftPatc
   draft.parameters["lfo.2.phase"] = instrument.lfo2Phase ?? 0;
   draft.parameters["lfo.2.retrigger"] = instrument.lfo2Retrigger ?? true;
   draft.parameters["lfo.2.oneShot"] = instrument.lfo2OneShot ?? false;
+  draft.parameters["lfo.2.keytrackRate"] = instrument.lfo2KeytrackRate ?? 0;
   draft.parameters["amp.level"] = instrument.ampLevel ?? 0.8;
   draft.parameters["amp.pan"] = instrument.ampPan ?? 0;
   draft.parameters.maxVoices = instrument.maxVoices ?? 16;
@@ -2934,6 +3189,7 @@ export function synthDraftFromInstrument(instrument: Instrument): SynthDraftPatc
       amount: instrument.lfoToFilter ?? 0,
       bipolar: instrument.lfoFilterBipolar ?? true,
       enabled: true,
+      curve: "linear",
     });
   }
   if ((instrument.envToFilter ?? 0) !== 0) {
@@ -2944,6 +3200,7 @@ export function synthDraftFromInstrument(instrument: Instrument): SynthDraftPatc
       amount: instrument.envToFilter ?? 0,
       bipolar: false,
       enabled: true,
+      curve: "linear",
     });
   }
   if ((instrument.lfoDepth ?? 0) !== 0) {
@@ -2954,6 +3211,7 @@ export function synthDraftFromInstrument(instrument: Instrument): SynthDraftPatc
       amount: instrument.lfoDepth ?? 0,
       bipolar: instrument.lfoPositionBipolar ?? true,
       enabled: true,
+      curve: "linear",
     });
   }
   if ((instrument.lfoToPitch ?? 0) !== 0) {
@@ -2964,6 +3222,7 @@ export function synthDraftFromInstrument(instrument: Instrument): SynthDraftPatc
       amount: Math.max(-1, Math.min(1, (instrument.lfoToPitch ?? 0) / 12)),
       bipolar: instrument.lfoPitchBipolar ?? true,
       enabled: true,
+      curve: "linear",
     });
   }
 
@@ -2980,7 +3239,7 @@ export const useSynthStore = create<SynthStoreState>((set) => ({
   setDraft: (draft) => set({ draft: normalizeSynthDraftPatch(draft) }),
   resetDraft: () => set({ draft: createDefaultSynthDraft(), selectedOscillator: "a" }),
   addOscillator: () => set((state) => {
-    if (state.draft.instrumentType === LUMUS_INSTRUMENT_TYPE) return state;
+    if (state.draft.instrumentType === LUMEN_INSTRUMENT_TYPE) return state;
     const used = new Set(state.draft.metadata.oscillators.map((oscillator) => oscillator.id));
     let index = 1;
     let id = oscillatorIdForIndex(index);
@@ -2996,7 +3255,7 @@ export const useSynthStore = create<SynthStoreState>((set) => ({
     };
   }),
   removeOscillator: (id) => set((state) => {
-    if (id === "a" || state.draft.instrumentType === LUMUS_INSTRUMENT_TYPE) return state;
+    if (id === "a" || state.draft.instrumentType === LUMEN_INSTRUMENT_TYPE) return state;
     const parameters = Object.fromEntries(Object.entries(state.draft.parameters).filter(([key]) => !key.startsWith(`osc.${id}.`))) as SynthDraftPatch["parameters"];
     return {
       selectedOscillator: state.selectedOscillator === id ? "a" : state.selectedOscillator,
@@ -3146,6 +3405,7 @@ export const useSynthStore = create<SynthStoreState>((set) => ({
             amount: 0.1,
             bipolar: false,
             enabled: true,
+            curve: "linear",
             ...route,
           },
         ],
@@ -3166,6 +3426,7 @@ function sanitizeNumber(value: number, id: SynthParameterId): number {
   if (id.endsWith(".enabled") || id === "filter.type" || id.endsWith(".wavetable") || id.endsWith(".warpMode")) return value;
   if (id === "filter.cutoff" || id === "filter.2.cutoff") return Math.max(20, Math.min(20000, value));
   if (/^lfo\.(?:[1-9]|10)\.rate$/.test(id)) return Math.max(0.05, Math.min(50, value));
+  if (/^lfo\.(?:[1-9]|10)\.keytrackRate$/.test(id)) return Math.max(-1, Math.min(1, value));
   if (id.includes(".octave")) return Math.max(-4, Math.min(4, Math.round(value)));
   if (id.includes(".semitone")) return Math.max(-12, Math.min(12, Math.round(value)));
   if (id.includes(".fine")) return Math.max(-100, Math.min(100, value));
@@ -3177,10 +3438,10 @@ function sanitizeNumber(value: number, id: SynthParameterId): number {
   if (id.endsWith(".unison.voices")) return clampAetherUnisonVoices(value);
   if (id === "maxVoices") return Math.max(1, Math.min(32, Math.round(value)));
   if (id === "glide.ms") return Math.max(0, Math.min(5000, Math.round(value)));
-  if (id === "lumus.arp.gate") return Math.max(0.05, Math.min(1, value));
-  if (id === "lumus.arp.swing") return Math.max(0, Math.min(0.75, value));
-  if (id === "lumus.arp.octaves") return Math.max(1, Math.min(4, Math.round(value)));
-  if (id === "lumus.clip.swing") return Math.max(0, Math.min(0.75, value));
+  if (id === "lumen.arp.gate") return Math.max(0.05, Math.min(1, value));
+  if (id === "lumen.arp.swing") return Math.max(0, Math.min(0.75, value));
+  if (id === "lumen.arp.octaves") return Math.max(1, Math.min(4, Math.round(value)));
+  if (id === "lumen.clip.swing") return Math.max(0, Math.min(0.75, value));
   if (id.startsWith("aether.mpe.") && id.endsWith("Channel")) return clampMidiChannel(value);
   if (id === "aether.sample.1.rootNote") return Math.max(0, Math.min(127, Math.round(value)));
   if (id === "aether.granular.2.rootNote") return Math.max(0, Math.min(127, Math.round(value)));
@@ -3216,7 +3477,12 @@ function normalizeModulationRoute(value: unknown): SynthModulationRoute | null {
     amount: clampBipolar(typeof value.amount === "number" ? value.amount : 0),
     bipolar: value.bipolar !== false,
     enabled: value.enabled !== false,
+    curve: isModulationRemapCurve(value.curve) ? value.curve : "linear",
   };
+}
+
+export function isModulationRemapCurve(value: unknown): value is ModulationRemapCurve {
+  return value === "linear" || value === "ease-in" || value === "ease-out" || value === "s-curve";
 }
 
 function dedupeModulationRouteIds(routes: SynthModulationRoute[]): SynthModulationRoute[] {
@@ -4153,7 +4419,7 @@ function slugFactoryGuideName(value: string): string {
     .replace(/^-+|-+$/g, "");
 }
 
-function createLumusMvpTestPresets(): SynthFactoryPresetRecord[] {
+function createLumenMvpTestPresets(): SynthFactoryPresetRecord[] {
   const effect = (id: string, kind: TrackEffect["kind"], params: Record<string, number>): TrackEffect => ({
     id,
     kind,
@@ -4170,14 +4436,14 @@ function createLumusMvpTestPresets(): SynthFactoryPresetRecord[] {
     options: {
       modulation?: SynthModulationRoute[];
       effects?: TrackEffect[];
-      clip?: LumusClipMetadata;
-      sourceModes?: [LumusSourceMode, LumusSourceMode, LumusSourceMode];
+      clip?: LumenClipMetadata;
+      sourceModes?: [LumenSourceMode, LumenSourceMode, LumenSourceMode];
       macroLabels?: [string, string, string, string];
     } = {},
   ): SynthFactoryPresetRecord => {
-    const base = createDefaultLumusDraft();
-    const name = `Lumus_${instrument}_01`;
-    const tags = ["factory", "lumus", "mvp-test", category.toLowerCase().replaceAll(" ", "-")];
+    const base = createDefaultLumenDraft();
+    const name = `Lumen_${instrument}_02`;
+    const tags = ["factory", "lumen", "mvp-test", "capability-bank", "v16", category.toLowerCase().replaceAll(" ", "-")];
     const labels = options.macroLabels ?? ["Motion", "Tone", "Shape", "Space"];
     const macros = cloneDefaultMacros();
     for (let index = 0; index < 4; index += 1) {
@@ -4191,17 +4457,17 @@ function createLumusMvpTestPresets(): SynthFactoryPresetRecord[] {
       parameters: { ...base.parameters, ...parameters },
       modulation: [
         ...(options.modulation ?? []),
-        { id: `factory.lumus-${slug}-01.macro.1`, source: "macro.1", target: "osc.a.position", amount: 0.12, bipolar: true, enabled: true },
-        { id: `factory.lumus-${slug}-01.macro.2`, source: "macro.2", target: "filter.cutoff", amount: 0.14, bipolar: false, enabled: true },
-        { id: `factory.lumus-${slug}-01.macro.3`, source: "macro.3", target: "amp.level", amount: 0.12, bipolar: false, enabled: true },
-        { id: `factory.lumus-${slug}-01.macro.4`, source: "macro.4", target: "unison.spread", amount: 0.14, bipolar: false, enabled: true },
+        { id: `factory.lumen-${slug}-01.macro.1`, source: "macro.1", target: "osc.a.position", amount: 0.12, bipolar: true, enabled: true },
+        { id: `factory.lumen-${slug}-01.macro.2`, source: "macro.2", target: "filter.cutoff", amount: 0.14, bipolar: false, enabled: true },
+        { id: `factory.lumen-${slug}-01.macro.3`, source: "macro.3", target: "amp.level", amount: 0.12, bipolar: false, enabled: true },
+        { id: `factory.lumen-${slug}-01.macro.4`, source: "macro.4", target: "unison.spread", amount: 0.14, bipolar: false, enabled: true },
       ],
       effects: { filters: options.effects ?? [] },
       metadata: {
         ...base.metadata,
         tags,
         macros,
-        lumusSourceRack: {
+        lumenSourceRack: {
           schemaVersion: 2,
           slots: [
             { id: "a", mode: modes[0] },
@@ -4209,28 +4475,27 @@ function createLumusMvpTestPresets(): SynthFactoryPresetRecord[] {
             { id: "c", mode: modes[2] },
           ],
         },
-        lumusClip: options.clip ?? base.metadata.lumusClip,
+        lumenClip: options.clip ?? base.metadata.lumenClip,
       },
     });
     return {
-      id: `factory.lumus-${slug}-01`,
+      id: `${LEGACY_LUMUS_FACTORY_ID_PREFIX}${slug}-01`,
       name,
       patch,
       tags,
       category,
       description,
-      family: `Lumus ${category}`,
-      role: `${category.toLowerCase()} MVP test`,
+      family: `Lumen ${category}`,
+      role: `${category.toLowerCase()} v16 capability instrument`,
       auditionNote,
     };
   };
-  const clipStep = (pitchOffset: number, velocity = 0.82, lengthSteps = 1): LumusClipStep => ({
-    enabled: true,
+  const clipNote = (startStep: number, pitchOffset: number, velocity = 0.82, lengthSteps = 1): LumenClipNote => ({
+    startStep,
     pitchOffset,
     lengthSteps,
     velocity,
   });
-  const rest = (): LumusClipStep => ({ enabled: false, pitchOffset: 0, lengthSteps: 1, velocity: 1 });
 
   return [
     preset("sub-bass", "SubBass", "Bass", "Focused three-source sub bass for low-register tuning, mono, and filter-envelope checks.",
@@ -4243,11 +4508,11 @@ function createLumusMvpTestPresets(): SynthFactoryPresetRecord[] {
         "env.1.attack": 0.004, "env.1.decay": 0.16, "env.1.sustain": 0.88, "env.1.release": 0.11,
         "amp.level": 0.72,
       }, {
-        modulation: [{ id: "lumus_sub_env_filter", source: "env.1", target: "filter.cutoff", amount: 0.16, bipolar: false, enabled: true }],
-        effects: [effect("factory.lumus-sub-bass-01.compress", "compressor", { threshold: -18, ratio: 3, attackMs: 18, releaseMs: 110, makeup: 1.5, mix: 100 })],
+        modulation: [{ id: "lumen_sub_env_filter", source: "env.1", target: "filter.cutoff", amount: 0.16, bipolar: false, enabled: true }],
+        effects: [effect("factory.lumen-sub-bass-01.compress", "compressor", { threshold: -18, ratio: 3, attackMs: 18, releaseMs: 110, makeup: 1.5, mix: 100 })],
         macroLabels: ["Weight", "Tone", "Drive", "Glide"],
       }),
-    preset("arp-pluck", "ArpPluck", "Pluck", "Bright three-source pluck with the Lumus arpeggiator enabled.",
+    preset("arp-pluck", "ArpPluck", "Pluck", "Bright three-source pluck with the Lumen arpeggiator enabled.",
       "Hold a C-minor triad around C4. Notes should step evenly, stop on release, and respond clearly to swing and rate changes.", {
         "osc.a.wavetable": "basic.pulse", "osc.a.level": 0.72,
         "osc.b.enabled": true, "osc.b.wavetable": "basic.triangle", "osc.b.octave": 1, "osc.b.level": 0.22,
@@ -4255,16 +4520,18 @@ function createLumusMvpTestPresets(): SynthFactoryPresetRecord[] {
         "filter.cutoff": 3400, "filter.resonance": 0.24,
         "filter.2.enabled": true, "filter.2.type": "highpass", "filter.2.cutoff": 1800, "filter.2.resonance": 0.18,
         "env.1.attack": 0.001, "env.1.decay": 0.18, "env.1.sustain": 0.04, "env.1.release": 0.09,
-        "lumus.arp.enabled": true, "lumus.arp.mode": "upDown", "lumus.arp.rate": "1/16", "lumus.arp.gate": 0.56,
-        "lumus.arp.swing": 0.12, "lumus.arp.octaves": 2, "lumus.arp.key": "c", "lumus.arp.scale": "naturalMinor",
+        "lumen.arp.enabled": true, "lumen.arp.mode": "upDown", "lumen.arp.rate": "1/16", "lumen.arp.gate": 0.56,
+        "lumen.arp.swing": 0.12, "lumen.arp.octaves": 2, "lumen.arp.key": "c", "lumen.arp.scale": "naturalMinor",
+        "lfo.1.enabled": true, "lfo.1.rate": 1.25, "lfo.1.shape": "triangle", "lfo.1.keytrackRate": 0.5,
         "amp.level": 0.66,
       }, {
-        effects: [effect("factory.lumus-arp-pluck-01.delay", "delay", { timeMs: 188, feedback: 22, mix: 16 })],
+        modulation: [{ id: "lumen_arp_keytracked_motion", source: "lfo.1", target: "osc.a.position", amount: 0.14, bipolar: true, enabled: true }],
+        effects: [effect("factory.lumen-arp-pluck-01.delay", "delay", { timeMs: 188, feedback: 22, mix: 16 })],
         macroLabels: ["Pattern", "Brightness", "Snap", "Echo"],
       }),
     preset("wide-pad", "WidePad", "Pad", "Slow, wide three-source pad for unison, stereo, and release-tail checks.",
       "Hold four-note chords from C3-C5, then release. The swell and tail should remain smooth with no clicks or collapsing stereo.", {
-        "osc.a.wavetable": "basic.saw", "osc.a.level": 0.48, "osc.a.unison.voices": 7, "osc.a.unison.detune": 0.14, "osc.a.unison.spread": 0.78,
+        "osc.a.wavetable": "basic.saw", "osc.a.level": 0.48, "osc.a.warp": 0.58, "osc.a.warpMode": "spectral-smear", "osc.a.unison.voices": 7, "osc.a.unison.detune": 0.14, "osc.a.unison.spread": 0.78,
         "osc.b.enabled": true, "osc.b.wavetable": "basic.triangle", "osc.b.fine": -7, "osc.b.level": 0.34, "osc.b.pan": -0.22,
         "osc.c.enabled": true, "osc.c.wavetable": "basic.square", "osc.c.octave": 1, "osc.c.fine": 7, "osc.c.level": 0.18, "osc.c.pan": 0.24,
         "filter.cutoff": 5200, "filter.resonance": 0.1, "filter.drive": 0.06,
@@ -4272,16 +4539,16 @@ function createLumusMvpTestPresets(): SynthFactoryPresetRecord[] {
         "lfo.1.enabled": true, "lfo.1.shape": "triangle", "lfo.1.sync": false, "lfo.1.rate": 0.09, "lfo.1.smoothing": 0.62,
         "amp.level": 0.54,
       }, {
-        modulation: [{ id: "lumus_pad_scan", source: "lfo.1", target: "osc.a.position", amount: 0.16, bipolar: true, enabled: true }],
+        modulation: [{ id: "lumen_pad_scan", source: "lfo.1", target: "osc.a.position", amount: 0.16, bipolar: true, enabled: true }],
         effects: [
-          effect("factory.lumus-wide-pad-01.chorus", "chorus", { rateHz: 0.18, depthMs: 8, delayMs: 16, feedback: 3, mix: 22 }),
-          effect("factory.lumus-wide-pad-01.reverb", "reverb", { roomSize: 62, damping: 46, mix: 20 }),
+          effect("factory.lumen-wide-pad-01.chorus", "chorus", { rateHz: 0.18, depthMs: 8, delayMs: 16, feedback: 3, mix: 22 }),
+          effect("factory.lumen-wide-pad-01.reverb", "reverb", { roomSize: 62, damping: 46, mix: 20 }),
         ],
         macroLabels: ["Drift", "Warmth", "Width", "Space"],
       }),
     preset("mono-lead", "MonoLead", "Lead", "Expressive mono lead for legato, glide, filter-2 routing, and effect-order checks.",
       "Play overlapping notes around C4 while changing velocity. Glide should occur only between connected phrases and note-offs must remain clean.", {
-        "osc.a.wavetable": "basic.saw", "osc.a.level": 0.64,
+        "osc.a.wavetable": "basic.saw", "osc.a.level": 0.64, "osc.a.warp": 0.46, "osc.a.warpMode": "harmonic-shift",
         "osc.b.enabled": true, "osc.b.wavetable": "basic.square", "osc.b.fine": -5, "osc.b.level": 0.31,
         "osc.c.enabled": true, "osc.c.wavetable": "basic.pulse", "osc.c.fine": 7, "osc.c.level": 0.24, "osc.c.route": "filter2",
         "filter.cutoff": 2800, "filter.resonance": 0.24, "filter.drive": 0.18,
@@ -4291,61 +4558,65 @@ function createLumusMvpTestPresets(): SynthFactoryPresetRecord[] {
         "amp.level": 0.62,
       }, {
         modulation: [
-          { id: "lumus_lead_velocity", source: "velocity", target: "amp.level", amount: 0.16, bipolar: false, enabled: true },
-          { id: "lumus_lead_env_filter", source: "env.1", target: "filter.cutoff", amount: 0.22, bipolar: false, enabled: true },
+          { id: "lumen_lead_velocity", source: "velocity", target: "amp.level", amount: 0.16, bipolar: false, enabled: true },
+          { id: "lumen_lead_env_filter", source: "env.1", target: "filter.cutoff", amount: 0.22, bipolar: false, enabled: true },
         ],
         effects: [
-          effect("factory.lumus-mono-lead-01.saturator", "saturator", { drive: 34, mix: 54 }),
-          effect("factory.lumus-mono-lead-01.delay", "delay", { timeMs: 245, feedback: 20, mix: 13 }),
+          effect("factory.lumen-mono-lead-01.saturator", "saturator", { drive: 34, mix: 54 }),
+          effect("factory.lumen-mono-lead-01.delay", "delay", { timeMs: 245, feedback: 20, mix: 13 }),
         ],
         macroLabels: ["Expression", "Bite", "Glide", "Echo"],
       }),
     preset("digital-keys", "DigitalKeys", "Keys", "Balanced digital keys patch for velocity, chord polyphony, tuning, and release behavior.",
       "Play short chords and repeated notes from C3-C6. Attacks should remain even and every note should respect its recorded length.", {
-        "osc.a.wavetable": "basic.triangle", "osc.a.level": 0.58,
+        "osc.a.wavetable": "basic.triangle", "osc.a.level": 0.58, "osc.a.warp": 0.42, "osc.a.warpMode": "spectral-skew",
         "osc.b.enabled": true, "osc.b.wavetable": "basic.sine", "osc.b.octave": 1, "osc.b.level": 0.27,
         "osc.c.enabled": true, "osc.c.wavetable": "basic.saw", "osc.c.octave": 2, "osc.c.level": 0.09, "osc.c.tuning.mode": "ratio", "osc.c.tuning.numerator": 2, "osc.c.tuning.denominator": 1,
         "filter.cutoff": 7600, "filter.resonance": 0.08,
         "env.1.attack": 0.006, "env.1.decay": 0.72, "env.1.sustain": 0.48, "env.1.release": 0.58,
         "amp.level": 0.66,
       }, {
-        modulation: [{ id: "lumus_keys_velocity", source: "velocity", target: "amp.level", amount: 0.22, bipolar: false, enabled: true }],
-        effects: [effect("factory.lumus-digital-keys-01.chorus", "chorus", { rateHz: 0.32, depthMs: 4, delayMs: 10, feedback: 1, mix: 12 })],
+        modulation: [{ id: "lumen_keys_velocity", source: "velocity", target: "amp.level", amount: 0.22, bipolar: false, enabled: true }],
+        effects: [effect("factory.lumen-digital-keys-01.chorus", "chorus", { rateHz: 0.32, depthMs: 4, delayMs: 10, feedback: 1, mix: 12 })],
         macroLabels: ["Touch", "Tone", "Body", "Room"],
       }),
-    preset("clip-sequence", "ClipSequence", "Sequence", "Bounded monophonic Lumus clip pattern for timing, rests, velocity, and trigger-note transposition.",
+    preset("clip-sequence", "ClipSequence", "Sequence", "Bounded polyphonic Lumen clip pattern for chords, timing, rests, velocity, and trigger-note transposition.",
       "Hold C3, then move the trigger to F3. The eight-step phrase should restart and transpose predictably; releasing the trigger should silence it.", {
         "osc.a.wavetable": "basic.square", "osc.a.level": 0.58,
         "osc.b.enabled": true, "osc.b.wavetable": "basic.saw", "osc.b.octave": 1, "osc.b.level": 0.2,
         "osc.c.enabled": true, "osc.c.wavetable": "basic.triangle", "osc.c.level": 0.24, "osc.c.pan": 0.18,
         "filter.cutoff": 4100, "filter.resonance": 0.2, "filter.drive": 0.1,
         "env.1.attack": 0.002, "env.1.decay": 0.14, "env.1.sustain": 0.08, "env.1.release": 0.07,
-        "lumus.clip.enabled": true, "lumus.clip.rate": "1/16", "lumus.clip.swing": 0.16,
+        "lumen.clip.enabled": true, "lumen.clip.rate": "1/16", "lumen.clip.swing": 0.16,
         "amp.level": 0.62,
       }, {
         clip: {
-          schemaVersion: 1,
+          schemaVersion: 2,
           lengthSteps: 8,
-          steps: [clipStep(0, 1), clipStep(7, 0.76), rest(), clipStep(12, 0.9), clipStep(3, 0.7, 2), rest(), clipStep(10, 0.84), clipStep(7, 0.72)],
+          notes: [
+            clipNote(0, 0, 1), clipNote(0, 7, 0.72, 2),
+            clipNote(1, 7, 0.76), clipNote(3, 12, 0.9),
+            clipNote(4, 3, 0.7, 2), clipNote(6, 10, 0.84), clipNote(7, 7, 0.72),
+          ],
         },
-        effects: [effect("factory.lumus-clip-sequence-01.delay", "delay", { timeMs: 160, feedback: 18, mix: 12 })],
+        effects: [effect("factory.lumen-clip-sequence-01.delay", "delay", { timeMs: 160, feedback: 18, mix: 12 })],
         macroLabels: ["Pattern", "Tone", "Accent", "Echo"],
       }),
     preset("granular-texture", "GranularTexture", "Texture", "Beat-owned granular source layered with a quiet oscillator pilot for hybrid-source verification.",
       "Hold a low fifth for several seconds. The texture should remain finite, repeatable, stereo-spread, and clearly different from the pad.", {
         "osc.a.wavetable": "basic.sine", "osc.a.level": 0.1,
         "osc.b.enabled": false, "osc.c.enabled": false,
-        "lumus.source.c.granular.enabled": true, "lumus.source.c.granular.builtinSource": "benchmark",
-        "lumus.source.c.granular.rootNote": 45, "lumus.source.c.granular.level": 0.62,
-        "lumus.source.c.granular.position": 0.44, "lumus.source.c.granular.positionSpread": 0.3,
-        "lumus.source.c.granular.grainMilliseconds": 132, "lumus.source.c.granular.densityHz": 22,
-        "lumus.source.c.granular.stereoSpread": 0.84, "lumus.source.c.granular.randomSeed": 314159,
+        "lumen.source.c.granular.enabled": true, "lumen.source.c.granular.builtinSource": "benchmark",
+        "lumen.source.c.granular.rootNote": 45, "lumen.source.c.granular.level": 0.62,
+        "lumen.source.c.granular.position": 0.44, "lumen.source.c.granular.positionSpread": 0.3,
+        "lumen.source.c.granular.grainMilliseconds": 132, "lumen.source.c.granular.densityHz": 22,
+        "lumen.source.c.granular.stereoSpread": 0.84, "lumen.source.c.granular.randomSeed": 314159,
         "filter.cutoff": 8400, "filter.resonance": 0.11,
         "env.1.attack": 0.08, "env.1.decay": 0.9, "env.1.sustain": 0.82, "env.1.release": 1.8,
         "amp.level": 0.6,
       }, {
         sourceModes: ["wavetable", "wavetable", "granular"],
-        effects: [effect("factory.lumus-granular-texture-01.reverb", "reverb", { roomSize: 52, damping: 48, mix: 16 })],
+        effects: [effect("factory.lumen-granular-texture-01.reverb", "reverb", { roomSize: 52, damping: 48, mix: 16 })],
         macroLabels: ["Position", "Density", "Width", "Space"],
       }),
   ];
@@ -4353,7 +4624,7 @@ function createLumusMvpTestPresets(): SynthFactoryPresetRecord[] {
 
 function createFactorySynthPresets(): SynthFactoryPresetRecord[] {
   const guidedPresets = createFactorySynthPresetsFromGuide();
-  if (guidedPresets.length > 0) return [...guidedPresets, ...createLumusMvpTestPresets()];
+  if (guidedPresets.length > 0) return [...guidedPresets, ...createLumenMvpTestPresets()];
 
   const custom = createDefaultCustomWavetable();
   const effect = (id: string, kind: TrackEffect["kind"], params: Record<string, number>): TrackEffect => ({
@@ -5549,7 +5820,14 @@ function applyWavetableToDraft(
 }
 
 function isWavetableWarpMode(value: unknown): value is WavetableWarpMode {
-  return value === "shape" || value === "fold" || value === "pinch" || value === "mirror";
+  return value === "shape" || value === "fold" || value === "pinch" || value === "mirror"
+    || value === "harmonic-shift" || value === "harmonic-stretch"
+    || value === "spectral-smear" || value === "spectral-skew" || value === "spectral-filter";
+}
+
+function isSpectralWavetableWarpMode(value: WavetableWarpMode): boolean {
+  return value === "harmonic-shift" || value === "harmonic-stretch"
+    || value === "spectral-smear" || value === "spectral-skew" || value === "spectral-filter";
 }
 
 function routeAmount(draft: SynthDraftPatch, source: ModulationSourceId, target: ModulationTargetId): number {

@@ -1,11 +1,19 @@
 import { evaluateAutomationCurve } from "../automation/curves";
+import { isNative, send } from "../ipc/bridge";
 import { clampAetherUnisonVoices } from "./aetherLimits";
-import { evaluateAurumResponseCurve, normalizedAurumConfigForInstrument } from "../state/aurum";
-import type { AurumFilterConfig, AurumOperatorConfig, AutomationCurve, CustomWavetableDefinition, CustomWavetableFrame, EnvelopeCurve, Instrument, WavetableConfig } from "../state/types";
+import {
+  aurumFilterCutoffModulationTarget,
+  aurumFilterModulationTarget,
+  aurumOperatorModulationTarget,
+  evaluateAurumResponseCurve,
+  normalizedAurumConfigForInstrument,
+} from "../state/aurum";
+import type { AurumFilterConfig, AurumOperatorConfig, AutomationCurve, CustomWavetableDefinition, CustomWavetableFrame, EnvelopeCurve, Instrument, ModulationRemapCurve, WavetableConfig } from "../state/types";
 import { sampleZoneStableId } from "../state/sampleZones";
 import { registerGlobalAudioStop } from "./globalAudioSafety";
 
 export type SynthRenderMode = "visual" | "audio";
+const INSTRUMENT_SAMPLE_LOAD_TIMEOUT_MS = 6_000;
 
 interface FilterRenderState {
   low: number;
@@ -43,7 +51,7 @@ export interface SynthRenderState extends FilterRenderState {
   aurumNoteOffMs: number;
 }
 
-interface RenderModulation {
+export interface RenderModulation {
   pitchSemitones: number;
   filterOffset: number;
   positionOffset: number;
@@ -51,6 +59,8 @@ interface RenderModulation {
   targetOffsets: Partial<Record<RuntimeModulationTarget, number>>;
   velocity?: number;
   keytrack?: number;
+  previewTimeS?: number;
+  previewDurationS?: number;
 }
 
 type DirectRuntimeModulationTarget =
@@ -62,7 +72,9 @@ type DirectRuntimeModulationTarget =
   | "amp.level"
   | "amp.pan"
   | "unison.detune"
-  | "unison.spread";
+  | "unison.spread"
+  | `aurum.op.${1 | 2 | 3 | 4 | 5 | 6}.${"level" | "pan"}`
+  | `aurum.filter.${"a" | "b"}.${"cutoff" | "resonance" | "drive"}`;
 
 type MacroAutomationTarget = `macro.${1 | 2 | 3 | 4 | 5 | 6 | 7 | 8}`;
 type RuntimeModulationTarget = DirectRuntimeModulationTarget | MacroAutomationTarget;
@@ -80,6 +92,7 @@ interface RuntimeModulationRoute {
   amount?: number;
   bipolar?: boolean;
   enabled?: boolean;
+  curve?: ModulationRemapCurve;
 }
 
 export const SYNTH_PREVIEW_MIDI_PITCH = 60;
@@ -103,6 +116,13 @@ export interface InstrumentPreviewAuditionHandle {
   stop: () => void;
 }
 
+export interface SynthPreviewExpression {
+  modWheel?: number;
+  pressure?: number;
+  timbre?: number;
+  pitchBendSemitones?: number;
+}
+
 export function startInstrumentPreviewAudition(
   instrument: Instrument,
   durationS = 1.8,
@@ -111,10 +131,11 @@ export function startInstrumentPreviewAudition(
   velocity = 104,
   onEnded?: () => void,
   sampleSelection?: SamplePlaybackSelection,
+  expression?: SynthPreviewExpression,
 ): InstrumentPreviewAuditionHandle {
   const ctx = getBrowserPreviewAudioContext();
   if (ctx.state === "suspended") void ctx.resume().catch(() => undefined);
-  const source = createInstrumentBufferSource(ctx, instrument, durationS, previewFrequency(instrument), undefined, velocity, bpm, sampleSelection);
+  const source = createInstrumentBufferSource(ctx, instrument, durationS, previewFrequency(instrument), undefined, velocity, bpm, sampleSelection, expression);
   const gain = ctx.createGain();
   let stopped = false;
 
@@ -272,11 +293,19 @@ export function renderInstrumentSamples(
   velocity = 127,
   modWheel = 0,
   pitchBendSemitones = 0,
+  expression?: SynthPreviewExpression,
 ) {
+  if (instrumentRequiresSamplePlayback(instrument)) {
+    for (let index = 0; index < out.length; index += 1) out[index] = 0;
+    return;
+  }
   const state = createSynthRenderState();
   const durationS = out.length / sampleRate;
   if (instrument.aurum && fade) state.aurumNoteOffMs = aurumPreviewNoteOffMs(instrument, durationS);
   const velocity01 = clamp01(velocity / 127);
+  const effectivePitchBend = Number.isFinite(expression?.pitchBendSemitones)
+    ? Number(expression?.pitchBendSemitones)
+    : pitchBendSemitones;
   const sortedCurve = curve?.filter((point) => Number.isFinite(point.timeS) && Number.isFinite(point.frequency))
     .sort((a, b) => a.timeS - b.timeS);
 
@@ -286,18 +315,21 @@ export function renderInstrumentSamples(
     const baseFrequency = sortedCurve && sortedCurve.length > 1
       ? frequencyAtCurveTime(sortedCurve, t)
       : glideBaseFrequency(instrument, frequency, targetFrequency, t, durationS);
-    const modulation = modulationAtTime(
+    const modulation = resolvedPreviewModulationAtTime(
       instrument,
       t,
       durationS,
       bpm,
       velocity01,
       keytrackSourceValue(baseFrequency),
-      modWheel,
-      automationMacroValues(instrument, automation, t),
+      automation,
+      {
+        modWheel: expression?.modWheel ?? modWheel,
+        pressure: expression?.pressure,
+        timbre: expression?.timbre,
+      },
     );
-    applyAutomationOffsets(instrument, modulation, automation, t);
-    const currentFrequency = baseFrequency * Math.pow(2, (pitchBendSemitones + modulation.pitchSemitones) / 12);
+    const currentFrequency = baseFrequency * Math.pow(2, (effectivePitchBend + modulation.pitchSemitones) / 12);
     out[i] = renderInstrumentSample(instrument, state, sampleRate, currentFrequency, mode, modulation) * amp;
   }
 }
@@ -317,8 +349,12 @@ export function renderInstrumentStereoSamples(
   velocity = 127,
   modWheel = 0,
   pitchBendSemitones = 0,
+  expression?: SynthPreviewExpression,
 ) {
   const length = Math.min(left.length, right.length);
+  const effectivePitchBend = Number.isFinite(expression?.pitchBendSemitones)
+    ? Number(expression?.pitchBendSemitones)
+    : pitchBendSemitones;
   if (instrument.aurum) {
     const phaseState = createSynthRenderState();
     const leftFilterAState = createSynthRenderState();
@@ -337,18 +373,21 @@ export function renderInstrumentStereoSamples(
       const baseFrequency = sortedCurve && sortedCurve.length > 1
         ? frequencyAtCurveTime(sortedCurve, timeS)
         : glideBaseFrequency(instrument, frequency, targetFrequency, timeS, durationS);
-      const modulation = modulationAtTime(
+      const modulation = resolvedPreviewModulationAtTime(
         instrument,
         timeS,
         durationS,
         bpm,
         velocity01,
         keytrackSourceValue(baseFrequency),
-        modWheel,
-        automationMacroValues(instrument, automation, timeS),
+        automation,
+        {
+          modWheel: expression?.modWheel ?? modWheel,
+          pressure: expression?.pressure,
+          timbre: expression?.timbre,
+        },
       );
-      applyAutomationOffsets(instrument, modulation, automation, timeS);
-      const currentFrequency = baseFrequency * Math.pow(2, (pitchBendSemitones + modulation.pitchSemitones) / 12);
+      const currentFrequency = baseFrequency * Math.pow(2, (effectivePitchBend + modulation.pitchSemitones) / 12);
       const stereo = renderAurumStereoSample(instrument, phaseState, leftFilterAState, rightFilterAState, leftFilterBState, rightFilterBState, sampleRate, currentFrequency, modulation);
       left[i] = stereo.left * amp;
       right[i] = stereo.right * amp;
@@ -357,7 +396,7 @@ export function renderInstrumentStereoSamples(
   }
   if (!instrument.aether) {
     const mono = new Float32Array(length);
-    renderInstrumentSamples(instrument, mono, sampleRate, frequency, mode, fade, targetFrequency, curve, automation, bpm, velocity, modWheel, pitchBendSemitones);
+    renderInstrumentSamples(instrument, mono, sampleRate, frequency, mode, fade, targetFrequency, curve, automation, bpm, velocity, modWheel, pitchBendSemitones, expression);
     const [leftGain, rightGain] = panGains(instrument.ampPan ?? 0);
     for (let i = 0; i < length; i++) {
       left[i] = mono[i] * leftGain;
@@ -380,18 +419,21 @@ export function renderInstrumentStereoSamples(
     const baseFrequency = sortedCurve && sortedCurve.length > 1
       ? frequencyAtCurveTime(sortedCurve, timeS)
       : glideBaseFrequency(instrument, frequency, targetFrequency, timeS, durationS);
-    const modulation = modulationAtTime(
+    const modulation = resolvedPreviewModulationAtTime(
       instrument,
       timeS,
       durationS,
       bpm,
       velocity01,
       keytrackSourceValue(baseFrequency),
-      modWheel,
-      automationMacroValues(instrument, automation, timeS),
+      automation,
+      {
+        modWheel: expression?.modWheel ?? modWheel,
+        pressure: expression?.pressure,
+        timbre: expression?.timbre,
+      },
     );
-    applyAutomationOffsets(instrument, modulation, automation, timeS);
-    const currentFrequency = baseFrequency * Math.pow(2, (pitchBendSemitones + modulation.pitchSemitones) / 12);
+    const currentFrequency = baseFrequency * Math.pow(2, (effectivePitchBend + modulation.pitchSemitones) / 12);
     const stereo = renderInstrumentStereoSample(instrument, phaseState, leftFilterState, rightFilterState, sampleRate, currentFrequency, mode, modulation);
     left[i] = stereo.left * amp;
     right[i] = stereo.right * amp;
@@ -407,6 +449,7 @@ export function createInstrumentBufferSource(
   velocity = 127,
   bpm = 120,
   sampleSelection?: SamplePlaybackSelection,
+  expression?: SynthPreviewExpression,
 ): AudioBufferSourceNode {
   const shouldGlide = targetFrequency != null && Number.isFinite(targetFrequency) && Math.abs(targetFrequency - frequency) > 0.01;
   const sampleTarget = nextSampleTarget(instrument, frequency, velocity, durationS, sampleSelection);
@@ -431,7 +474,13 @@ export function createInstrumentBufferSource(
     return source;
   }
 
-  const buffer = renderedInstrumentBuffer(ctx, instrument, durationS, frequency, targetFrequency, bpm, velocity);
+  if (instrumentRequiresSamplePlayback(instrument)) {
+    const source = ctx.createBufferSource();
+    source.buffer = ctx.createBuffer(1, Math.max(1, Math.ceil(ctx.sampleRate * Math.max(0.01, durationS))), ctx.sampleRate);
+    return source;
+  }
+
+  const buffer = renderedInstrumentBuffer(ctx, instrument, durationS, frequency, targetFrequency, bpm, velocity, expression);
   const source = ctx.createBufferSource();
   source.buffer = buffer;
   return source;
@@ -467,9 +516,10 @@ export function renderedInstrumentBuffer(
   targetFrequency?: number,
   bpm = 120,
   velocity = 127,
+  expression?: SynthPreviewExpression,
 ): AudioBuffer {
   const sampleCount = Math.max(1, Math.ceil(ctx.sampleRate * durationS));
-  const key = renderedInstrumentBufferKey(instrument, sampleCount, ctx.sampleRate, frequency, targetFrequency, bpm, velocity);
+  const key = renderedInstrumentBufferKey(instrument, sampleCount, ctx.sampleRate, frequency, targetFrequency, bpm, velocity, expression);
   const cached = renderedInstrumentBufferCache.get(key);
   if (cached) return cached;
 
@@ -487,6 +537,9 @@ export function renderedInstrumentBuffer(
     undefined,
     bpm,
     velocity,
+    0,
+    0,
+    expression,
   );
   renderedInstrumentBufferCache.set(key, buffer);
   while (renderedInstrumentBufferCache.size > MAX_RENDERED_INSTRUMENT_BUFFERS) {
@@ -510,6 +563,9 @@ export function renderInstrumentOutputWaveformPreview(
   velocity = 104,
 ): InstrumentOutputWaveformPreview {
   const safeBucketCount = Math.max(8, Math.min(256, Math.round(bucketCount)));
+  if (instrumentRequiresSamplePlayback(instrument)) {
+    return { peaks: Array.from({ length: safeBucketCount }, () => 0), peak: 0 };
+  }
   const sampleRate = 48000;
   const sampleCount = Math.max(safeBucketCount, Math.ceil(sampleRate * Math.max(0.05, durationS)));
   const left = new Float32Array(sampleCount);
@@ -637,6 +693,12 @@ export function createInstrumentCurveBufferSource(
     return source;
   }
 
+  if (instrumentRequiresSamplePlayback(instrument)) {
+    const source = ctx.createBufferSource();
+    source.buffer = ctx.createBuffer(1, Math.max(1, Math.ceil(ctx.sampleRate * Math.max(0.01, durationS))), ctx.sampleRate);
+    return source;
+  }
+
   const length = Math.max(1, Math.ceil(ctx.sampleRate * durationS));
   const buffer = ctx.createBuffer(2, length, ctx.sampleRate);
   renderInstrumentStereoSamples(
@@ -670,19 +732,62 @@ export async function preloadInstrumentSampleUrl(ctx: AudioContext, url: string)
     await pending;
     return;
   }
-  const loadPromise = (async () => {
-    const response = await fetch(url);
+  const loadPromise = withInstrumentSampleTimeout((async () => {
+    let playableUrl = url;
+    const nativePath = nativeInstrumentSamplePath(url);
+    if (isNative() && nativePath) {
+      const nativeResponse = await send({ kind: "audio.previewData", path: nativePath });
+      if (!nativeResponse.audioDataUrl) throw new Error(nativeResponse.error ?? `Failed to load sample: ${url}`);
+      playableUrl = nativeResponse.audioDataUrl;
+    }
+    const response = await fetch(playableUrl);
     if (!response.ok) throw new Error(`Failed to load sample: ${url}`);
     const data = await response.arrayBuffer();
     const buffer = await ctx.decodeAudioData(data.slice(0));
     sampleBufferCache.set(url, buffer);
-  })();
+  })(), url);
   sampleLoadPromises.set(url, loadPromise);
   try {
     await loadPromise;
   } finally {
     sampleLoadPromises.delete(url);
   }
+}
+
+function withInstrumentSampleTimeout(promise: Promise<void>, url: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const timeout = window.setTimeout(
+      () => reject(new Error(`Timed out while loading sample: ${url}`)),
+      INSTRUMENT_SAMPLE_LOAD_TIMEOUT_MS,
+    );
+    promise.then(
+      () => {
+        window.clearTimeout(timeout);
+        resolve();
+      },
+      (error) => {
+        window.clearTimeout(timeout);
+        reject(error);
+      },
+    );
+  });
+}
+
+export function nativeInstrumentSamplePath(url: string): string | null {
+  // Vite public assets deliberately use root-relative URLs. In the packaged
+  // WebView these are application resources, not absolute filesystem paths.
+  if (url.startsWith("/samples/")) return null;
+  if (url.startsWith("/")) return url;
+  if (!url.startsWith("file:")) return null;
+  try {
+    return decodeURIComponent(new URL(url).pathname);
+  } catch {
+    return null;
+  }
+}
+
+export function instrumentRequiresSamplePlayback(instrument: Instrument): boolean {
+  return instrument.kind === "sampler" || instrument.waveform === "sample";
 }
 
 export function primaryInstrumentSampleUrl(instrument: Instrument): string | undefined {
@@ -817,6 +922,7 @@ function renderedInstrumentBufferKey(
   targetFrequency?: number,
   bpm = 120,
   velocity = 127,
+  expression?: SynthPreviewExpression,
 ): string {
   return JSON.stringify({
     sampleCount,
@@ -825,6 +931,12 @@ function renderedInstrumentBufferKey(
     velocity: quantizeKeyNumber(velocity, 1),
     frequency: quantizeKeyNumber(frequency, 0.01),
     targetFrequency: targetFrequency == null ? null : quantizeKeyNumber(targetFrequency, 0.01),
+    expression: {
+      modWheel: quantizeKeyNumber(clamp01(expression?.modWheel ?? 0), 0.001),
+      pressure: quantizeKeyNumber(clamp01(expression?.pressure ?? 0), 0.001),
+      timbre: quantizeKeyNumber(clamp01(expression?.timbre ?? 0), 0.001),
+      pitchBendSemitones: quantizeKeyNumber(Number.isFinite(expression?.pitchBendSemitones) ? Number(expression?.pitchBendSemitones) : 0, 0.001),
+    },
     patch: renderRelevantInstrumentState(instrument),
   });
 }
@@ -946,6 +1058,7 @@ function renderRelevantInstrumentState(instrument: Instrument) {
     lfoRandomPhase: instrument.lfoRandomPhase,
     lfoPhase: instrument.lfoPhase,
     lfoOneShot: instrument.lfoOneShot,
+    lfoKeytrackRate: instrument.lfoKeytrackRate,
     lfo2Waveform: instrument.lfo2Waveform,
     lfo2RateHz: instrument.lfo2RateHz,
     lfo2Sync: instrument.lfo2Sync,
@@ -955,6 +1068,7 @@ function renderRelevantInstrumentState(instrument: Instrument) {
     lfo2Enabled: instrument.lfo2Enabled,
     lfo2Phase: instrument.lfo2Phase,
     lfo2OneShot: instrument.lfo2OneShot,
+    lfo2KeytrackRate: instrument.lfo2KeytrackRate,
     lfoDepth: instrument.lfoDepth,
     lfoSync: instrument.lfoSync,
     lfoRetrigger: instrument.lfoRetrigger,
@@ -1191,7 +1305,9 @@ function aurumMatrixStereoSample(instrument: Instrument, state: SynthRenderState
       const phaseDelta = (frequency * voiceRate * ratio * tuning * pitchEnvelopeRate) / (sampleRate * oversampling);
       const responseGain = evaluateAurumResponseCurve(operator.velocityCurve, modulationState.velocity ?? 1)
         * evaluateAurumResponseCurve(operator.keytrackCurve, modulationState.keytrack ?? 0.5);
-      nextOutputs[stateIndex] = sampleAurumOperatorWaveform(operator, phase, phaseDelta) * clamp01(operator.level) * envelope * responseGain * rmGain;
+      const operatorLevel = clamp01(operator.level
+        + modulationTargetOffset(modulationState, aurumOperatorModulationTarget(target, "level")));
+      nextOutputs[stateIndex] = sampleAurumOperatorWaveform(operator, phase, phaseDelta) * operatorLevel * envelope * responseGain * rmGain;
       state.aurumPhases[stateIndex] = (state.aurumPhases[stateIndex] + phaseDelta) % 1;
     }
 
@@ -1209,7 +1325,10 @@ function aurumMatrixStereoSample(instrument: Instrument, state: SynthRenderState
         const amountA = clampBipolar(config.outputSends[source]?.[0] ?? 0);
         const amountB = clampBipolar(config.outputSends[source]?.[1] ?? 0);
         const amountDirect = clampBipolar(config.outputSends[source]?.[2] ?? 0);
-        const [leftGain, rightGain] = panGains(clampBipolar((config.operators[source]?.pan ?? 0) + centered * spread));
+        const operatorPan = (config.operators[source]?.pan ?? 0)
+          + centered * spread
+          + modulationTargetOffset(modulationState, aurumOperatorModulationTarget(source, "pan"));
+        const [leftGain, rightGain] = panGains(clampBipolar(operatorPan));
         voiceALeft += output * amountA * leftGain;
         voiceARight += output * amountA * rightGain;
         voiceBLeft += output * amountB * leftGain;
@@ -1275,8 +1394,12 @@ function renderAurumStereoSample(
   );
   const level = clamp01((instrument.ampLevel ?? 1) + modulationTargetOffset(modulation, "amp.level"));
   const gain = level * clamp01(modulation.ampEnvelope ?? 1);
+  const [leftGain, rightGain] = panGains((instrument.ampPan ?? 0) + modulationTargetOffset(modulation, "amp.pan"));
   phaseState.index += 1;
-  return { left: clamp(filtered.left * gain, -1, 1), right: clamp(filtered.right * gain, -1, 1) };
+  return {
+    left: clamp(filtered.left * gain * leftGain, -1, 1),
+    right: clamp(filtered.right * gain * rightGain, -1, 1),
+  };
 }
 
 function driveSample(sample: number, drive: number) {
@@ -1285,10 +1408,18 @@ function driveSample(sample: number, drive: number) {
   return Math.tanh(sample * amount) / Math.tanh(amount);
 }
 
-function processAurumMonoFilter(instrument: Instrument, input: number, filter: AurumFilterConfig, state: FilterRenderState, sampleRate: number, frequency: number, modulation: RenderModulation) {
-  const cutoff = clamp01(filter.cutoff + filterKeytrackOffset(instrument, sampleRate, frequency) + modulation.filterOffset + modulationTargetOffset(modulation, "filter.cutoff"));
-  const resonance = clamp01(filter.resonance + modulationTargetOffset(modulation, "filter.resonance"));
-  const drive = clamp01(filter.drive + modulationTargetOffset(modulation, "filter.drive"));
+function processAurumMonoFilter(instrument: Instrument, input: number, filter: AurumFilterConfig, filterIndex: 0 | 1, state: FilterRenderState, sampleRate: number, frequency: number, modulation: RenderModulation) {
+  const cutoff = clamp01(filter.cutoff
+    + filterKeytrackOffset(instrument, sampleRate, frequency)
+    + modulation.filterOffset
+    + modulationTargetOffset(modulation, "filter.cutoff")
+    + modulationTargetOffset(modulation, aurumFilterCutoffModulationTarget(filterIndex)));
+  const resonance = clamp01(filter.resonance
+    + modulationTargetOffset(modulation, "filter.resonance")
+    + modulationTargetOffset(modulation, aurumFilterModulationTarget(filterIndex, "resonance")));
+  const drive = clamp01(filter.drive
+    + modulationTargetOffset(modulation, "filter.drive")
+    + modulationTargetOffset(modulation, aurumFilterModulationTarget(filterIndex, "drive")));
   return resonantFilter(driveSample(input, drive), state, sampleRate, cutoff, resonance, filter.type);
 }
 
@@ -1311,21 +1442,21 @@ function processAurumMonoBuses(
   const directActive = (activeMask & 4) !== 0;
   if (config.filterRouting === "serial") {
     let filterAOutput = filterAInput;
-    if (filterA.enabled) filterAOutput = processAurumMonoFilter(instrument, filterAOutput, filterA, filterAState, sampleRate, frequency, modulation);
+    if (filterA.enabled) filterAOutput = processAurumMonoFilter(instrument, filterAOutput, filterA, 0, filterAState, sampleRate, frequency, modulation);
     const filterBInputCount = Number(filterAActive) + Number(filterBActive);
     let filterBOutput = filterBInputCount > 0 ? (filterAOutput + filterBInput) / filterBInputCount : 0;
-    if (filterB.enabled) filterBOutput = processAurumMonoFilter(instrument, filterBOutput, filterB, filterBState, sampleRate, frequency, modulation);
+    if (filterB.enabled) filterBOutput = processAurumMonoFilter(instrument, filterBOutput, filterB, 1, filterBState, sampleRate, frequency, modulation);
     const outputCount = Number(filterAActive || filterBActive) + Number(directActive);
     return outputCount > 0 ? (filterBOutput + directInput) / outputCount : 0;
   }
   let output = 0;
   let branchCount = 0;
   if (filterAActive) {
-    output += filterA.enabled ? processAurumMonoFilter(instrument, filterAInput, filterA, filterAState, sampleRate, frequency, modulation) : filterAInput;
+    output += filterA.enabled ? processAurumMonoFilter(instrument, filterAInput, filterA, 0, filterAState, sampleRate, frequency, modulation) : filterAInput;
     branchCount += 1;
   }
   if (filterBActive) {
-    output += filterB.enabled ? processAurumMonoFilter(instrument, filterBInput, filterB, filterBState, sampleRate, frequency, modulation) : filterBInput;
+    output += filterB.enabled ? processAurumMonoFilter(instrument, filterBInput, filterB, 1, filterBState, sampleRate, frequency, modulation) : filterBInput;
     branchCount += 1;
   }
   if (directActive) {
@@ -1355,15 +1486,15 @@ function processAurumStereoBuses(
     let filterALeft = buses.filterALeft;
     let filterARight = buses.filterARight;
     if (filterA.enabled) {
-      filterALeft = processAurumMonoFilter(instrument, filterALeft, filterA, leftFilterAState, sampleRate, frequency, modulation);
-      filterARight = processAurumMonoFilter(instrument, filterARight, filterA, rightFilterAState, sampleRate, frequency, modulation);
+      filterALeft = processAurumMonoFilter(instrument, filterALeft, filterA, 0, leftFilterAState, sampleRate, frequency, modulation);
+      filterARight = processAurumMonoFilter(instrument, filterARight, filterA, 0, rightFilterAState, sampleRate, frequency, modulation);
     }
     const filterBInputCount = Number(filterAActive) + Number(filterBActive);
     let left = filterBInputCount > 0 ? (filterALeft + buses.filterBLeft) / filterBInputCount : 0;
     let right = filterBInputCount > 0 ? (filterARight + buses.filterBRight) / filterBInputCount : 0;
     if (filterB.enabled) {
-      left = processAurumMonoFilter(instrument, left, filterB, leftFilterBState, sampleRate, frequency, modulation);
-      right = processAurumMonoFilter(instrument, right, filterB, rightFilterBState, sampleRate, frequency, modulation);
+      left = processAurumMonoFilter(instrument, left, filterB, 1, leftFilterBState, sampleRate, frequency, modulation);
+      right = processAurumMonoFilter(instrument, right, filterB, 1, rightFilterBState, sampleRate, frequency, modulation);
     }
     const outputCount = Number(filterAActive || filterBActive) + Number(directActive);
     return outputCount > 0
@@ -1374,13 +1505,13 @@ function processAurumStereoBuses(
   let right = 0;
   let branchCount = 0;
   if (filterAActive) {
-    left += filterA.enabled ? processAurumMonoFilter(instrument, buses.filterALeft, filterA, leftFilterAState, sampleRate, frequency, modulation) : buses.filterALeft;
-    right += filterA.enabled ? processAurumMonoFilter(instrument, buses.filterARight, filterA, rightFilterAState, sampleRate, frequency, modulation) : buses.filterARight;
+    left += filterA.enabled ? processAurumMonoFilter(instrument, buses.filterALeft, filterA, 0, leftFilterAState, sampleRate, frequency, modulation) : buses.filterALeft;
+    right += filterA.enabled ? processAurumMonoFilter(instrument, buses.filterARight, filterA, 0, rightFilterAState, sampleRate, frequency, modulation) : buses.filterARight;
     branchCount += 1;
   }
   if (filterBActive) {
-    left += filterB.enabled ? processAurumMonoFilter(instrument, buses.filterBLeft, filterB, leftFilterBState, sampleRate, frequency, modulation) : buses.filterBLeft;
-    right += filterB.enabled ? processAurumMonoFilter(instrument, buses.filterBRight, filterB, rightFilterBState, sampleRate, frequency, modulation) : buses.filterBRight;
+    left += filterB.enabled ? processAurumMonoFilter(instrument, buses.filterBLeft, filterB, 1, leftFilterBState, sampleRate, frequency, modulation) : buses.filterBLeft;
+    right += filterB.enabled ? processAurumMonoFilter(instrument, buses.filterBRight, filterB, 1, rightFilterBState, sampleRate, frequency, modulation) : buses.filterBRight;
     branchCount += 1;
   }
   if (directActive) {
@@ -1628,6 +1759,7 @@ function aetherStackBuses(
   const interactionA: { sample: number; level: number; route: NonNullable<Instrument["aether"]>["oscA"]["route"]; active: boolean } = { sample: 0, level: 0, route: "filter", active: false };
   const interactionB = { sample: 0, active: false };
   const addOsc = (osc: NonNullable<Instrument["aether"]>["oscA"], key: string) => {
+    if (lumenSourceMode(instrument, key) === "sample") return;
     const level = clamp01(osc.level + modulationTargetOffset(modulation, `osc.${key}.level`));
     if (!osc.enabled || level <= 0) return;
     const fineOffset = modulationTargetOffset(modulation, `osc.${key}.fine`);
@@ -1669,6 +1801,14 @@ function aetherStackBuses(
   };
   const oscillators = config.oscillators?.length ? config.oscillators : [{ ...config.oscA, id: "a" }, { ...config.oscB, id: "b" }];
   for (const oscillator of oscillators) addOsc(oscillator, oscillator.id);
+  for (const source of lumenSamplePreviewSources(instrument, state.phase, modulation)) {
+    if (source.route === "none") continue;
+    if (source.route === "direct") directSum += source.sample * source.level;
+    else if (source.route === "filter1") filter1Sum += source.sample * source.level;
+    else if (source.route === "filter2") filter2Sum += source.sample * source.level;
+    else sum += source.sample * source.level;
+    levelSum += source.level;
+  }
   if (config.interactionMode && config.interactionMode !== "off" && interactionA.active && interactionB.active) {
     const amount = clamp01(config.interactionAmount ?? 0);
     const interacted = config.interactionMode === "am"
@@ -1770,6 +1910,7 @@ function aetherStackStereoSample(
     osc: NonNullable<Instrument["aether"]>["oscA"],
     key: string,
   ) => {
+    if (lumenSourceMode(instrument, key) === "sample") return;
     const level = clamp01(osc.level + modulationTargetOffset(modulation, `osc.${key}.level`));
     if (!osc.enabled || level <= 0) return;
     const fineOffset = modulationTargetOffset(modulation, `osc.${key}.fine`);
@@ -1816,6 +1957,8 @@ function aetherStackStereoSample(
 
   const oscillators = config.oscillators?.length ? config.oscillators : [{ ...config.oscA, id: "a" }, { ...config.oscB, id: "b" }];
   for (const oscillator of oscillators) addOsc(oscillator, oscillator.id);
+  for (const source of lumenSamplePreviewSources(instrument, state.phase, modulation))
+    add(source.sample, source.level, source.pan, source.route);
   if (config.interactionMode && config.interactionMode !== "off" && interactionA.active && interactionB.active) {
     const amount = clamp01(config.interactionAmount ?? 0);
     const interacted = config.interactionMode === "am"
@@ -1851,6 +1994,78 @@ function aetherStackStereoSample(
     directLeft: clamp(directLeft / normalizer, -1, 1),
     directRight: clamp(directRight / normalizer, -1, 1),
   };
+}
+
+function lumenSourceMode(instrument: Instrument, id: string) {
+  return instrument.synthPatch?.instrumentType === "lumen-hybrid-synth"
+    ? instrument.synthPatch.metadata.lumenSourceRack?.slots.find((slot) => slot.id === id)?.mode
+    : undefined;
+}
+
+function lumenSamplePreviewSources(instrument: Instrument, phase: number,
+                                   modulation?: RenderModulation): Array<{
+  sample: number;
+  level: number;
+  pan: number;
+  route: "filter" | "both" | "filter1" | "filter2" | "direct" | "none";
+}> {
+  if (instrument.synthPatch?.instrumentType !== "lumen-hybrid-synth") return [];
+  const rack = instrument.synthPatch.metadata.lumenSourceRack;
+  if (!rack || rack.schemaVersion !== 2) return [];
+  const parameters = instrument.synthPatch.parameters;
+  return rack.slots.flatMap((slot) => {
+    if (slot.mode !== "sample") return [];
+    const prefix = `lumen.source.${slot.id}.sample`;
+    if (parameters[`${prefix}.enabled`] !== true) return [];
+    const playbackRateValue = Number(parameters[`${prefix}.playbackRate`] ?? 1);
+    const playbackRate = Number.isFinite(playbackRateValue)
+      ? Math.max(0.25, Math.min(4, playbackRateValue)) : 1;
+    const reverse = parameters[`${prefix}.direction`] === "reverse";
+    const baseStart = clamp01(Number(parameters[`${prefix}.start`] ?? 0));
+    const baseEnd = Math.max(baseStart, clamp01(Number(parameters[`${prefix}.end`] ?? 1)));
+    const selectedSliceId = String(parameters[`${prefix}.selectedSliceId`] ?? "");
+    const selectedSlice = instrument.synthPatch?.metadata.lumenSampleSlots?.[slot.id]?.slices
+      ?.find((slice) => slice.id === selectedSliceId);
+    const regionStart = selectedSlice?.startRatio ?? baseStart;
+    const regionEnd = selectedSlice?.endRatio ?? baseEnd;
+    let loopStart = Math.max(regionStart, clamp01(Number(parameters[`${prefix}.loop.start`] ?? regionStart)));
+    let loopEnd = Math.min(regionEnd, clamp01(Number(parameters[`${prefix}.loop.end`] ?? regionEnd)));
+    if (loopEnd <= loopStart) {
+      loopStart = regionStart;
+      loopEnd = regionEnd;
+    }
+    const loopValid = parameters[`${prefix}.loop.enabled`] === true && loopEnd > loopStart;
+    const rawPhase = phase * playbackRate;
+    let p: number;
+    if (loopValid && parameters[`${prefix}.loopMode`] === "pingPong") {
+      const cycle = ((rawPhase % 2) + 2) % 2;
+      const triangle = cycle <= 1 ? cycle : 2 - cycle;
+      p = loopStart + (reverse ? 1 - triangle : triangle) * (loopEnd - loopStart);
+    } else {
+      const wrapped = ((rawPhase * (reverse ? -1 : 1)) % 1 + 1) % 1;
+      p = loopValid
+        ? loopStart + wrapped * (loopEnd - loopStart)
+        : regionStart + wrapped * (regionEnd - regionStart);
+    }
+    const sample = Math.sin(p * Math.PI * 2) * 0.52
+      + Math.cos(p * Math.PI * 4) * 0.21
+      + (p * 2 - 1) * 0.17;
+    const releaseTailValue = Number(parameters[`${prefix}.releaseTailMs`] ?? 4);
+    const releaseTailS = Math.max(0.001, Math.min(2,
+      (Number.isFinite(releaseTailValue) ? releaseTailValue : 4) / 1000));
+    const previewTimeS = modulation?.previewTimeS;
+    const previewDurationS = modulation?.previewDurationS;
+    const releaseGain = previewTimeS != null && previewDurationS != null
+      && previewTimeS > previewDurationS - releaseTailS
+      ? clamp01((previewDurationS - previewTimeS) / releaseTailS)
+      : 1;
+    const level = clamp01(Number(parameters[`${prefix}.level`] ?? 0.8)) * releaseGain;
+    const pan = clampBipolar(Number(parameters[`${prefix}.pan`] ?? 0));
+    const routeValue = parameters[`${prefix}.route`];
+    const route = routeValue === "both" || routeValue === "filter1" || routeValue === "filter2"
+      || routeValue === "direct" || routeValue === "none" ? routeValue : "filter";
+    return [{ sample, level, pan, route }];
+  });
 }
 
 function wavetableOscillatorSample(
@@ -1978,7 +2193,7 @@ function getPreviewWavetable(
   const harmonicLimit = Math.min(32, Math.max(1, Math.floor((sampleRate * 0.48) / Math.max(20, frequency))));
   if (custom == null) {
     const warpKey = Math.round(clamp01(warp) * 1000);
-    const modeKey = warpMode === "fold" ? 1 : warpMode === "pinch" ? 2 : warpMode === "mirror" ? 3 : 0;
+    const modeKey = wavetableWarpModeKey(warpMode);
     const key = ((modeKey * 33) + harmonicLimit) * 1001 + warpKey;
     let configCache = builtInPreviewWavetableCache.get(config);
     if (!configCache) {
@@ -2059,8 +2274,8 @@ function createPreviewWavetable(
     let fullBandNormalizer = 0;
     for (let harmonic = 1; harmonic <= 32; harmonic++) {
       const amp = customFrame
-        ? customWavetableHarmonicAmplitude(customFrame, harmonic, clamp01(warp), warpMode)
-        : wavetableHarmonicAmplitude(config.bank, harmonic, normalizedFrame, clamp01(warp), warpMode);
+        ? customWavetableHarmonicAmplitude(customFrame, harmonic, clamp01(warp), warpMode, harmonicLimit)
+        : wavetableHarmonicAmplitude(config.bank, harmonic, normalizedFrame, clamp01(warp), warpMode, harmonicLimit);
       if (amp > 0.0001) fullBandNormalizer += amp;
     }
     const commonGainDivisor = Math.max(1, fullBandNormalizer * 0.72);
@@ -2071,8 +2286,8 @@ function createPreviewWavetable(
       let sample = 0;
       for (let harmonic = 1; harmonic <= harmonicLimit; harmonic++) {
         const amp = customFrame
-          ? customWavetableHarmonicAmplitude(customFrame, harmonic, clamp01(warp), warpMode)
-          : wavetableHarmonicAmplitude(config.bank, harmonic, normalizedFrame, clamp01(warp), warpMode);
+          ? customWavetableHarmonicAmplitude(customFrame, harmonic, clamp01(warp), warpMode, harmonicLimit)
+          : wavetableHarmonicAmplitude(config.bank, harmonic, normalizedFrame, clamp01(warp), warpMode, harmonicLimit);
         if (amp <= 0.0001) continue;
         const harmonicPhase = customFrame
           ? customWavetableHarmonicPhase(customFrame, harmonic, clamp01(warp), warpMode)
@@ -2243,7 +2458,80 @@ function warpModeIntensity(warp: number, warpMode: WavetableConfig["warpMode"] =
   return clamp01(warp);
 }
 
-function customWavetableHarmonicAmplitude(frame: CustomWavetableFrame, harmonic: number, warp: number, warpMode: WavetableConfig["warpMode"] = "shape"): number {
+function wavetableWarpModeKey(warpMode: WavetableConfig["warpMode"] = "shape"): number {
+  if (warpMode === "fold") return 1;
+  if (warpMode === "pinch") return 2;
+  if (warpMode === "mirror") return 3;
+  if (warpMode === "harmonic-shift") return 4;
+  if (warpMode === "harmonic-stretch") return 5;
+  if (warpMode === "spectral-smear") return 6;
+  if (warpMode === "spectral-skew") return 7;
+  if (warpMode === "spectral-filter") return 8;
+  return 0;
+}
+
+function isSpectralWavetableWarpMode(warpMode: WavetableConfig["warpMode"] = "shape"): boolean {
+  return wavetableWarpModeKey(warpMode) >= 4;
+}
+
+function spectralWarpedAmplitude(
+  baseAmplitude: (harmonic: number) => number,
+  harmonic: number,
+  harmonicLimit: number,
+  frame: number,
+  warp: number,
+  warpMode: WavetableConfig["warpMode"],
+): number {
+  const mix = clamp01(warp);
+  const safeLimit = Math.max(1, harmonicLimit);
+  const sampleAt = (sourceHarmonic: number) => {
+    if (sourceHarmonic < 1 || sourceHarmonic > safeLimit) return 0;
+    const lower = Math.max(1, Math.min(safeLimit, Math.floor(sourceHarmonic)));
+    const upper = Math.max(1, Math.min(safeLimit, lower + 1));
+    const fraction = sourceHarmonic - lower;
+    const lowerAmplitude = baseAmplitude(lower);
+    return lowerAmplitude + (baseAmplitude(upper) - lowerAmplitude) * fraction;
+  };
+  const original = baseAmplitude(harmonic);
+  const normalized = safeLimit <= 1 ? 0 : (harmonic - 1) / (safeLimit - 1);
+  let transformed = original;
+  if (warpMode === "harmonic-shift") {
+    const shiftBins = 1 + Math.min(7, safeLimit - 1) * mix;
+    transformed = sampleAt(harmonic - shiftBins);
+  } else if (warpMode === "harmonic-stretch") {
+    transformed = sampleAt(1 + (harmonic - 1) / 2.5);
+  } else if (warpMode === "spectral-smear") {
+    let total = 0;
+    let weight = 0;
+    for (let offset = -4; offset <= 4; offset++) {
+      const source = harmonic + offset;
+      if (source < 1 || source > safeLimit) continue;
+      const tap = 5 - Math.abs(offset);
+      total += baseAmplitude(source) * tap;
+      weight += tap;
+    }
+    transformed = weight > 0 ? total / weight : original;
+  } else if (warpMode === "spectral-skew") {
+    const pivot = 0.2 + clamp01(frame) * 0.6;
+    transformed = original * Math.exp((normalized - pivot) * 2.2);
+  } else if (warpMode === "spectral-filter") {
+    const cutoff = 0.15 + clamp01(frame) * 0.7;
+    transformed = original / (1 + Math.exp((normalized - cutoff) * 18));
+  }
+  return original + (transformed - original) * mix;
+}
+
+function customWavetableHarmonicAmplitude(frame: CustomWavetableFrame, harmonic: number, warp: number, warpMode: WavetableConfig["warpMode"] = "shape", harmonicLimit = 32): number {
+  if (isSpectralWavetableWarpMode(warpMode)) {
+    return spectralWarpedAmplitude(
+      (sourceHarmonic) => customWavetableHarmonicAmplitude(frame, sourceHarmonic, 0, "shape", harmonicLimit),
+      harmonic,
+      harmonicLimit,
+      frame.brightness,
+      warp,
+      warpMode,
+    );
+  }
   const brightness = clamp01(frame.brightness);
   const even = clamp01(frame.even);
   const formant = clamp01(frame.formant);
@@ -2277,6 +2565,19 @@ function customWavetableHarmonicAmplitude(frame: CustomWavetableFrame, harmonic:
 }
 
 function customWavetableHarmonicPhase(frame: CustomWavetableFrame, harmonic: number, warp: number, warpMode: WavetableConfig["warpMode"] = "shape"): number {
+  if (isSpectralWavetableWarpMode(warpMode)) {
+    const amount = clamp01(warp);
+    const spectralPhase = warpMode === "harmonic-shift"
+      ? Math.sin(harmonic * 0.21 + frame.brightness * Math.PI) * amount * 0.28
+      : warpMode === "harmonic-stretch"
+        ? Math.cos(harmonic * 0.17 + frame.brightness) * amount * 0.22
+        : warpMode === "spectral-smear"
+          ? Math.sin(harmonic * 0.31 + frame.brightness * Math.PI) * amount * 0.35
+          : warpMode === "spectral-skew"
+            ? Math.log2(harmonic + 1) * amount * 0.06
+            : 0;
+    return customWavetableHarmonicPhase(frame, harmonic, 0, "shape") + spectralPhase;
+  }
   const shapedWarp = warpModeIntensity(warp, warpMode);
   const skew = clampBipolar(frame.skew);
   const formant = clamp01(frame.formant);
@@ -2302,7 +2603,18 @@ function wavetableHarmonicAmplitude(
   frame: number,
   warp: number,
   warpMode: WavetableConfig["warpMode"] = "shape",
+  harmonicLimit = 32,
 ): number {
+  if (isSpectralWavetableWarpMode(warpMode)) {
+    return spectralWarpedAmplitude(
+      (sourceHarmonic) => wavetableHarmonicAmplitude(bank, sourceHarmonic, frame, 0, "shape", harmonicLimit),
+      harmonic,
+      harmonicLimit,
+      frame,
+      warp,
+      warpMode,
+    );
+  }
   const odd = harmonic % 2 === 1;
   const shapedWarp = warpModeIntensity(warp, warpMode);
   const folded = warpMode === "fold" ? Math.abs(Math.sin(harmonic * 0.58 + frame * 4)) * shapedWarp * 0.22 / Math.sqrt(harmonic) : 0;
@@ -2329,6 +2641,19 @@ function wavetableHarmonicAmplitude(
 }
 
 function wavetableHarmonicPhase(bank: NonNullable<Instrument["wavetable"]>["bank"], harmonic: number, frame: number, warp: number, warpMode: WavetableConfig["warpMode"] = "shape"): number {
+  if (isSpectralWavetableWarpMode(warpMode)) {
+    const amount = clamp01(warp);
+    const spectralPhase = warpMode === "harmonic-shift"
+      ? Math.sin(harmonic * 0.21 + frame * Math.PI) * amount * 0.28
+      : warpMode === "harmonic-stretch"
+        ? Math.cos(harmonic * 0.17 + frame) * amount * 0.22
+        : warpMode === "spectral-smear"
+          ? Math.sin(harmonic * 0.31 + frame * Math.PI) * amount * 0.35
+          : warpMode === "spectral-skew"
+            ? Math.log2(harmonic + 1) * amount * 0.06
+            : 0;
+    return wavetableHarmonicPhase(bank, harmonic, frame, 0, "shape") + spectralPhase;
+  }
   const modePhase = warpMode === "fold"
     ? Math.sin(harmonic * 0.47 + frame * Math.PI) * warpModeIntensity(warp, warpMode) * 0.55
     : warpMode === "pinch"
@@ -2501,6 +2826,17 @@ function automationValueAtTime(points: Array<{ timeS: number; value: number; cur
 }
 
 function baseAutomationValue(instrument: Instrument, target: RuntimeModulationTarget): number | null {
+  const aurumOperatorTarget = /^aurum\.op\.([1-6])\.(level|pan)$/.exec(target);
+  if (aurumOperatorTarget) {
+    const operator = instrument.aurum?.operators[Number(aurumOperatorTarget[1]) - 1];
+    return aurumOperatorTarget[2] === "level" ? operator?.level ?? 0 : operator?.pan ?? 0;
+  }
+  if (target === "aurum.filter.a.cutoff") return instrument.aurum?.filters[0]?.cutoff ?? 0;
+  if (target === "aurum.filter.b.cutoff") return instrument.aurum?.filters[1]?.cutoff ?? 0;
+  if (target === "aurum.filter.a.resonance") return instrument.aurum?.filters[0]?.resonance ?? 0;
+  if (target === "aurum.filter.b.resonance") return instrument.aurum?.filters[1]?.resonance ?? 0;
+  if (target === "aurum.filter.a.drive") return instrument.aurum?.filters[0]?.drive ?? 0;
+  if (target === "aurum.filter.b.drive") return instrument.aurum?.filters[1]?.drive ?? 0;
   switch (target) {
     case "osc.a.position":
       return instrument.aether?.oscA.wavetable.position ?? instrument.wavetable?.position ?? 0;
@@ -2552,7 +2888,11 @@ function baseAutomationValue(instrument: Instrument, target: RuntimeModulationTa
     case "macro.6":
     case "macro.7":
     case "macro.8":
-      return clamp01(Number(instrument.synthPatch?.parameters?.[target] ?? 0));
+      return clamp01(Number(
+        instrument.synthPatch?.parameters?.[target]
+        ?? instrument.aurum?.macroValues?.[Number(target.slice(6)) - 1]
+        ?? 0,
+      ));
     case "unison.detune":
       return instrument.wavetable?.detuneCents ?? instrument.aether?.oscA.wavetable.detuneCents ?? 0;
     case "unison.spread":
@@ -2583,17 +2923,28 @@ function syncedLfoRateHz(rate: unknown, bpm: number): number {
   return clamp((safeBpm / 60) / syncedLfoDivisionBeats(rate), 0.01, 50);
 }
 
-function effectiveLfoRateHz(instrument: Instrument, lfo: 1 | 2, bpm: number): number {
+function effectiveLfoRateHz(instrument: Instrument, lfo: 1 | 2, bpm: number, keytrack: number): number {
   const params = instrument.synthPatch?.parameters;
+  let baseRate: number;
   if (lfo === 1) {
     const sync = params?.["lfo.1.sync"] === true || instrument.lfoSync === true;
-    if (sync) return syncedLfoRateHz(params?.["lfo.1.syncedRate"] ?? instrument.lfoSyncedRate ?? "1/4", bpm);
-    return Math.max(0.01, instrument.lfoRateHz ?? 4);
+    baseRate = sync
+      ? syncedLfoRateHz(params?.["lfo.1.syncedRate"] ?? instrument.lfoSyncedRate ?? "1/4", bpm)
+      : Math.max(0.01, instrument.lfoRateHz ?? 4);
+  } else {
+    const sync = params?.["lfo.2.sync"] === true || instrument.lfo2Sync === true;
+    baseRate = sync
+      ? syncedLfoRateHz(params?.["lfo.2.syncedRate"] ?? instrument.lfo2SyncedRate ?? "1/2", bpm)
+      : Math.max(0.01, instrument.lfo2RateHz ?? 0.5);
   }
-
-  const sync = params?.["lfo.2.sync"] === true || instrument.lfo2Sync === true;
-  if (sync) return syncedLfoRateHz(params?.["lfo.2.syncedRate"] ?? instrument.lfo2SyncedRate ?? "1/2", bpm);
-  return Math.max(0.01, instrument.lfo2RateHz ?? 0.5);
+  const supportsKeytracking = instrument.synthPatch?.instrumentType === "lumen-hybrid-synth"
+    && Number(instrument.synthPatch.schemaVersion) >= 16;
+  const parameter = Number(params?.[`lfo.${lfo}.keytrackRate`]);
+  const fallback = lfo === 1 ? instrument.lfoKeytrackRate : instrument.lfo2KeytrackRate;
+  const amount = supportsKeytracking ? clamp(Number.isFinite(parameter) ? parameter : (fallback ?? 0), -1, 1) : 0;
+  if (amount === 0) return clamp(baseRate, 0.01, 50);
+  const midiNote = clamp(keytrack, 0, 1) * 127;
+  return clamp(baseRate * Math.pow(2, amount * ((midiNote - 60) / 12)), 0.01, 50);
 }
 
 export function modulationAtTime(
@@ -2612,13 +2963,13 @@ export function modulationAtTime(
   const lfo2OneShot = instrument.synthPatch?.parameters?.["lfo.2.oneShot"] === true || instrument.lfo2OneShot === true;
   const rawLfo = lfoShapeValue(
     instrument.lfoWaveform ?? "sine",
-    timeS * effectiveLfoRateHz(instrument, 1, bpm) + (instrument.lfoPhase ?? 0) + effectiveLfoRandomPhaseOffset(instrument, 1),
+    timeS * effectiveLfoRateHz(instrument, 1, bpm, keytrack) + (instrument.lfoPhase ?? 0) + effectiveLfoRandomPhaseOffset(instrument, 1),
     lfo1OneShot,
     effectiveLfoSmoothing(instrument, 1),
   );
   const rawLfo2 = lfoShapeValue(
     instrument.lfo2Waveform ?? "triangle",
-    timeS * effectiveLfoRateHz(instrument, 2, bpm) + (instrument.lfo2Phase ?? 0) + effectiveLfoRandomPhaseOffset(instrument, 2),
+    timeS * effectiveLfoRateHz(instrument, 2, bpm, keytrack) + (instrument.lfo2Phase ?? 0) + effectiveLfoRandomPhaseOffset(instrument, 2),
     lfo2OneShot,
     effectiveLfoSmoothing(instrument, 2),
   );
@@ -2627,9 +2978,16 @@ export function modulationAtTime(
     const prefix = `lfo.${index}`;
     const params = instrument.synthPatch?.parameters;
     if (params?.[`${prefix}.enabled`] !== true) return 0;
-    const rate = params?.[`${prefix}.sync`] === true
+    const baseRate = params?.[`${prefix}.sync`] === true
       ? syncedLfoRateHz(params?.[`${prefix}.syncedRate`] ?? "1/4", bpm)
       : Math.max(0.01, Number(params?.[`${prefix}.rate`] ?? 1));
+    const supportsKeytracking = instrument.synthPatch?.instrumentType === "lumen-hybrid-synth"
+      && Number(instrument.synthPatch.schemaVersion) >= 16;
+    const keytrackAmount = supportsKeytracking
+      ? clamp(Number(params?.[`${prefix}.keytrackRate`] ?? 0), -1, 1) : 0;
+    const rate = keytrackAmount === 0
+      ? clamp(baseRate, 0.01, 50)
+      : clamp(baseRate * Math.pow(2, keytrackAmount * (((clamp(keytrack, 0, 1) * 127) - 60) / 12)), 0.01, 50);
     const phase = Number(params?.[`${prefix}.phase`] ?? 0);
     const smoothing = clamp01(Number(params?.[`${prefix}.smoothing`] ?? 0));
     const oneShot = params?.[`${prefix}.oneShot`] === true;
@@ -2642,7 +3000,8 @@ export function modulationAtTime(
   const env4 = modEnvelopePreviewValue(timeS, durationS, instrument, 4);
   const targetOffsets = routeTargetOffsets(instrument, rawLfo, rawLfo2, rawExtraLfos, env, env2, env3, env4, velocity, keytrack, modWheel, macroOverrides, pressure, timbre);
   if (targetOffsets) {
-    return { pitchSemitones: 0, filterOffset: 0, positionOffset: 0, ampEnvelope: env, targetOffsets, velocity, keytrack };
+    return { pitchSemitones: 0, filterOffset: 0, positionOffset: 0, ampEnvelope: env,
+      targetOffsets, velocity, keytrack, previewTimeS: timeS, previewDurationS: durationS };
   }
 
   const positionLfo = lfoRouteValue(rawLfo, instrument.lfoPositionBipolar ?? true);
@@ -2652,7 +3011,41 @@ export function modulationAtTime(
   const pitchSemitones = pitchLfo * Math.max(0, instrument.lfoToPitch ?? 0);
   const lfoFilter = filterLfo * clamp(instrument.lfoToFilter ?? 0, -1, 1) * 0.35;
   const envFilter = env * clamp(instrument.envToFilter ?? 0, -1, 1) * 0.35;
-  return { pitchSemitones, filterOffset: lfoFilter + envFilter, positionOffset, ampEnvelope: env, targetOffsets: {}, velocity, keytrack };
+  return { pitchSemitones, filterOffset: lfoFilter + envFilter, positionOffset,
+    ampEnvelope: env, targetOffsets: {}, velocity, keytrack,
+    previewTimeS: timeS, previewDurationS: durationS };
+}
+
+/**
+ * Resolves one browser-preview modulation frame in a stable order:
+ * persisted manual values establish the base, macro automation replaces its
+ * persisted macro value, direct automation replaces its manual destination
+ * value, and modulation routes (including note expression) remain additive.
+ */
+export function resolvedPreviewModulationAtTime(
+  instrument: Instrument,
+  timeS: number,
+  durationS: number,
+  bpm = 120,
+  velocity = 1,
+  keytrack = keytrackSourceValue(previewFrequency(instrument)),
+  automation?: SynthAutomationLane[],
+  expression: SynthPreviewExpression = {},
+): RenderModulation {
+  const modulation = modulationAtTime(
+    instrument,
+    timeS,
+    durationS,
+    bpm,
+    velocity,
+    keytrack,
+    clamp01(expression.modWheel ?? 0),
+    automationMacroValues(instrument, automation, timeS),
+    clamp01(expression.pressure ?? 0),
+    clamp01(expression.timbre ?? 0),
+  );
+  applyAutomationOffsets(instrument, modulation, automation, timeS);
+  return modulation;
 }
 
 function routeTargetOffsets(
@@ -2671,7 +3064,7 @@ function routeTargetOffsets(
   pressure = 0,
   timbre = 0,
 ): Partial<Record<DirectRuntimeModulationTarget, number>> | null {
-  const routes = instrument.synthPatch?.modulation as RuntimeModulationRoute[] | undefined;
+  const routes = (instrument.synthPatch?.modulation ?? instrument.aurum?.modulation) as RuntimeModulationRoute[] | undefined;
   if (!Array.isArray(routes)) return null;
 
   const offsets: Partial<Record<DirectRuntimeModulationTarget, number>> = {};
@@ -2682,9 +3075,21 @@ function routeTargetOffsets(
 
     const sourceValue = modulationSourceValue(instrument, route, rawLfo, rawLfo2, rawExtraLfos, env, env2, env3, env4, velocity, keytrack, modWheel, macroOverrides, pressure, timbre);
     if (sourceValue == null) continue;
-    offsets[route.target] = (offsets[route.target] ?? 0) + sourceValue * amount * modulationTargetScale(route.target);
+    const remapped = applyModulationRemap(sourceValue, route.curve ?? "linear");
+    offsets[route.target] = (offsets[route.target] ?? 0) + remapped * amount * modulationTargetScale(route.target);
   }
   return offsets;
+}
+
+export function applyModulationRemap(value: number, curve: ModulationRemapCurve): number {
+  if (curve === "linear") return value;
+  const sign = value < 0 ? -1 : 1;
+  const x = clamp(Math.abs(value), 0, 1);
+  let shaped: number;
+  if (curve === "ease-in") shaped = x * x;
+  else if (curve === "ease-out") shaped = 1 - (1 - x) * (1 - x);
+  else shaped = x * x * (3 - 2 * x);
+  return sign * shaped;
 }
 
 function modulationSourceValue(
@@ -2745,7 +3150,12 @@ function modulationSourceValue(
     return route.bipolar ? value * 2 - 1 : value;
   }
   if (isMacroAutomationTarget(route.source)) {
-    const value = clamp01(Number(macroOverrides?.[route.source] ?? instrument.synthPatch?.parameters?.[route.source] ?? 0));
+    const value = clamp01(Number(
+      macroOverrides?.[route.source]
+      ?? instrument.synthPatch?.parameters?.[route.source]
+      ?? instrument.aurum?.macroValues?.[Number(route.source.slice(6)) - 1]
+      ?? 0,
+    ));
     return route.bipolar ? value * 2 - 1 : value;
   }
   return null;
@@ -2761,7 +3171,10 @@ function isRuntimeModulationTarget(value: unknown): value is RuntimeModulationTa
 }
 
 function isDirectRuntimeModulationTarget(value: unknown): value is DirectRuntimeModulationTarget {
-  return typeof value === "string" && [
+  if (typeof value !== "string") return false;
+  if (/^aurum\.op\.[1-6]\.(level|pan)$/.test(value)) return true;
+  if (/^aurum\.filter\.[ab]\.(cutoff|resonance|drive)$/.test(value)) return true;
+  return [
     "osc.a.position",
     "osc.a.warp",
     "osc.a.fine",

@@ -9,7 +9,7 @@
 
 namespace beat
 {
-    class LumusArpeggiator
+    class LumenArpeggiator
     {
     public:
         enum class Mode { up, down, upDown, random };

@@ -1,0 +1,99 @@
+.panel {
+  position: fixed;
+  left: 6px;
+  bottom: 6px;
+  z-index: var(--z-diagnostics);
+  width: min(720px, calc(100vw - 12px));
+  background: var(--color-bg);
+  color: var(--color-fg);
+  border: var(--border-fg);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-ui);
+  pointer-events: auto;
+}
+
+.ribbon {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 27px;
+  padding: 0 6px;
+  border-bottom: var(--border-fg);
+}
+
+.title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
+.metric,
+.path {
+  color: var(--color-fg);
+}
+
+.metric {
+  white-space: nowrap;
+}
+
+.body {
+  display: grid;
+  gap: 3px;
+  padding: 6px;
+}
+
+.log {
+  box-sizing: border-box;
+  width: 100%;
+  height: min(390px, 52vh);
+  margin: 0;
+  padding: 6px;
+  overflow: auto;
+  border: var(--border-fg);
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font: inherit;
+  line-height: 1.35;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  tab-size: 2;
+  cursor: text;
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.log::selection,
+.log *::selection {
+  background: var(--color-fg);
+  color: var(--color-bg);
+}
+
+.log:focus-visible {
+  outline: var(--border-fg);
+  outline-offset: -1px;
+}
+
+.path,
+.error {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.error {
+  color: var(--color-fg);
+  font-weight: 700;
+}
+
+.collapsed {
+  left: auto;
+  right: 42px;
+  width: 33px;
+  border: 0;
+  background: transparent;
+}

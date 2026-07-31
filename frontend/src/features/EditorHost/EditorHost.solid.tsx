@@ -52,8 +52,8 @@ export function EditorHost() {
                     ? instrument()?.name ?? "Nodemap"
                     : instrument()?.aurum
                       ? "Instrument - Aurum Engine"
-                      : instrument()?.synthPatch?.instrumentType === "lumus-hybrid-synth"
-                      ? "Instrument - Lumus Engine"
+                      : instrument()?.synthPatch?.instrumentType === "lumen-hybrid-synth"
+                      ? "Instrument - Lumen Engine"
                       : "Instrument - Aether Engine"}
                   width="editor"
                   scopeId={scopeId}
@@ -98,17 +98,17 @@ export function EditorHost() {
                   <SynthEditor hotkeyScopeId="synth-editor" />
                 </Modal>
               );
-            case "lumus":
+            case "lumen":
               return (
                 <Modal
                   open
-                  title="Instrument - Lumus Engine"
+                  title="Instrument - Lumen Engine"
                   width="editor"
-                  scopeId="lumus-editor"
+                  scopeId="lumen-editor"
                   flushBody
-                  onClose={() => closeEditor({ kind: "lumus" })}
+                  onClose={() => closeEditor({ kind: "lumen" })}
                 >
-                  <SynthEditor hotkeyScopeId="lumus-editor" editorKind="lumus" />
+                  <SynthEditor hotkeyScopeId="lumen-editor" editorKind="lumen" />
                 </Modal>
               );
             case "track":

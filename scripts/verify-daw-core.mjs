@@ -26,6 +26,17 @@ try {
   execFileSync(
     esbuild,
     [
+      join(repoRoot, "frontend/src/state/selectors.ts"),
+      "--bundle",
+      "--format=esm",
+      "--platform=node",
+      `--outfile=${join(outDir, "selectors.js")}`,
+    ],
+    { stdio: "inherit" },
+  );
+  execFileSync(
+    esbuild,
+    [
       join(repoRoot, "frontend/src/state/components.ts"),
       "--bundle",
       "--format=esm",
@@ -53,6 +64,17 @@ try {
       "--format=esm",
       "--platform=node",
       `--outfile=${join(outDir, "synthPreview.js")}`,
+    ],
+    { stdio: "inherit" },
+  );
+  execFileSync(
+    esbuild,
+    [
+      join(repoRoot, "frontend/src/audio/engineProjectPayload.ts"),
+      "--bundle",
+      "--format=esm",
+      "--platform=node",
+      `--outfile=${join(outDir, "engineProjectPayload.js")}`,
     ],
     { stdio: "inherit" },
   );
@@ -113,14 +135,89 @@ try {
   );
 
   const store = await import(pathToFileURL(join(outDir, "store.js")));
+  const selectors = await import(pathToFileURL(join(outDir, "selectors.js")));
   const components = await import(pathToFileURL(join(outDir, "components.js")));
   const geometry = await import(pathToFileURL(join(outDir, "geometry.js")));
   const synthPreview = await import(pathToFileURL(join(outDir, "synthPreview.js")));
+  const engineProjectPayload = await import(pathToFileURL(join(outDir, "engineProjectPayload.js")));
   const drumSteps = await import(pathToFileURL(join(outDir, "drumSteps.js")));
   const trackEffects = await import(pathToFileURL(join(outDir, "trackEffects.js")));
   const curves = await import(pathToFileURL(join(outDir, "curves.js")));
   const exportStore = await import(pathToFileURL(join(outDir, "exportStore.js")));
   const assetReferenceGraph = await import(pathToFileURL(join(outDir, "assetReferenceGraph.js")));
+  const loopOccurrences = selectors.expandTrackSegments({
+    segments: [{ id: "loop", startBeat: 4, lengthBeats: 4, repeats: 3 }],
+  }, 32);
+  assert.deepEqual(
+    loopOccurrences.map((occurrence) => ({ startBeat: occurrence.startBeat, repetition: occurrence.repetition })),
+    [
+      { startBeat: 4, repetition: 0 },
+      { startBeat: 8, repetition: 1 },
+      { startBeat: 12, repetition: 2 },
+      { startBeat: 16, repetition: 3 },
+    ],
+    "segment loop counts should expand to the original plus the explicit additional plays",
+  );
+  const enginePayloadProject = store.createEmptyProject();
+  const enginePayloadTrack = enginePayloadProject.tracks[0];
+  enginePayloadTrack.instrumentId = "track-instrument";
+  enginePayloadTrack.audioFileId = "track-audio";
+  enginePayloadTrack.freezeSource = {
+    sourceTrackId: "source-track",
+    audioFileId: "freeze-audio",
+    createdAt: 1,
+    sourceMute: false,
+    sourceSolo: false,
+  };
+  enginePayloadTrack.segments = [
+    {
+      id: "audio-segment",
+      trackId: enginePayloadTrack.id,
+      instrumentId: "segment-instrument",
+      startBeat: 0,
+      lengthBeats: 4,
+      repeats: 0,
+      layer: 0,
+      payload: { kind: "audio", audioFileId: "segment-audio", gainDb: 0 },
+    },
+    {
+      id: "drum-segment",
+      trackId: enginePayloadTrack.id,
+      startBeat: 4,
+      lengthBeats: 4,
+      repeats: 0,
+      layer: 0,
+      payload: { kind: "drum", rows: [{ id: "row", name: "Kick", instrumentId: "drum-instrument", steps: [] }], stepCount: 16, speed: 4 },
+    },
+    {
+      id: "drumpad-segment",
+      trackId: enginePayloadTrack.id,
+      startBeat: 8,
+      lengthBeats: 4,
+      repeats: 0,
+      layer: 0,
+      payload: { kind: "drumpad", keyboardLayout: "mac", lanes: [{ id: "lane", name: "Pad", instrumentId: "pad-instrument" }], hits: [], quantizeSeconds: 1 / 64 },
+    },
+  ];
+  const enginePayloadFiles = ["unrelated", "segment-audio", "track-audio", "freeze-audio"].map((id) => ({
+    id,
+    name: `${id}.wav`,
+    path: `/tmp/${id}.wav`,
+    durationSeconds: 1,
+    sampleRate: 48000,
+  }));
+  assert.deepEqual(
+    engineProjectPayload.engineAudioFilesForProject(enginePayloadProject, enginePayloadFiles).map((file) => file.id),
+    ["segment-audio", "track-audio", "freeze-audio"],
+    "engine project payloads should exclude unrelated global audio-library rows",
+  );
+  const enginePayloadInstruments = ["unrelated", "pad-instrument", "track-instrument", "drum-instrument", "segment-instrument"]
+    .map((id) => ({ id }));
+  assert.deepEqual(
+    engineProjectPayload.engineInstrumentsForProject(enginePayloadProject, enginePayloadInstruments).map((instrument) => instrument.id),
+    ["pad-instrument", "track-instrument", "drum-instrument", "segment-instrument"],
+    "engine project payloads should include every track, segment, drum-row, and drumpad-lane instrument while excluding unrelated library instruments",
+  );
   const projectStore = store.useProjectStore.getState();
   projectStore.loadProject(store.createEmptyProject());
   const mixerTrackId = store.useProjectStore.getState().project.tracks[0].id;
@@ -235,13 +332,23 @@ try {
   assert.equal(assetRows.find((asset) => asset.path.endsWith("/sfz-managed-a/source.sfz")).managed, true, "managed SFZ source should remain project-owned");
   assert.equal(assetRows.find((asset) => asset.path === "/Users/alex/Pack.dspreset").state, "plugin", "plugin package assets should keep plugin state");
 
-  assert.ok(exportStore.FACTORY_EXPORT_PRESETS.length >= 5, "export review should expose factory presets");
+  assert.equal(exportStore.FACTORY_EXPORT_PRESETS.length, 4, "export review should expose one factory preset per render scope");
   assert.ok(
     exportStore.FACTORY_EXPORT_PRESETS.some((preset) => preset.target === "project")
       && exportStore.FACTORY_EXPORT_PRESETS.some((preset) => preset.target === "range")
       && exportStore.FACTORY_EXPORT_PRESETS.some((preset) => preset.target === "track")
       && exportStore.FACTORY_EXPORT_PRESETS.some((preset) => preset.target === "stems"),
     "export presets should cover full project, review range, selected stem, and all-stems targets",
+  );
+  assert.equal(
+    exportStore.FACTORY_EXPORT_PRESETS.some((preset) => preset.id === "web-draft" || preset.id === "mono-reference"),
+    false,
+    "channel count and compact PCM settings should not be duplicated as export scopes",
+  );
+  assert.equal(
+    exportStore.projectFolderFromFilePath("/Users/alex/Documents/Test_song_1/Test_song_1.beat"),
+    "/Users/alex/Documents/Test_song_1",
+    "exports should derive the containing project folder from the current document path",
   );
   assert.deepEqual(
     exportStore.normalizeExportOptions({ sampleRate: 123, bitDepth: 99, channels: 9, blockSize: 7 }),
@@ -285,13 +392,49 @@ try {
     false,
     "custom export presets should be deletable",
   );
-  exportState.setJob({ active: false, finished: true, ok: true, type: "project", path: "/tmp/a.wav", progress: 1 });
+  exportState.setJob({
+    active: false,
+    finished: true,
+    ok: true,
+    type: "project",
+    path: "/tmp/a.wav",
+    progress: 1,
+    analysis: { sampleRate: 48000, durationSeconds: 1, lengthInSamples: 48000, channelCount: 2, bitDepth: 24 },
+  });
   exportState.setJob({ active: false, finished: true, ok: true, type: "project", path: "/tmp/b.wav", progress: 1 });
-  exportState.setJob({ active: false, finished: true, ok: true, type: "project", path: "/tmp/a.wav", progress: 1 });
+  exportState.setJob({
+    active: false,
+    finished: true,
+    ok: true,
+    type: "project",
+    path: "/tmp/a.wav",
+    progress: 1,
+    analysis: { sampleRate: 48000, durationSeconds: 1, lengthInSamples: 48000, channelCount: 2, bitDepth: 24 },
+  });
+  exportState.setJob({ active: true, finished: false, ok: false, type: "project", path: "/tmp/pending.wav", progress: 0.25 });
+  exportState.setJob({ active: false, finished: true, ok: false, type: "project", path: "/tmp/failed.wav", progress: 0.5, error: "failed" });
   assert.deepEqual(
     exportStore.useExportStore.getState().recentDestinations.slice(0, 2),
     ["/tmp/a.wav", "/tmp/b.wav"],
     "export jobs should maintain de-duplicated recent destination history",
+  );
+  assert.equal(
+    exportStore.useExportStore.getState().recentDestinations.includes("/tmp/pending.wav")
+      || exportStore.useExportStore.getState().recentDestinations.includes("/tmp/failed.wav"),
+    false,
+    "pending and failed export jobs should not pollute completed destination history",
+  );
+  assert.equal(
+    exportStore.useExportStore.getState().lastCompletedJob?.path,
+    "/tmp/a.wav",
+    "failed or pending jobs should not replace the last successful export result",
+  );
+  exportStore.useExportStore.getState().clear();
+  assert.equal(exportStore.useExportStore.getState().job, null, "dismissing export status should clear the current job");
+  assert.equal(
+    exportStore.useExportStore.getState().lastCompletedJob?.path,
+    "/tmp/a.wav",
+    "dismissing export status should preserve the last successful analysis for Export Review",
   );
   assert.equal(
     exportStore.recentExportFolder(exportStore.useExportStore.getState().recentDestinations),
@@ -336,47 +479,63 @@ try {
   const failedExportValidation = exportStore.failedExportValidationStatus("Project Health scan failed.", 1000);
   assert.equal(failedExportValidation.state, "failed", "Project Health scan failures should block export");
   assert.equal(exportStore.exportValidationBlocksExport(failedExportValidation), true);
+  exportStore.useExportStore.getState().setValidateBeforeExport(false);
+  assert.equal(
+    exportStore.useExportStore.getState().validateBeforeExport,
+    true,
+    "Project Health should remain mandatory even when a legacy caller requests the retired bypass",
+  );
 
   store.useInstrumentStore.getState().seedSystemInstruments();
-  const lumusTestSet = store.useInstrumentStore.getState().instrumentSets.find(
-    (set) => set.id === store.LUMUS_TEST_INSTRUMENT_SET_ID,
+  const lumenTestSet = store.useInstrumentStore.getState().instrumentSets.find(
+    (set) => set.id === store.LUMEN_TEST_INSTRUMENT_SET_ID,
   );
-  assert.deepEqual(lumusTestSet, { id: "lumus-test", name: "Lumus Test", factory: true });
-  const expectedLumusTestNames = [
-    "Lumus_SubBass_01",
-    "Lumus_ArpPluck_01",
-    "Lumus_WidePad_01",
-    "Lumus_MonoLead_01",
-    "Lumus_DigitalKeys_01",
-    "Lumus_ClipSequence_01",
-    "Lumus_GranularTexture_01",
+  assert.deepEqual(lumenTestSet, { id: "lumus-test", name: "Lumen Test", factory: true });
+  const expectedLumenTestNames = [
+    "Lumen_SubBass_02",
+    "Lumen_ArpPluck_02",
+    "Lumen_WidePad_02",
+    "Lumen_MonoLead_02",
+    "Lumen_DigitalKeys_02",
+    "Lumen_ClipSequence_02",
+    "Lumen_GranularTexture_02",
   ];
-  const lumusTestInstruments = store.useInstrumentStore.getState().instruments
-    .filter((instrument) => instrument.setId === store.LUMUS_TEST_INSTRUMENT_SET_ID);
+  const lumenTestInstruments = store.useInstrumentStore.getState().instruments
+    .filter((instrument) => instrument.setId === store.LUMEN_TEST_INSTRUMENT_SET_ID);
   assert.deepEqual(
-    lumusTestInstruments.map((instrument) => instrument.name).sort(),
-    [...expectedLumusTestNames].sort(),
-    "the Instruments panel should materialize the complete Lumus Test group",
+    lumenTestInstruments.map((instrument) => instrument.name).sort(),
+    [...expectedLumenTestNames].sort(),
+    "the Instruments panel should materialize the complete Lumen Test group",
   );
-  for (const instrument of lumusTestInstruments) {
-    assert.equal(instrument.id.startsWith("factory.lumus-"), true, `${instrument.name} should have a stable factory id`);
+  for (const instrument of lumenTestInstruments) {
+    assert.equal(instrument.id.startsWith("factory.lumus-"), true, `${instrument.name} should retain its compatibility-stable factory id`);
     assert.equal(instrument.userCreated, false, `${instrument.name} should be a protected factory instrument`);
-    assert.equal(instrument.source?.label, "Made in Beat / Lumus");
-    assert.equal(instrument.synthPatch?.instrumentType, "lumus-hybrid-synth");
-    assert.equal(instrument.synthPatch?.namespace, "lumus");
+    assert.equal(instrument.source?.label, "Made in Beat / Lumen v16 capability bank");
+    assert.ok(instrument.descriptors?.includes("lumen-test-bank") && instrument.descriptors?.includes("v16"));
+    assert.equal(instrument.synthPatch?.instrumentType, "lumen-hybrid-synth");
+    assert.equal(instrument.synthPatch?.namespace, "lumen");
   }
-  store.useInstrumentStore.getState().removeInstrument(lumusTestInstruments[0].id);
+  store.useInstrumentStore.getState().removeInstrument(lumenTestInstruments[0].id);
   assert.ok(
-    store.useInstrumentStore.getState().instruments.some((instrument) => instrument.id === lumusTestInstruments[0].id),
-    "Lumus Test factory instruments must not be deletable",
+    store.useInstrumentStore.getState().instruments.some((instrument) => instrument.id === lumenTestInstruments[0].id),
+    "Lumen Test factory instruments must not be deletable",
   );
+  const migratedLumenId = lumenTestInstruments[0].id;
+  store.useInstrumentStore.getState().updateInstrument(migratedLumenId, {
+    name: "Lumen_SubBass_01",
+    source: { kind: "created", label: "Made in Beat / Lumen" },
+    descriptors: ["lumen", "mvp-test", "bass"],
+  });
   store.useInstrumentStore.getState().seedSystemInstruments();
+  const migratedLumen = store.useInstrumentStore.getState().instruments.find((instrument) => instrument.id === migratedLumenId);
+  assert.equal(migratedLumen?.name, "Lumen_SubBass_02", "re-seeding must upgrade the legacy Lumen factory bank to the Lumen product name in place");
+  assert.equal(migratedLumen?.source?.label, "Made in Beat / Lumen v16 capability bank");
   assert.equal(
     store.useInstrumentStore.getState().instruments.filter(
-      (instrument) => instrument.setId === store.LUMUS_TEST_INSTRUMENT_SET_ID,
+      (instrument) => instrument.setId === store.LUMEN_TEST_INSTRUMENT_SET_ID,
     ).length,
     7,
-    "re-seeding must not duplicate Lumus Test instruments",
+    "re-seeding must not duplicate Lumen Test instruments",
   );
   const legacySynthProbeId = store.useInstrumentStore.getState().addInstrument({
     name: "Legacy Synth Creation Probe",
@@ -907,6 +1066,30 @@ try {
   assert.equal(trimmedAudio.fadeInBeats, 1.25);
   assert.equal(trimmedAudio.fadeOutBeats, 6, "fade should clamp to segment length");
 
+  const recordingTakeIds = [1, 2, 3].map((takeNumber) => projectStore.addSegment(trackA, {
+    name: `Live Record · Take ${takeNumber}`,
+    startBeat: 32,
+    lengthBeats: 4,
+    recordingGroupId: "live-record-group",
+    recordingTakeNumber: takeNumber,
+    recordedAt: 1000 + takeNumber,
+    payload: { kind: "audio", audioFileId: `recorded-take-${takeNumber}`, gainDb: 0 },
+  }));
+  project = store.useProjectStore.getState().project;
+  assert.deepEqual(
+    recordingTakeIds.map((id) => project.tracks[0].segments.find((segment) => segment.id === id)?.layer),
+    [0, 1, 2],
+    "takes from one Live Record segment should retain a stable layered order",
+  );
+  projectStore.updateSegment(recordingTakeIds[1], { muted: true });
+  project = store.useProjectStore.getState().project;
+  assert.equal(project.tracks[0].segments.find((segment) => segment.id === recordingTakeIds[1])?.muted, true, "a recorded take should be independently excludable");
+  assert.deepEqual(
+    recordingTakeIds.map((id) => project.tracks[0].segments.find((segment) => segment.id === id)?.layer),
+    [0, 1, 2],
+    "take inclusion changes should not collapse the layered order",
+  );
+
   const dragResize = projectStore.addSegment(trackA, {
     name: "Origin Resize",
     startBeat: 24,
@@ -1172,6 +1355,16 @@ try {
     "default effect timepoint should land one second into a 120bpm project",
   );
   assert.equal(
+    trackEffects.effectAutomationBeatFromDrag(12, 500, 540, 40, 64),
+    13,
+    "effect-point dragging should preserve the grabbed point's starting beat and apply only pointer delta",
+  );
+  assert.equal(
+    trackEffects.effectAutomationBeatFromDrag(1, 500, 300, 40, 64),
+    0,
+    "effect-point dragging should clamp before the project start",
+  );
+  assert.equal(
     trackEffects.formatEffectParamValue(1234.4, trackEffects.EFFECT_META.delay.params[0]),
     "1234ms",
     "shared effect formatting should respect parameter units",
@@ -1223,6 +1416,16 @@ try {
     store.useUiStore.getState().selectedTrackEffectAutomationPointKeys,
     ["track-a:effect-a:mix:point-a", "track-a:effect-a:mix:point-b"],
     "additive effect point selection should keep same-type selections",
+  );
+  uiStore.setSelectedTrackEffectAutomationPoints([
+    "track-a:effect-a:mix:point-b",
+    "track-a:effect-a:mix:point-a",
+    "track-a:effect-a:mix:point-b",
+  ]);
+  assert.deepEqual(
+    store.useUiStore.getState().selectedTrackEffectAutomationPointKeys,
+    ["track-a:effect-a:mix:point-b", "track-a:effect-a:mix:point-a"],
+    "effect-point marquee selection should replace and de-duplicate the selected point set",
   );
   uiStore.clearSelection();
   assert.deepEqual(

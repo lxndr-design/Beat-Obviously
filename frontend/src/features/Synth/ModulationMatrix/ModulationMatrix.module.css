@@ -7,7 +7,7 @@
 .headerRow,
 .routeRow {
   display: grid;
-  grid-template-columns: 33px 147px 27px 159px 27px minmax(321px, 1.25fr) 39px 27px;
+  grid-template-columns: 33px 147px 27px 159px 27px minmax(321px, 1.25fr) 99px 39px 27px;
   gap: 6px;
   align-items: center;
   min-width: 0;
@@ -36,8 +36,12 @@
   color: color-mix(in srgb, var(--color-fg) 58%, transparent);
 }
 
-.headerRow span:nth-child(8) {
+.headerRow span:nth-child(9) {
   justify-self: end;
+}
+
+.curveSelect {
+  width: 99px;
 }
 
 .onCell {

@@ -52,13 +52,15 @@ namespace beat::WavetableVoiceCache
 
         Wavetable createTableForConfig(const InstrumentVoice::Params::WavetableConfig& config)
         {
-            const auto warpMode = config.warpMode == 1
-                ? WavetableWarpMode::Fold
-                : config.warpMode == 2
-                    ? WavetableWarpMode::Pinch
-                    : config.warpMode == 3
-                        ? WavetableWarpMode::Mirror
-                        : WavetableWarpMode::Shape;
+            const auto warpMode = config.warpMode == 1 ? WavetableWarpMode::Fold
+                : config.warpMode == 2 ? WavetableWarpMode::Pinch
+                : config.warpMode == 3 ? WavetableWarpMode::Mirror
+                : config.warpMode == 4 ? WavetableWarpMode::HarmonicShift
+                : config.warpMode == 5 ? WavetableWarpMode::HarmonicStretch
+                : config.warpMode == 6 ? WavetableWarpMode::SpectralSmear
+                : config.warpMode == 7 ? WavetableWarpMode::SpectralSkew
+                : config.warpMode == 8 ? WavetableWarpMode::SpectralFilter
+                : WavetableWarpMode::Shape;
             if (config.custom || config.bank == 5)
                 return WavetableFactory::createCustom(factoryCustomFrames(config), config.warp, warpMode, config.smoothInterpolation, config.morph);
 
@@ -72,7 +74,7 @@ namespace beat::WavetableVoiceCache
             key << "bank=" << config.bank
                 << "|custom=" << (custom ? 1 : 0)
                 << "|warp=" << juce::String(juce::jlimit(0.0f, 1.0f, config.warp), 4)
-                << "|warpMode=" << juce::jlimit(0, 3, config.warpMode)
+                << "|warpMode=" << juce::jlimit(0, 8, config.warpMode)
                 << "|smooth=" << (config.smoothInterpolation ? 1 : 0)
                 << "|morph=" << juce::String(juce::jlimit(0.0f, 1.0f, config.morph), 4);
             if (custom)

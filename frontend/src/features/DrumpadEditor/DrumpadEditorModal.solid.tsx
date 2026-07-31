@@ -2,12 +2,15 @@ import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show }
 import { nanoid as nano } from "nanoid";
 import { createInstrumentBufferSource, noteFrequency } from "../../audio/synthPreview";
 import { getTimelineAudioContext } from "../../audio/timelineAudio";
-import { registerGlobalAudioStop } from "../../audio/globalAudioSafety";
+import { registerGlobalAudioStop, stopAllBrowserAudio } from "../../audio/globalAudioSafety";
+import { pauseTransport } from "../../audio/transportActions";
+import { isNative, send } from "../../ipc/bridge";
 import { Button, FloatingSelect, Icon, MicroButton, Modal, TextInput } from "../../solid-ui";
 import { createStoreSelector } from "../../solid-utils/store";
 import { selectSegment } from "../../state/selectors";
-import { useInstrumentStore, useProjectStore, useUiStore } from "../../state/store";
+import { useInstrumentStore, useProjectStore, useTransportStore, useUiStore } from "../../state/store";
 import type { DrumpadHit, DrumpadLane, DrumpadPayload, Id, Instrument, Segment } from "../../state/types";
+import { SegmentLoopControl } from "../SegmentEditor/SegmentLoopControl.solid";
 import styles from "./DrumpadEditorModal.module.css";
 
 interface Props {
@@ -76,7 +79,7 @@ const DRUMPAD_WHEEL_ZOOM_FACTOR = 0.002;
 const DRUMPAD_FINE_TICKS_PER_BEAT = 8;
 
 export function DrumpadEditorModal(props: Props) {
-  onCleanup(registerGlobalAudioStop(stopPreviewAudio));
+  onCleanup(registerGlobalAudioStop(stopPlaybackSession));
   let bodyRef: HTMLDivElement | undefined;
   let trackTimelineRef: HTMLDivElement | undefined;
   let countdownTimer: number | undefined;
@@ -90,7 +93,9 @@ export function DrumpadEditorModal(props: Props) {
   let recordStartBeat = 0;
   const activePreviewSources = new Set<AudioBufferSourceNode>();
   const activePreviewGains = new Set<GainNode>();
+  let previewGeneration = 0;
   let playbackScheduled = new Set<Id>();
+  let playbackContentSignature = "";
   const project = createStoreSelector(useProjectStore, (state) => state.project);
   const source = createStoreSelector(useProjectStore, () => selectSegment(props.segmentId));
   const instruments = createStoreSelector(useInstrumentStore, (state) => state.instruments);
@@ -193,6 +198,20 @@ export function DrumpadEditorModal(props: Props) {
     if (length <= 64) return 1 / DRUMPAD_FINE_TICKS_PER_BEAT;
     if (length <= 128) return 0.25;
     return 1;
+  });
+  createEffect(() => {
+    const signature = JSON.stringify({ hits: hits(), lanes: lanes() });
+    if (!playbackContentSignature) {
+      playbackContentSignature = signature;
+      return;
+    }
+    if (signature === playbackContentSignature) return;
+    playbackContentSignature = signature;
+    if (!playing()) return;
+    stopPreviewAudio();
+    playbackScheduled = new Set();
+    playbackStartBeat = playheadBeat();
+    playbackStartedAt = performance.now();
   });
   const trackGridLines = createMemo(() => {
     const start = visibleStartBeat();
@@ -395,6 +414,10 @@ export function DrumpadEditorModal(props: Props) {
   }
 
   function stopPreviewAudio() {
+    previewGeneration += 1;
+    const trackId = draft()?.trackId;
+    if (isNative() && trackId)
+      void send({ kind: "engine.stopMidiPreview", trackId });
     for (const source of Array.from(activePreviewSources)) {
       try {
         source.stop();
@@ -418,14 +441,59 @@ export function DrumpadEditorModal(props: Props) {
     activePreviewGains.clear();
   }
 
+  function stopPlaybackSession() {
+    setPlaying(false);
+    if (playbackRaf) window.cancelAnimationFrame(playbackRaf);
+    playbackRaf = undefined;
+    stopPreviewAudio();
+  }
+
+  function prepareExclusivePreview() {
+    if (useTransportStore.getState().playing) pauseTransport();
+    else stopAllBrowserAudio();
+  }
+
   function laneInstrument(lane: DrumpadLane): Instrument | undefined {
     return instruments().find((instrument) => instrument.id === lane.instrumentId);
   }
 
-  function auditionLane(lane: DrumpadLane, velocity = 110, atTimeS?: number) {
+  function auditionLane(lane: DrumpadLane, velocity = 110, atTimeS?: number, forceBrowser = false) {
     if (lane.muted) return;
     const instrument = laneInstrument(lane);
     if (!instrument) return;
+    const currentDraft = draft();
+    if (isNative() && currentDraft?.trackId && !forceBrowser) {
+      const requestGeneration = previewGeneration;
+      const nowSeconds = performance.now() / 1000;
+      const pitch = Math.max(0, Math.min(127, Math.round(lane.pitch ?? 60)));
+      const delaySeconds = Math.max(0, (atTimeS ?? nowSeconds) - nowSeconds);
+      const requestStartedMs = performance.now();
+      void send({
+        kind: "engine.previewMidiNote",
+        trackId: currentDraft.trackId,
+        instrumentId: instrument.id,
+        pitch,
+        velocity: Math.max(1, Math.min(127, Math.round(velocity))),
+        delaySeconds,
+        durationSeconds: DRUMPAD_HIT_PREVIEW_SECONDS,
+        gainDb: payload()?.gainDb ?? 0,
+        note: {
+          pitch,
+          velocity,
+          startBeat: 0,
+          lengthBeats: Math.max(0.03125, DRUMPAD_HIT_PREVIEW_SECONDS * (project().bpm / 60)),
+        },
+      }).then((accepted) => {
+        if (accepted !== false || requestGeneration !== previewGeneration) return;
+        const remainingDelay = Math.max(0, delaySeconds - (performance.now() - requestStartedMs) / 1000);
+        auditionLane(lane, velocity, previewContext().currentTime + remainingDelay, true);
+      }).catch(() => {
+        if (requestGeneration !== previewGeneration) return;
+        const remainingDelay = Math.max(0, delaySeconds - (performance.now() - requestStartedMs) / 1000);
+        auditionLane(lane, velocity, previewContext().currentTime + remainingDelay, true);
+      });
+      return;
+    }
     const audioCtx = previewContext();
     const durationS = DRUMPAD_HIT_PREVIEW_SECONDS;
     const startTimeS = Math.max(atTimeS ?? audioCtx.currentTime, audioCtx.currentTime + 0.001);
@@ -491,6 +559,7 @@ export function DrumpadEditorModal(props: Props) {
 
   function startPlayback() {
     if (recording()) stopRecording();
+    prepareExclusivePreview();
     stopPreviewAudio();
     playbackScheduled = new Set();
     playbackStartBeat = playheadBeat();
@@ -509,7 +578,6 @@ export function DrumpadEditorModal(props: Props) {
   }
 
   function schedulePlaybackHits(positionBeat: number) {
-    const audioCtx = previewContext();
     const beatsPerSecond = project().bpm / 60;
     const lookaheadBeats = Math.max(0.25, beatsPerSecond * 0.18);
     for (const hit of hits()) {
@@ -518,7 +586,8 @@ export function DrumpadEditorModal(props: Props) {
       const lane = lanes().find((candidate) => candidate.id === hit.laneId);
       if (!lane) continue;
       const delayS = (hit.startBeat - positionBeat) / beatsPerSecond;
-      auditionLane(lane, hit.velocity, audioCtx.currentTime + delayS);
+      const previewNow = isNative() ? performance.now() / 1000 : previewContext().currentTime;
+      auditionLane(lane, hit.velocity, previewNow + delayS);
       playbackScheduled.add(hit.id);
     }
   }
@@ -800,6 +869,7 @@ export function DrumpadEditorModal(props: Props) {
     updateSegment(props.segmentId, {
       name: current.name,
       lengthBeats: Math.max(current.lengthBeats, timelineLengthBeats()),
+      repeats: current.repeats,
       payload: current.payload,
     });
     closeEditorOnly();
@@ -873,6 +943,11 @@ export function DrumpadEditorModal(props: Props) {
                 onInput={(event) => setDraft((current) => current ? { ...current, name: event.currentTarget.value } : current)}
               />
             </div>
+            <SegmentLoopControl
+              repeats={draft()!.repeats}
+              lengthBeats={draft()!.lengthBeats}
+              onChange={(repeats) => setDraft((current) => current ? { ...current, repeats } : current)}
+            />
 
             <div>
               <div class={styles.keyboardPanel}>

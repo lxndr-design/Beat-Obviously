@@ -5,20 +5,21 @@ import { LiveMidiExpressionInput } from "./audio/LiveMidiExpressionInput.solid";
 import { startAnalyzerClient } from "./audio/analyzerClient";
 import { RenderTimingPanel } from "./features/Debug/RenderTimingPanel.solid";
 import { ExportJobPanel } from "./features/Debug/ExportJobPanel.solid";
-import { TrainingAutoRunner } from "./features/Training/TrainingAutoRunner.solid";
+import { DiagnosticLogPanel } from "./features/Debug/DiagnosticLogPanel.solid";
 import { StartupSplash, STARTUP_MINIMUM_VISIBLE_MS, type StartupStage } from "./features/Startup/StartupSplash.solid";
 import { runProjectExport } from "./features/ExportReview/exportActions";
 import { getTimelineAudioContext, stopTimelineAudio } from "./audio/timelineAudio";
 import { stopAllBrowserAudio } from "./audio/globalAudioSafety";
+import { engineAudioFilesForProject, engineInstrumentsForProject } from "./audio/engineProjectPayload";
 import { importAudioFiles } from "./audio/audioImport";
 import { preloadInstrumentSample } from "./audio/synthPreview";
 import { installGlobalHotkeys } from "./hotkeys/hotkeys";
 import { isNative, onEvent, send } from "./ipc/bridge";
 import { redo, undo, useAudioFileStore, useDocumentStore, useInstrumentStore, useProjectStore, useSettingsStore, useTransportStore, useUiStore } from "./state/store";
-import { useSynthStore } from "./state/synthStore";
+import { createDefaultLumenDraft, useSynthStore } from "./state/synthStore";
 import { useExportStore } from "./state/exportStore";
 import { useComponentStore } from "./state/components";
-import { listAudioFiles, listComponents, listInstruments, pruneBlankUntitledProjects, saveAudioFiles, saveComponents, saveInstruments } from "./persistence/dexie";
+import { listAudioFiles, listComponents, listInstruments, pruneBlankUntitledProjects, saveAudioFiles, saveComponents, saveInstruments, saveProject } from "./persistence/dexie";
 import { closeCurrentDocumentForHome, createNewDocument, openDocumentFromUserChoice, openRecentDocument, recoverCurrentDocumentFromBackup, saveCurrentDocument } from "./persistence/documentActions";
 import { buildCurrentBeatDocumentFingerprint } from "./persistence/beatDocument";
 import { createStoreSelector } from "./solid-utils/store";
@@ -34,6 +35,9 @@ import { ModalStackOverlay } from "./solid-ui/Modal";
 import trackStyles from "./features/Tracks/TrackList.module.css";
 import { SolidUiKitCatalog } from "./design/SolidUiKitCatalog.solid";
 import { UiKitOnePager } from "./design/UiKitOnePager.solid";
+import { AurumEditor } from "./features/Aurum/AurumEditor.solid";
+import { createAurumTestInstruments } from "./state/aurumTestBank";
+import { SynthEditor } from "./features/Synth/SynthEditor/SynthEditor.solid";
 
 type StartupReadinessKey = "instruments" | "components" | "audio";
 
@@ -55,6 +59,10 @@ function allStartupReady(readiness: Record<StartupReadinessKey, boolean>) {
   return readiness.instruments && readiness.components && readiness.audio;
 }
 
+function writeFrontendDiagnostic(category: string, message: string) {
+  void send({ kind: "diagnostics.write", category, message }).catch(() => undefined);
+}
+
 const startupStageOrder: StartupReadinessKey[] = [
   "instruments",
   "components",
@@ -73,12 +81,42 @@ export function App() {
     const devFixture = new URLSearchParams(window.location.search).get("beatDevFixture");
     if (devFixture === "ui-elements") return <SolidUiKitCatalog />;
     if (devFixture === "ui-one-pager") return <UiKitOnePager />;
+    if (devFixture === "aurum-editor") {
+      const instrument = createAurumTestInstruments("dev-aurum-editor")[1];
+      return (
+        <>
+          <AurumEditor instrument={instrument} onCommit={() => undefined} onClose={() => undefined} />
+          <AppDialogHost />
+        </>
+      );
+    }
+    if (devFixture === "lumen-sample-slices") {
+      const draft = createDefaultLumenDraft();
+      const slotC = draft.metadata.lumenSourceRack?.slots.find((slot) => slot.id === "c");
+      if (slotC) slotC.mode = "sample";
+      if (draft.metadata.lumenSampleSlots?.c) {
+        draft.metadata.lumenSampleSlots.c.slices = [
+          { id: "slice-1", startRatio: 0.18, endRatio: 0.64 },
+          { id: "slice-2", startRatio: 0.68, endRatio: 0.92 },
+        ];
+      }
+      draft.parameters["lumen.source.c.sample.selectedSliceId"] = "slice-1";
+      useSynthStore.getState().setDraft(draft);
+      return (
+        <>
+          <SynthEditor hotkeyScopeId="lumen-sample-slices" editorKind="lumen" />
+          <AppDialogHost />
+        </>
+      );
+    }
   }
 
   const shouldMountEditorHost = createStoreSelector(useUiStore, (s) => s.openEditors.length > 0 || Boolean(s.trackEffectsEditorTrackId));
+  const documentOpen = createStoreSelector(useDocumentStore, (s) => s.documentOpen);
   const themeContrastLevel = createStoreSelector(useSettingsStore, (s) => s.themeContrastLevel);
   const themeMode = createStoreSelector(useSettingsStore, (s) => s.themeMode);
   const [showHome, setShowHome] = createSignal(true);
+  const showHomeSurface = createMemo(() => showHome() && !documentOpen());
   const [startupReadiness, setStartupReadiness] = createSignal<Record<StartupReadinessKey, boolean>>(initialStartupReadiness(), { equals: false });
   const [startupMinimumElapsed, setStartupMinimumElapsed] = createSignal(false);
   let startupReadySent = false;
@@ -92,8 +130,19 @@ export function App() {
     setStartupReadiness((current) => ({ ...current, [key]: true }));
   }
 
+  function finishStartupStage(key: StartupReadinessKey, startedAt: number, itemCount: number) {
+    markStartupReady(key);
+    void send({
+      kind: "app.startupStage",
+      stage: key,
+      durationMs: Math.max(0, performance.now() - startedAt),
+      itemCount: Math.max(0, itemCount),
+    });
+  }
+
   onMount(() => {
     const cleanupHotkeys = installGlobalHotkeys();
+    void send({ kind: "app.shellReady" });
     const timer = window.setTimeout(() => setStartupMinimumElapsed(true), STARTUP_MINIMUM_VISIBLE_MS);
     onCleanup(() => {
       cleanupHotkeys();
@@ -116,6 +165,37 @@ export function App() {
     onCleanup(() => window.removeEventListener("keydown", onKeyDown, true));
   });
 
+  onMount(() => {
+    const onFrontendError = (event: ErrorEvent) => {
+      const location = event.filename
+        ? ` at ${event.filename}${event.lineno ? `:${event.lineno}:${event.colno || 0}` : ""}`
+        : "";
+      writeFrontendDiagnostic("frontend-error", `${event.message || "Unknown frontend error"}${location}`);
+    };
+    const onUnhandledRejection = (event: PromiseRejectionEvent) => {
+      const reason = event.reason instanceof Error
+        ? `${event.reason.name}: ${event.reason.message}${event.reason.stack ? `\n${event.reason.stack}` : ""}`
+        : String(event.reason ?? "Unknown rejected promise");
+      writeFrontendDiagnostic("frontend-error", `Unhandled rejection: ${reason}`);
+    };
+    window.addEventListener("error", onFrontendError);
+    window.addEventListener("unhandledrejection", onUnhandledRejection);
+    onCleanup(() => {
+      window.removeEventListener("error", onFrontendError);
+      window.removeEventListener("unhandledrejection", onUnhandledRejection);
+    });
+  });
+
+  onMount(() => {
+    const syncDocumentSurface = (state: ReturnType<typeof useDocumentStore.getState>) => {
+      document.documentElement.dataset.beatDocumentOpen = state.documentOpen ? "1" : "0";
+      if (state.documentOpen) closeHome();
+    };
+    syncDocumentSurface(useDocumentStore.getState());
+    const unsubscribe = useDocumentStore.subscribe(syncDocumentSurface);
+    onCleanup(unsubscribe);
+  });
+
   createEffect(() => {
     if (startupReadySent || !startupMinimumElapsed() || !allStartupReady(startupReadiness())) return;
     startupReadySent = true;
@@ -125,6 +205,19 @@ export function App() {
   createEffect(() => {
     document.documentElement.dataset.themeContrast = themeContrastLevel();
     document.documentElement.dataset.theme = themeMode();
+  });
+
+  createEffect(() => {
+    const expected = showHomeSurface() ? "home" : "editor";
+    const open = documentOpen();
+    const requestedHome = showHome();
+    document.documentElement.dataset.beatShowHomeSignal = requestedHome ? "1" : "0";
+    document.documentElement.dataset.beatExpectedSurface = expected;
+    window.requestAnimationFrame(() => {
+      const homeMounted = Boolean(document.querySelector('[data-beat-surface="home"]'));
+      const editorMounted = Boolean(document.querySelector('[data-beat-surface="editor"]'));
+      writeFrontendDiagnostic("project-ui", `surface rendered expected=${expected} documentOpen=${open ? 1 : 0} showHome=${requestedHome ? 1 : 0} homeMounted=${homeMounted ? 1 : 0} editorMounted=${editorMounted ? 1 : 0}`);
+    });
   });
 
   onMount(() => {
@@ -145,10 +238,14 @@ export function App() {
 
   function closeHome() {
     setShowHome(false);
+    document.documentElement.dataset.beatHomeRequested = "editor";
   }
 
   async function openHome() {
-    if (await closeCurrentDocumentForHome()) setShowHome(true);
+    if (await closeCurrentDocumentForHome()) {
+      setShowHome(true);
+      document.documentElement.dataset.beatHomeRequested = "home";
+    }
   }
 
   function openUserGuide() {
@@ -161,13 +258,23 @@ export function App() {
   }
 
   async function openFromHome() {
+    const startedAt = performance.now();
+    writeFrontendDiagnostic("project-ui", "picker open requested from Home");
     const result = await openDocumentFromUserChoice();
-    if (result === "opened") closeHome();
+    if (result === "opened") {
+      closeHome();
+      writeFrontendDiagnostic("project-ui", `picker open applied durationMs=${(performance.now() - startedAt).toFixed(2)}`);
+    }
   }
 
   async function openRecentFromHome(path: string) {
+    const startedAt = performance.now();
+    writeFrontendDiagnostic("project-ui", `recent open requested path=${path}`);
     const result = await openRecentDocument(path);
-    if (result === "opened") closeHome();
+    if (result === "opened") {
+      closeHome();
+      writeFrontendDiagnostic("project-ui", `recent open applied path=${path} durationMs=${(performance.now() - startedAt).toFixed(2)}`);
+    }
   }
 
   async function removeRecentFromHome(path: string) {
@@ -181,7 +288,7 @@ export function App() {
 
   async function revealRecentFromHome(path: string) {
     if (!isNative()) {
-      await appAlert("View in Folder is only available in the native app.");
+      await appAlert("Reveal in Finder is only available in the native app.");
       return;
     }
     const result = await send({ kind: "project.revealFile", path });
@@ -191,36 +298,59 @@ export function App() {
       if (shouldRemove) await removeRecentFromHome(path);
       return;
     }
-    throw new Error(result.error || "Could not reveal this project file.");
+    throw new Error(result.error || "Could not reveal this project file in Finder.");
+  }
+
+  async function duplicateRecentFromHome(path: string) {
+    if (!isNative()) {
+      await appAlert("Duplicate Project is only available in the native app.");
+      return;
+    }
+    const result = await send({ kind: "project.duplicateFile", path });
+    if (!result.ok || !result.project) {
+      if (result.missing) {
+        const shouldRemove = await appConfirm("This project file could not be found. Remove it from Recent?");
+        if (shouldRemove) await removeRecentFromHome(path);
+        return;
+      }
+      throw new Error(result.error || "Could not duplicate this project.");
+    }
+    useDocumentStore.getState().addRecentProject(result.project);
   }
 
   onMount(() => {
-    void pruneBlankUntitledProjects().catch((error) => {
-      // eslint-disable-next-line no-console
-      console.warn("[Beat] Could not prune blank local project clutter", error);
-    });
+    const timer = window.setTimeout(() => {
+      void pruneBlankUntitledProjects().catch((error) => {
+        // eslint-disable-next-line no-console
+        console.warn("[Beat] Could not prune blank local project clutter", error);
+      });
+    }, 10_000);
+    onCleanup(() => window.clearTimeout(timer));
   });
 
   onMount(() => {
     if (!isNative()) return;
-    void send({ kind: "project.recentList" })
-      .then((result) => {
-        const existingPaths = result.projects
-          .filter((project) => project.exists !== false && Boolean(project.path))
-          .map((project) => project.path);
-        const documentStore = useDocumentStore.getState();
-        for (const path of documentStore.recentFilePaths) {
-          if (!existingPaths.includes(path)) documentStore.removeRecentFilePath(path);
-        }
-        for (const project of result.projects) {
-          if (project.exists === false || !project.path) continue;
-          useDocumentStore.getState().addRecentProject(project);
-        }
-      })
-      .catch((error) => {
-        // eslint-disable-next-line no-console
-        console.warn("[Beat] Could not load recent projects", error);
-      });
+    const timer = window.setTimeout(() => {
+      void send({ kind: "project.recentList" })
+        .then((result) => {
+          const existingPaths = result.projects
+            .filter((project) => project.exists !== false && Boolean(project.path))
+            .map((project) => project.path);
+          const documentStore = useDocumentStore.getState();
+          for (const path of documentStore.recentFilePaths) {
+            if (!existingPaths.includes(path)) documentStore.removeRecentFilePath(path);
+          }
+          for (const project of result.projects) {
+            if (project.exists === false || !project.path) continue;
+            useDocumentStore.getState().addRecentProject(project);
+          }
+        })
+        .catch((error) => {
+          // eslint-disable-next-line no-console
+          console.warn("[Beat] Could not load recent projects", error);
+        });
+    }, 1_500);
+    onCleanup(() => window.clearTimeout(timer));
   });
 
   onMount(() => startAnalyzerClient());
@@ -228,6 +358,7 @@ export function App() {
   onMount(() => {
     let hydrated = false;
     let timer: number | null = null;
+    const startedAt = performance.now();
 
     void listInstruments()
       .then(({ instruments, sets }) => {
@@ -246,18 +377,18 @@ export function App() {
           }
         }
         hydrated = true;
-        markStartupReady("instruments");
+        finishStartupStage("instruments", startedAt, useInstrumentStore.getState().instruments.length);
       })
       .catch((error) => {
         // eslint-disable-next-line no-console
         console.error("[Beat] Instrument library hydration failed", error);
         useInstrumentStore.getState().setLoading(false);
-        markStartupReady("instruments");
+        finishStartupStage("instruments", startedAt, useInstrumentStore.getState().instruments.length);
       });
 
     const unsub = useInstrumentStore.subscribe((state) => {
       if (!hydrated) return;
-      scheduleCurrentDocumentDirtyState();
+      if (allStartupReady(startupReadiness())) scheduleCurrentDocumentDirtyState();
       if (timer) window.clearTimeout(timer);
       timer = window.setTimeout(() => {
         const instruments = state.instruments.map((instrument) => structuredClone(instrument));
@@ -274,6 +405,7 @@ export function App() {
   onMount(() => {
     let hydrated = false;
     let timer: number | null = null;
+    const startedAt = performance.now();
 
     void listComponents()
       .then(({ components, folders }) => {
@@ -284,11 +416,11 @@ export function App() {
         // eslint-disable-next-line no-console
         console.error("[Beat] Component library hydration failed", error);
       })
-      .finally(() => markStartupReady("components"));
+      .finally(() => finishStartupStage("components", startedAt, useComponentStore.getState().components.length));
 
     const unsub = useComponentStore.subscribe((state) => {
       if (!hydrated) return;
-      scheduleCurrentDocumentDirtyState();
+      if (allStartupReady(startupReadiness())) scheduleCurrentDocumentDirtyState();
       if (timer) window.clearTimeout(timer);
       timer = window.setTimeout(() => {
         const snapshot = state.components
@@ -308,23 +440,24 @@ export function App() {
 
   onMount(() => {
     let hydrated = false;
+    const startedAt = performance.now();
     void (async () => {
       try {
-        for (const file of await listAudioFiles()) useAudioFileStore.getState().addFile(file);
-        const resp = await send({ kind: "audio.list" });
-        for (const file of resp.files) useAudioFileStore.getState().addFile(file);
+        const localFiles = await listAudioFiles();
+        useAudioFileStore.getState().hydrateFiles(localFiles);
         hydrated = true;
       } catch (error) {
         // eslint-disable-next-line no-console
-        console.error("[Beat] Audio library hydration failed", error);
+        console.error("[Beat] Local audio library hydration failed", error);
+        hydrated = true;
       } finally {
-        markStartupReady("audio");
+        finishStartupStage("audio", startedAt, useAudioFileStore.getState().files.length);
       }
     })();
     let timer: number | null = null;
     const unsub = useAudioFileStore.subscribe((state) => {
       if (!hydrated) return;
-      scheduleCurrentDocumentDirtyState();
+      if (allStartupReady(startupReadiness())) scheduleCurrentDocumentDirtyState();
       if (timer) window.clearTimeout(timer);
       timer = window.setTimeout(() => {
         const files = state.files.map((file) => structuredClone(file));
@@ -401,12 +534,47 @@ export function App() {
 
   onMount(() => {
     let timer: number | null = null;
+    const persistRecoverySnapshot = () => {
+      if (!useDocumentStore.getState().documentOpen) return;
+      if (!useSettingsStore.getState().autosaveBackups) return;
+      if (timer) window.clearTimeout(timer);
+      timer = window.setTimeout(() => {
+        timer = null;
+        const project = structuredClone(useProjectStore.getState().project);
+        void saveProject(project).catch((error) => {
+          console.error("[Beat] Local recovery autosave failed", error);
+          writeFrontendDiagnostic(
+            "project-recovery",
+            `local autosave failed: ${error instanceof Error ? error.message : String(error)}`,
+          );
+        });
+      }, 500);
+    };
+    const unsubProject = useProjectStore.subscribe(persistRecoverySnapshot);
+    const unsubSettings = useSettingsStore.subscribe((state, previous) => {
+      if (state.autosaveBackups && !previous.autosaveBackups) persistRecoverySnapshot();
+      if (!state.autosaveBackups && timer) {
+        window.clearTimeout(timer);
+        timer = null;
+      }
+    });
+    onCleanup(() => {
+      if (timer) window.clearTimeout(timer);
+      unsubProject();
+      unsubSettings();
+    });
+  });
+
+  onMount(() => {
+    let timer: number | null = null;
     const apply = () => {
       if (timer) window.clearTimeout(timer);
       timer = window.setTimeout(() => {
         const project = structuredClone(useProjectStore.getState().project);
-        const instruments = useInstrumentStore.getState().instruments.map((instrument) => structuredClone(instrument));
-        const audioFiles = useAudioFileStore.getState().files.map((file) => structuredClone(file));
+        const instruments = engineInstrumentsForProject(project, useInstrumentStore.getState().instruments)
+          .map((instrument) => structuredClone(instrument));
+        const audioFiles = engineAudioFilesForProject(project, useAudioFileStore.getState().files)
+          .map((file) => structuredClone(file));
         void send({ kind: "engine.applyProject", project, instruments, audioFiles });
       }, 120);
     };
@@ -516,7 +684,8 @@ export function App() {
     onNew: () => void createFromHome(),
     onOpen: () => void openFromHome().catch((error) => appAlert(error instanceof Error ? error.message : "Open failed.")),
     onRecent: (path: string) => void openRecentFromHome(path).catch((error) => appAlert(error instanceof Error ? error.message : "Open recent failed.")),
-    onRevealRecent: (path: string) => void revealRecentFromHome(path).catch((error) => appAlert(error instanceof Error ? error.message : "View in Folder failed.")),
+    onRevealRecent: (path: string) => void revealRecentFromHome(path).catch((error) => appAlert(error instanceof Error ? error.message : "Reveal in Finder failed.")),
+    onDuplicateRecent: (path: string) => void duplicateRecentFromHome(path).catch((error) => appAlert(error instanceof Error ? error.message : "Duplicate project failed.")),
     onRemoveRecent: (path: string) => void removeRecentFromHome(path).catch((error) => appAlert(error instanceof Error ? error.message : "Remove recent failed.")),
     onSave: () => void saveFromMenu(false),
     onSaveAs: () => void saveFromMenu(true),
@@ -531,6 +700,7 @@ export function App() {
     onHome: () => void openHome(),
     onNew: () => void createFromHome(),
     onOpen: () => void openFromHome().catch((error) => appAlert(error instanceof Error ? error.message : "Open failed.")),
+    onImportAudio: () => void importAudioFromMenu(),
     onSave: () => void saveFromMenu(false),
     onSaveAs: () => void saveFromMenu(true),
     onExport: () => void runProjectExport().catch((error) => appAlert(error instanceof Error ? error.message : "Export failed.")),
@@ -546,7 +716,7 @@ export function App() {
   return (
     <>
       <Show
-        when={!showHome()}
+        when={!showHomeSurface()}
         fallback={(
           <>
             <HomeHub {...homeProps()} />
@@ -562,10 +732,9 @@ export function App() {
         <Visualizer />
         <TimelineMidiPlayback />
         <LiveMidiExpressionInput />
-        <TrainingAutoRunner />
         <RenderTimingPanel />
         <ExportJobPanel />
-        <div class="app-root">
+        <div class="app-root" data-beat-surface="editor">
           <TopBar props={topBarProps} />
           <main class="app-main">
             <Sidebar />
@@ -582,6 +751,7 @@ export function App() {
         <AppDialogHost />
         <StartupSplash props={() => ({ stages: startupStages() })} />
       </Show>
+      <DiagnosticLogPanel />
     </>
   );
 }
@@ -620,8 +790,7 @@ async function handleNativeMenuCommand(command: "newProject" | "openProject" | "
       return;
     }
     case "importAudio": {
-      const files = await importAudioFiles();
-      for (const file of files) useAudioFileStore.getState().addFile(file);
+      await importAudioFromMenu();
       return;
     }
     case "exportWav":
@@ -630,6 +799,15 @@ async function handleNativeMenuCommand(command: "newProject" | "openProject" | "
     case "preferences":
       useUiStore.getState().openEditor({ kind: "preferences" });
       return;
+  }
+}
+
+async function importAudioFromMenu() {
+  try {
+    const files = await importAudioFiles();
+    for (const file of files) useAudioFileStore.getState().addFile(file);
+  } catch (error) {
+    await appAlert(error instanceof Error ? error.message : "Audio import failed.");
   }
 }
 

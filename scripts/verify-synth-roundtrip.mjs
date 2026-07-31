@@ -22,6 +22,7 @@ try {
       join(repoRoot, "frontend/src/audio/synthPreview.ts"),
       join(repoRoot, "frontend/src/audio/liveMidiExpression.ts"),
       join(repoRoot, "frontend/src/ai/aiService.ts"),
+      join(repoRoot, "frontend/src/features/Synth/lumenClipPianoRoll.ts"),
       "--bundle",
       "--format=esm",
       "--platform=node",
@@ -37,6 +38,26 @@ try {
   const synthPreview = await import(pathToFileURL(join(outDir, "audio/synthPreview.js")));
   const liveMidiExpression = await import(pathToFileURL(join(outDir, "audio/liveMidiExpression.js")));
   const aiService = await import(pathToFileURL(join(outDir, "ai/aiService.js")));
+  const lumenClipPianoRoll = await import(pathToFileURL(join(outDir, "features/Synth/lumenClipPianoRoll.js")));
+
+  const classicSamplerFixture = {
+    id: "classic-sampler-fixture",
+    name: "Classic Sampler Fixture",
+    kind: "sampler",
+    envelope: { attackMs: 1, decayMs: 80, sustain: 0, releaseMs: 120 },
+    knobs: { cutoff: 1, resonance: 0, drive: 0, color: 0.5 },
+    waveform: "sample",
+    sampleIds: [],
+    sampleUrl: "/samples/cr78/cymbal.wav",
+    userCreated: false,
+  };
+  assert.equal(synthPreview.nativeInstrumentSamplePath("/samples/cr78/cymbal.wav"), null, "bundled samples must remain WebView resource URLs");
+  assert.equal(synthPreview.nativeInstrumentSamplePath("/Users/example/Kick.wav"), "/Users/example/Kick.wav", "absolute user sample paths must use native file loading");
+  assert.equal(synthPreview.nativeInstrumentSamplePath("file:///Users/example/Kick.wav"), "/Users/example/Kick.wav", "file URLs must use native file loading");
+  assert.equal(synthPreview.instrumentRequiresSamplePlayback(classicSamplerFixture), true);
+  const missingSamplerSamples = new Float32Array(256).fill(1);
+  synthPreview.renderInstrumentSamples(classicSamplerFixture, missingSamplerSamples, 48000, synthPreview.previewFrequency(classicSamplerFixture), "audio", true);
+  assert.equal(missingSamplerSamples.every((sample) => sample === 0), true, "a missing sampler asset must stay silent instead of rendering the generic synth fallback");
 
   const draft = synthStore.normalizeSynthDraftPatch({
     name: "Roundtrip Probe",
@@ -124,7 +145,7 @@ try {
       { id: "route", source: "lfo.1", target: "osc.a.position", amount: -0.21, bipolar: false, enabled: true },
       { id: "route", source: "lfo.1", target: "osc.a.fine", amount: 0.4, bipolar: true, enabled: true },
       { id: "route_lfo2_b_pan", source: "lfo.2", target: "osc.b.pan", amount: -0.25, bipolar: true, enabled: true },
-      { id: "filter_env", source: "env.1", target: "filter.cutoff", amount: 0.31, bipolar: false, enabled: true },
+      { id: "filter_env", source: "env.1", target: "filter.cutoff", amount: 0.31, bipolar: false, enabled: true, curve: "ease-in" },
       { id: "env2_res", source: "env.2", target: "filter.resonance", amount: 0.2, bipolar: false, enabled: true },
       { id: "keytrack_level", source: "keytrack", target: "osc.a.level", amount: 0.2, bipolar: false, enabled: true },
       { id: "modwheel_pan", source: "modWheel", target: "amp.pan", amount: 0.35, bipolar: true, enabled: true },
@@ -166,100 +187,427 @@ try {
   assert.equal(draft.parameters["osc.a.unison.spread"], 0.5);
   assert.equal(draft.parameters["osc.b.unison.spread"], 0.5);
 
-  const lumusDraft = synthStore.createDefaultLumusDraft();
-  assert.equal(lumusDraft.instrumentType, "lumus-hybrid-synth", "Lumus must have an independent instrument identity");
-  assert.equal(lumusDraft.namespace, "lumus", "Lumus must not serialize into Aether's namespace");
-  assert.equal(lumusDraft.schemaVersion, 10, "Lumus must use the bounded clip-sequencer schema");
-  assert.equal(lumusDraft.metadata.lumusSourceRack.schemaVersion, 2);
-  assert.equal(lumusDraft.name, "Lumus Init");
-  assert.deepEqual(lumusDraft.metadata.oscillators.map(({ id }) => id), ["a", "b", "c"], "Lumus must expose exactly three stable source identities");
-  assert.equal(lumusDraft.parameters["osc.c.enabled"], false, "Slot C must migrate in silently disabled");
-  const normalizedLumus = synthStore.normalizeSynthDraftPatch(structuredClone(lumusDraft));
-  assert.equal(normalizedLumus.instrumentType, "lumus-hybrid-synth", "normalization must preserve Lumus identity");
-  assert.equal(normalizedLumus.namespace, "lumus", "normalization must preserve the Lumus namespace");
-  const lumusInstrumentPatch = synthStore.synthDraftToInstrumentPatch(normalizedLumus);
-  assert.equal(lumusInstrumentPatch.synthPatch.instrumentType, "lumus-hybrid-synth", "instrument conversion must preserve Lumus identity");
-  assert.equal(lumusInstrumentPatch.synthPatch.namespace, "lumus", "instrument conversion must preserve the Lumus namespace");
-  const restoredLumus = synthStore.synthDraftFromInstrument({ id: "lumus-roundtrip", ...lumusInstrumentPatch });
-  assert.equal(restoredLumus.instrumentType, "lumus-hybrid-synth", "instrument roundtrip must not migrate Lumus into Aether");
-  assert.equal(restoredLumus.namespace, "lumus");
-  const routedLumus = synthStore.normalizeSynthDraftPatch({
-    ...structuredClone(lumusDraft),
+  const lumenDraft = synthStore.createDefaultLumenDraft();
+  assert.equal(lumenDraft.instrumentType, "lumen-hybrid-synth", "Lumen must have an independent instrument identity");
+  assert.equal(lumenDraft.namespace, "lumen", "Lumen must not serialize into Aether's namespace");
+  assert.equal(lumenDraft.schemaVersion, 16, "Lumen must expose keytracked LFO rates on top of the prepared spectral-warp contract");
+  assert.equal(lumenDraft.metadata.lumenSourceRack.schemaVersion, 2);
+  assert.equal(lumenDraft.name, "Lumen Init");
+  assert.deepEqual(lumenDraft.metadata.oscillators.map(({ id }) => id), ["a", "b", "c"], "Lumen must expose exactly three stable source identities");
+  assert.equal(lumenDraft.parameters["osc.c.enabled"], false, "Slot C must migrate in silently disabled");
+  for (const slot of ["a", "b", "c"]) {
+    assert.equal(lumenDraft.parameters[`lumen.source.${slot}.sample.direction`], "forward");
+    assert.equal(lumenDraft.parameters[`lumen.source.${slot}.sample.playbackRate`], 1);
+    assert.equal(lumenDraft.parameters[`lumen.source.${slot}.sample.loopMode`], "forward");
+    assert.equal(lumenDraft.parameters[`lumen.source.${slot}.sample.releaseTailMs`], 4);
+    assert.equal(lumenDraft.parameters[`lumen.source.${slot}.sample.selectedSliceId`], "");
+    assert.equal(lumenDraft.metadata.lumenSampleSlots[slot].schemaVersion, 2);
+    assert.deepEqual(lumenDraft.metadata.lumenSampleSlots[slot].slices, []);
+  }
+
+  const legacyLumusDraft = structuredClone(lumenDraft);
+  legacyLumusDraft.instrumentType = "lumus-hybrid-synth";
+  legacyLumusDraft.namespace = "lumus";
+  legacyLumusDraft.parameters = Object.fromEntries(Object.entries(legacyLumusDraft.parameters).map(([id, value]) => [
+    id.startsWith("lumen.") ? `lumus.${id.slice("lumen.".length)}` : id,
+    value,
+  ]));
+  legacyLumusDraft.parameters["lumus.arp.swing"] = 0.37;
+  legacyLumusDraft.metadata.lumusSourceRack = legacyLumusDraft.metadata.lumenSourceRack;
+  legacyLumusDraft.metadata.lumusSampleSlots = legacyLumusDraft.metadata.lumenSampleSlots;
+  legacyLumusDraft.metadata.lumusGranularSlots = legacyLumusDraft.metadata.lumenGranularSlots;
+  legacyLumusDraft.metadata.lumusClip = legacyLumusDraft.metadata.lumenClip;
+  delete legacyLumusDraft.metadata.lumenSourceRack;
+  delete legacyLumusDraft.metadata.lumenSampleSlots;
+  delete legacyLumusDraft.metadata.lumenGranularSlots;
+  delete legacyLumusDraft.metadata.lumenClip;
+  legacyLumusDraft.metadata.tags = ["lumus", "lumus-test-bank", "legacy-fixture"];
+  const legacyLumusBeforeMigration = structuredClone(legacyLumusDraft);
+  const migratedLumen = synthStore.normalizeSynthDraftPatch(legacyLumusDraft);
+  assert.deepEqual(legacyLumusDraft, legacyLumusBeforeMigration, "Lumus compatibility migration must not mutate persisted input");
+  assert.equal(migratedLumen.instrumentType, "lumen-hybrid-synth", "legacy Lumus type must migrate to Lumen");
+  assert.equal(migratedLumen.namespace, "lumen", "legacy Lumus namespace must migrate to Lumen");
+  assert.equal(migratedLumen.parameters["lumen.arp.swing"], 0.37, "legacy Lumus parameter values must survive migration");
+  assert.equal(Object.keys(migratedLumen.parameters).some((id) => id.startsWith("lumus.")), false);
+  assert.equal(migratedLumen.metadata.lumenSourceRack.schemaVersion, 2);
+  assert.equal(migratedLumen.metadata.lumenSampleSlots.a.schemaVersion, 2);
+  assert.equal(migratedLumen.metadata.lumenGranularSlots.a.schemaVersion, 1);
+  assert.equal(migratedLumen.metadata.lumenClip.schemaVersion, 2);
+  assert.equal(Object.prototype.hasOwnProperty.call(migratedLumen.metadata, "lumusSourceRack"), false);
+  assert.deepEqual(migratedLumen.metadata.tags, ["lumen", "lumen-test-bank", "legacy-fixture"]);
+  const migratedLumenSave = JSON.stringify(synthStore.synthDraftToInstrumentPatch(migratedLumen));
+  assert.equal(migratedLumenSave.includes("lumus"), false, "the next save after migration must emit only canonical Lumen engine data");
+
+  const aetherCloneSource = synthStore.normalizeSynthDraftPatch({
+    ...synthStore.createDefaultSynthDraft(),
+    name: "Aether Source",
     parameters: {
-      ...lumusDraft.parameters,
+      ...synthStore.createDefaultSynthDraft().parameters,
+      "osc.a.position": 0.73,
+      "filter.cutoff": 2345,
+      "macro.1": 0.82,
+    },
+    metadata: {
+      ...synthStore.createDefaultSynthDraft().metadata,
+      tags: ["source-tag"],
+      macros: { "macro.1": { id: "macro.1", label: "Source Macro", min: 0.1, max: 0.9, curve: "ease-out" } },
+    },
+  });
+  const sourceBeforeClone = structuredClone(aetherCloneSource);
+  const clonedLumen = synthStore.cloneAetherDraftAsLumen(aetherCloneSource, "Aether Source Lumen");
+  assert.deepEqual(aetherCloneSource, sourceBeforeClone, "Lumen conversion must never mutate the Aether source patch");
+  assert.equal(clonedLumen.instrumentType, "lumen-hybrid-synth");
+  assert.equal(clonedLumen.namespace, "lumen");
+  assert.equal(clonedLumen.schemaVersion, 16);
+  assert.equal(clonedLumen.name, "Aether Source Lumen");
+  assert.equal(clonedLumen.parameters["osc.a.position"], 0.73, "Lumen clones must preserve Aether oscillator state");
+  assert.equal(clonedLumen.parameters["filter.cutoff"], 2345, "Lumen clones must preserve Aether filter state");
+  assert.equal(clonedLumen.parameters["macro.1"], 0.82, "Lumen clones must preserve Aether macro values");
+  assert.equal(clonedLumen.metadata.macros["macro.1"].label, "Source Macro", "Lumen clones must preserve Aether macro definitions");
+  assert.equal(clonedLumen.parameters["osc.c.enabled"], false, "Lumen-only source C must remain silent after conversion");
+  assert.equal(clonedLumen.parameters["lumen.arp.enabled"], false, "Lumen performance tools must remain opt-in after conversion");
+  assert.equal(clonedLumen.parameters["lumen.clip.enabled"], false, "Lumen clip playback must remain opt-in after conversion");
+  assert.throws(
+    () => synthStore.cloneAetherDraftAsLumen(lumenDraft),
+    /lumen\.clone\.source-not-aether/,
+    "Lumen patches must not be re-converted as if they were Aether",
+  );
+  const normalizedLumen = synthStore.normalizeSynthDraftPatch(structuredClone(lumenDraft));
+  assert.equal(normalizedLumen.instrumentType, "lumen-hybrid-synth", "normalization must preserve Lumen identity");
+  assert.equal(normalizedLumen.namespace, "lumen", "normalization must preserve the Lumen namespace");
+  const lumenInstrumentPatch = synthStore.synthDraftToInstrumentPatch(normalizedLumen);
+  assert.equal(lumenInstrumentPatch.synthPatch.instrumentType, "lumen-hybrid-synth", "instrument conversion must preserve Lumen identity");
+  assert.equal(lumenInstrumentPatch.synthPatch.namespace, "lumen", "instrument conversion must preserve the Lumen namespace");
+  const restoredLumen = synthStore.synthDraftFromInstrument({ id: "lumen-roundtrip", ...lumenInstrumentPatch });
+  assert.equal(restoredLumen.instrumentType, "lumen-hybrid-synth", "instrument roundtrip must not migrate Lumen into Aether");
+  assert.equal(restoredLumen.namespace, "lumen");
+  const routedLumen = synthStore.normalizeSynthDraftPatch({
+    ...structuredClone(lumenDraft),
+    parameters: {
+      ...lumenDraft.parameters,
       "osc.c.enabled": true,
       "osc.c.route": "filter2",
       "osc.c.fxSend1": 0.64,
-      "aether.fxBus1Id": "lumus-return-a",
-      "aether.fxBus2Id": "lumus-return-b",
+      "aether.fxBus1Id": "lumen-return-a",
+      "aether.fxBus2Id": "lumen-return-b",
     },
     effects: { filters: [
-      { id: "lumus-drive", kind: "saturator", bypassed: false, params: { drive: 58, mix: 72 } },
-      { id: "lumus-tone", kind: "lowpass", bypassed: true, params: { cutoffHz: 4200, resonance: 18 } },
+      { id: "lumen-drive", kind: "saturator", bypassed: false, params: { drive: 58, mix: 72 } },
+      { id: "lumen-tone", kind: "lowpass", bypassed: true, params: { cutoffHz: 4200, resonance: 18 } },
     ] },
   });
-  const routedInstrument = synthStore.synthDraftToInstrumentPatch(routedLumus);
-  assert.deepEqual(routedInstrument.aether.fxBusIds, ["lumus-return-a", "lumus-return-b"]);
+  const routedInstrument = synthStore.synthDraftToInstrumentPatch(routedLumen);
+  assert.deepEqual(routedInstrument.aether.fxBusIds, ["lumen-return-a", "lumen-return-b"]);
   assert.deepEqual(routedInstrument.aether.oscillators?.find(({ id }) => id === "c")?.fxSends, [0.64, 0]);
-  assert.deepEqual(routedInstrument.effects.filters.map(({ id }) => id), ["lumus-drive", "lumus-tone"]);
-  const restoredRoutedLumus = synthStore.synthDraftFromInstrument({ id: "lumus-routing-roundtrip", ...routedInstrument });
-  assert.equal(restoredRoutedLumus.parameters["osc.c.route"], "filter2");
-  assert.equal(restoredRoutedLumus.parameters["osc.c.fxSend1"], 0.64);
-  assert.equal(restoredRoutedLumus.parameters["aether.fxBus1Id"], "lumus-return-a");
-  assert.deepEqual(restoredRoutedLumus.effects.filters.map(({ id, bypassed }) => ({ id, bypassed })), [
-    { id: "lumus-drive", bypassed: false },
-    { id: "lumus-tone", bypassed: true },
+  assert.deepEqual(routedInstrument.effects.filters.map(({ id }) => id), ["lumen-drive", "lumen-tone"]);
+  const restoredRoutedLumen = synthStore.synthDraftFromInstrument({ id: "lumen-routing-roundtrip", ...routedInstrument });
+  assert.equal(restoredRoutedLumen.parameters["osc.c.route"], "filter2");
+  assert.equal(restoredRoutedLumen.parameters["osc.c.fxSend1"], 0.64);
+  assert.equal(restoredRoutedLumen.parameters["aether.fxBus1Id"], "lumen-return-a");
+  assert.deepEqual(restoredRoutedLumen.effects.filters.map(({ id, bypassed }) => ({ id, bypassed })), [
+    { id: "lumen-drive", bypassed: false },
+    { id: "lumen-tone", bypassed: true },
   ]);
   assert.throws(
-    () => synthStore.normalizeSynthDraftPatch({ ...lumusDraft, namespace: "synth" }),
-    /lumus\.identity\.namespace-mismatch/,
-    "Lumus namespace mismatches must fail diagnostically",
+    () => synthStore.normalizeSynthDraftPatch({ ...lumenDraft, namespace: "synth" }),
+    /lumen\.identity\.namespace-mismatch/,
+    "Lumen namespace mismatches must fail diagnostically",
   );
   assert.throws(
-    () => synthStore.normalizeSynthDraftPatch({ ...lumusDraft, schemaVersion: 11 }),
-    /lumus\.schema\.unsupported/,
-    "future or inconsistent Lumus schemas must not be silently normalized",
+    () => synthStore.normalizeSynthDraftPatch({ ...lumenDraft, schemaVersion: 17 }),
+    /lumen\.schema\.unsupported/,
+    "future or inconsistent Lumen schemas must not be silently normalized",
   );
 
   const aetherInit = synthStore.createDefaultSynthDraft();
   const aetherInitLeft = new Float32Array(2048);
   const aetherInitRight = new Float32Array(2048);
-  const lumusInitLeft = new Float32Array(2048);
-  const lumusInitRight = new Float32Array(2048);
+  const lumenInitLeft = new Float32Array(2048);
+  const lumenInitRight = new Float32Array(2048);
   synthPreview.renderInstrumentStereoSamples(synthStore.synthDraftToPreviewInstrument(aetherInit), aetherInitLeft, aetherInitRight, 48000, 261.625565, "audio");
-  synthPreview.renderInstrumentStereoSamples(synthStore.synthDraftToPreviewInstrument(lumusDraft), lumusInitLeft, lumusInitRight, 48000, 261.625565, "audio");
-  assert.deepEqual(lumusInitLeft, aetherInitLeft, "Disabled Lumus Slot C must preserve the frozen Aether renderer");
-  assert.deepEqual(lumusInitRight, aetherInitRight, "Disabled Lumus Slot C must preserve the frozen Aether stereo renderer");
+  synthPreview.renderInstrumentStereoSamples(synthStore.synthDraftToPreviewInstrument(lumenDraft), lumenInitLeft, lumenInitRight, 48000, 261.625565, "audio");
+  assert.deepEqual(lumenInitLeft, aetherInitLeft, "Disabled Lumen Slot C must preserve the frozen Aether renderer");
+  assert.deepEqual(lumenInitRight, aetherInitRight, "Disabled Lumen Slot C must preserve the frozen Aether stereo renderer");
 
-  const migratedLumusV1 = synthStore.normalizeSynthDraftPatch({
-    ...structuredClone(lumusDraft),
-    schemaVersion: 1,
-    metadata: { ...structuredClone(lumusDraft.metadata), lumusSourceRack: undefined, oscillators: [{ id: "a", name: "A" }, { id: "b", name: "B" }] },
-    parameters: Object.fromEntries(Object.entries(lumusDraft.parameters).filter(([id]) => !id.startsWith("osc.c."))),
+  const migratedLumenV11 = synthStore.normalizeSynthDraftPatch({
+    ...structuredClone(lumenDraft),
+    schemaVersion: 11,
+    parameters: {
+      ...lumenDraft.parameters,
+      "lumen.source.a.sample.direction": "reverse",
+      "lumen.source.a.sample.playbackRate": 4,
+    },
   });
-  assert.equal(migratedLumusV1.schemaVersion, 10, "Lumus v1 must deterministically migrate to v10");
-  assert.deepEqual(migratedLumusV1.metadata.oscillators.map(({ id }) => id), ["a", "b", "c"]);
-  assert.equal(migratedLumusV1.parameters["osc.c.enabled"], false);
-  assert.equal(migratedLumusV1.parameters["lumus.arp.enabled"], false, "legacy Lumus patches must migrate with the arpeggiator off");
-  assert.equal(migratedLumusV1.parameters["lumus.arp.swing"], 0, "legacy Lumus patches must migrate with straight timing");
-  assert.equal(migratedLumusV1.parameters["lumus.arp.key"], "c");
-  assert.equal(migratedLumusV1.parameters["lumus.arp.scale"], "chromatic");
-  assert.equal(migratedLumusV1.parameters["lumus.clip.enabled"], false);
-  assert.equal(migratedLumusV1.metadata.lumusClip?.steps.length, 16);
-  const migratedLumusV3 = synthStore.normalizeSynthDraftPatch({
-    ...structuredClone(lumusDraft),
+  assert.equal(migratedLumenV11.schemaVersion, 16);
+  assert.equal(migratedLumenV11.parameters["lumen.source.a.sample.direction"], "forward", "v11 migration must not activate future reverse playback");
+  assert.equal(migratedLumenV11.parameters["lumen.source.a.sample.playbackRate"], 1, "v11 migration must not activate a future playback rate");
+  const migratedLumenV12 = synthStore.normalizeSynthDraftPatch({
+    ...structuredClone(lumenDraft),
+    schemaVersion: 12,
+    parameters: {
+      ...lumenDraft.parameters,
+      "lumen.source.a.sample.loopMode": "pingPong",
+      "lumen.source.a.sample.releaseTailMs": 900,
+    },
+  });
+  assert.equal(migratedLumenV12.schemaVersion, 16);
+  assert.equal(migratedLumenV12.parameters["lumen.source.a.sample.loopMode"], "forward", "v12 migration must not activate future ping-pong looping");
+  assert.equal(migratedLumenV12.parameters["lumen.source.a.sample.releaseTailMs"], 4, "v12 migration must retain the established four-millisecond anti-click tail");
+  const migratedLumenV13 = synthStore.normalizeSynthDraftPatch({
+    ...structuredClone(lumenDraft),
+    schemaVersion: 13,
+    parameters: {
+      ...lumenDraft.parameters,
+      "lumen.source.a.sample.selectedSliceId": "future-slice",
+    },
+    metadata: {
+      ...structuredClone(lumenDraft.metadata),
+      lumenSampleSlots: {
+        ...structuredClone(lumenDraft.metadata.lumenSampleSlots),
+        a: { schemaVersion: 2, zones: [], slices: [{ id: "future-slice", startRatio: 0.2, endRatio: 0.4 }] },
+      },
+    },
+  });
+  assert.equal(migratedLumenV13.schemaVersion, 16);
+  assert.equal(migratedLumenV13.parameters["lumen.source.a.sample.selectedSliceId"], "", "v13 migration must not activate future slice selection");
+  assert.deepEqual(migratedLumenV13.metadata.lumenSampleSlots.a.slices, [], "v13 migration must add an empty bounded slice model");
+
+  const migratedLumenV14 = synthStore.normalizeSynthDraftPatch({
+    ...structuredClone(lumenDraft),
+    schemaVersion: 14,
+    parameters: {
+      ...lumenDraft.parameters,
+      "osc.a.warpMode": "harmonic-shift",
+    },
+  });
+  assert.equal(migratedLumenV14.schemaVersion, 16);
+  assert.equal(migratedLumenV14.parameters["osc.a.warpMode"], "shape", "v14 migration must not activate a future spectral warp mode");
+
+  const lumenSpectralDraft = synthStore.normalizeSynthDraftPatch({
+    ...structuredClone(lumenDraft),
+    parameters: {
+      ...lumenDraft.parameters,
+      "osc.a.warp": 0.82,
+      "osc.a.warpMode": "spectral-smear",
+    },
+  });
+  assert.equal(lumenSpectralDraft.parameters["osc.a.warpMode"], "spectral-smear", "v15 must preserve an explicit Lumen spectral warp mode");
+  const lumenSpectralRuntime = synthStore.synthDraftToInstrumentPatch(lumenSpectralDraft);
+  assert.equal(lumenSpectralRuntime.aether.oscA.wavetable.warpMode, "spectral-smear", "Lumen spectral warp mode must reach the prepared runtime config");
+
+  const migratedLumenV15 = synthStore.normalizeSynthDraftPatch({
+    ...structuredClone(lumenDraft),
+    schemaVersion: 15,
+    parameters: {
+      ...lumenDraft.parameters,
+      "lfo.1.keytrackRate": 1,
+      "lfo.2.keytrackRate": -1,
+      "lfo.3.keytrackRate": 0.75,
+    },
+  });
+  assert.equal(migratedLumenV15.schemaVersion, 16);
+  assert.equal(migratedLumenV15.parameters["lfo.1.keytrackRate"], 0, "v15 migration must preserve its original LFO rate behavior");
+  assert.equal(migratedLumenV15.parameters["lfo.2.keytrackRate"], 0);
+  assert.equal(migratedLumenV15.parameters["lfo.3.keytrackRate"], 0);
+
+  const keytrackedLfoDraft = synthStore.normalizeSynthDraftPatch({
+    ...structuredClone(lumenDraft),
+    parameters: {
+      ...lumenDraft.parameters,
+      "lfo.1.sync": false,
+      "lfo.1.rate": 1,
+      "lfo.1.shape": "saw",
+      "lfo.1.phase": 0,
+      "lfo.1.keytrackRate": 1,
+    },
+    modulation: [{ id: "keytracked-lfo", source: "lfo.1", target: "osc.a.position", amount: 1, bipolar: true, enabled: true, curve: "linear" }],
+  });
+  const keytrackedLfoRuntime = synthStore.synthDraftToInstrumentPatch(keytrackedLfoDraft);
+  assert.equal(keytrackedLfoRuntime.lfoKeytrackRate, 1, "Lumen keytracked rate must reach the preview/native instrument contract");
+  const keytrackedPreview = synthStore.synthDraftToPreviewInstrument(keytrackedLfoDraft);
+  const c4Modulation = synthPreview.modulationAtTime(keytrackedPreview, 0.125, 1, 120, 1, 60 / 127);
+  const c5Modulation = synthPreview.modulationAtTime(keytrackedPreview, 0.125, 1, 120, 1, 72 / 127);
+  assert.ok(Math.abs(c5Modulation.targetOffsets["osc.a.position"] - c4Modulation.targetOffsets["osc.a.position"]) > 0.2,
+    "one octave at +100% key tracking must double the browser LFO rate");
+
+  const aetherKeytrackProbe = synthStore.normalizeSynthDraftPatch({
+    ...structuredClone(aetherInit),
+    parameters: { ...aetherInit.parameters, "lfo.1.keytrackRate": 1 },
+  });
+  assert.equal(aetherKeytrackProbe.parameters["lfo.1.keytrackRate"], 0, "Aether must ignore the Lumen-only keytracked-rate field");
+
+  const rejectedAetherSpectralMode = synthStore.normalizeSynthDraftPatch({
+    ...structuredClone(aetherInit),
+    parameters: {
+      ...aetherInit.parameters,
+      "osc.a.warpMode": "spectral-smear",
+    },
+  });
+  assert.equal(rejectedAetherSpectralMode.parameters["osc.a.warpMode"], "shape", "Aether must remain on its frozen warp contract");
+
+  const lumenSampleDraft = synthStore.normalizeSynthDraftPatch({
+    ...structuredClone(lumenDraft),
+    parameters: {
+      ...lumenDraft.parameters,
+      "osc.a.enabled": false,
+      "osc.b.enabled": false,
+      "lumen.source.c.sample.enabled": true,
+      "lumen.source.c.sample.audioFileId": "sample-preview-fixture",
+      "lumen.source.c.sample.direction": "forward",
+      "lumen.source.c.sample.playbackRate": 1,
+      "lumen.source.c.sample.loop.enabled": true,
+      "lumen.source.c.sample.loop.start": 0.15,
+      "lumen.source.c.sample.loop.end": 0.8,
+      "lumen.source.c.sample.loopMode": "forward",
+      "lumen.source.c.sample.releaseTailMs": 4,
+      "lumen.source.c.sample.selectedSliceId": "slice-1",
+    },
+    metadata: {
+      ...structuredClone(lumenDraft.metadata),
+      lumenSourceRack: {
+        schemaVersion: 2,
+        slots: [{ id: "a", mode: "wavetable" }, { id: "b", mode: "wavetable" }, { id: "c", mode: "sample" }],
+      },
+      lumenSampleSlots: {
+        ...structuredClone(lumenDraft.metadata.lumenSampleSlots),
+        c: { schemaVersion: 2, zones: [], slices: [{ id: "slice-1", startRatio: 0.25, endRatio: 0.55 }] },
+      },
+    },
+  });
+  const lumenSampleRuntime = synthStore.synthDraftToInstrumentPatch(lumenSampleDraft);
+  assert.equal(lumenSampleRuntime.aether.sampleSlot1.direction, "forward");
+  assert.equal(lumenSampleRuntime.aether.sampleSlot1.playbackRate, 1);
+  assert.equal(lumenSampleRuntime.aether.sampleSlot1.loopMode, "forward");
+  assert.equal(lumenSampleRuntime.aether.sampleSlot1.releaseTailMs, 4);
+  assert.equal(lumenSampleRuntime.aether.sampleSlot1.selectedSliceId, "slice-1");
+  assert.deepEqual(lumenSampleRuntime.aether.sampleSlot1.slices, [{ id: "slice-1", startRatio: 0.25, endRatio: 0.55 }]);
+  const sampleForward = new Float32Array(2048);
+  const sampleReverse = new Float32Array(2048);
+  const sampleDoubleRate = new Float32Array(2048);
+  const samplePingPong = new Float32Array(2048);
+  const sampleLongTail = new Float32Array(2048);
+  const sampleFullRegion = new Float32Array(2048);
+  synthPreview.renderInstrumentSamples(synthStore.synthDraftToPreviewInstrument(lumenSampleDraft), sampleForward, 48000, 261.625565, "visual");
+  const reverseSampleDraft = synthStore.normalizeSynthDraftPatch({
+    ...structuredClone(lumenSampleDraft),
+    parameters: { ...lumenSampleDraft.parameters, "lumen.source.c.sample.direction": "reverse" },
+  });
+  synthPreview.renderInstrumentSamples(synthStore.synthDraftToPreviewInstrument(reverseSampleDraft), sampleReverse, 48000, 261.625565, "visual");
+  const doubleRateSampleDraft = synthStore.normalizeSynthDraftPatch({
+    ...structuredClone(lumenSampleDraft),
+    parameters: { ...lumenSampleDraft.parameters, "lumen.source.c.sample.playbackRate": 2 },
+  });
+  synthPreview.renderInstrumentSamples(synthStore.synthDraftToPreviewInstrument(doubleRateSampleDraft), sampleDoubleRate, 48000, 261.625565, "visual");
+  const pingPongSampleDraft = synthStore.normalizeSynthDraftPatch({
+    ...structuredClone(lumenSampleDraft),
+    parameters: { ...lumenSampleDraft.parameters, "lumen.source.c.sample.loopMode": "pingPong" },
+  });
+  synthPreview.renderInstrumentSamples(synthStore.synthDraftToPreviewInstrument(pingPongSampleDraft), samplePingPong, 48000, 261.625565, "visual");
+  const longTailSampleDraft = synthStore.normalizeSynthDraftPatch({
+    ...structuredClone(lumenSampleDraft),
+    parameters: { ...lumenSampleDraft.parameters, "lumen.source.c.sample.releaseTailMs": 40 },
+  });
+  synthPreview.renderInstrumentSamples(synthStore.synthDraftToPreviewInstrument(longTailSampleDraft), sampleLongTail, 48000, 261.625565, "visual");
+  const fullRegionSampleDraft = synthStore.normalizeSynthDraftPatch({
+    ...structuredClone(lumenSampleDraft),
+    parameters: { ...lumenSampleDraft.parameters, "lumen.source.c.sample.selectedSliceId": "" },
+  });
+  synthPreview.renderInstrumentSamples(synthStore.synthDraftToPreviewInstrument(fullRegionSampleDraft), sampleFullRegion, 48000, 261.625565, "visual");
+  const differenceRms = (left, right) => Math.sqrt(left.reduce((sum, sample, index) => {
+    const delta = sample - right[index];
+    return sum + delta * delta;
+  }, 0) / left.length);
+  const spectralShapeSamples = new Float32Array(4096);
+  const spectralSmearSamples = new Float32Array(4096);
+  const lumenSpectralShapeDraft = synthStore.normalizeSynthDraftPatch({
+    ...structuredClone(lumenSpectralDraft),
+    parameters: { ...lumenSpectralDraft.parameters, "osc.a.warpMode": "shape" },
+  });
+  synthPreview.renderInstrumentSamples(synthStore.synthDraftToPreviewInstrument(lumenSpectralShapeDraft), spectralShapeSamples, 48000, 261.625565, "audio");
+  synthPreview.renderInstrumentSamples(synthStore.synthDraftToPreviewInstrument(lumenSpectralDraft), spectralSmearSamples, 48000, 261.625565, "audio");
+  assert.ok(differenceRms(spectralShapeSamples, spectralSmearSamples) > 0.002, "browser preview must render the Lumen spectral warp distinctly from Shape");
+  assert.ok(differenceRms(sampleForward, sampleReverse) > 0.01, "browser preview must render Lumen Sample reverse direction distinctly");
+  assert.ok(differenceRms(sampleForward, sampleDoubleRate) > 0.01, "browser preview must render Lumen Sample playback rate distinctly");
+  assert.ok(differenceRms(sampleForward, samplePingPong) > 0.01, "browser preview must render Lumen Sample ping-pong looping distinctly");
+  assert.ok(differenceRms(sampleForward, sampleLongTail) > 0.01, "browser preview must render Lumen Sample release-tail duration distinctly");
+  assert.ok(differenceRms(sampleForward, sampleFullRegion) > 0.01, "browser preview must render the selected Lumen Sample slice distinctly from the full trimmed region");
+  const withSampleSlices = (slices, selectedSliceId = "") => ({
+    ...structuredClone(lumenDraft),
+    parameters: {
+      ...lumenDraft.parameters,
+      "lumen.source.a.sample.selectedSliceId": selectedSliceId,
+    },
+    metadata: {
+      ...structuredClone(lumenDraft.metadata),
+      lumenSampleSlots: {
+        ...structuredClone(lumenDraft.metadata.lumenSampleSlots),
+        a: { schemaVersion: 2, zones: [], slices },
+      },
+    },
+  });
+  assert.throws(
+    () => synthStore.normalizeSynthDraftPatch(withSampleSlices([
+      { id: "slice-1", startRatio: 0.1, endRatio: 0.2 },
+      { id: "slice-1", startRatio: 0.3, endRatio: 0.4 },
+    ])),
+    /lumen\.sample-slice\.id-invalid/,
+    "duplicate Lumen Sample slice IDs must be rejected",
+  );
+  assert.throws(
+    () => synthStore.normalizeSynthDraftPatch(withSampleSlices([
+      { id: "slice-1", startRatio: 0.5, endRatio: 0.5 },
+    ])),
+    /lumen\.sample-slice\.range-invalid/,
+    "empty Lumen Sample slice ranges must be rejected",
+  );
+  assert.throws(
+    () => synthStore.normalizeSynthDraftPatch(withSampleSlices(
+      Array.from({ length: 17 }, (_, index) => ({
+        id: `slice-${index + 1}`,
+        startRatio: index / 34,
+        endRatio: (index + 1) / 34,
+      })),
+    )),
+    /lumen\.sample-slices\.invalid/,
+    "more than 16 Lumen Sample slices must be rejected",
+  );
+  assert.throws(
+    () => synthStore.normalizeSynthDraftPatch(withSampleSlices([
+      { id: "slice-1", startRatio: 0.1, endRatio: 0.2 },
+    ], "missing-slice")),
+    /lumen\.sample-slice\.selection-invalid/,
+    "unknown Lumen Sample slice selections must be rejected",
+  );
+
+  const migratedLumenV1 = synthStore.normalizeSynthDraftPatch({
+    ...structuredClone(lumenDraft),
+    schemaVersion: 1,
+    metadata: { ...structuredClone(lumenDraft.metadata), lumenSourceRack: undefined, oscillators: [{ id: "a", name: "A" }, { id: "b", name: "B" }] },
+    parameters: Object.fromEntries(Object.entries(lumenDraft.parameters).filter(([id]) => !id.startsWith("osc.c."))),
+  });
+  assert.equal(migratedLumenV1.schemaVersion, 16, "Lumen v1 must deterministically migrate to v16");
+  assert.deepEqual(migratedLumenV1.metadata.oscillators.map(({ id }) => id), ["a", "b", "c"]);
+  assert.equal(migratedLumenV1.parameters["osc.c.enabled"], false);
+  assert.equal(migratedLumenV1.parameters["lumen.arp.enabled"], false, "legacy Lumen patches must migrate with the arpeggiator off");
+  assert.equal(migratedLumenV1.parameters["lumen.arp.swing"], 0, "legacy Lumen patches must migrate with straight timing");
+  assert.equal(migratedLumenV1.parameters["lumen.arp.key"], "c");
+  assert.equal(migratedLumenV1.parameters["lumen.arp.scale"], "chromatic");
+  assert.equal(migratedLumenV1.parameters["lumen.clip.enabled"], false);
+  assert.deepEqual(migratedLumenV1.metadata.lumenClip?.notes, []);
+  const migratedLumenV3 = synthStore.normalizeSynthDraftPatch({
+    ...structuredClone(lumenDraft),
     schemaVersion: 3,
     parameters: {
-      ...lumusDraft.parameters,
+      ...lumenDraft.parameters,
       "aether.sample.1.enabled": true,
-      "aether.sample.1.audioFileId": "legacy-lumus-c",
+      "aether.sample.1.audioFileId": "legacy-lumen-c",
       "aether.sample.1.rootNote": 65,
     },
     metadata: {
-      ...structuredClone(lumusDraft.metadata),
-      lumusSampleSlots: undefined,
+      ...structuredClone(lumenDraft.metadata),
+      lumenSampleSlots: undefined,
       sampleSlot1Zones: [{
-        audioFileId: "legacy-lumus-c",
+        audioFileId: "legacy-lumen-c",
         rootNote: 65,
         loNote: 0,
         hiNote: 127,
@@ -275,68 +623,69 @@ try {
       }],
     },
   });
-  assert.equal(migratedLumusV3.schemaVersion, 10);
-  assert.equal(migratedLumusV3.parameters["lumus.source.c.sample.enabled"], true);
-  assert.equal(migratedLumusV3.parameters["lumus.source.c.sample.audioFileId"], "legacy-lumus-c");
-  assert.equal(migratedLumusV3.parameters["lumus.source.c.sample.rootNote"], 65);
-  assert.equal(migratedLumusV3.metadata.lumusSampleSlots?.c?.zones.length, 1);
-  assert.deepEqual(migratedLumusV3.metadata.lumusSampleSlots?.a?.zones, []);
-  assert.deepEqual(migratedLumusV3.metadata.lumusSampleSlots?.b?.zones, []);
+  assert.equal(migratedLumenV3.schemaVersion, 16);
+  assert.equal(migratedLumenV3.parameters["lumen.source.c.sample.enabled"], true);
+  assert.equal(migratedLumenV3.parameters["lumen.source.c.sample.audioFileId"], "legacy-lumen-c");
+  assert.equal(migratedLumenV3.parameters["lumen.source.c.sample.rootNote"], 65);
+  assert.equal(migratedLumenV3.metadata.lumenSampleSlots?.c?.zones.length, 1);
+  assert.deepEqual(migratedLumenV3.metadata.lumenSampleSlots?.a?.zones, []);
+  assert.deepEqual(migratedLumenV3.metadata.lumenSampleSlots?.b?.zones, []);
   const arpRoundtrip = synthStore.normalizeSynthDraftPatch({
-    ...structuredClone(lumusDraft),
+    ...structuredClone(lumenDraft),
     parameters: {
-      ...lumusDraft.parameters,
-      "lumus.arp.enabled": true,
-      "lumus.arp.mode": "upDown",
-      "lumus.arp.rate": "1/8",
-      "lumus.arp.gate": 0.63,
-      "lumus.arp.swing": 0.28,
-      "lumus.arp.octaves": 3,
-      "lumus.arp.key": "gSharp",
-      "lumus.arp.scale": "naturalMinor",
+      ...lumenDraft.parameters,
+      "lumen.arp.enabled": true,
+      "lumen.arp.mode": "upDown",
+      "lumen.arp.rate": "1/8",
+      "lumen.arp.gate": 0.63,
+      "lumen.arp.swing": 0.28,
+      "lumen.arp.octaves": 3,
+      "lumen.arp.key": "gSharp",
+      "lumen.arp.scale": "naturalMinor",
     },
   });
-  assert.equal(arpRoundtrip.parameters["lumus.arp.enabled"], true);
-  assert.equal(arpRoundtrip.parameters["lumus.arp.mode"], "upDown");
-  assert.equal(arpRoundtrip.parameters["lumus.arp.rate"], "1/8");
-  assert.equal(arpRoundtrip.parameters["lumus.arp.gate"], 0.63);
-  assert.equal(arpRoundtrip.parameters["lumus.arp.swing"], 0.28);
-  assert.equal(arpRoundtrip.parameters["lumus.arp.octaves"], 3);
-  assert.equal(arpRoundtrip.parameters["lumus.arp.key"], "gSharp");
-  assert.equal(arpRoundtrip.parameters["lumus.arp.scale"], "naturalMinor");
-  const migratedLumusV7 = synthStore.normalizeSynthDraftPatch({
-    ...structuredClone(lumusDraft),
+  assert.equal(arpRoundtrip.parameters["lumen.arp.enabled"], true);
+  assert.equal(arpRoundtrip.parameters["lumen.arp.mode"], "upDown");
+  assert.equal(arpRoundtrip.parameters["lumen.arp.rate"], "1/8");
+  assert.equal(arpRoundtrip.parameters["lumen.arp.gate"], 0.63);
+  assert.equal(arpRoundtrip.parameters["lumen.arp.swing"], 0.28);
+  assert.equal(arpRoundtrip.parameters["lumen.arp.octaves"], 3);
+  assert.equal(arpRoundtrip.parameters["lumen.arp.key"], "gSharp");
+  assert.equal(arpRoundtrip.parameters["lumen.arp.scale"], "naturalMinor");
+  const migratedLumenV7 = synthStore.normalizeSynthDraftPatch({
+    ...structuredClone(lumenDraft),
     schemaVersion: 7,
-    parameters: { ...lumusDraft.parameters, "lumus.arp.swing": 0.5 },
+    parameters: { ...lumenDraft.parameters, "lumen.arp.swing": 0.5 },
   });
-  assert.equal(migratedLumusV7.parameters["lumus.arp.swing"], 0, "v7 must not activate a future swing field");
-  const migratedLumusV8 = synthStore.normalizeSynthDraftPatch({
-    ...structuredClone(lumusDraft),
+  assert.equal(migratedLumenV7.parameters["lumen.arp.swing"], 0, "v7 must not activate a future swing field");
+  const migratedLumenV8 = synthStore.normalizeSynthDraftPatch({
+    ...structuredClone(lumenDraft),
     schemaVersion: 8,
-    parameters: { ...lumusDraft.parameters, "lumus.arp.key": "b", "lumus.arp.scale": "blues" },
+    parameters: { ...lumenDraft.parameters, "lumen.arp.key": "b", "lumen.arp.scale": "blues" },
   });
-  assert.equal(migratedLumusV8.parameters["lumus.arp.key"], "c", "v8 must not activate a future key field");
-  assert.equal(migratedLumusV8.parameters["lumus.arp.scale"], "chromatic", "v8 must not activate a future scale field");
-  const migratedLumusV9 = synthStore.normalizeSynthDraftPatch({
-    ...structuredClone(lumusDraft),
+  assert.equal(migratedLumenV8.parameters["lumen.arp.key"], "c", "v8 must not activate a future key field");
+  assert.equal(migratedLumenV8.parameters["lumen.arp.scale"], "chromatic", "v8 must not activate a future scale field");
+  const migratedLumenV9 = synthStore.normalizeSynthDraftPatch({
+    ...structuredClone(lumenDraft),
     schemaVersion: 9,
-    parameters: { ...lumusDraft.parameters, "lumus.clip.enabled": true, "lumus.clip.rate": "1/4" },
-    metadata: { ...structuredClone(lumusDraft.metadata), lumusClip: undefined },
+    parameters: { ...lumenDraft.parameters, "lumen.clip.enabled": true, "lumen.clip.rate": "1/4" },
+    metadata: { ...structuredClone(lumenDraft.metadata), lumenClip: undefined },
   });
-  assert.equal(migratedLumusV9.parameters["lumus.clip.enabled"], false, "v9 must not activate future clip state");
-  assert.equal(migratedLumusV9.parameters["lumus.clip.rate"], "1/16");
-  assert.equal(migratedLumusV9.metadata.lumusClip?.steps.length, 16);
-  const clipRoundtrip = synthStore.normalizeSynthDraftPatch({
-    ...structuredClone(lumusDraft),
+  assert.equal(migratedLumenV9.parameters["lumen.clip.enabled"], false, "v9 must not activate future clip state");
+  assert.equal(migratedLumenV9.parameters["lumen.clip.rate"], "1/16");
+  assert.deepEqual(migratedLumenV9.metadata.lumenClip?.notes, []);
+  const migratedLumenV10Clip = synthStore.normalizeSynthDraftPatch({
+    ...structuredClone(lumenDraft),
+    schemaVersion: 10,
     parameters: {
-      ...lumusDraft.parameters,
-      "lumus.clip.enabled": true,
-      "lumus.clip.rate": "1/8",
-      "lumus.clip.swing": 0.24,
+      ...lumenDraft.parameters,
+      "lumen.clip.enabled": true,
+      "lumen.clip.rate": "1/8",
+      "lumen.clip.swing": 0.24,
     },
     metadata: {
-      ...structuredClone(lumusDraft.metadata),
-      lumusClip: {
+      ...structuredClone(lumenDraft.metadata),
+      lumenClip: {
         schemaVersion: 1,
         lengthSteps: 4,
         steps: [
@@ -348,77 +697,143 @@ try {
       },
     },
   });
-  assert.equal(clipRoundtrip.parameters["lumus.clip.enabled"], true);
-  assert.equal(clipRoundtrip.parameters["lumus.clip.rate"], "1/8");
-  assert.equal(clipRoundtrip.parameters["lumus.clip.swing"], 0.24);
-  assert.deepEqual(clipRoundtrip.metadata.lumusClip?.steps.map((step) => [step.enabled, step.pitchOffset, step.velocity]), [
-    [true, 0, 1], [true, 4, 0.8], [false, 0, 1], [true, 7, 0.6],
+  assert.equal(migratedLumenV10Clip.schemaVersion, 16);
+  assert.equal(migratedLumenV10Clip.parameters["lumen.clip.enabled"], true);
+  assert.deepEqual(migratedLumenV10Clip.metadata.lumenClip?.notes.map((note) => [note.startStep, note.pitchOffset, note.velocity]), [
+    [0, 0, 1], [1, 4, 0.8], [3, 7, 0.6],
   ]);
+  const clipRoundtrip = synthStore.normalizeSynthDraftPatch({
+    ...structuredClone(lumenDraft),
+    parameters: {
+      ...lumenDraft.parameters,
+      "lumen.clip.enabled": true,
+      "lumen.clip.rate": "1/8",
+      "lumen.clip.swing": 0.24,
+    },
+    metadata: { ...structuredClone(lumenDraft.metadata), lumenClip: {
+      schemaVersion: 2,
+      lengthSteps: 4,
+      notes: [
+        { startStep: 0, pitchOffset: 0, lengthSteps: 2, velocity: 1 },
+        { startStep: 0, pitchOffset: 7, lengthSteps: 1, velocity: 0.8 },
+        { startStep: 3, pitchOffset: -5, lengthSteps: 1, velocity: 0.6 },
+      ],
+    } },
+  });
+  assert.equal(clipRoundtrip.parameters["lumen.clip.enabled"], true);
+  assert.deepEqual(clipRoundtrip.metadata.lumenClip?.notes.map((note) => [note.startStep, note.pitchOffset, note.lengthSteps]), [
+    [0, 0, 2], [0, 7, 1], [3, -5, 1],
+  ]);
+  const clipMidiNotes = lumenClipPianoRoll.lumenClipToMidiNotes(clipRoundtrip.metadata.lumenClip);
+  assert.deepEqual(clipMidiNotes.map((note) => [note.startBeat, note.pitch, note.lengthBeats]), [
+    [0, 60, 2], [0, 67, 1], [3, 55, 1],
+  ]);
+  const clipFromMidi = lumenClipPianoRoll.midiNotesToLumenClip(
+    clipRoundtrip.metadata.lumenClip,
+    [
+      ...clipMidiNotes,
+      { startBeat: 1, pitch: 108, lengthBeats: 3, velocity: 127 },
+      { startBeat: 1, pitch: 12, lengthBeats: 3, velocity: 64 },
+    ],
+  );
+  assert.deepEqual(clipFromMidi.notes.map((note) => [note.startStep, note.pitchOffset]), [
+    [0, 0], [0, 7], [1, -48], [1, 48], [3, -5],
+  ]);
+  const importedPatternClip = lumenClipPianoRoll.midiPatternToLumenClip([
+    { startBeat: 2, pitch: 64, lengthBeats: 2, velocity: 96 },
+    { startBeat: 2, pitch: 67, lengthBeats: 1, velocity: 80 },
+    { startBeat: 3, pitch: 71, lengthBeats: 0.5, velocity: 127 },
+  ], 6);
+  assert.equal(importedPatternClip.lengthSteps, 4, "pattern import must remove leading silence while retaining the source phrase length");
+  assert.deepEqual(importedPatternClip.notes.map((note) => [note.startStep, note.pitchOffset, note.lengthSteps, note.velocity]), [
+    [0, 0, 2, 96 / 127], [0, 3, 1, 80 / 127], [1, 7, 1, 1],
+  ], "pattern import must preserve relative pitch, timing, length, and velocity without instrument ownership");
+  const cappedPatternClip = lumenClipPianoRoll.midiPatternToLumenClip(
+    Array.from({ length: 70 }, (_, index) => ({ startBeat: index / 8, pitch: 48 + (index % 24), lengthBeats: 0.25, velocity: 100 })),
+    16,
+  );
+  assert.equal(cappedPatternClip.notes.length, 64, "pattern import must retain Lumen's bounded 64-note clip capacity");
   assert.throws(
     () => synthStore.normalizeSynthDraftPatch({
       ...structuredClone(clipRoundtrip),
-      parameters: { ...clipRoundtrip.parameters, "lumus.arp.enabled": true },
+      parameters: { ...clipRoundtrip.parameters, "lumen.arp.enabled": true },
     }),
-    /lumus\.performance-mode\.conflict/,
+    /lumen\.performance-mode\.conflict/,
   );
   assert.throws(
     () => synthStore.normalizeSynthDraftPatch({
       ...structuredClone(clipRoundtrip),
-      metadata: { ...structuredClone(clipRoundtrip.metadata), lumusClip: {
-        schemaVersion: 1,
+      metadata: { ...structuredClone(clipRoundtrip.metadata), lumenClip: {
+        schemaVersion: 2,
         lengthSteps: 1,
-        steps: [{ enabled: true, pitchOffset: Number.NaN, lengthSteps: 1, velocity: 1 }],
+        notes: [{ startStep: 0, pitchOffset: Number.NaN, lengthSteps: 1, velocity: 1 }],
       } },
     }),
-    /lumus\.clip\.step-malformed/,
+    /lumen\.clip\.note-malformed/,
   );
   assert.throws(
     () => synthStore.normalizeSynthDraftPatch({
-      ...structuredClone(lumusDraft),
-      parameters: { ...lumusDraft.parameters, "lumus.arp.key": "h" },
+      ...structuredClone(clipRoundtrip),
+      metadata: { ...structuredClone(clipRoundtrip.metadata), lumenClip: {
+        schemaVersion: 2,
+        lengthSteps: 16,
+        notes: Array.from({ length: 65 }, (_, index) => ({
+          startStep: index % 16,
+          pitchOffset: 0,
+          lengthSteps: 1,
+          velocity: 1,
+        })),
+      } },
     }),
-    /lumus\.arp\.key-invalid/,
+    /lumen\.clip\.notes-capacity/,
   );
   assert.throws(
     () => synthStore.normalizeSynthDraftPatch({
-      ...structuredClone(lumusDraft),
-      parameters: { ...lumusDraft.parameters, "lumus.arp.scale": "dorian" },
+      ...structuredClone(lumenDraft),
+      parameters: { ...lumenDraft.parameters, "lumen.arp.key": "h" },
     }),
-    /lumus\.arp\.scale-invalid/,
+    /lumen\.arp\.key-invalid/,
   );
   assert.throws(
     () => synthStore.normalizeSynthDraftPatch({
-      ...structuredClone(lumusDraft),
+      ...structuredClone(lumenDraft),
+      parameters: { ...lumenDraft.parameters, "lumen.arp.scale": "dorian" },
+    }),
+    /lumen\.arp\.scale-invalid/,
+  );
+  assert.throws(
+    () => synthStore.normalizeSynthDraftPatch({
+      ...structuredClone(lumenDraft),
       schemaVersion: 2,
-      parameters: { ...lumusDraft.parameters, "aether.sample.1.enabled": true },
-      metadata: { ...structuredClone(lumusDraft.metadata), lumusSourceRack: {
+      parameters: { ...lumenDraft.parameters, "aether.sample.1.enabled": true },
+      metadata: { ...structuredClone(lumenDraft.metadata), lumenSourceRack: {
         schemaVersion: 1,
         slots: [{ id: "a", mode: "wavetable" }, { id: "b", mode: "wavetable" }, { id: "c", mode: "wavetable" }],
       } },
     }),
-    /lumus\.migration\.source-conflict/,
+    /lumen\.migration\.source-conflict/,
     "Ambiguous legacy sample ownership must fail instead of discarding data",
   );
   assert.throws(
     () => synthStore.normalizeSynthDraftPatch({
-      ...structuredClone(lumusDraft),
+      ...structuredClone(lumenDraft),
       metadata: {
-        ...structuredClone(lumusDraft.metadata),
-        lumusSourceRack: { schemaVersion: 2, slots: [
+        ...structuredClone(lumenDraft.metadata),
+        lumenSourceRack: { schemaVersion: 2, slots: [
           { id: "a", mode: "wavetable" },
           { id: "c", mode: "wavetable" },
           { id: "b", mode: "wavetable" },
         ] },
       },
     }),
-    /lumus\.source-rack\.slot-invalid/,
+    /lumen\.source-rack\.slot-invalid/,
     "Malformed fixed-slot identities must fail before playback preparation",
   );
 
-  const audibleLumus = synthStore.normalizeSynthDraftPatch({
-    ...structuredClone(lumusDraft),
+  const audibleLumen = synthStore.normalizeSynthDraftPatch({
+    ...structuredClone(lumenDraft),
     parameters: {
-      ...lumusDraft.parameters,
+      ...lumenDraft.parameters,
       "osc.c.enabled": true,
       "osc.c.wavetable": "basic.square",
       "osc.c.level": 0.5,
@@ -430,145 +845,145 @@ try {
   });
   const audibleLeft = new Float32Array(2048);
   const audibleRight = new Float32Array(2048);
-  synthPreview.renderInstrumentStereoSamples(synthStore.synthDraftToPreviewInstrument(audibleLumus), audibleLeft, audibleRight, 48000, 261.625565, "audio");
-  assert.notDeepEqual(audibleLeft, lumusInitLeft, "Enabled Slot C must make an audible deterministic contribution");
-  assert.notDeepEqual(audibleRight, lumusInitRight, "Slot C pan must affect the stereo render");
-  const audibleInstrument = synthStore.synthDraftToPreviewInstrument(audibleLumus);
+  synthPreview.renderInstrumentStereoSamples(synthStore.synthDraftToPreviewInstrument(audibleLumen), audibleLeft, audibleRight, 48000, 261.625565, "audio");
+  assert.notDeepEqual(audibleLeft, lumenInitLeft, "Enabled Slot C must make an audible deterministic contribution");
+  assert.notDeepEqual(audibleRight, lumenInitRight, "Slot C pan must affect the stereo render");
+  const audibleInstrument = synthStore.synthDraftToPreviewInstrument(audibleLumen);
   assert.equal(audibleInstrument.aether.oscillators.find(({ id }) => id === "c")?.route, "filter2", "Slot C routing must survive conversion");
 
-  const sampleModeLumus = synthStore.normalizeSynthDraftPatch({
-    ...structuredClone(lumusDraft),
+  const sampleModeLumen = synthStore.normalizeSynthDraftPatch({
+    ...structuredClone(lumenDraft),
     parameters: {
-      ...lumusDraft.parameters,
+      ...lumenDraft.parameters,
       "osc.c.enabled": true,
-      "lumus.source.c.sample.enabled": true,
-      "lumus.source.c.sample.audioFileId": "lumus-sample-fixture",
+      "lumen.source.c.sample.enabled": true,
+      "lumen.source.c.sample.audioFileId": "lumen-sample-fixture",
     },
-    metadata: { ...structuredClone(lumusDraft.metadata), lumusSourceRack: {
+    metadata: { ...structuredClone(lumenDraft.metadata), lumenSourceRack: {
       schemaVersion: 2,
       slots: [{ id: "a", mode: "wavetable" }, { id: "b", mode: "wavetable" }, { id: "c", mode: "sample" }],
     } },
   });
-  const sampleModeInstrument = synthStore.synthDraftToPreviewInstrument(sampleModeLumus);
+  const sampleModeInstrument = synthStore.synthDraftToPreviewInstrument(sampleModeLumen);
   assert.equal(sampleModeInstrument.aether.oscillators.find(({ id }) => id === "c")?.enabled, false, "Sample mode must disable the Slot C wavetable renderer");
   assert.equal(sampleModeInstrument.aether.sampleSlot1.enabled, true, "Sample mode must publish the existing bounded sample renderer as Slot C");
 
   const independentSampleSlots = synthStore.normalizeSynthDraftPatch({
-    ...structuredClone(lumusDraft),
+    ...structuredClone(lumenDraft),
     parameters: {
-      ...lumusDraft.parameters,
-      "lumus.source.a.sample.audioFileId": "sample-a",
-      "lumus.source.b.sample.audioFileId": "sample-b",
-      "lumus.source.c.sample.audioFileId": "sample-c",
-      "lumus.source.a.sample.rootNote": 48,
-      "lumus.source.b.sample.rootNote": 60,
-      "lumus.source.c.sample.rootNote": 72,
+      ...lumenDraft.parameters,
+      "lumen.source.a.sample.audioFileId": "sample-a",
+      "lumen.source.b.sample.audioFileId": "sample-b",
+      "lumen.source.c.sample.audioFileId": "sample-c",
+      "lumen.source.a.sample.rootNote": 48,
+      "lumen.source.b.sample.rootNote": 60,
+      "lumen.source.c.sample.rootNote": 72,
     },
     metadata: {
-      ...structuredClone(lumusDraft.metadata),
-      lumusSourceRack: { schemaVersion: 2, slots: [
+      ...structuredClone(lumenDraft.metadata),
+      lumenSourceRack: { schemaVersion: 2, slots: [
         { id: "a", mode: "sample" },
         { id: "b", mode: "sample" },
         { id: "c", mode: "sample" },
       ] },
-      lumusSampleSlots: {
-        a: { schemaVersion: 1, zones: [] },
-        b: { schemaVersion: 1, zones: [] },
-        c: { schemaVersion: 1, zones: [] },
+      lumenSampleSlots: {
+        a: { schemaVersion: 2, zones: [], slices: [] },
+        b: { schemaVersion: 2, zones: [], slices: [] },
+        c: { schemaVersion: 2, zones: [], slices: [] },
       },
     },
   });
-  assert.equal(independentSampleSlots.parameters["lumus.source.a.sample.audioFileId"], "sample-a");
-  assert.equal(independentSampleSlots.parameters["lumus.source.b.sample.audioFileId"], "sample-b");
-  assert.equal(independentSampleSlots.parameters["lumus.source.c.sample.audioFileId"], "sample-c");
-  assert.equal(independentSampleSlots.parameters["lumus.source.a.sample.rootNote"], 48);
-  assert.equal(independentSampleSlots.parameters["lumus.source.b.sample.rootNote"], 60);
-  assert.equal(independentSampleSlots.parameters["lumus.source.c.sample.rootNote"], 72);
-  assert.deepEqual(independentSampleSlots.metadata.lumusSourceRack?.slots.map(({ mode }) => mode), ["sample", "sample", "sample"]);
+  assert.equal(independentSampleSlots.parameters["lumen.source.a.sample.audioFileId"], "sample-a");
+  assert.equal(independentSampleSlots.parameters["lumen.source.b.sample.audioFileId"], "sample-b");
+  assert.equal(independentSampleSlots.parameters["lumen.source.c.sample.audioFileId"], "sample-c");
+  assert.equal(independentSampleSlots.parameters["lumen.source.a.sample.rootNote"], 48);
+  assert.equal(independentSampleSlots.parameters["lumen.source.b.sample.rootNote"], 60);
+  assert.equal(independentSampleSlots.parameters["lumen.source.c.sample.rootNote"], 72);
+  assert.deepEqual(independentSampleSlots.metadata.lumenSourceRack?.slots.map(({ mode }) => mode), ["sample", "sample", "sample"]);
   const independentGranularSlots = synthStore.normalizeSynthDraftPatch({
-    ...structuredClone(lumusDraft),
+    ...structuredClone(lumenDraft),
     parameters: {
-      ...lumusDraft.parameters,
-      "lumus.source.a.granular.enabled": true,
-      "lumus.source.a.granular.builtinSource": "benchmark",
-      "lumus.source.a.granular.rootNote": 48,
-      "lumus.source.b.granular.enabled": true,
-      "lumus.source.b.granular.builtinSource": "benchmark",
-      "lumus.source.b.granular.rootNote": 60,
-      "lumus.source.c.granular.enabled": true,
-      "lumus.source.c.granular.builtinSource": "benchmark",
-      "lumus.source.c.granular.rootNote": 72,
+      ...lumenDraft.parameters,
+      "lumen.source.a.granular.enabled": true,
+      "lumen.source.a.granular.builtinSource": "benchmark",
+      "lumen.source.a.granular.rootNote": 48,
+      "lumen.source.b.granular.enabled": true,
+      "lumen.source.b.granular.builtinSource": "benchmark",
+      "lumen.source.b.granular.rootNote": 60,
+      "lumen.source.c.granular.enabled": true,
+      "lumen.source.c.granular.builtinSource": "benchmark",
+      "lumen.source.c.granular.rootNote": 72,
     },
     metadata: {
-      ...structuredClone(lumusDraft.metadata),
-      lumusSourceRack: { schemaVersion: 2, slots: [
+      ...structuredClone(lumenDraft.metadata),
+      lumenSourceRack: { schemaVersion: 2, slots: [
         { id: "a", mode: "granular" }, { id: "b", mode: "granular" }, { id: "c", mode: "granular" },
       ] },
     },
   });
-  assert.deepEqual(independentGranularSlots.metadata.lumusSourceRack?.slots.map(({ mode }) => mode), ["granular", "granular", "granular"]);
-  assert.equal(independentGranularSlots.parameters["lumus.source.a.granular.rootNote"], 48);
-  assert.equal(independentGranularSlots.parameters["lumus.source.b.granular.rootNote"], 60);
-  assert.equal(independentGranularSlots.parameters["lumus.source.c.granular.rootNote"], 72);
+  assert.deepEqual(independentGranularSlots.metadata.lumenSourceRack?.slots.map(({ mode }) => mode), ["granular", "granular", "granular"]);
+  assert.equal(independentGranularSlots.parameters["lumen.source.a.granular.rootNote"], 48);
+  assert.equal(independentGranularSlots.parameters["lumen.source.b.granular.rootNote"], 60);
+  assert.equal(independentGranularSlots.parameters["lumen.source.c.granular.rootNote"], 72);
   const multisampleSlot = synthStore.normalizeSynthDraftPatch({
-    ...structuredClone(lumusDraft),
+    ...structuredClone(lumenDraft),
     parameters: {
-      ...lumusDraft.parameters,
-      "lumus.source.a.sample.enabled": true,
-      "lumus.source.a.sample.audioFileId": "multisample-a",
+      ...lumenDraft.parameters,
+      "lumen.source.a.sample.enabled": true,
+      "lumen.source.a.sample.audioFileId": "multisample-a",
     },
     metadata: {
-      ...structuredClone(lumusDraft.metadata),
-      lumusSourceRack: { schemaVersion: 2, slots: [
+      ...structuredClone(lumenDraft.metadata),
+      lumenSourceRack: { schemaVersion: 2, slots: [
         { id: "a", mode: "multisample" }, { id: "b", mode: "wavetable" }, { id: "c", mode: "wavetable" },
       ] },
     },
   });
-  assert.equal(multisampleSlot.metadata.lumusSourceRack?.slots[0].mode, "multisample");
-  assert.equal(multisampleSlot.parameters["lumus.source.a.sample.audioFileId"], "multisample-a");
+  assert.equal(multisampleSlot.metadata.lumenSourceRack?.slots[0].mode, "multisample");
+  assert.equal(multisampleSlot.parameters["lumen.source.a.sample.audioFileId"], "multisample-a");
   assert.throws(
     () => synthStore.normalizeSynthDraftPatch({
-      ...structuredClone(lumusDraft),
-      metadata: { ...structuredClone(lumusDraft.metadata), lumusGranularSlots: {
+      ...structuredClone(lumenDraft),
+      metadata: { ...structuredClone(lumenDraft.metadata), lumenGranularSlots: {
         a: { schemaVersion: 2 }, b: { schemaVersion: 1 }, c: { schemaVersion: 1 },
       } },
     }),
-    /lumus\.granular-slot\.invalid/,
+    /lumen\.granular-slot\.invalid/,
     "future per-slot granular metadata must be rejected diagnostically",
   );
   assert.throws(
     () => synthStore.normalizeSynthDraftPatch({
-      ...structuredClone(lumusDraft),
-      metadata: { ...structuredClone(lumusDraft.metadata), lumusSampleSlots: {
-        a: { schemaVersion: 2, zones: [] },
-        b: { schemaVersion: 1, zones: [] },
-        c: { schemaVersion: 1, zones: [] },
+      ...structuredClone(lumenDraft),
+      metadata: { ...structuredClone(lumenDraft.metadata), lumenSampleSlots: {
+        a: { schemaVersion: 3, zones: [], slices: [] },
+        b: { schemaVersion: 2, zones: [], slices: [] },
+        c: { schemaVersion: 2, zones: [], slices: [] },
       } },
     }),
-    /lumus\.sample-slot\.invalid/,
+    /lumen\.sample-slot\.invalid/,
     "future per-slot sample metadata must be rejected diagnostically",
   );
 
-  const modulatedLumus = synthStore.normalizeSynthDraftPatch({
-    ...structuredClone(audibleLumus),
-    parameters: { ...audibleLumus.parameters, "macro.1": 1 },
+  const modulatedLumen = synthStore.normalizeSynthDraftPatch({
+    ...structuredClone(audibleLumen),
+    parameters: { ...audibleLumen.parameters, "macro.1": 1 },
     modulation: [
-      ...audibleLumus.modulation,
-      { id: "lumus-c-position", source: "macro.1", target: "osc.c.position", amount: 0.65, bipolar: false, enabled: true },
-      { id: "lumus-c-fine", source: "macro.1", target: "osc.c.fine", amount: 0.2, bipolar: false, enabled: true },
-      { id: "lumus-c-pan", source: "macro.1", target: "osc.c.pan", amount: -0.5, bipolar: false, enabled: true },
+      ...audibleLumen.modulation,
+      { id: "lumen-c-position", source: "macro.1", target: "osc.c.position", amount: 0.65, bipolar: false, enabled: true },
+      { id: "lumen-c-fine", source: "macro.1", target: "osc.c.fine", amount: 0.2, bipolar: false, enabled: true },
+      { id: "lumen-c-pan", source: "macro.1", target: "osc.c.pan", amount: -0.5, bipolar: false, enabled: true },
     ],
   });
   const modulatedLeft = new Float32Array(2048);
   const modulatedRight = new Float32Array(2048);
-  synthPreview.renderInstrumentStereoSamples(synthStore.synthDraftToPreviewInstrument(modulatedLumus), modulatedLeft, modulatedRight, 48000, 261.625565, "audio");
+  synthPreview.renderInstrumentStereoSamples(synthStore.synthDraftToPreviewInstrument(modulatedLumen), modulatedLeft, modulatedRight, 48000, 261.625565, "audio");
   assert.notDeepEqual(modulatedLeft, audibleLeft, "Slot C modulation must alter the deterministic preview render");
   assert.notDeepEqual(modulatedRight, audibleRight, "Slot C pan modulation must alter the stereo preview render");
 
-  const noneRoutedLumus = synthStore.normalizeSynthDraftPatch({
-    ...structuredClone(audibleLumus),
+  const noneRoutedLumen = synthStore.normalizeSynthDraftPatch({
+    ...structuredClone(audibleLumen),
     parameters: {
-      ...audibleLumus.parameters,
+      ...audibleLumen.parameters,
       "osc.a.enabled": false,
       "osc.b.enabled": false,
       "osc.c.route": "none",
@@ -576,7 +991,7 @@ try {
   });
   const noneLeft = new Float32Array(2048);
   const noneRight = new Float32Array(2048);
-  synthPreview.renderInstrumentStereoSamples(synthStore.synthDraftToPreviewInstrument(noneRoutedLumus), noneLeft, noneRight, 48000, 261.625565, "audio");
+  synthPreview.renderInstrumentStereoSamples(synthStore.synthDraftToPreviewInstrument(noneRoutedLumen), noneLeft, noneRight, 48000, 261.625565, "audio");
   assert.ok(noneLeft.every((sample) => sample === 0) && noneRight.every((sample) => sample === 0), "None must remove Slot C from all main/filter destinations");
 
   const independentUnisonDraft = synthStore.normalizeSynthDraftPatch({
@@ -948,6 +1363,12 @@ try {
 
   assert.equal(draft.parameters["future.experimental"], "preserve-me");
   assert.equal(new Set(draft.modulation.map((route) => route.id)).size, draft.modulation.length);
+  assert.equal(draft.modulation.find((route) => route.id === "filter_env")?.curve, "ease-in", "per-route remap curves must survive normalization");
+  assert.equal(draft.modulation.find((route) => route.id === "macro_cutoff")?.curve, "linear", "legacy routes without a curve must migrate to linear");
+  assert.equal(synthPreview.applyModulationRemap(-0.5, "linear"), -0.5, "linear remapping must preserve legacy values exactly");
+  assert.equal(synthPreview.applyModulationRemap(-0.5, "ease-in"), -0.25, "bipolar curves must preserve sign while shaping magnitude");
+  assert.equal(synthPreview.applyModulationRemap(0.5, "ease-out"), 0.75);
+  assert.equal(synthPreview.applyModulationRemap(0.25, "s-curve"), 0.15625);
   assert.equal(draft.metadata.macros["macro.1"].label, "Brightness");
   assert.equal(Math.abs(synthStore.macroOutputValue(draft, "macro.1") - 0.35) < 0.000001, true);
   assert.equal(synthStore.modulationSourceLabel(draft, "macro.1"), "Brightness");
@@ -1345,29 +1766,37 @@ try {
     false,
     "factory Aether preset bank should not include rough breakcore synth drums",
   );
-  const lumusMvpNames = [
-    "Lumus_SubBass_01",
-    "Lumus_ArpPluck_01",
-    "Lumus_WidePad_01",
-    "Lumus_MonoLead_01",
-    "Lumus_DigitalKeys_01",
-    "Lumus_ClipSequence_01",
-    "Lumus_GranularTexture_01",
+  const lumenMvpNames = [
+    "Lumen_SubBass_02",
+    "Lumen_ArpPluck_02",
+    "Lumen_WidePad_02",
+    "Lumen_MonoLead_02",
+    "Lumen_DigitalKeys_02",
+    "Lumen_ClipSequence_02",
+    "Lumen_GranularTexture_02",
   ];
-  const lumusMvpPresets = lumusMvpNames.map((name) => {
+  const lumenMvpPresets = lumenMvpNames.map((name) => {
     const preset = synthStore.FACTORY_SYNTH_PRESETS.find((candidate) => candidate.name === name);
-    assert.ok(preset, `expected Lumus MVP test preset ${name}`);
-    assert.equal(preset.patch.instrumentType, "lumus-hybrid-synth");
-    assert.equal(preset.patch.namespace, "lumus");
+    assert.ok(preset, `expected Lumen MVP test preset ${name}`);
+    assert.equal(preset.patch.instrumentType, "lumen-hybrid-synth");
+    assert.equal(preset.patch.namespace, "lumen");
     assert.ok(preset.tags.includes("mvp-test"));
+    assert.ok(preset.tags.includes("capability-bank") && preset.tags.includes("v16"));
     return preset;
   });
-  assert.equal(lumusMvpPresets[1].patch.parameters["lumus.arp.enabled"], true);
-  assert.equal(lumusMvpPresets[5].patch.parameters["lumus.clip.enabled"], true);
-  assert.equal(lumusMvpPresets[5].patch.metadata.lumusClip?.lengthSteps, 8);
-  assert.equal(lumusMvpPresets[6].patch.metadata.lumusSourceRack?.slots[2].mode, "granular");
-  assert.equal(lumusMvpPresets[6].patch.parameters["lumus.source.c.granular.builtinSource"], "benchmark");
-  const lumusMvpRenders = lumusMvpPresets.map((preset) => {
+  assert.equal(lumenMvpPresets[1].patch.parameters["lumen.arp.enabled"], true);
+  assert.equal(lumenMvpPresets[1].patch.parameters["lfo.1.keytrackRate"], 0.5,
+    "the Lumen Arp Pluck factory patch should exercise v16 keytracked LFO motion");
+  assert.equal(lumenMvpPresets[5].patch.parameters["lumen.clip.enabled"], true);
+  assert.equal(lumenMvpPresets[5].patch.metadata.lumenClip?.lengthSteps, 8);
+  assert.equal(lumenMvpPresets[5].patch.metadata.lumenClip?.schemaVersion, 2);
+  assert.ok(
+    lumenMvpPresets[5].patch.metadata.lumenClip?.notes.filter((note) => note.startStep === 0).length >= 2,
+    "the Lumen clip factory test should exercise a chord at the first step",
+  );
+  assert.equal(lumenMvpPresets[6].patch.metadata.lumenSourceRack?.slots[2].mode, "granular");
+  assert.equal(lumenMvpPresets[6].patch.parameters["lumen.source.c.granular.builtinSource"], "benchmark");
+  const lumenMvpRenders = lumenMvpPresets.map((preset) => {
     const preview = synthStore.synthDraftToPreviewInstrument(preset.patch);
     const samples = new Float32Array(48000);
     synthPreview.renderInstrumentSamples(preview, samples, 48000, synthPreview.previewFrequency(preview), "audio", true);
@@ -1386,16 +1815,16 @@ try {
     assert.deepEqual(repeated, samples, `${preset.name} must render deterministically`);
     return samples;
   });
-  for (let left = 0; left < lumusMvpRenders.length; left += 1) {
-    for (let right = left + 1; right < lumusMvpRenders.length; right += 1) {
+  for (let left = 0; left < lumenMvpRenders.length; left += 1) {
+    for (let right = left + 1; right < lumenMvpRenders.length; right += 1) {
       let differenceEnergy = 0;
-      for (let sample = 0; sample < lumusMvpRenders[left].length; sample += 1) {
-        const difference = lumusMvpRenders[left][sample] - lumusMvpRenders[right][sample];
+      for (let sample = 0; sample < lumenMvpRenders[left].length; sample += 1) {
+        const difference = lumenMvpRenders[left][sample] - lumenMvpRenders[right][sample];
         differenceEnergy += difference * difference;
       }
       assert.ok(
-        Math.sqrt(differenceEnergy / lumusMvpRenders[left].length) > 0.002,
-        `${lumusMvpNames[left]} and ${lumusMvpNames[right]} must be materially distinct`,
+        Math.sqrt(differenceEnergy / lumenMvpRenders[left].length) > 0.002,
+        `${lumenMvpNames[left]} and ${lumenMvpNames[right]} must be materially distinct`,
       );
     }
   }
@@ -1545,11 +1974,11 @@ try {
     "benchmark factory instruments should be discoverable through the shared preset library",
   );
   assert.deepEqual(
-    aetherPresetLibrary.filterAetherPresetLibraryEntries(presetLibraryEntries, { search: "lumus mvp-test" })
+    aetherPresetLibrary.filterAetherPresetLibraryEntries(presetLibraryEntries, { search: "lumen mvp-test" })
       .map((entry) => entry.name)
       .sort(),
-    [...lumusMvpNames].sort(),
-    "all Lumus MVP instruments should be discoverable through the shared factory library",
+    [...lumenMvpNames].sort(),
+    "all Lumen MVP instruments should be discoverable through the shared factory library",
   );
   const macroUserPresetResults = aetherPresetLibrary.filterAetherPresetLibraryEntries(presetLibraryEntries, {
     search: "macro user preset",

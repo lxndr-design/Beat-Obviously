@@ -27,6 +27,7 @@ function sendTransport(message: Parameters<typeof send>[0], onFailure?: () => vo
 }
 
 export function playTransport() {
+  stopAllBrowserAudio();
   if (!isNative()) primeTimelineAudio();
   useTransportStore.getState().play();
   sendTransport({ kind: "transport.play" }, () => useTransportStore.getState().pause());
@@ -50,6 +51,7 @@ export function stopTransport() {
 }
 
 export function restartTransport() {
+  stopAllBrowserAudio();
   if (!isNative()) primeTimelineAudio();
   const transport = useTransportStore.getState();
   transport.setPosition(0);

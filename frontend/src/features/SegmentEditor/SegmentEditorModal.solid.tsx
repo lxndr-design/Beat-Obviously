@@ -1,6 +1,5 @@
 import { For, createEffect, createMemo, createSignal, onCleanup, Show } from "solid-js";
 import { DRUM_MAX_STEPS, type GeneratedDrumBeat } from "../../ai/drumBeatGenerator";
-import { maybeRunDueTraining } from "../../ai/trainingRunner";
 import {
   AETHER_ARRANGEMENT_AUTOMATION_TARGETS,
   type AetherArrangementAutomationPointClipboard,
@@ -37,6 +36,7 @@ import { importAudioFile } from "../../audio/audioImport";
 import { createInstrumentBufferSource, noteFrequency } from "../../audio/synthPreview";
 import { appAlert, useModalStack } from "../../solid-ui";
 import { updateDrumBeatFeedback } from "../../persistence/dexie";
+import { isNative, send } from "../../ipc/bridge";
 import { Button, Checkbox, FloatingSelect, Icon, Modal, NumberInput, Slider, TextInput } from "../../solid-ui";
 import { createStoreSelector } from "../../solid-utils/store";
 import { selectSegment } from "../../state/selectors";
@@ -52,6 +52,8 @@ import type { AutomationCurve, DrumRow, DrumSpeed, Instrument, MidiNote, Segment
 import { DrumSequencer } from "../DrumEditor/DrumSequencer.solid";
 import { PianoRoll } from "../MidiEditor/PianoRoll.solid";
 import { MidiTransport } from "../MidiEditor/MidiTransport.solid";
+import { AudioSegmentTransport } from "./AudioSegmentTransport.solid";
+import { SegmentLoopControl } from "./SegmentLoopControl.solid";
 import {
   COMPUTER_PIANO_OCTAVES,
   MIDI_LIVE_MIN_LENGTH_BEATS,
@@ -81,8 +83,10 @@ const MIDI_LIVE_BASE_BPM = 120;
 export function SegmentEditorModal(props: SegmentEditorModalProps) {
   const source = createStoreSelector(useProjectStore, () => selectSegment(props.segmentId));
   const instruments = createStoreSelector(useInstrumentStore, (s) => s.instruments);
+  const audioFiles = createStoreSelector(useAudioFileStore, (s) => s.files);
   const positionBeat = createStoreSelector(useTransportStore, (s) => s.positionBeat);
   const playing = createStoreSelector(useTransportStore, (s) => s.playing);
+  const transportSpeed = createStoreSelector(useTransportStore, (s) => s.speed);
   const timeSignature = createStoreSelector(useProjectStore, (s) => s.project.timeSignature);
   const bpm = createStoreSelector(useProjectStore, (s) => s.project.bpm);
   const updateSegment = useProjectStore.getState().updateSegment;
@@ -137,8 +141,11 @@ export function SegmentEditorModal(props: SegmentEditorModalProps) {
   const isMidi = createMemo(() => draft()?.payload.kind === "midi" || draft()?.payload.kind === "mixed");
   const drumPayload = createMemo<DrumPayload | null>(() => draft()?.payload.kind === "drum" ? draft()!.payload as DrumPayload : null);
   const audioPayload = createMemo<AudioPayload | null>(() => draft()?.payload.kind === "audio" ? draft()!.payload as AudioPayload : null);
+  const audioFile = createMemo(() => {
+    const id = audioPayload()?.audioFileId;
+    return id ? audioFiles().find((file) => file.id === id) : undefined;
+  });
   const midiNotes = createMemo<MidiNote[]>(() => isMidi() ? (draft()?.payload as MidiLikePayload).notes : []);
-  const transpose = createMemo(() => draft()?.transpose ?? 0);
   const midiGainDb = createMemo(() => draft() ? midiSegmentGainDb(draft()!.payload) : 0);
   const activeSegmentAutomationMeta = createMemo(() => aetherArrangementAutomationTargetMeta(activeSegmentAutomationTarget()));
   const segmentAutomationRange = createMemo(() => segmentAutomationValueRange(draft(), activeSegmentAutomationTarget()));
@@ -164,11 +171,7 @@ export function SegmentEditorModal(props: SegmentEditorModalProps) {
       currentBeat: midiPreviewBeat() ?? 0,
     });
   });
-  const previewMidiNotes = createMemo(() => liveMidiNotes().map((note) => ({
-    ...note,
-    pitch: Math.max(0, Math.min(127, note.pitch + transpose())),
-    curve: note.curve?.map((point) => ({ ...point, pitch: Math.max(0, Math.min(127, point.pitch + transpose())) })),
-  })));
+  const previewMidiNotes = createMemo(() => liveMidiNotes());
   const editorTitle = createMemo(() => {
     const currentDraft = draft();
     if (!currentDraft) return "Segment";
@@ -241,7 +244,7 @@ export function SegmentEditorModal(props: SegmentEditorModalProps) {
       void updateDrumBeatFeedback(sessionId, {
         acceptedEdit: true,
         finalBeat: drumPayloadFromSegment(currentDraft),
-      }).then(() => maybeRunDueTraining("drums"));
+      });
     }
     updateSegment(props.segmentId, prepareSegmentForSave(currentDraft));
     closeEditorOnly();
@@ -631,15 +634,27 @@ export function SegmentEditorModal(props: SegmentEditorModalProps) {
   }
 
   function previewNote(pitch: number, velocity = 100) {
+    const currentDraft = draft();
+    if (!currentDraft) return;
+    const instrument = instruments().find((item) => item.id === currentDraft.instrumentId);
+    if (isNative() && instrument) {
+      void send({
+        kind: "engine.previewMidiNote",
+        trackId: currentDraft.trackId,
+        instrumentId: instrument.id,
+        pitch: Math.max(0, Math.min(127, pitch + (currentDraft.transpose ?? 0))),
+        velocity: Math.round(applyGainToVelocity(velocity, midiSegmentGainDb(currentDraft.payload))),
+        durationSeconds: 0.2,
+      });
+      return;
+    }
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const Ctor = (window.AudioContext || (window as any).webkitAudioContext) as typeof AudioContext;
     if (!previewCtx) previewCtx = new Ctor();
     const ctx = previewCtx;
     if (ctx.state === "suspended") void ctx.resume();
     const gain = ctx.createGain();
-    const currentDraft = draft();
-    if (!currentDraft) return;
-    const instrument = instruments().find((item) => item.id === currentDraft.instrumentId);
     const now = ctx.currentTime;
     const peak = (applyGainToVelocity(velocity, midiSegmentGainDb(currentDraft.payload)) / 127) * 0.25;
     gain.gain.setValueAtTime(0, now);
@@ -679,6 +694,11 @@ export function SegmentEditorModal(props: SegmentEditorModalProps) {
           </>
         }
       >
+        <SegmentLoopControl
+          repeats={draft()!.repeats}
+          lengthBeats={draft()!.lengthBeats}
+          onChange={(repeats) => setDraft((current) => current ? { ...current, repeats } : current)}
+        />
         <Show when={isMidi()}>
           <>
             <div class={styles.midiTopFields}>
@@ -716,6 +736,8 @@ export function SegmentEditorModal(props: SegmentEditorModalProps) {
                     lengthBeats={draft()!.lengthBeats}
                     bpm={bpm()}
                     instrument={instruments().find((instrument) => instrument.id === draft()!.instrumentId)}
+                    trackId={draft()!.trackId}
+                    transpose={draft()!.transpose}
                     hotkeyScopeId={scopeId()}
                     captureSpaceKey
                     onPositionChange={setMidiPreviewBeat}
@@ -995,6 +1017,7 @@ export function SegmentEditorModal(props: SegmentEditorModalProps) {
               timeSignature={timeSignature()}
               segmentTimeSignature={payload().timeSignature ?? timeSignature()}
               instruments={instruments()}
+              trackId={draft()!.trackId}
               hotkeyScopeId={scopeId()}
               onChange={updateDrumRows}
               onResize={resizeDrum}
@@ -1012,19 +1035,40 @@ export function SegmentEditorModal(props: SegmentEditorModalProps) {
         <Show when={audioPayload()}>
           {(payload) => (
           <div class={styles.audioPanel}>
-            <TextInput
-              label="Name"
-              layout="inline"
-              value={draft()?.name ?? ""}
-              placeholder="Audio segment"
-              onInput={(event) => setDraft((current) => current ? { ...current, name: event.currentTarget.value } : current)}
+            <div class={styles.audioFields}>
+              <TextInput
+                label="Name"
+                layout="inline"
+                value={draft()?.name ?? ""}
+                placeholder="Audio segment"
+                onInput={(event) => setDraft((current) => current ? { ...current, name: event.currentTarget.value } : current)}
+              />
+              <NumberInput
+                label="Gain"
+                layout="inline"
+                min={-96}
+                max={24}
+                step={0.5}
+                value={payload().gainDb ?? 0}
+                unit="dB"
+                onChange={(gainDb) => setDraft((current) => current?.payload.kind === "audio"
+                  ? { ...current, payload: { ...current.payload, gainDb } }
+                  : current)}
+              />
+            </div>
+            <AudioSegmentTransport
+              segment={draft()!}
+              file={audioFile()}
+              bpm={bpm()}
+              speed={transportSpeed()}
+              onPositionChange={setMidiPreviewBeat}
             />
-            <div class={styles.audioLabel}>Audio source</div>
-            <p class={styles.audioHint}>
-              {payload().audioFileId
-                ? payload().audioFileId
-                : "(no file attached - use 'Import Audio' from the track menu)"}
-            </p>
+            <div class={styles.audioSourceRow}>
+              <span class={styles.audioLabel}>Audio source</span>
+              <span class={styles.audioHint} title={audioFile()?.path}>
+                {audioFile()?.name ?? payload().audioFileId ?? "(no file attached - use 'Import Audio' from the track menu)"}
+              </span>
+            </div>
           </div>
           )}
         </Show>

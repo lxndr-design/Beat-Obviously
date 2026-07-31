@@ -67,6 +67,8 @@ const DEV_DRUMPAD_LINKS_TRACK_ID = "dev-drumpad-links-track";
 const DEV_DRUMPAD_LINKS_SEGMENT_ID = "dev-drumpad-links-segment";
 const DEV_DRUMPAD_LINKS_LANE_A_ID = "dev-drumpad-links-lane-a";
 const DEV_DRUMPAD_LINKS_LANE_S_ID = "dev-drumpad-links-lane-s";
+const DEV_DRUM_GRID_TRACK_ID = "dev-drum-grid-track";
+const DEV_DRUM_GRID_SEGMENT_ID = "dev-drum-grid-segment";
 const DEV_NODE_INSTRUMENT_INTERACTION_ID = "dev-node-instrument-interaction-host";
 const USER_PRESET_PREFIX = "user:";
 
@@ -78,6 +80,9 @@ declare global {
         instrumentId: string;
       };
       installNodeInstrumentFixture: () => {
+        instrumentId: string;
+      };
+      installAurumEditorFixture: () => {
         instrumentId: string;
       };
       exerciseNodeInstrumentEditorFlow: () => Promise<DevNodeInstrumentExerciseState>;
@@ -148,6 +153,10 @@ declare global {
         segmentId: string;
       };
       readDrumpadLinksFixtureState: () => DevDrumpadLinksFixtureState;
+      installDrumGridFixture: () => {
+        trackId: string;
+        segmentId: string;
+      };
       openAetherAutomationFixtureEditor: (editor: DevAetherAutomationEditor) => Promise<DevAetherAutomationFixtureState>;
       readAetherAutomationFixtureState: () => DevAetherAutomationFixtureState;
       exerciseAetherAutomationPointEditorFlow: () => Promise<DevAetherAutomationPointExerciseState>;
@@ -1924,6 +1933,50 @@ export function installBeatDevHooks() {
     return { trackId: track.id, segmentId: DEV_DRUMPAD_LINKS_SEGMENT_ID };
   };
 
+  const installDrumGridFixture = () => {
+    const project = createEmptyProject();
+    project.id = "dev-drum-grid-project";
+    project.name = "Drum Grid Selection Fixture";
+    project.lengthBeats = 16;
+    project.bpm = 124;
+    const track = project.tracks[0];
+    track.id = DEV_DRUM_GRID_TRACK_ID;
+    track.name = "Drum Grid Track";
+    track.kind = "midi";
+    track.segments = [{
+      id: DEV_DRUM_GRID_SEGMENT_ID,
+      trackId: DEV_DRUM_GRID_TRACK_ID,
+      name: "Drum Grid Selection",
+      startBeat: 0,
+      lengthBeats: 8,
+      repeats: 0,
+      layer: 0,
+      payload: {
+        kind: "drum",
+        stepCount: 8,
+        speed: 4,
+        sourceLengthBeats: 8,
+        defaultPitchHz: 261.63,
+        swingPercent: 50,
+        rows: [
+          { id: "dev-drum-kick", name: "Kick", steps: [true, false, false, false, true, false, false, false] },
+          { id: "dev-drum-snare", name: "Snare", steps: [false, false, true, false, false, false, true, false] },
+          { id: "dev-drum-hat", name: "Hat", steps: [true, true, true, true, true, true, true, true] },
+        ],
+      },
+    }];
+
+    useProjectStore.getState().loadProject(project);
+    useUiStore.setState({
+      openEditors: [],
+      selectedTrackIds: [],
+      selectedSegmentIds: [],
+      selectedTrackEffectAutomationPointKeys: [],
+    });
+    useUiStore.getState().openEditor({ kind: "segment", segmentId: DEV_DRUM_GRID_SEGMENT_ID });
+    return { trackId: track.id, segmentId: DEV_DRUM_GRID_SEGMENT_ID };
+  };
+
   const readDrumpadLinksFixtureState = (): DevDrumpadLinksFixtureState => {
     const dialog = document.querySelector<HTMLElement>('[role="dialog"]');
     const pathElements = Array.from(document.querySelectorAll<SVGPathElement>("[data-drumpad-link-path]"));
@@ -2287,6 +2340,7 @@ export function installBeatDevHooks() {
     ...(window.__beatTestHooks ?? {}),
     installDecentSamplerFixture,
     installNodeInstrumentFixture,
+    installAurumEditorFixture,
     exerciseNodeInstrumentEditorFlow,
     installMixedEraAetherPresetFixture,
     installMixedEraAetherFxPresetFixture,
@@ -2312,6 +2366,7 @@ export function installBeatDevHooks() {
     installAetherAutomationFixture,
     installDrumpadLinksFixture,
     readDrumpadLinksFixtureState,
+    installDrumGridFixture,
     openAetherAutomationFixtureEditor,
     readAetherAutomationFixtureState,
     exerciseAetherAutomationPointEditorFlow,
@@ -2326,6 +2381,9 @@ export function installBeatDevHooks() {
   document.addEventListener("beat:install-decent-sampler-fixture", (event) => {
     const fixture = event instanceof CustomEvent ? event.detail?.fixture : undefined;
     installDecentSamplerFixture(fixture === "wide" ? "wide" : "lorenzo");
+  });
+  document.addEventListener("beat:install-aurum-editor-fixture", () => {
+    installAurumEditorFixture();
   });
 
   const fixture = new URLSearchParams(window.location.search).get("beatDevFixture");
@@ -2421,6 +2479,10 @@ export function installBeatDevHooks() {
   } else if (fixture === "drumpad-links") {
     window.setTimeout(() => {
       installDrumpadLinksFixture();
+    }, 0);
+  } else if (fixture === "drum-grid-selection") {
+    window.setTimeout(() => {
+      installDrumGridFixture();
     }, 0);
   } else if (fixture === "aether-automation-points") {
     window.setTimeout(() => {
@@ -3574,7 +3636,7 @@ async function waitForSynthPresetNamed(name: string): Promise<SynthPresetRecord 
   for (let attempt = 0; attempt < 30; attempt += 1) {
     await nextFrame();
     const record = await db.synthPresets.where("name").equals(name).first();
-    if (record) return record;
+    if (record?.kind === "instrument") return record;
   }
   return null;
 }

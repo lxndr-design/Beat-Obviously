@@ -72,6 +72,20 @@ interface NodeDefinition {
   defaults: Record<string, InstrumentNodeParameterValue>;
 }
 
+export const CV_SOURCE_NODE_KINDS = [
+  "lfo",
+  "envelope",
+  "velocity",
+  "keytrack",
+  "modWheel",
+  "midiControl",
+  "macro",
+  "random",
+  "constant",
+] as const satisfies readonly InstrumentNodeKind[];
+
+export type CvSourceNodeKind = typeof CV_SOURCE_NODE_KINDS[number];
+
 const AUDIO_IN: InstrumentNodePort = { id: "audio-in", label: "Audio", kind: "input", signal: "audio" };
 const SUM_AUDIO_IN: InstrumentNodePort = { id: "audio-in", label: "Audio", kind: "input", signal: "audio", acceptsMultiple: true };
 const MIXER_INPUTS: InstrumentNodePort[] = [
@@ -776,6 +790,9 @@ export const NODE_DEFINITIONS: Record<InstrumentNodeKind, NodeDefinition> = {
   },
 };
 
+export const CV_SOURCE_NODE_OPTIONS: Array<{ value: CvSourceNodeKind; label: string }> =
+  CV_SOURCE_NODE_KINDS.map((kind) => ({ value: kind, label: NODE_DEFINITIONS[kind].label }));
+
 export const NODE_BROWSER_GROUPS: NodeBrowserGroup[] = [
   {
     id: "sound_sources_audio_out",
@@ -805,7 +822,10 @@ export const NODE_BROWSER_GROUPS: NodeBrowserGroup[] = [
   {
     id: "sole_cv_out_modulation_sources",
     label: "CV Sources / Modulation Generators",
-    nodeKinds: ["lfo", "wavetableLfo", "envelope", "velocity", "keytrack", "midiControl", "macro", "random", "constant"],
+    // Sources with the shared no-input / cv-out contract are represented by
+    // one CV Source picker in the browser. Wavetable LFO remains separate
+    // because it exposes Reset and Position inputs.
+    nodeKinds: ["wavetableLfo"],
   },
   {
     id: "cv_processors_in_out",
@@ -872,6 +892,49 @@ export function createInstrumentNode(kind: InstrumentNodeKind, x: number, y: num
     inputs: structuredClone(definition.inputs),
     outputs: structuredClone(definition.outputs),
     parameters: structuredClone(definition.defaults),
+  };
+}
+
+export function isCvSourceNodeKind(kind: InstrumentNodeKind): kind is CvSourceNodeKind {
+  return (CV_SOURCE_NODE_KINDS as readonly InstrumentNodeKind[]).includes(kind);
+}
+
+export function nodeKindsSharePortContract(left: InstrumentNodeKind, right: InstrumentNodeKind): boolean {
+  const signature = (kind: InstrumentNodeKind) => {
+    const definition = NODE_DEFINITIONS[kind];
+    return JSON.stringify({ inputs: definition.inputs, outputs: definition.outputs });
+  };
+  return signature(left) === signature(right);
+}
+
+export function replaceNodeWithCompatibleKind(node: InstrumentNode, kind: InstrumentNodeKind): InstrumentNode {
+  if (node.kind === kind) return node;
+  if (!nodeKindsSharePortContract(node.kind, kind)) {
+    throw new Error(`Cannot change ${node.kind} to ${kind}: node port contracts differ.`);
+  }
+
+  const previousDefinition = NODE_DEFINITIONS[node.kind];
+  const nextDefinition = NODE_DEFINITIONS[kind];
+  const next = createInstrumentNode(kind, node.x, node.y);
+  const parameters = { ...next.parameters };
+  for (const spec of nextDefinition.parameters) {
+    const previous = node.parameters[spec.id];
+    if (spec.kind === "number" && typeof previous === "number") parameters[spec.id] = previous;
+    if (spec.kind === "boolean" && typeof previous === "boolean") parameters[spec.id] = previous;
+    if (
+      spec.kind === "select"
+      && typeof previous === "string"
+      && spec.options?.some((option) => option.value === previous)
+    ) {
+      parameters[spec.id] = previous;
+    }
+  }
+
+  return {
+    ...next,
+    id: node.id,
+    label: node.label === previousDefinition.label ? nextDefinition.label : node.label,
+    parameters,
   };
 }
 

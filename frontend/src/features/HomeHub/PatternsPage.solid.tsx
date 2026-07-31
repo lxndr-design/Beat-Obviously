@@ -1,5 +1,5 @@
 import { createEffect, createMemo, createSignal, For, onCleanup, Show, type JSX } from "solid-js";
-import { ActionFooter, Button, HoverInfo, Icon, MarqueeText } from "../../solid-ui";
+import { ActionFooter, Button, FloatingSelect, HoverInfo, Icon, LibrarySearch, MarqueeText } from "../../solid-ui";
 import { useComponentStore, type BeatComponent, type DrumComponent, type MidiComponent } from "../../state/components";
 import {
   drumPlaybackDurationBeats,
@@ -16,6 +16,19 @@ import { AssetBrowserRibbon, AssetPageShell, AssetStateMessage } from "./AssetPa
 import styles from "./PatternsPage.module.css";
 
 type PatternKind = "midi" | "drum";
+type PatternFilter = "all" | PatternKind;
+type PatternSort = "name" | "newest" | "length";
+
+const PATTERN_FILTER_OPTIONS = [
+  { value: "all", label: "All Patterns" },
+  { value: "midi", label: "MIDI" },
+  { value: "drum", label: "Drum" },
+];
+const PATTERN_SORT_OPTIONS = [
+  { value: "name", label: "Name" },
+  { value: "newest", label: "Newest" },
+  { value: "length", label: "Length" },
+];
 
 export function PatternsPage() {
   const components = createStoreSelector(useComponentStore, (s) => s.components);
@@ -27,10 +40,21 @@ export function PatternsPage() {
   const [loopPreview, setLoopPreview] = createSignal(false);
   const [previewProgress, setPreviewProgress] = createSignal(0);
   const [previewSpeed, setPreviewSpeed] = createSignal<1 | 2 | 3>(1);
+  const [searchQuery, setSearchQuery] = createSignal("");
+  const [filter, setFilter] = createSignal<PatternFilter>("all");
+  const [sortMode, setSortMode] = createSignal<PatternSort>("name");
   let playback: ComponentPlayback | null = null;
   let progressFrame: number | null = null;
 
-  const sorted = createMemo(() => [...components()].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" })));
+  const sorted = createMemo(() => {
+    const query = searchQuery().trim().toLowerCase();
+    const filtered = components().filter((component) => {
+      if (filter() !== "all" && componentKind(component) !== filter()) return false;
+      return !query || [component.name, componentLabel(component), componentItemCount(component)]
+        .some((value) => value.toLowerCase().includes(query));
+    });
+    return [...filtered].sort((a, b) => comparePatterns(a, b, sortMode()));
+  });
   const active = createMemo(() => sorted().find((component) => component.id === activeId()) ?? sorted()[0] ?? null);
   const activeReferenceIssue = createMemo(() => active() ? patternReferenceIssue(active()!, instruments()) : null);
 
@@ -112,6 +136,36 @@ export function PatternsPage() {
       browser={
         <>
           <AssetBrowserRibbon label="Patterns" count={components().length} />
+          <div class={styles.browserBody}>
+          <div class={styles.browserControls}>
+            <span class={styles.searchWrap}>
+              <Icon name="ph:magnifying-glass" size={18} decorative />
+              <LibrarySearch
+                className={styles.searchInput}
+                value={searchQuery()}
+                onInput={(event) => setSearchQuery(event.currentTarget.value)}
+                placeholder="Search patterns…"
+                aria-label="Search patterns"
+              />
+            </span>
+            <FloatingSelect
+              className={styles.toolbarSelect}
+              layout="bare"
+              value={filter()}
+              options={PATTERN_FILTER_OPTIONS}
+              ariaLabel="Filter patterns"
+              onChange={(value) => setFilter(value as PatternFilter)}
+            />
+            <FloatingSelect
+              className={styles.toolbarSelect}
+              layout="bare"
+              value={sortMode()}
+              options={PATTERN_SORT_OPTIONS}
+              ariaLabel="Sort patterns"
+              onChange={(value) => setSortMode(value as PatternSort)}
+            />
+            <span class={styles.resultCount}>{sorted().length}</span>
+          </div>
           <div class={styles.table}>
             <div class={styles.headerRow}>
               <span>Name</span>
@@ -128,7 +182,7 @@ export function PatternsPage() {
                     <AssetStateMessage
                       icon="ph:grid-four"
                       title="No Patterns"
-                      body="Save MIDI or beat clips to build the project pattern library."
+                      body={components().length > 0 ? "Adjust search or filters to show more patterns." : "Save MIDI or beat clips to build the project pattern library."}
                     />
                   </div>
                 }
@@ -149,7 +203,7 @@ export function PatternsPage() {
                           <MarqueeText text={component.name} />
                         </span>
                         <span class={`${styles.referenceChip} ${issue() ? styles.referenceWarning : styles.referenceManaged}`}>
-                          {issue() ? "Missing" : "Ready"}
+                          {issue() ? "Missing" : componentKind(component) === "midi" ? "Portable" : "Ready"}
                         </span>
                         <span>{componentLabel(component)}</span>
                         <span>{componentLength(component)}</span>
@@ -160,6 +214,7 @@ export function PatternsPage() {
                 </For>
               </Show>
             </div>
+          </div>
           </div>
         </>
       }
@@ -250,7 +305,7 @@ export function PatternsPage() {
                 </div>
                 <div>
                   <dt>References</dt>
-                  <dd>{activeReferenceIssue() ?? "All instruments available"}</dd>
+                  <dd>{componentKind(currentActive()) === "midi" ? "Notes and expression only" : activeReferenceIssue() ?? "All instruments available"}</dd>
                 </div>
                 <div>
                   <dt>Created</dt>
@@ -447,7 +502,30 @@ function componentItemCount(component: BeatComponent): string {
     return `${hits} hit${hits === 1 ? "" : "s"}`;
   }
   const count = component.notes.length;
-  return `${count} note${count === 1 ? "" : "s"}`;
+  const expressionCount = component.notes.reduce((sum, note) => (
+    sum
+    + (note.curve?.length ?? 0)
+    + (note.automation?.reduce((laneSum, lane) => laneSum + lane.points.length, 0) ?? 0)
+    + (typeof note.connectToIndex === "number" ? 1 : 0)
+  ), 0);
+  return expressionCount > 0
+    ? `${count} note${count === 1 ? "" : "s"} · ${expressionCount} expr`
+    : `${count} note${count === 1 ? "" : "s"}`;
+}
+
+function comparePatterns(a: BeatComponent, b: BeatComponent, mode: PatternSort): number {
+  if (mode === "newest") return b.createdAt - a.createdAt || a.name.localeCompare(b.name);
+  if (mode === "length") {
+    const lengthOrder = patternLengthBeats(a) - patternLengthBeats(b);
+    if (lengthOrder !== 0) return lengthOrder;
+  }
+  return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+}
+
+function patternLengthBeats(component: BeatComponent): number {
+  return component.kind === "drum"
+    ? drumPlaybackDurationBeats(component.lengthBeats, component.speed)
+    : component.lengthBeats;
 }
 
 function patternDurationSeconds(component: BeatComponent, bpm: number, playbackRate = 1): number {
@@ -464,9 +542,6 @@ function patternReferenceIssue(component: BeatComponent, instruments: Instrument
     if (missingRows.length === 0) return null;
     const names = missingRows.map((row) => row.name).slice(0, 2).join(", ");
     return `${missingRows.length} drum row${missingRows.length === 1 ? "" : "s"} reference missing instrument${missingRows.length === 1 ? "" : "s"}${names ? `: ${names}` : ""}.`;
-  }
-  if (component.instrumentId && !known.has(component.instrumentId)) {
-    return "This MIDI pattern references an instrument that is no longer in the library.";
   }
   return null;
 }

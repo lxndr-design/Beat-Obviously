@@ -137,7 +137,10 @@ function audioFileIdFromSegmentPayload(payload: SegmentPayload): string | null {
 
 export function assetPolicy(path: string, kind: BeatProjectAssetKind): BeatProjectAssetPolicy {
   if (kind === "plugin") return "plugin";
-  return path.startsWith("/samples/") || path.includes(" Assets/sfz/")
+  return path.startsWith("/samples/")
+    || path.includes(" Assets/sfz/")
+    || path.includes("/Assets/sfz/")
+    || path.startsWith("Assets/sfz/")
     ? "bundled" : "external";
 }
 

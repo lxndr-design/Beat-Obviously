@@ -47,6 +47,7 @@ namespace beat
          *  WebBrowser native function bridge. */
         juce::var handleRequest(const juce::String& kind, const juce::var& payload);
 
+        std::function<void()> onAppShellReady;
         std::function<void()> onAppReady;
 
     private:

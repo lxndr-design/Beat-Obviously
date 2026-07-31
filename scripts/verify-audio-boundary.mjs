@@ -44,10 +44,13 @@ const transportActionsPath = join(frontendSrc, "audio", "transportActions.ts");
 const globalAudioSafetyPath = join(frontendSrc, "audio", "globalAudioSafety.ts");
 const wavemapResynthesisPath = join(frontendSrc, "audio", "wavemapResynthesis.ts");
 const audioRecordingModalPath = join(frontendSrc, "features", "Tracks", "AudioRecordingModal.solid.tsx");
+const audioFilesPagePath = join(frontendSrc, "features", "HomeHub", "AudioFilesPage.solid.tsx");
+const audioSegmentTransportPath = join(frontendSrc, "features", "SegmentEditor", "AudioSegmentTransport.solid.tsx");
 const schemaPath = join(frontendSrc, "ipc", "schema.ts");
 const bridgePath = join(frontendSrc, "ipc", "bridge.ts");
 const backendSchemaPath = join(repoRoot, "backend", "Source", "Ipc", "Schema.h");
 const messageBridgePath = join(repoRoot, "backend", "Source", "Ipc", "MessageBridge.cpp");
+const backendCmakePath = join(repoRoot, "backend", "CMakeLists.txt");
 const audioEngineHeaderPath = join(repoRoot, "backend", "Source", "Audio", "AudioEngine.h");
 const audioEnginePath = join(repoRoot, "backend", "Source", "Audio", "AudioEngine.cpp");
 
@@ -60,10 +63,13 @@ for (const requiredPath of [
   globalAudioSafetyPath,
   wavemapResynthesisPath,
   audioRecordingModalPath,
+  audioFilesPagePath,
+  audioSegmentTransportPath,
   schemaPath,
   bridgePath,
   backendSchemaPath,
   messageBridgePath,
+  backendCmakePath,
   audioEngineHeaderPath,
   audioEnginePath,
 ]) {
@@ -177,13 +183,51 @@ if (existsSync(wavemapResynthesisPath)) {
 
 if (existsSync(audioRecordingModalPath)) {
   const source = read(audioRecordingModalPath);
-  if (!source.includes('import { isNative } from "../../ipc/bridge";')) {
-    fail("Track audio recorder browser fallback must import isNative.");
+  const backendSource = read(messageBridgePath);
+  if (!source.includes('import { isNative, send } from "../../ipc/bridge";')) {
+    fail("Track audio recorder must import the native bridge and retain browser capability detection.");
   }
-  if (!source.includes("!isNative()")
-      || !source.includes("if (isNative()) return;")
-      || !source.includes("Track recording needs the native recorder backend")) {
-    fail("Track audio recorder browser fallback must stay disabled in native mode until native capture exists.");
+  if (!["recording.plan", "recording.prepare", "recording.start", "recording.stop", "recording.commitTake"]
+    .every((kind) => source.includes(`kind: "${kind}"`))
+      || !source.includes("navigator.mediaDevices.getUserMedia")) {
+    fail("Track audio recorder must use native capture in the app while retaining the browser MediaRecorder fallback.");
+  }
+  if (!backendSource.includes("uniqueAudioLibraryFile")
+      || !backendSource.includes("commitRecordedCapture(project, engine.inputRecordingCapture(), outputFile")
+      || !backendSource.includes('response->setProperty("path", outputFile.getFullPathName())')) {
+    fail("Native recorded takes without an explicit path must commit into Beat's managed audio library.");
+  }
+  if (!source.includes("No input audio was captured.")
+      || !source.includes('role="alert"')
+      || !backendSource.includes('diagnostics::log("recording", "stop samples="')
+      || !backendSource.includes('diagnostics::log("recording", "commit ready samples="')) {
+    fail("Native Live Record must expose zero-sample failures and log capture/commit diagnostics.");
+  }
+}
+
+if (existsSync(backendCmakePath)) {
+  const source = read(backendCmakePath);
+  if (!source.includes("MICROPHONE_PERMISSION_ENABLED TRUE")
+      || !source.includes("MICROPHONE_PERMISSION_TEXT")) {
+    fail("The native app bundle must declare macOS microphone permission for Live Record.");
+  }
+}
+
+if (existsSync(audioFilesPagePath)) {
+  const source = read(audioFilesPagePath);
+  if (!source.includes('kind: "audio.previewData"')
+      || !source.includes("nativeAudioFilePath(file.path)")
+      || !source.includes("nativeResponse.audioDataUrl")) {
+    fail("Audio Files native preview must request trusted preview data instead of fetching local file URLs in the web view.");
+  }
+}
+
+if (existsSync(audioSegmentTransportPath)) {
+  const source = read(audioSegmentTransportPath);
+  if (!source.includes('kind: "engine.previewAudioSegment"')
+      || !source.includes('kind: "engine.stopAudioPreview"')
+      || !/if \(isNative\(\)\) \{[\s\S]*?return;\s*\}\s*\n\s*try \{\s*await startBrowserPreview/.test(source)) {
+    fail("Audio segment preview must use the project engine in native mode and isolate WebAudio to the browser fallback.");
   }
 }
 
@@ -204,12 +248,18 @@ if (existsSync(schemaPath)) {
       || !source.includes("pitchBendSemitones")) {
     fail("Frontend IPC schema must expose native MIDI synth expression activity events.");
   }
+  if (!source.includes('kind: "audio.previewData"') || !source.includes("audioDataUrl?: string")) {
+    fail("Frontend IPC schema must expose native audio preview data.");
+  }
 }
 
 if (existsSync(bridgePath)) {
   const source = read(bridgePath);
   if (!source.includes('case "instrument.renderPreview"')) {
     fail("Dev bridge must keep an instrument.renderPreview mock response.");
+  }
+  if (!source.includes('case "audio.previewData"')) {
+    fail("Dev bridge must keep an audio.previewData mock response.");
   }
 }
 
@@ -220,6 +270,9 @@ if (existsSync(backendSchemaPath)) {
   }
   if (!source.includes("EV_SYNTH_EXPRESSION_ACTIVITY")) {
     fail("Backend IPC schema must expose EV_SYNTH_EXPRESSION_ACTIVITY.");
+  }
+  if (!source.includes("AUDIO_PREVIEW_DATA")) {
+    fail("Backend IPC schema must expose AUDIO_PREVIEW_DATA.");
   }
 }
 
@@ -233,6 +286,11 @@ if (existsSync(messageBridgePath)) {
   }
   if (!source.includes("makeWavDataUrl")) {
     fail("Backend instrument preview must keep the optional rendered WAV data URL path.");
+  }
+  if (!source.includes("kind == AUDIO_PREVIEW_DATA")
+      || !source.includes("makeAudioDataUrl")
+      || !source.includes("maxInlineAudioPreviewBytes")) {
+    fail("Backend audio preview must validate and inline supported local audio through IPC.");
   }
   if (!source.includes('trackVar.getProperty("automation", {})')
       || !source.includes("lane.trackId = t.id;")
@@ -264,6 +322,7 @@ const webAudioAllowlist = new Set([
   "frontend/src/features/InstrumentLibrary/InstrumentLibraryPanel.solid.tsx",
   "frontend/src/features/MidiEditor/MidiTransport.solid.tsx",
   "frontend/src/features/SegmentEditor/SegmentEditorModal.solid.tsx",
+  "frontend/src/features/SegmentEditor/AudioSegmentTransport.solid.tsx",
   "frontend/src/features/Synth/SynthEditor/SynthEditor.solid.tsx",
   "frontend/src/features/Tracks/AudioRecordingModal.solid.tsx",
 ]);

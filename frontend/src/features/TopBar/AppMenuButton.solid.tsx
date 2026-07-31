@@ -10,6 +10,7 @@ export interface AppMenuButtonProps {
   onHome: () => void;
   onNew: () => void;
   onOpen: () => void;
+  onImportAudio: () => void;
   onSave: () => void;
   onSaveAs: () => void;
   onExport: () => void;
@@ -41,7 +42,7 @@ export function AppMenuButton(props: { props: Accessor<AppMenuButtonProps> }) {
       { label: "User Guide", icon: "ph:folder-open", onSelect: callbacks.onUserGuide },
       { label: "New Project", icon: "ph:plus", separatorBefore: true, onSelect: callbacks.onNew },
       { label: "Open...", icon: "ph:folder-open", onSelect: callbacks.onOpen },
-      { label: "Import...", icon: "ph:download-simple", disabled: true, hint: "Later" },
+      { label: "Import Audio...", icon: "ph:file-audio", onSelect: callbacks.onImportAudio },
       { label: "Save As...", icon: "ph:floppy-disk-back", disabled: disableFileStateActions, onSelect: callbacks.onSaveAs },
       {
         label: "Save...",

@@ -18,10 +18,12 @@ try {
       join(repoRoot, "frontend/src/testing/interactionRunner.ts"),
       join(repoRoot, "frontend/src/features/MidiEditor/pianoRollInteraction.ts"),
       join(repoRoot, "frontend/src/features/SegmentEditor/midiLiveRecording.ts"),
+      join(repoRoot, "frontend/src/features/DrumEditor/drumGridSelection.ts"),
       join(repoRoot, "frontend/src/automation/aetherNoteAutomation.ts"),
       join(repoRoot, "frontend/src/automation/aetherArrangementAutomation.ts"),
       join(repoRoot, "frontend/src/automation/aetherAutomationConflicts.ts"),
       join(repoRoot, "frontend/src/state/components.ts"),
+      join(repoRoot, "frontend/src/features/NodeInstrumentEditor/nodeGraph.ts"),
       join(repoRoot, "frontend/src/solid-ui/FloatingSelect/floatingSelectKeyboard.ts"),
       "--bundle",
       "--format=esm",
@@ -34,15 +36,20 @@ try {
   const runner = await import(pathToFileURL(join(outDir, "testing/interactionRunner.js")));
   const midiInteraction = await import(pathToFileURL(join(outDir, "features/MidiEditor/pianoRollInteraction.js")));
   const midiLiveRecording = await import(pathToFileURL(join(outDir, "features/SegmentEditor/midiLiveRecording.js")));
+  const drumGridSelection = await import(pathToFileURL(join(outDir, "features/DrumEditor/drumGridSelection.js")));
   const noteAutomation = await import(pathToFileURL(join(outDir, "automation/aetherNoteAutomation.js")));
   const arrangementAutomation = await import(pathToFileURL(join(outDir, "automation/aetherArrangementAutomation.js")));
   const automationConflicts = await import(pathToFileURL(join(outDir, "automation/aetherAutomationConflicts.js")));
   const componentState = await import(pathToFileURL(join(outDir, "state/components.js")));
+  const nodeGraph = await import(pathToFileURL(join(outDir, "features/NodeInstrumentEditor/nodeGraph.js")));
   const floatingSelectKeyboard = await import(pathToFileURL(join(outDir, "solid-ui/FloatingSelect/floatingSelectKeyboard.js")));
   const pianoRollSource = readFileSync(join(repoRoot, "frontend/src/features/MidiEditor/PianoRoll.solid.tsx"), "utf8");
   const pianoRollCss = readFileSync(join(repoRoot, "frontend/src/features/MidiEditor/PianoRoll.module.css"), "utf8");
   const midiTransportSource = readFileSync(join(repoRoot, "frontend/src/features/MidiEditor/MidiTransport.solid.tsx"), "utf8");
   const segmentEditorSource = readFileSync(join(repoRoot, "frontend/src/features/SegmentEditor/SegmentEditorModal.solid.tsx"), "utf8");
+  const audioSegmentTransportSource = readFileSync(join(repoRoot, "frontend/src/features/SegmentEditor/AudioSegmentTransport.solid.tsx"), "utf8");
+  const segmentLoopControlSource = readFileSync(join(repoRoot, "frontend/src/features/SegmentEditor/SegmentLoopControl.solid.tsx"), "utf8");
+  const numberInputSource = readFileSync(join(repoRoot, "frontend/src/solid-ui/NumberInput/NumberInput.solid.tsx"), "utf8");
   const drumpadEditorSource = readFileSync(join(repoRoot, "frontend/src/features/DrumpadEditor/DrumpadEditorModal.solid.tsx"), "utf8");
   const drumpadEditorCss = readFileSync(join(repoRoot, "frontend/src/features/DrumpadEditor/DrumpadEditorModal.module.css"), "utf8");
   const preferencesSource = readFileSync(join(repoRoot, "frontend/src/features/Preferences/PreferencesModal.solid.tsx"), "utf8");
@@ -50,14 +57,21 @@ try {
   const ipcBridgeSource = readFileSync(join(repoRoot, "frontend/src/ipc/bridge.ts"), "utf8");
   const ipcBackendSchemaSource = readFileSync(join(repoRoot, "backend/Source/Ipc/Schema.h"), "utf8");
   const ipcBackendBridgeSource = readFileSync(join(repoRoot, "backend/Source/Ipc/MessageBridge.cpp"), "utf8");
+  const nativeMainSource = readFileSync(join(repoRoot, "backend/Source/Main.cpp"), "utf8");
+  const mainComponentSource = readFileSync(join(repoRoot, "backend/Source/MainComponent.cpp"), "utf8");
   const audioEngineHeaderSource = readFileSync(join(repoRoot, "backend/Source/Audio/AudioEngine.h"), "utf8");
   const audioEngineSource = readFileSync(join(repoRoot, "backend/Source/Audio/AudioEngine.cpp"), "utf8");
   const trackDetailsSource = readFileSync(join(repoRoot, "frontend/src/features/TrackDetails/TrackDetailsModal.solid.tsx"), "utf8");
   const trackHeaderSource = readFileSync(join(repoRoot, "frontend/src/features/Tracks/TrackHeader.solid.tsx"), "utf8");
   const homeHubSource = readFileSync(join(repoRoot, "frontend/src/features/HomeHub/HomeHub.solid.tsx"), "utf8");
+  const homeHubCss = readFileSync(join(repoRoot, "frontend/src/features/HomeHub/HomeHub.module.css"), "utf8");
   const audioFilesSource = readFileSync(join(repoRoot, "frontend/src/features/HomeHub/AudioFilesPage.solid.tsx"), "utf8");
   const assetReferenceGraphSource = readFileSync(join(repoRoot, "frontend/src/persistence/assetReferenceGraph.ts"), "utf8");
   const documentActionsSource = readFileSync(join(repoRoot, "frontend/src/persistence/documentActions.ts"), "utf8");
+  const beatDocumentSource = readFileSync(join(repoRoot, "frontend/src/persistence/beatDocument.ts"), "utf8");
+  const effectStateSource = readFileSync(join(repoRoot, "frontend/src/state/effects.ts"), "utf8");
+  const trackEffectRowsSource = readFileSync(join(repoRoot, "frontend/src/features/Tracks/TrackEffectRows.solid.tsx"), "utf8");
+  const timepointLaneSource = readFileSync(join(repoRoot, "frontend/src/features/Tracks/TimepointLane.solid.tsx"), "utf8");
   const appSource = readFileSync(join(repoRoot, "frontend/src/App.solid.tsx"), "utf8");
   const appMenuSource = readFileSync(join(repoRoot, "frontend/src/features/TopBar/AppMenuButton.solid.tsx"), "utf8");
   const sidebarSource = readFileSync(join(repoRoot, "frontend/src/features/Sidebar/Sidebar.solid.tsx"), "utf8");
@@ -69,6 +83,7 @@ try {
   const exportReviewSource = readFileSync(join(repoRoot, "frontend/src/features/ExportReview/ExportReviewModal.solid.tsx"), "utf8");
   const exportActionsSource = readFileSync(join(repoRoot, "frontend/src/features/ExportReview/exportActions.ts"), "utf8");
   const exportStoreSource = readFileSync(join(repoRoot, "frontend/src/state/exportStore.ts"), "utf8");
+  const exportJobPanelSource = readFileSync(join(repoRoot, "frontend/src/features/Debug/ExportJobPanel.solid.tsx"), "utf8");
   const projectHealthSource = readFileSync(join(repoRoot, "frontend/src/features/ProjectHealth/ProjectHealthModal.solid.tsx"), "utf8");
   const projectIntegritySource = readFileSync(join(repoRoot, "backend/Source/Persistence/ProjectIntegrityVerifier.cpp"), "utf8");
   const nodeEditorSource = readFileSync(join(repoRoot, "frontend/src/features/NodeInstrumentEditor/NodeInstrumentEditor.solid.tsx"), "utf8");
@@ -82,14 +97,36 @@ try {
   const oscillatorPanelSource = readFileSync(join(repoRoot, "frontend/src/features/Synth/OscillatorPanel/OscillatorPanel.solid.tsx"), "utf8");
   const patternsPageSource = readFileSync(join(repoRoot, "frontend/src/features/HomeHub/PatternsPage.solid.tsx"), "utf8");
   const instrumentsPageSource = readFileSync(join(repoRoot, "frontend/src/features/HomeHub/InstrumentsPage.solid.tsx"), "utf8");
+  const instrumentsPageCss = readFileSync(join(repoRoot, "frontend/src/features/HomeHub/InstrumentsPage.module.css"), "utf8");
   const instrumentEditorSource = readFileSync(join(repoRoot, "frontend/src/features/InstrumentEditor/InstrumentEditorModal.solid.tsx"), "utf8");
   const componentLibrarySource = readFileSync(join(repoRoot, "frontend/src/features/ComponentLibrary/ComponentLibraryPanel.solid.tsx"), "utf8");
   const instrumentLibrarySource = readFileSync(join(repoRoot, "frontend/src/features/InstrumentLibrary/InstrumentLibraryPanel.solid.tsx"), "utf8");
   const trackLaneSource = readFileSync(join(repoRoot, "frontend/src/features/Tracks/TrackLane.solid.tsx"), "utf8");
+  const trackListSource = readFileSync(join(repoRoot, "frontend/src/features/Tracks/TrackList.solid.tsx"), "utf8");
+  const trackListCss = readFileSync(join(repoRoot, "frontend/src/features/Tracks/TrackList.module.css"), "utf8");
+  const timelineSource = readFileSync(join(repoRoot, "frontend/src/features/Tracks/Timeline.solid.tsx"), "utf8");
+  const knobSource = readFileSync(join(repoRoot, "frontend/src/solid-ui/Knob/Knob.solid.tsx"), "utf8");
+  const audioRecordingModalSource = readFileSync(join(repoRoot, "frontend/src/features/Tracks/AudioRecordingModal.solid.tsx"), "utf8");
   const drumSequencerSource = readFileSync(join(repoRoot, "frontend/src/features/DrumEditor/DrumSequencer.solid.tsx"), "utf8");
   const devHooksSource = readFileSync(join(repoRoot, "frontend/src/testing/devHooks.ts"), "utf8");
 
   assert.equal(runner.snapBeat(1.12, 0.25), 1, "snapBeat should snap to nearest grid");
+  const drumRectangle = drumGridSelection.drumSelectionRectangle(
+    ["kick", "snare", "hat"], 8,
+    { rowId: "kick", step: 2 },
+    { rowId: "snare", step: 4 },
+  );
+  assert.deepEqual([...drumRectangle], ["kick:2", "kick:3", "kick:4", "snare:2", "snare:3", "snare:4"]);
+  assert.deepEqual(
+    [...drumGridSelection.mergeDrumSelection(new Set(["hat:0"]), drumRectangle, true)],
+    ["hat:0", ...drumRectangle],
+    "drum marquee should preserve the base set in additive mode",
+  );
+  assert.deepEqual(
+    [...drumGridSelection.mergeDrumSelection(new Set(["hat:0"]), drumRectangle, false)],
+    [...drumRectangle],
+    "drum marquee should replace the selection outside additive mode",
+  );
   assert.equal(floatingSelectKeyboard.nextFloatingSelectOptionIndex("ArrowDown", -1, 3), 0);
   assert.equal(floatingSelectKeyboard.nextFloatingSelectOptionIndex("ArrowDown", 2, 3), 2);
   assert.equal(floatingSelectKeyboard.nextFloatingSelectOptionIndex("ArrowUp", -1, 3), 2);
@@ -104,6 +141,30 @@ try {
     notes: [],
     lengthBeats: 4,
   });
+  const portableMidiId = componentState.useComponentStore.getState().add({
+    kind: "midi",
+    name: "Portable expression",
+    instrumentId: "legacy-bound-instrument",
+    lengthBeats: 4,
+    notes: [{
+      pitch: 64,
+      velocity: 101,
+      startBeat: 0,
+      lengthBeats: 1,
+      frequencyHz: 330,
+      sampleZoneId: "legacy-zone",
+      samplePath: "/tmp/legacy.wav",
+      sampleLabel: "Legacy zone",
+      curve: [{ beat: 0.5, pitch: 64.5 }],
+      automation: [{ target: "pitch", points: [{ beat: 0.5, value: 0.25 }] }],
+    }],
+  });
+  const portableMidi = componentState.useComponentStore.getState().components.find((component) => component.id === portableMidiId);
+  assert.equal(portableMidi?.instrumentId, undefined, "MIDI patterns should not retain an instrument binding");
+  assert.equal(portableMidi?.kind === "midi" ? portableMidi.notes[0]?.samplePath : "wrong-kind", undefined, "MIDI patterns should remove sampler-specific note paths");
+  assert.equal(portableMidi?.kind === "midi" ? portableMidi.notes[0]?.frequencyHz : -1, undefined, "MIDI patterns should retain pitch identity rather than instrument-specific frequency");
+  assert.deepEqual(portableMidi?.kind === "midi" ? portableMidi.notes[0]?.curve : null, [{ beat: 0.5, pitch: 64.5 }], "MIDI patterns should preserve bend curves");
+  assert.deepEqual(portableMidi?.kind === "midi" ? portableMidi.notes[0]?.automation : null, [{ target: "pitch", points: [{ beat: 0.5, value: 0.25 }] }], "MIDI patterns should preserve expression automation");
   componentState.useComponentStore.getState().moveToFolder(componentId, componentFolderId);
   assert.equal(
     componentState.useComponentStore.getState().components.find((component) => component.id === componentId)?.folderId,
@@ -127,21 +188,92 @@ try {
     "instrument and component libraries should share the LibraryFolder UI and interactions",
   );
   assert.ok(
-    instrumentLibrarySource.includes("LUMUS_TEST_INSTRUMENT_SET_ID")
-      && instrumentLibrarySource.includes("set.id === LUMUS_TEST_INSTRUMENT_SET_ID"),
-    "the protected Lumus Test factory group should display with its exact product-testing name",
+    audioFilesSource.includes("const AUDIO_PAGE_SIZE = 50")
+      && audioFilesSource.includes("<For each={pagedFiles()}")
+      && audioFilesSource.includes('aria-label="Audio file pages"'),
+    "Audio Files should render a maximum of 50 paged rows with explicit navigation",
   );
   assert.ok(
-    ["Aether", "Aurum", "Lumus"].every((engine) =>
+    audioFilesSource.includes('variant="ghost" selected={selectMode()}')
+      && audioFilesSource.includes('kind: "audio.previewData"')
+      && audioFilesSource.includes("nativeAudioFilePath(file.path)"),
+    "Audio Files should use neutral shared controls and native preview data for local files",
+  );
+  assert.ok(
+    audioFilesSource.includes("nextPreviewFileId !== previousPreviewFileId")
+      && audioFilesSource.includes("stopPreview();\n      setPreviewDirection(\"forward\");\n      setScrubbing(false);")
+      && audioFilesSource.includes("previewRequestId += 1")
+      && audioFilesSource.includes("requestId !== previewRequestId"),
+    "Audio Files should stop and reset the preview when selection changes and reject stale async decodes",
+  );
+  assert.ok(
+    audioFilesSource.includes("loadPreferredAnalysis")
+      && audioFilesSource.includes("withTimeout(loadBrowserAnalysis(), WAVEFORM_PRIMARY_TIMEOUT_MS")
+      && audioFilesSource.includes("return loadNativeAnalysis()")
+      && audioFilesSource.includes("WAVEFORM_LOAD_TIMEOUT_MS")
+      && audioFilesSource.includes('"Waveform Unavailable"')
+      && audioFilesSource.includes("normalizeWaveformChannel"),
+    "Audio Files should decode normal waveform previews through the playable-audio path, retain native fallback, and terminate loading visibly",
+  );
+  assert.ok(
+    patternsPageSource.includes('componentKind(component) === "midi" ? "Portable"')
+      && patternsPageSource.includes("Notes and expression only"),
+    "Patterns should identify instrument-independent MIDI note and expression data",
+  );
+  assert.ok(
+    instrumentsPageSource.includes("INSTRUMENT_FILTER_OPTIONS")
+      && instrumentsPageSource.includes("INSTRUMENT_GROUP_OPTIONS")
+      && instrumentsPageSource.includes('value: "alphabetical"')
+      && instrumentsPageSource.includes('value: "edited-desc"')
+      && instrumentsPageSource.includes('value: "usage-desc"')
+      && instrumentsPageSource.includes("collapseAllGroups")
+      && instrumentsPageSource.includes("expandAllGroups")
+      && instrumentsPageSource.includes("collapsedGroups"),
+    "Instruments should expose search, filtering, alphabetical/engine grouping, useful sorting, and explicit group controls",
+  );
+  assert.ok(
+    instrumentsPageSource.includes("previewLoadingId")
+      && instrumentsPageSource.includes("styles.previewSpinner")
+      && instrumentsPageSource.includes("await preloadInstrumentSampleUrl(ctx, sampleUrl)")
+      && !instrumentsPageSource.includes("await preloadInstrumentSample(ctx, instrument)")
+      && instrumentsPageSource.includes("normalizeWaveformSummary")
+      && instrumentsPageSource.includes("INSTRUMENT_WAVEFORM_TIMEOUT_MS")
+      && instrumentsPageCss.includes("@keyframes instrument-preview-spin")
+      && synthPreviewSource.includes('kind: "audio.previewData"')
+      && synthPreviewSource.includes("INSTRUMENT_SAMPLE_LOAD_TIMEOUT_MS"),
+    "instrument auditions should show bounded loading feedback, decode only the selected sample, and render native sample waveforms",
+  );
+  assert.ok(
+    instrumentLibrarySource.includes("LUMEN_TEST_INSTRUMENT_SET_ID")
+      && instrumentLibrarySource.includes("set.id === LUMEN_TEST_INSTRUMENT_SET_ID"),
+    "the protected Lumen Test factory group should display with its exact product-testing name",
+  );
+  assert.ok(
+    ['kind: "audio.listDevices"', 'kind: "audio.selectInputDevice"', 'kind: "recording.plan"', 'kind: "recording.prepare"', 'kind: "recording.start"', 'kind: "recording.stop"', 'kind: "recording.commitTake"']
+      .every((request) => audioRecordingModalSource.includes(request))
+      && audioRecordingModalSource.includes("Recorded Takes")
+      && audioRecordingModalSource.includes("props.onToggleTake")
+      && audioRecordingModalSource.includes("Bluetooth")
+      && audioRecordingModalSource.includes("ensureNativeInputReady")
+      && trackLaneSource.includes("recordingGroupId: nano()")
+      && trackListSource.includes("recordingTakeNumber")
+      && trackListSource.includes("muted: !enabled")
+      && storeSource.includes("updateRecordingInput")
+      && storeSource.includes("recordingGroups")
+      && typesSource.includes("recordingGroupId?: Id"),
+    "Live Record should use native microphone capture, enumerate connected inputs, and retain toggleable layered takes per segment",
+  );
+  assert.ok(
+    ["Aether", "Aurum", "Lumen"].every((engine) =>
       trackLaneSource.includes(`Create ${engine} Segment`)),
-    "track creation UI should expose dedicated Aether, Aurum, and Lumus segment actions",
+    "track creation UI should expose dedicated Aether, Aurum, and Lumen segment actions",
   );
   assert.ok(
     trackLaneSource.includes('addEngineSegment("aether")')
       && trackLaneSource.includes('addEngineSegment("aurum")')
-      && trackLaneSource.includes('addEngineSegment("lumus")')
+      && trackLaneSource.includes('addEngineSegment("lumen")')
       && trackLaneSource.includes("createAurumInstrument")
-      && trackLaneSource.includes("createDefaultLumusDraft")
+      && trackLaneSource.includes("createDefaultLumenDraft")
       && trackLaneSource.includes("createDefaultSynthDraft"),
     "each engine segment action should construct and bind its own engine instrument",
   );
@@ -170,6 +302,21 @@ try {
     midiInteraction.midiNoteDragIndicesForSelection([0, 2], 1),
     [1],
     "MIDI note edits should switch to the pressed note when it is outside the active selection",
+  );
+  assert.deepEqual(
+    midiInteraction.midiNoteSelectionAfterAdditiveClick({ selectedIndices: [0, 2], noteIndex: 2, moved: false }),
+    [0],
+    "MIDI shift-click should toggle an already-selected note off when no drag occurred",
+  );
+  assert.deepEqual(
+    midiInteraction.midiNoteSelectionAfterAdditiveClick({ selectedIndices: [0, 2], noteIndex: 2, moved: true }),
+    [0, 2],
+    "MIDI shift-drag should preserve the active multi-selection",
+  );
+  assert.deepEqual(
+    midiInteraction.midiNoteSelectionAfterMarquee({ selectedIndices: [0, 3], marqueeIndices: [1, 3], additive: true }),
+    [0, 1, 3],
+    "MIDI shift-marquee should add to the existing selection without duplicates",
   );
   assert.equal(
     midiInteraction.midiNotePointerMovedPastThreshold({
@@ -208,6 +355,14 @@ try {
     "piano roll note selection, hover classes, and zoom-scaled note rects should be reactive after note nodes are created",
   );
   assert.ok(
+    pianoRollSource.includes('role="listbox"')
+      && pianoRollSource.includes('role="option"')
+      && pianoRollSource.includes("aria-selected={isSelected()}")
+      && pianoRollSource.includes("midiNoteSelectionAfterAdditiveClick")
+      && pianoRollSource.includes("midiNoteSelectionAfterMarquee"),
+    "piano roll selection should expose accessible state and standard additive click/marquee behavior",
+  );
+  assert.ok(
     pianoRollSource.includes("has: (_target, property) => Reflect.has(props.notes, property)")
       && pianoRollSource.includes("getOwnPropertyDescriptor: (_target, property) => Reflect.getOwnPropertyDescriptor(props.notes, property)"),
     "piano roll note proxy should support array methods such as slice during note drags",
@@ -219,12 +374,13 @@ try {
       && pianoRollSource.includes("function noteEditDragHasStarted")
       && pianoRollSource.includes("midiNotePointerMovedPastThreshold")
       && pianoRollSource.includes("snapMidiBeatToVisibleGrid(beat, pxPerBeat())")
-      && pianoRollSource.includes("const startBeat = clamp(e.shiftKey ? snapShiftDrag(rawStartBeat) : rawStartBeat")
+      && pianoRollSource.includes("fixedGridStep != null || shiftKey ? snapShiftDrag(beat) : beat")
+      && pianoRollSource.includes("const startBeat = clamp(editBeat(rawStartBeat, e.shiftKey)")
       && pianoRollSource.includes("const rawEnd = start.startBeat + start.lengthBeats + dLen")
-      && pianoRollSource.includes("const nextEnd = e.shiftKey ? snapShiftDrag(rawEnd) : rawEnd")
+      && pianoRollSource.includes("const nextEnd = editBeat(rawEnd, e.shiftKey)")
       && pianoRollSource.includes("const rawStart = start.startBeat + dLen")
-      && pianoRollSource.includes("const nextStart = clamp(e.shiftKey ? snapShiftDrag(rawStart) : rawStart"),
-    "piano roll note movement should use window-level tracking and shift-snap note drags/resizes to visible grid ticks",
+      && pianoRollSource.includes("const nextStart = clamp(editBeat(rawStart, e.shiftKey)"),
+    "piano roll note movement should use window-level tracking and visible or fixed-grid note drags/resizes",
   );
   assert.ok(
     pianoRollSource.includes("e.currentTarget.setPointerCapture(e.pointerId)")
@@ -275,6 +431,34 @@ try {
       && !midiTransportSource.includes("function pause() {\n    setPlaying(false);\n    stopPreviewAudio();\n    props.state().onPositionChange?.(null);")
       && midiTransportSource.includes("onCleanup(() => {\n    stopPreviewAudio();\n    props.state().onPositionChange?.(null);"),
     "MIDI preview pause should keep the playhead visible and only clear preview position on cleanup",
+  );
+  assert.ok(
+    midiTransportSource.includes("prepareExclusivePreview()")
+      && midiTransportSource.includes("const previewNote = transposeMidiNote(note, transpose)")
+      && midiTransportSource.includes("note: previewNote")
+      && midiTransportSource.includes("midiPreviewScheduleKey(note, index)")
+      && midiTransportSource.includes("stopPreviewAudio();\n        startMs = now"),
+    "MIDI editor playback should be exclusive, transpose once, retain duplicate notes, and clean voices at loop boundaries",
+  );
+  assert.ok(
+    drumSequencerSource.includes("usesNativePreview()")
+      && drumSequencerSource.includes('kind: "engine.previewMidiNote"')
+      && drumSequencerSource.includes("prepareExclusivePreview()")
+      && drumpadEditorSource.includes("stopPlaybackSession")
+      && drumpadEditorSource.includes('kind: "engine.previewMidiNote"'),
+    "drum and drumpad segment editors should use exclusive native instrument preview when a project track is available",
+  );
+  assert.ok(
+    segmentEditorSource.includes("<AudioSegmentTransport")
+      && segmentEditorSource.includes("file={audioFile()}")
+      && audioSegmentTransportSource.includes('kind: "engine.previewAudioSegment"')
+      && audioSegmentTransportSource.includes('kind: "engine.stopAudioPreview"')
+      && audioSegmentTransportSource.includes('kind: "audio.waveform"')
+      && audioSegmentTransportSource.includes("prepareExclusivePreview()")
+      && audioSegmentTransportSource.includes("sourceStartBeat() + beat")
+      && audioSegmentTransportSource.includes("fadeInBeats")
+      && audioSegmentTransportSource.includes("fadeOutBeats"),
+    "audio segments should expose real waveform playback with trim, fades, gain, seeking, and exclusive native routing",
   );
   assert.ok(
     drumpadEditorSource.includes("function togglePlayback()")
@@ -511,6 +695,16 @@ try {
     "beat editor should label drum speed as grid density, not playback speed",
   );
   assert.ok(
+    drumSequencerSource.includes("drumSelectionRectangle")
+      && drumSequencerSource.includes("mergeDrumSelection")
+      && drumSequencerSource.includes("onPointerMove={moveCellPointer}")
+      && drumSequencerSource.includes("data-drum-cell-row={row.id}")
+      && drumSequencerSource.includes("aria-selected={selected}")
+      && drumSequencerSource.includes('e.key.toLowerCase() === "a"')
+      && drumSequencerSource.includes('e.key === "Escape"'),
+    "drum grid should expose rectangular additive selection, pointer tracking, keyboard select-all, and clear-selection",
+  );
+  assert.ok(
     drumSequencerSource.includes("Math.min(1.5, source.buffer.duration / source.playbackRate.value)")
       && !drumSequencerSource.includes("Math.min(1.5, maxDuration, source.buffer.duration"),
     "beat editor drum samples should be allowed to ring instead of being clipped to the step preview length",
@@ -599,8 +793,94 @@ try {
     "Home hub should not expose the removed Project Assets one-off page",
   );
   assert.ok(
+    /\.recentCard\s*\{[^}]*position:\s*relative;/s.test(homeHubCss)
+      && /\.recentOpen\s*\{[^}]*width:\s*100%;/s.test(homeHubCss)
+      && /\.recentActions\s*\{[^}]*position:\s*absolute;/s.test(homeHubCss)
+      && /\.recentRemove\s*\{[^}]*background:\s*transparent;/s.test(homeHubCss),
+    "recent project cards should remain a single full-width surface with the remove button overlaid",
+  );
+  assert.ok(
+    homeHubSource.includes("onContextMenu={menu.onContextMenu}")
+      && homeHubSource.includes("onMouseDown={openMenuFromSecondaryMouseDown}")
+      && homeHubSource.includes("event.button !== 2")
+      && homeHubSource.includes("event.button === 0 && event.ctrlKey")
+      && homeHubSource.includes('label: "Reveal in Finder"')
+      && homeHubSource.includes('label: "Duplicate Project"')
+      && homeHubSource.includes('label: "Remove from Recent"')
+      && appSource.includes('kind: "project.duplicateFile"')
+      && ipcSchemaSource.includes('kind: "project.duplicateFile"')
+      && ipcBackendSchemaSource.includes('PROJECT_DUPLICATE_FILE = "project.duplicateFile"')
+      && ipcBackendBridgeSource.includes("if (kind == PROJECT_DUPLICATE_FILE)")
+      && ipcBackendBridgeSource.includes('projectObject->setProperty("id", juce::Uuid().toString())')
+      && ipcBackendBridgeSource.includes("relocateDocumentSidecarPaths(document, source, destination)")
+      && ipcBackendBridgeSource.includes("projectRepo.recordRecentProject(destination, document)"),
+    "recent project cards should expose reveal, safe independent duplication, and removal through the shared context menu",
+  );
+  assert.ok(
+    trackEffectRowsSource.includes("Unsupported effect (${kind || \"unknown\"})")
+      && trackEffectRowsSource.includes("params: []")
+      && effectStateSource.includes(".filter((effect) => effect && typeof effect === \"object\" && isEffectKind")
+      && beatDocumentSource.includes("effects: normalizeTrackEffectChain(value.effects)")
+      && appSource.includes('writeFrontendDiagnostic("frontend-error"')
+      && appSource.includes('window.addEventListener("unhandledrejection", onUnhandledRejection)'),
+    "project opening should tolerate unsupported persisted effects and report frontend render failures diagnostically",
+  );
+  assert.ok(
+    trackEffectRowsSource.includes("TimepointHandle")
+      && trackEffectRowsSource.includes("effectAutomationBeatFromDrag(point.beat, startClientX, event.clientX")
+      && trackEffectRowsSource.includes("window.addEventListener(\"pointermove\"")
+      && trackEffectRowsSource.includes("TimepointValuePopover")
+      && trackEffectRowsSource.includes("fallbackPoint")
+      && trackEffectRowsSource.includes("selectTrackEffectAutomationPoint")
+      && timepointLaneSource.includes("onPointerDown={(event) =>")
+      && timepointLaneSource.includes("props.onSelect?.(event.shiftKey)")
+      && timepointLaneSource.includes("role=\"dialog\"")
+      && timepointLaneSource.includes("data-floating-layer"),
+    "FX automation points should select on pointer-down, drag by pointer delta, preserve the default anchor, and open an isolated value popover",
+  );
+  assert.ok(
+    trackListSource.includes("[data-track-timepoint-selection-key]")
+      && trackListSource.includes("setSelectedTrackEffectAutomationPoints(Array.from(effectPointKeys))")
+      && storeSource.includes("setSelectedTrackEffectAutomationPoints"),
+    "arrangement marquee should not start from an FX point and should select FX points when drawn across their lane",
+  );
+  assert.ok(
+    segmentLoopControlSource.includes("<Toggle")
+      && segmentLoopControlSource.includes('aria-label="Enable segment looping"')
+      && segmentLoopControlSource.includes('label="Repeats"')
+      && segmentLoopControlSource.includes("disabled={!enabled()}")
+      && segmentLoopControlSource.includes("next ? Math.max(1")
+      && segmentLoopControlSource.includes(": 0"),
+    "segment editors should expose an explicit loop switch and an enabled-only additional-repeat count",
+  );
+  assert.ok(
+    numberInputSource.indexOf("const raw = event.currentTarget.value")
+      < numberInputSource.indexOf("commit(raw)")
+      && numberInputSource.indexOf("commit(raw)")
+        < numberInputSource.indexOf("setEditing(false)", numberInputSource.indexOf("commit(raw)")),
+    "number inputs should capture and commit edited text before releasing their props-sync guard",
+  );
+  assert.ok(
+    trackListSource.indexOf("styles.timelineSpacer") < trackListSource.indexOf("<For each={tracks()}")
+      && trackListSource.includes("styles.timelineDock")
+      && trackListSource.includes("<Timeline scrollLeft={horizontalScrollLeft()} />")
+      && trackListSource.includes("onScroll={(event) => setHorizontalScrollLeft(event.currentTarget.scrollLeft)}")
+      && timelineSource.includes("props.scrollLeft")
+      && /\.timelineDock\s*\{[^}]*position:\s*sticky;[^}]*top:\s*0;/s.test(trackListCss)
+      && /\.zoomFloat\s*\{[^}]*position:\s*absolute;[^}]*top:\s*var\(--space-3\);/s.test(trackListCss),
+    "the timeline ruler and zoom controls should remain fixed at the top while track rows scroll",
+  );
+  assert.ok(
+    knobSource.includes('activePointerId = event.pointerId')
+      && knobSource.includes('window.addEventListener("pointermove", handlePointerMove, true)')
+      && knobSource.includes('window.addEventListener("pointercancel", handlePointerEnd, true)')
+      && !knobSource.includes("setPointerCapture"),
+    "shared knobs should drag through capture-phase window listeners without depending on element pointer capture",
+  );
+  assert.ok(
     assetReferenceGraphSource.includes("track:${track.id}:segment:${segment.id}:audioFileId")
       && assetReferenceGraphSource.includes("instrument:${instrument.id}:sampleIds:${index}")
+      && assetReferenceGraphSource.includes('path.includes("/Assets/sfz/")')
       && assetReferenceGraphSource.includes("buildProjectAssetReferenceRows"),
     "shared asset reference graph should remain available for document repair, packaging, and health flows",
   );
@@ -658,6 +938,23 @@ try {
     "export review modal should expose one loop-range toggle and launch the shared export runner without scope cards",
   );
   assert.ok(
+    appSource.includes('send({ kind: "app.shellReady" })')
+      && !appSource.includes('send({ kind: "audio.list"')
+      && appSource.includes("useAudioFileStore.getState().hydrateFiles(localFiles)")
+      && appSource.includes("engineAudioFilesForProject(project, useAudioFileStore.getState().files)")
+      && appSource.includes("engineInstrumentsForProject(project, useInstrumentStore.getState().instruments)")
+      && appSource.match(/allStartupReady\(startupReadiness\(\)\)\) scheduleCurrentDocumentDirtyState\(\);/g)?.length === 3
+      && appSource.includes("}, 10_000);")
+      && appSource.includes("}, 1_500);")
+      && ipcBackendSchemaSource.includes('APP_SHELL_READY     = "app.shellReady"')
+      && ipcBackendBridgeSource.includes("refreshMetadata && audioFileNeedsMetadataRefresh")
+      && ipcBackendBridgeSource.includes("for (const auto& file : refreshedFiles)")
+      && mainComponentSource.includes("onAppShellReady")
+      && nativeMainSource.includes("onFrontendShellReady")
+      && nativeMainSource.includes("Preparing audio engine and interface"),
+    "startup should hand off from the native splash to visible staged progress and avoid synchronous metadata repair for the full audio library",
+  );
+  assert.ok(
     exportReviewSource.includes("Project Health")
       && exportReviewSource.includes("showProjectHealth")
       && exportReviewSource.includes('["checking", "warning", "blocked", "failed"]')
@@ -671,6 +968,19 @@ try {
       && exportActionsSource.includes("exportValidationBlocksExport")
       && exportActionsSource.includes("includeTail: true"),
     "shared export runner should validate before export IPC and always include effect tails",
+  );
+  assert.ok(
+    exportStoreSource.includes("job.finished && job.ok && job.path")
+      && exportStoreSource.includes("lastCompletedJob: job.finished && job.ok && job.analysis ? job : state.lastCompletedJob")
+      && exportReviewSource.includes('job()?.active || validation().state === "checking"')
+      && exportReviewSource.includes("Last Successful Export Analysis")
+      && exportReviewSource.includes('"Retry Export"'),
+    "export review should retain only completed destinations and analysis, prevent duplicate active jobs, and allow stale blocked validation to be retried",
+  );
+  assert.ok(
+    exportJobPanelSource.includes("current.finished && current.cancelled")
+      && exportJobPanelSource.includes("Export Cancelled"),
+    "export progress UI should distinguish user cancellation from render failure",
   );
   assert.ok(
     exportActionsSource.includes("bounceTrackInPlace")
@@ -705,7 +1015,7 @@ try {
       && exportStoreSource.includes("persistExportPreferences")
       && exportStoreSource.includes("validateBeforeExport")
       && exportStoreSource.includes("normalizeRecentDestinations"),
-    "export store should persist recent destinations and validate-before-export preference",
+    "export store should persist recent destinations while retaining the mandatory validation migration field",
   );
   assert.ok(
     !exportReviewSource.includes("renderableStemCount")
@@ -755,6 +1065,27 @@ try {
     "app and track-header menus should route isolated track WAV export directly to the shared track exporter",
   );
   assert.ok(
+    appMenuSource.includes('label: "Import Audio..."')
+      && appMenuSource.includes("callbacks.onImportAudio")
+      && appSource.includes("async function importAudioFromMenu()")
+      && !appMenuSource.includes('label: "Import..."'),
+    "the app menu should expose only the supported audio-file import workflow",
+  );
+  assert.ok(
+    !appSource.includes("TrainingAutoRunner")
+      && !homeHubSource.includes("AI Training")
+      && !preferencesSource.includes("Local AI Training Status")
+      && !preferencesSource.includes("training-assisted suggestions"),
+    "AI training should remain outside the active product and runtime until it is intentionally reintroduced",
+  );
+  assert.ok(
+    appSource.includes("Local recovery autosave failed")
+      && appSource.includes("useSettingsStore.getState().autosaveBackups")
+      && appSource.includes("saveProject(project)")
+      && preferencesSource.includes('label="Recovery autosave"'),
+    "recovery autosave preference should persist project edits locally",
+  );
+  assert.ok(
     sidebarSource.includes('openEditor({ kind: "exportReview" })') && !sidebarSource.includes("project.exportWav"),
     "sidebar export button should open export review instead of bypassing it with direct IPC",
   );
@@ -769,6 +1100,27 @@ try {
       && nodeEditorSource.includes("NodeDetails")
       && nodeEditorSource.includes("analyzeInstrumentNodeGraph"),
     "Nodemap editor should expose grouped node browsing, templates, play, undo, details, and warning analysis without output creation",
+  );
+  assert.ok(
+    nodeEditorSource.includes('label="CV Source"')
+      && nodeEditorSource.includes('ariaLabel="CV source type"')
+      && nodeEditorSource.includes('label="CV Type"')
+      && nodeEditorSource.includes("replaceNodeWithCompatibleKind")
+      && nodeGraphSource.includes('nodeKinds: ["wavetableLfo"]')
+      && nodeGraphSource.includes("CV_SOURCE_NODE_KINDS"),
+    "Nodemap should consolidate compatible CV sources behind one add picker and an editable node-type selector",
+  );
+  const velocityNode = nodeGraph.createInstrumentNode("velocity", 12, 24);
+  velocityNode.parameters.amount = 0.72;
+  const keytrackNode = nodeGraph.replaceNodeWithCompatibleKind(velocityNode, "keytrack");
+  assert.equal(keytrackNode.id, velocityNode.id, "compatible CV conversion should preserve node identity and cables");
+  assert.equal(keytrackNode.kind, "keytrack");
+  assert.equal(keytrackNode.outputs[0].id, "cv-out");
+  assert.equal(keytrackNode.parameters.amount, 0.72, "compatible CV conversion should preserve shared parameters");
+  assert.throws(
+    () => nodeGraph.replaceNodeWithCompatibleKind(velocityNode, "wavetableLfo"),
+    /port contracts differ/,
+    "nodes with different input or output contracts must not be consolidated",
   );
   assert.ok(
     nodeCanvasSource.includes("createContextMenu")
@@ -1320,7 +1672,7 @@ try {
   assert.ok(
     editorHostSource.includes("Instrument - Aether Engine")
       && synthEditorSource.includes('`${props.instrumentName} output preview`')
-      && synthEditorSource.includes('instrumentName={draft().instrumentType === "lumus-hybrid-synth" ? "Lumus" : "Aether"}')
+      && synthEditorSource.includes('instrumentName={draft().instrumentType === "lumen-hybrid-synth" ? "Lumen" : "Aether"}')
       && synthEditorSource.includes('label="Name"')
       && synthEditorSource.includes('label="Category"')
       && synthEditorSource.includes('label="Instrument"')
@@ -1364,9 +1716,9 @@ try {
     "browser fixture coverage should exercise Aether oscillator, disabled-row, and voice-stack editing",
   );
   assert.ok(
-    synthEditorSource.includes('"Lumus instrument effects" : "Aether instrument effects"')
+    synthEditorSource.includes('"Lumen instrument effects" : "Aether instrument effects"')
       && synthEditorSource.includes('aria-label="Add instrument effect"')
-      && synthEditorSource.includes('"Current Lumus FX chain" : "Current Aether FX chain"')
+      && synthEditorSource.includes('"Current Lumen FX chain" : "Current Aether FX chain"')
       && synthEditorSource.includes("Drag ${EFFECT_LABELS[effect.kind]} to reorder")
       && synthEditorSource.includes("Bypass")
       && synthEditorSource.includes("Remove ${EFFECT_LABELS[effect.kind]}"),
@@ -1444,7 +1796,7 @@ try {
       && synthEditorSource.includes('aria-describedby="aether-sample-slot-1-source-status"')
       && synthEditorSource.includes('aria-labelledby="aether-granular-slot-2-title"')
       && synthEditorSource.includes('id="aether-granular-slot-2-source-status"')
-      && synthEditorSource.includes('isLumus() ? `Enable Source ${activeLumusSampleSlot().toUpperCase()} granular` : "Enable Aether granular slot 2"')
+      && synthEditorSource.includes('isLumen() ? `Enable Source ${activeLumenSampleSlot().toUpperCase()} granular` : "Enable Aether granular slot 2"')
       && synthEditorSource.includes('aria-describedby="aether-granular-slot-2-source-status"')
       && synthEditorSource.includes('aria-busy={importingSfz()}')
       && synthEditorSource.includes('aria-busy={importingGranular()}')

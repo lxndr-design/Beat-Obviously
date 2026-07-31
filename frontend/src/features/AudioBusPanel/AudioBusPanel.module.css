@@ -144,13 +144,6 @@
   padding-bottom: var(--space-2);
 }
 
-.sectionTitle {
-  position: static;
-  z-index: auto;
-  height: var(--button-square-md);
-  min-height: var(--button-square-md);
-}
-
 .sectionMeta {
   display: block;
   max-width: calc(var(--space-10) * 5);
@@ -217,8 +210,6 @@
 }
 
 .rackHeader {
-  position: static;
-  z-index: auto;
   flex: 0 0 var(--sidebar-rail-size);
 }
 
@@ -351,8 +342,6 @@
 }
 
 .sendHeader {
-  position: static;
-  z-index: auto;
   min-height: var(--sidebar-rail-size);
   border-block: var(--border-fg);
 }

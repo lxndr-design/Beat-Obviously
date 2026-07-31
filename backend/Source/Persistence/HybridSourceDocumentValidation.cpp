@@ -204,31 +204,32 @@ namespace beat
             }
         }
 
-        void validateLumusConfig(const juce::var& lumus,
+        void validateLumenConfig(const juce::var& lumen,
                                  const juce::String& path,
                                  std::vector<HybridSourceDocumentDiagnostic>& diagnostics)
         {
-            if (!lumus.isObject())
+            if (!lumen.isObject())
             {
-                add(diagnostics, "lumus.config.shape", path,
-                    "A Lumus instrument requires an object-valued Lumus configuration.");
+                add(diagnostics, "lumen.config.shape", path,
+                    "A Lumen instrument requires an object-valued Lumen configuration.");
                 return;
             }
-            if (!validateVersion(lumus, 1, "lumus.config", path, diagnostics))
+            if (!validateVersion(lumen, 2, "lumen.config", path, diagnostics))
                 return;
+            const int configSchemaVersion = (int) lumen.getProperty("schemaVersion", 0);
 
             const auto requireThree = [&](const char* property, const char* code) -> const juce::Array<juce::var>*
             {
-                const auto* array = lumus.getProperty(property, {}).getArray();
+                const auto* array = lumen.getProperty(property, {}).getArray();
                 if (array == nullptr || array->size() != 3)
                     add(diagnostics, code, path + "." + property,
                         juce::String(property) + " must contain exactly three entries.");
                 return array != nullptr && array->size() == 3 ? array : nullptr;
             };
-            const auto* sampleSlots = requireThree("sampleSlots", "lumus.sample-slots.capacity");
-            const auto* sampleModes = requireThree("sampleModes", "lumus.sample-modes.capacity");
-            const auto* granularSlots = requireThree("granularSlots", "lumus.granular-slots.capacity");
-            const auto* granularModes = requireThree("granularModes", "lumus.granular-modes.capacity");
+            const auto* sampleSlots = requireThree("sampleSlots", "lumen.sample-slots.capacity");
+            const auto* sampleModes = requireThree("sampleModes", "lumen.sample-modes.capacity");
+            const auto* granularSlots = requireThree("granularSlots", "lumen.granular-slots.capacity");
+            const auto* granularModes = requireThree("granularModes", "lumen.granular-modes.capacity");
             const auto validateModes = [&](const juce::Array<juce::var>* modes,
                                            const char* property,
                                            const char* code)
@@ -240,8 +241,8 @@ namespace beat
                             path + "." + property + "[" + juce::String(index) + "]",
                             "Each source mode must be a boolean.");
             };
-            validateModes(sampleModes, "sampleModes", "lumus.sample-modes.type");
-            validateModes(granularModes, "granularModes", "lumus.granular-modes.type");
+            validateModes(sampleModes, "sampleModes", "lumen.sample-modes.type");
+            validateModes(granularModes, "granularModes", "lumen.granular-modes.type");
             for (int index = 0; index < 3; ++index)
             {
                 if (sampleSlots != nullptr)
@@ -260,10 +261,10 @@ namespace beat
                 }
             }
 
-            const auto arpeggiator = lumus.getProperty("arpeggiator", {});
-            const auto clip = lumus.getProperty("clip", {});
+            const auto arpeggiator = lumen.getProperty("arpeggiator", {});
+            const auto clip = lumen.getProperty("clip", {});
             if (!arpeggiator.isObject())
-                add(diagnostics, "lumus.arpeggiator.shape", path + ".arpeggiator",
+                add(diagnostics, "lumen.arpeggiator.shape", path + ".arpeggiator",
                     "arpeggiator must be an object.");
             const auto validateRate = [&](const juce::var& owner,
                                           const juce::String& ownerPath,
@@ -277,31 +278,62 @@ namespace beat
                         "rateDivision must be one of 4, 8, 16, or 32.");
             };
             if (arpeggiator.isObject())
-                validateRate(arpeggiator, path + ".arpeggiator", "lumus.arpeggiator.rate");
+                validateRate(arpeggiator, path + ".arpeggiator", "lumen.arpeggiator.rate");
             if (!clip.isObject())
             {
-                add(diagnostics, "lumus.clip.shape", path + ".clip", "clip must be an object.");
+                add(diagnostics, "lumen.clip.shape", path + ".clip", "clip must be an object.");
                 return;
             }
-            validateRate(clip, path + ".clip", "lumus.clip.rate");
+            validateRate(clip, path + ".clip", "lumen.clip.rate");
             const auto lengthValue = clip.getProperty("lengthSteps", {});
-            const auto* steps = clip.getProperty("steps", {}).getArray();
             if (!isIntegralNumber(lengthValue) || (int) lengthValue < 1 || (int) lengthValue > 32)
-                add(diagnostics, "lumus.clip.length", path + ".clip.lengthSteps",
+            {
+                add(diagnostics, "lumen.clip.length", path + ".clip.lengthSteps",
                     "lengthSteps must be an integer from 1 through 32.");
-            else if (steps == nullptr || steps->size() != (int) lengthValue)
-                add(diagnostics, "lumus.clip.steps-capacity", path + ".clip.steps",
-                    "steps must contain exactly lengthSteps entries.");
+            }
+            else if (configSchemaVersion < 2)
+            {
+                const auto* steps = clip.getProperty("steps", {}).getArray();
+                if (steps == nullptr || steps->size() != (int) lengthValue)
+                    add(diagnostics, "lumen.clip.steps-capacity", path + ".clip.steps",
+                        "steps must contain exactly lengthSteps entries.");
+                else
+                    for (int index = 0; index < steps->size(); ++index)
+                        if (!steps->getReference(index).isObject())
+                            add(diagnostics, "lumen.clip.step-shape",
+                                path + ".clip.steps[" + juce::String(index) + "]",
+                                "Each clip step must be an object.");
+            }
             else
-                for (int index = 0; index < steps->size(); ++index)
-                    if (!steps->getReference(index).isObject())
-                        add(diagnostics, "lumus.clip.step-shape",
-                            path + ".clip.steps[" + juce::String(index) + "]",
-                            "Each clip step must be an object.");
+            {
+                const auto* notes = clip.getProperty("notes", {}).getArray();
+                if ((int) clip.getProperty("schemaVersion", 0) != 2)
+                    add(diagnostics, "lumen.clip.schema", path + ".clip.schemaVersion",
+                        "Polyphonic clips require schemaVersion 2.");
+                if (notes == nullptr || notes->size() > 64)
+                    add(diagnostics, "lumen.clip.notes-capacity", path + ".clip.notes",
+                        "notes must contain at most 64 entries.");
+                else
+                    for (int index = 0; index < notes->size(); ++index)
+                    {
+                        const auto& note = notes->getReference(index);
+                        const int startStep = (int) note.getProperty("startStep", -1);
+                        const int pitchOffset = (int) note.getProperty("pitchOffset", 99);
+                        const int noteLength = (int) note.getProperty("lengthSteps", 0);
+                        const double velocity = (double) note.getProperty("velocity", 0.0);
+                        if (!note.isObject() || startStep < 0 || startStep >= (int) lengthValue
+                            || pitchOffset < -48 || pitchOffset > 48
+                            || noteLength < 1 || noteLength > (int) lengthValue - startStep
+                            || !std::isfinite(velocity) || velocity <= 0.0 || velocity > 1.0)
+                            add(diagnostics, "lumen.clip.note-range",
+                                path + ".clip.notes[" + juce::String(index) + "]",
+                                "Each clip note must fit the bounded time, pitch, length, and velocity range.");
+                    }
+            }
             if (arpeggiator.isObject()
                 && (bool) arpeggiator.getProperty("enabled", false)
                 && (bool) clip.getProperty("enabled", false))
-                add(diagnostics, "lumus.performance-mode.conflict", path,
+                add(diagnostics, "lumen.performance-mode.conflict", path,
                     "Arpeggiator and clip cannot both be enabled.");
         }
     }
@@ -323,9 +355,13 @@ namespace beat
                 validateSampleSlot(aether, path, diagnostics);
                 validateGranularSlot(aether, path, diagnostics);
             }
-            if (instrument.getProperty("synthEngine", {}).toString() == "lumus")
-                validateLumusConfig(instrument.getProperty("lumus", {}),
-                    "instruments[" + juce::String(index) + "].lumus", diagnostics);
+            const auto synthEngine = instrument.getProperty("synthEngine", {}).toString();
+            if (synthEngine == "lumen" || synthEngine == "lumus")
+            {
+                const bool legacy = synthEngine == "lumus" && !instrument.hasProperty("lumen");
+                validateLumenConfig(instrument.getProperty(legacy ? "lumus" : "lumen", {}),
+                    "instruments[" + juce::String(index) + "]." + (legacy ? "lumus" : "lumen"), diagnostics);
+            }
         }
         return diagnostics;
     }

@@ -16,6 +16,7 @@ import type {
   Instrument,
   ManagedSfzAssetConfig,
   ManagedGranularAssetConfig,
+  MidiNote,
   InstrumentSet,
   PluginAdapter,
   Project,
@@ -195,6 +196,7 @@ export interface ProjectExportJobStatus {
   active: boolean;
   finished: boolean;
   ok: boolean;
+  cancelled?: boolean;
   jobId?: string;
   type?: "project" | "track" | "range" | "stems";
   path: string;
@@ -301,6 +303,8 @@ export interface DecentSamplerImport {
 // ===== Outbound (JS → C++) =================================================
 
 export type OutboundRequest =
+  | { kind: "app.shellReady" }
+  | { kind: "app.startupStage"; stage: "instruments" | "components" | "audio"; durationMs: number; itemCount: number }
   | { kind: "app.ready" }
   // Transport ---------------------------------------------------------------
   | { kind: "transport.play" }
@@ -319,6 +323,7 @@ export type OutboundRequest =
   | { kind: "project.recentList" }
   | { kind: "project.recentRemove"; path: string }
   | { kind: "project.revealFile"; path: string }
+  | { kind: "project.duplicateFile"; path: string }
   | { kind: "project.chooseExportFolder"; pathHint?: string }
   | { kind: "project.inspectDocument"; document: BeatProjectDocument; projectPath?: string }
   | { kind: "project.repairDocument"; document: BeatProjectDocument; projectPath?: string; action: "rebuildAssetManifest" | "repairSegmentTrackIds" }
@@ -326,20 +331,24 @@ export type OutboundRequest =
   | { kind: "project.restoreBackup"; projectPath: string; backupPath: string }
   | { kind: "project.relinkAsset"; asset: Pick<BeatProjectAsset, "kind" | "name" | "path">; pathHint?: string }
   | { kind: "project.cleanupAssets"; projectPath: string; document: BeatProjectDocument }
-  | { kind: "project.exportWav"; project: Project; instruments?: Instrument[]; audioFiles?: AudioFile[]; pathHint?: string; options?: ProjectExportOptions }
-  | { kind: "project.exportTrackWav"; project: Project; trackId: Id; instruments?: Instrument[]; audioFiles?: AudioFile[]; pathHint?: string; options?: ProjectExportOptions }
+  | { kind: "project.exportWav"; project: Project; instruments?: Instrument[]; audioFiles?: AudioFile[]; pathHint?: string; includeTail?: boolean; options?: ProjectExportOptions }
+  | { kind: "project.exportTrackWav"; project: Project; trackId: Id; instruments?: Instrument[]; audioFiles?: AudioFile[]; pathHint?: string; includeTail?: boolean; options?: ProjectExportOptions }
   | { kind: "project.exportRangeWav"; project: Project; startBeat: Beats; endBeat: Beats; includeTail?: boolean; instruments?: Instrument[]; audioFiles?: AudioFile[]; pathHint?: string; options?: ProjectExportOptions }
-  | { kind: "project.bounceTrackWav"; project: Project; trackId: Id; instruments?: Instrument[]; audioFiles?: AudioFile[]; pathHint?: string; options?: ProjectExportOptions }
-  | { kind: "project.exportWavAsync"; project: Project; instruments?: Instrument[]; audioFiles?: AudioFile[]; pathHint?: string; options?: ProjectExportOptions }
-  | { kind: "project.exportTrackWavAsync"; project: Project; trackId: Id; instruments?: Instrument[]; audioFiles?: AudioFile[]; pathHint?: string; options?: ProjectExportOptions }
+  | { kind: "project.bounceTrackWav"; project: Project; trackId: Id; instruments?: Instrument[]; audioFiles?: AudioFile[]; pathHint?: string; includeTail?: boolean; options?: ProjectExportOptions }
+  | { kind: "project.exportWavAsync"; project: Project; instruments?: Instrument[]; audioFiles?: AudioFile[]; pathHint?: string; includeTail?: boolean; options?: ProjectExportOptions }
+  | { kind: "project.exportTrackWavAsync"; project: Project; trackId: Id; instruments?: Instrument[]; audioFiles?: AudioFile[]; pathHint?: string; includeTail?: boolean; options?: ProjectExportOptions }
   | { kind: "project.exportRangeWavAsync"; project: Project; startBeat: Beats; endBeat: Beats; includeTail?: boolean; instruments?: Instrument[]; audioFiles?: AudioFile[]; pathHint?: string; options?: ProjectExportOptions }
-  | { kind: "project.exportAllTrackWavsAsync"; project: Project; instruments?: Instrument[]; audioFiles?: AudioFile[]; pathHint?: string; options?: ProjectExportOptions }
+  | { kind: "project.exportAllTrackWavsAsync"; project: Project; instruments?: Instrument[]; audioFiles?: AudioFile[]; pathHint?: string; includeTail?: boolean; options?: ProjectExportOptions }
   | { kind: "project.exportCancel" }
   | { kind: "project.exportStatus" }
   // Tracks / segments — the audio engine reflects these into its model -----
   | { kind: "engine.applyProject"; project: Project; instruments?: Instrument[]; audioFiles?: AudioFile[] }
   | { kind: "engine.updateSegment"; segmentId: Id; patch: Partial<{ startBeat: Beats; lengthBeats: Beats; repeats: number; muted: boolean }> }
   | { kind: "engine.setParameter"; instrumentId: Id; parameterId: string; value: number; sampleOffset?: number; rampSamples?: number }
+  | { kind: "engine.previewMidiNote"; trackId: Id; instrumentId: Id; pitch: number; velocity: number; delaySeconds?: number; durationSeconds?: number; gainDb?: number; note?: MidiNote; glideTargetPitch?: number; glideMs?: number }
+  | { kind: "engine.stopMidiPreview"; trackId: Id }
+  | { kind: "engine.previewAudioSegment"; trackId: Id; audioFileId: Id; sourceStartBeat?: Beats; positionBeat?: Beats; lengthBeats: Beats; fadeInBeats?: Beats; fadeOutBeats?: Beats; gainDb?: number }
+  | { kind: "engine.stopAudioPreview"; trackId: Id }
   // Instruments ------------------------------------------------------------
   | { kind: "instrument.save"; instrument: Instrument }
   | { kind: "instrument.delete"; id: Id }
@@ -352,10 +361,11 @@ export type OutboundRequest =
   // Audio files -----------------------------------------------------------
   | { kind: "audio.import"; pathHint?: string } // opens file picker
   | { kind: "audio.importMany"; pathHint?: string } // opens multi-file picker
-  | { kind: "audio.list" }
+  | { kind: "audio.list"; refreshMetadata?: boolean }
   | { kind: "audio.delete"; ids: Id[]; deleteFiles?: boolean }
   | { kind: "audio.reveal"; path: string }
   | { kind: "audio.waveform"; path: string; bucketCount?: number }
+  | { kind: "audio.previewData"; path: string }
   | { kind: "audio.stemsStart"; path: string }
   | { kind: "audio.stemsStatus" }
   | { kind: "audio.stemsCancel" }
@@ -373,15 +383,19 @@ export type OutboundRequest =
   | { kind: "recording.cancel" }
   | { kind: "recording.status" }
   | { kind: "recording.writeWav"; pathHint: string; bitDepth?: 16 | 24 | 32 }
-  | { kind: "recording.commitTake"; project: Project; instruments?: Instrument[]; audioFiles?: AudioFile[]; trackId?: Id; pathHint: string; startBeat?: Beats; name?: string; trackName?: string; audioFileId?: Id; segmentId?: Id; bpm?: number; gainDb?: number; compensateLatency?: boolean; inputLatencySamples?: number; outputLatencySamples?: number; manualLatencySamples?: number; bitDepth?: 16 | 24 | 32 }
+  | { kind: "recording.commitTake"; project: Project; instruments?: Instrument[]; audioFiles?: AudioFile[]; trackId?: Id; pathHint?: string; startBeat?: Beats; name?: string; trackName?: string; audioFileId?: Id; segmentId?: Id; bpm?: number; gainDb?: number; compensateLatency?: boolean; inputLatencySamples?: number; outputLatencySamples?: number; manualLatencySamples?: number; bitDepth?: 16 | 24 | 32 }
   // EQ -------------------------------------------------------------------
   | { kind: "eq.setAutomation"; points: EqAutomationPoint[] }
-  // Local AI training ------------------------------------------------------
-  | { kind: "training.run"; task: "drums" | "instruments" | "midi"; jsonl: string; signalCount: number }
   // Misc -----------------------------------------------------------------
+  | { kind: "diagnostics.readLog"; maxLines?: number }
+  | { kind: "diagnostics.clearLog" }
+  | { kind: "diagnostics.saveLog"; text: string }
+  | { kind: "diagnostics.write"; category: string; message: string }
   | { kind: "ping" };
 
 export type ResponseFor<R extends OutboundRequest> =
+  R extends { kind: "engine.previewMidiNote" } ? boolean :
+  R extends { kind: "engine.previewAudioSegment" } ? boolean :
   R extends { kind: "project.list" }   ? { projects: Array<Pick<Project, "id" | "name" | "savedAt">> } :
   R extends { kind: "project.load" }   ? { project: Project | null } :
   R extends { kind: "project.saveFile" } ? { path: string; backupPath?: string; cleanupReport?: ProjectSidecarCleanupReport; integrityReport?: BeatProjectIntegrityReport; error?: string } :
@@ -389,6 +403,7 @@ export type ResponseFor<R extends OutboundRequest> =
   R extends { kind: "project.recentList" } ? { projects: RecentProjectEntry[] } :
   R extends { kind: "project.recentRemove" } ? { ok: true } :
   R extends { kind: "project.revealFile" } ? { ok: boolean; missing?: boolean; error?: string } :
+  R extends { kind: "project.duplicateFile" } ? { ok: boolean; missing?: boolean; project?: RecentProjectEntry; error?: string } :
   R extends { kind: "project.chooseExportFolder" } ? { path: string; cancelled?: boolean; error?: string } :
   R extends { kind: "project.inspectDocument" } ? { path?: string; missingAssets: BeatProjectAsset[]; integrityReport?: BeatProjectIntegrityReport; error?: string } :
   R extends { kind: "project.repairDocument" } ? { changed: boolean; document?: BeatProjectDocument; path?: string; missingAssets: BeatProjectAsset[]; integrityReport?: BeatProjectIntegrityReport; error?: string } :
@@ -418,6 +433,7 @@ export type ResponseFor<R extends OutboundRequest> =
   R extends { kind: "audio.delete" }   ? { deletedIds: Id[]; failedIds: Id[]; failedPaths: string[]; error?: string } :
   R extends { kind: "audio.reveal" }   ? { ok: boolean; error?: string } :
   R extends { kind: "audio.waveform" } ? { waveform: AudioWaveformSummary | null; cached?: boolean; error?: string } :
+  R extends { kind: "audio.previewData" } ? { audioDataUrl?: string; error?: string } :
   R extends { kind: "audio.stemsStart" } ? StemSeparationJobStatus :
   R extends { kind: "audio.stemsStatus" } ? StemSeparationJobStatus :
   R extends { kind: "audio.stemsCancel" } ? StemSeparationJobStatus :
@@ -435,7 +451,12 @@ export type ResponseFor<R extends OutboundRequest> =
   R extends { kind: "recording.status" } ? { stats: RecordingCaptureStats } :
   R extends { kind: "recording.writeWav" } ? { path: string; stats: RecordingCaptureStats; analysis?: AudioRenderAnalysis; error?: string } :
   R extends { kind: "recording.commitTake" } ? { path?: string; trackId?: Id; audioFileId?: Id; segmentId?: Id; lengthBeats?: Beats; stats: RecordingCaptureStats; audioFile?: AudioFile; track?: Track; analysis?: AudioRenderAnalysis; error?: string } :
-  R extends { kind: "training.run" }    ? { started: boolean; reason?: string } :
+  R extends { kind: "diagnostics.readLog" } ? { path: string; text: string; lineCount: number; truncated: boolean } :
+  R extends { kind: "diagnostics.clearLog" } ? { ok: boolean; path: string; error?: string } :
+  R extends { kind: "diagnostics.saveLog" } ? { path: string; cancelled?: boolean; error?: string } :
+  R extends { kind: "diagnostics.write" } ? { ok: true } :
+  R extends { kind: "app.shellReady" }  ? { ok: true } :
+  R extends { kind: "app.startupStage" } ? { ok: true } :
   R extends { kind: "app.ready" }       ? { ok: true } :
   R extends { kind: "ping" }           ? { pong: true; backendVersion: string } :
   { ok: true };
@@ -465,6 +486,8 @@ export type InboundEvent =
       copyMs: number;
       totalMs: number;
       loadPercent: number;
+      hottestRouteIndex: number;
+      hottestRouteMs: number;
       activeSynthVoices: number;
       activeSampleVoices: number;
       activeAudioClipVoices: number;
@@ -522,7 +545,6 @@ export type InboundEvent =
       timbre: number;
     }
   | (ProjectExportJobStatus & { kind: "project.exportProgress" })
-  | { kind: "training.status"; task: "drums" | "instruments" | "midi"; status: "started" | "finished" | "failed"; signalCount: number; message?: string; exitCode?: number }
   | { kind: "native.menuCommand"; command: "home" | "whatsNew" | "userGuide" | "newProject" | "openProject" | "saveProject" | "importAudio" | "exportWav" | "preferences" | "undo" | "redo" | "songInfo" }
   | { kind: "native.openProjectFile"; path: string }
   | { kind: "log"; level: "info" | "warn" | "error"; message: string };

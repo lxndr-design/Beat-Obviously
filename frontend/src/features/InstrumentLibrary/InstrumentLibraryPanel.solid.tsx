@@ -2,12 +2,14 @@ import { createEffect, createSignal, For, onCleanup, Show } from "solid-js";
 import { Button, Checkbox, HoverInfo, Icon, LibraryFolder, LibrarySearch, RowActionButton, RowItem, SectionRibbon, SectionRibbonActionButton, createContextMenu, type ContextMenuItem } from "../../solid-ui";
 import { createInstrumentBufferSource, preloadInstrumentSample, previewFrequency } from "../../audio/synthPreview";
 import { registerGlobalAudioStop } from "../../audio/globalAudioSafety";
-import { LUMUS_TEST_INSTRUMENT_SET_ID, TEMPORARY_DS_INSTRUMENT_SET_ID, useInstrumentStore, usePluginStore, useProjectStore, useUiStore } from "../../state/store";
+import { LUMEN_TEST_INSTRUMENT_SET_ID, TEMPORARY_DS_INSTRUMENT_SET_ID, snapshotInstrument, useInstrumentStore, usePluginStore, useProjectStore, useUiStore } from "../../state/store";
 import { createAurumInstrument } from "../../state/aurum";
 import { instrumentIcon, instrumentIconLabel } from "../../state/instrumentIcons";
 import {
   FACTORY_SYNTH_PRESETS,
-  createDefaultLumusDraft,
+  canCloneAetherInstrumentAsLumen,
+  cloneAetherDraftAsLumen,
+  createDefaultLumenDraft,
   createDefaultSynthDraft,
   synthDraftToInstrumentPatch,
   useSynthStore,
@@ -35,12 +37,12 @@ interface WavetableStarter {
   icon: string;
   presetId: string;
   fallbackNameBase: string;
-  engine: "aether" | "lumus";
+  engine: "aether" | "lumen";
 }
 
 const WAVETABLE_STARTERS: WavetableStarter[] = [
   { label: "Create Aether", icon: "ph:cube", presetId: "factory.init", fallbackNameBase: "Aether Patch", engine: "aether" },
-  { label: "Create Lumus", icon: "ph:sparkle", presetId: "", fallbackNameBase: "Lumus Patch", engine: "lumus" },
+  { label: "Create Lumen", icon: "ph:sparkle", presetId: "", fallbackNameBase: "Lumen Patch", engine: "lumen" },
 ];
 
 function createDraftId() {
@@ -112,7 +114,7 @@ export function InstrumentLibraryPanel(props: InstrumentLibraryPanelProps) {
       onSelect: () => createWavetable(WAVETABLE_STARTERS[0]),
     },
     {
-      label: "Create Lumus",
+      label: "Create Lumen",
       icon: "ph:sparkle",
       onSelect: () => createWavetable(WAVETABLE_STARTERS[1]),
     },
@@ -220,7 +222,7 @@ export function InstrumentLibraryPanel(props: InstrumentLibraryPanelProps) {
 
   function createWavetable(starter: WavetableStarter) {
     const preset = FACTORY_SYNTH_PRESETS.find((candidate) => candidate.id === starter.presetId);
-    const draft = starter.engine === "lumus" ? createDefaultLumusDraft() : preset?.patch ?? createDefaultSynthDraft();
+    const draft = starter.engine === "lumen" ? createDefaultLumenDraft() : preset?.patch ?? createDefaultSynthDraft();
     const instrumentName = nextInstrumentName(instruments(), starter.fallbackNameBase);
     const namedDraft: SynthDraftPatch = {
       ...structuredClone(draft),
@@ -228,8 +230,8 @@ export function InstrumentLibraryPanel(props: InstrumentLibraryPanelProps) {
     };
     useSynthStore.getState().bindInstrument(null);
     useSynthStore.getState().setDraft(namedDraft);
-    useUiStore.getState().openEditor(starter.engine === "lumus"
-      ? { kind: "lumus" }
+    useUiStore.getState().openEditor(starter.engine === "lumen"
+      ? { kind: "lumen" }
       : { kind: "synthInstrument", instrumentId: createDraftId() });
   }
 
@@ -309,6 +311,24 @@ export function InstrumentLibraryPanel(props: InstrumentLibraryPanelProps) {
   function deleteInstrument(instrument: Instrument) {
     if (!instrument.userCreated) return;
     useInstrumentStore.getState().removeInstrument(instrument.id);
+  }
+
+  function cloneAsLumen(instrument: Instrument) {
+    if (!canCloneAetherInstrumentAsLumen(instrument)) return;
+    const name = nextInstrumentName(instruments(), `${instrument.name} Lumen`);
+    const lumenDraft = cloneAetherDraftAsLumen(instrument, name);
+    const requestedId = createDraftId();
+    const id = useInstrumentStore.getState().addInstrument(createDraftInstrument({
+      ...synthDraftToInstrumentPatch(lumenDraft),
+      id: requestedId,
+      name,
+      setId: instrument.setId,
+      source: { kind: "derived", label: `Lumen clone of ${instrument.name}`, edited: false },
+      original: snapshotInstrument(instrument),
+      parentIds: [instrument.id],
+      userCreated: true,
+    }));
+    useUiStore.getState().openEditor({ kind: "synthInstrument", instrumentId: id });
   }
 
   function groupSelected() {
@@ -413,6 +433,7 @@ export function InstrumentLibraryPanel(props: InstrumentLibraryPanelProps) {
                           useUiStore.getState().openEditor(editorRequestForInstrument(instrument));
                         }}
                         onDuplicate={() => useInstrumentStore.getState().duplicateInstrument(instrument.id)}
+                        onCloneAsLumen={() => cloneAsLumen(instrument)}
                         onMerge={() => setMergeFromId(instrument.id)}
                         onDelete={() => void deleteInstrument(instrument)}
                         onMoveBefore={(draggedId) => useInstrumentStore.getState().moveInstrument(draggedId, set.id, instrument.id)}
@@ -451,6 +472,7 @@ interface InstrumentItemProps {
   instrument: Instrument;
   onEdit: () => void;
   onDuplicate: () => void;
+  onCloneAsLumen: () => void;
   onMerge: () => void;
   onDelete: () => void;
   onMoveBefore: (instrumentId: string) => void;
@@ -467,6 +489,11 @@ function InstrumentItem(props: InstrumentItemProps) {
     { label: "Select", icon: "ph:checks", onSelect: props.onEnterSelectMode },
     { label: "Edit", icon: "ph:pencil-simple", onSelect: props.onEdit },
     { label: "Duplicate", icon: "ph:copy", onSelect: props.onDuplicate },
+    ...(canCloneAetherInstrumentAsLumen(props.instrument) ? [{
+      label: "Clone as Lumen",
+      icon: "ph:sparkle",
+      onSelect: props.onCloneAsLumen,
+    }] : []),
     { label: "Merge with...", icon: "ph:intersect", onSelect: props.onMerge },
     {
       label: props.instrument.userCreated ? "Delete" : "Delete (system)",
@@ -499,7 +526,10 @@ function InstrumentItem(props: InstrumentItemProps) {
   const icon = () => instrumentIcon(props.instrument);
   const hint = () => props.instrument.icon
     ? instrumentIconLabel(props.instrument.icon)
-    : KIND_HINT[props.instrument.kind] ?? props.instrument.kind;
+    : props.instrument.synthPatch?.instrumentType === "lumen-hybrid-synth"
+      || props.instrument.synthPatch?.namespace === "lumen"
+      ? "Lumen"
+      : KIND_HINT[props.instrument.kind] ?? props.instrument.kind;
 
   return (
     <RowItem
@@ -580,7 +610,7 @@ function persistOpenInstrumentSets(openSets: Record<string, boolean>) {
 }
 
 function instrumentSetDisplayName(set: InstrumentSet): string {
-  if (!set.factory || set.id === "user-instruments" || set.id === TEMPORARY_DS_INSTRUMENT_SET_ID || set.id === LUMUS_TEST_INSTRUMENT_SET_ID || set.name === "Aurum Test") return set.name;
+  if (!set.factory || set.id === "user-instruments" || set.id === TEMPORARY_DS_INSTRUMENT_SET_ID || set.id === LUMEN_TEST_INSTRUMENT_SET_ID || set.name === "Aurum Test") return set.name;
   return set.name.toLowerCase().startsWith("factory ") ? set.name : `Factory ${set.name}`;
 }
 
@@ -648,9 +678,7 @@ registerGlobalAudioStop(stopInstrumentPreview);
 async function playInstrumentPreview(instrument: Instrument, onDone: () => void, shouldContinue: () => boolean) {
   const ctx = getPreviewCtx();
   if (ctx.state === "suspended") await ctx.resume();
-  await preloadInstrumentSample(ctx, instrument).catch(() => {
-    // Synth fallback remains useful when a sample cannot be decoded.
-  });
+  await preloadInstrumentSample(ctx, instrument);
   if (!shouldContinue()) return;
 
   stopInstrumentPreview();

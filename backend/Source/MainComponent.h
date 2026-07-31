@@ -22,6 +22,7 @@ public:
     juce::var handleNativeRequest(const juce::String& kind, const juce::var& payload);
     void emitMenuCommand(const juce::String& command);
     void emitOpenProjectFile(const juce::String& path);
+    std::function<void()> onFrontendShellReady;
     std::function<void()> onFrontendReady;
 
 private:

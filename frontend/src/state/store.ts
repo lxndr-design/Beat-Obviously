@@ -1,5 +1,6 @@
 import { createStore as create } from "zustand/vanilla";
 import { immer } from "zustand/middleware/immer";
+import { current } from "immer";
 import { nanoid } from "nanoid";
 import { temporal, type TemporalStoreApi } from "./temporal";
 import { defaultTrackEffectParams } from "./effects";
@@ -99,6 +100,7 @@ interface ProjectSlice {
   setTimeSignature: (ts: { num: number; denom: number; boldBeats: number[] }) => void;
   setLengthBeats: (beats: Beats) => void;
   updateMasterChain: (patch: Partial<MasterChainSettings>) => void;
+  updateRecordingInput: (patch: Partial<Project["recordingInput"]>) => void;
   rename: (name: string) => void;
 
   // Loading
@@ -1130,6 +1132,10 @@ export const useProjectStore = create<ProjectSlice>()(
         set((s) => {
           Object.assign(s.project.masterChain, patch);
         }),
+      updateRecordingInput: (patch) =>
+        set((s) => {
+          Object.assign(s.project.recordingInput, patch);
+        }),
 
       rename: (name) =>
         set((s) => {
@@ -1826,7 +1832,7 @@ export const usePluginStore = create<PluginLibrarySlice>()(
         id: PLUGIN_BRIDGE_ID,
         name: "Aether Bridge Host",
         vendor: "Beat",
-        version: "0.2.1",
+        version: "0.2.2",
         kind: "synth",
         format: "bridge",
         status: "available",
@@ -1905,6 +1911,7 @@ interface UiSlice extends UiState {
   selectSegment: (id: Id, additive?: boolean) => void;
   setSelectedSegments: (ids: Id[]) => void;
   selectTrackEffectAutomationPoint: (key: string, additive?: boolean) => void;
+  setSelectedTrackEffectAutomationPoints: (keys: string[]) => void;
   clearSelection: () => void;
   triggerSegmentPlayback: (id: Id) => void;
   openEditor: (e: UiState["openEditors"][number]) => void;
@@ -1958,6 +1965,11 @@ export const useUiStore = create<UiSlice>()((set) => ({
       selectedTrackIds: [],
       selectedSegmentIds: [],
     })),
+  setSelectedTrackEffectAutomationPoints: (keys) => set({
+    selectedTrackEffectAutomationPointKeys: Array.from(new Set(keys)),
+    selectedTrackIds: [],
+    selectedSegmentIds: [],
+  }),
   clearSelection: () =>
     set({ selectedTrackIds: [], selectedSegmentIds: [], selectedTrackEffectAutomationPointKeys: [] }),
   triggerSegmentPlayback: (id) => {
@@ -2018,7 +2030,8 @@ interface InstrumentLibrarySlice {
 export const FACTORY_DRUM_SET_ID = "factory-drums";
 export const FACTORY_SYNTH_SET_ID = "factory-synths";
 export const AURUM_TEST_SET_ID = "aurum-test";
-export const LUMUS_TEST_INSTRUMENT_SET_ID = "lumus-test";
+/** Stable library ID retained so existing project grouping references remain valid. */
+export const LUMEN_TEST_INSTRUMENT_SET_ID = "lumus-test";
 export const ROCK_DRUM_SET_ID = "rock-drums";
 export const ORCHESTRA_SET_ID = "orchestra-pit";
 export const TEMPORARY_DS_INSTRUMENT_SET_ID = "temporary-ds-instruments";
@@ -2031,16 +2044,19 @@ function defaultInstrumentSets(): InstrumentSet[] {
     { id: ORCHESTRA_SET_ID, name: "Orchestra Pit", factory: true },
     { id: FACTORY_SYNTH_SET_ID, name: "Synths", factory: true },
     { id: AURUM_TEST_SET_ID, name: "Aurum Test", factory: true },
-    { id: LUMUS_TEST_INSTRUMENT_SET_ID, name: "Lumus Test", factory: true },
+    { id: LUMEN_TEST_INSTRUMENT_SET_ID, name: "Lumen Test", factory: true },
     { id: TEMPORARY_DS_INSTRUMENT_SET_ID, name: "Instanced Instruments", factory: true },
     { id: USER_INSTRUMENT_SET_ID, name: "User", factory: true },
   ];
 }
 
 function defaultInstrument(): Instrument {
+  const now = Date.now();
   return {
     id: nanoid(),
     name: "Aether Patch 1",
+    createdAt: now,
+    updatedAt: now,
     icon: "ph:cube",
     kind: "wavetable",
     envelope: { attackMs: 5, decayMs: 100, sustain: 0.7, releaseMs: 200 },
@@ -2054,6 +2070,7 @@ function defaultInstrument(): Instrument {
     maxVoices: 16,
     mono: false,
     legato: false,
+    pitchBendRangeSemitones: 2,
     ampLevel: 1,
     ampPan: 0,
     lfoWaveform: "sine",
@@ -2179,6 +2196,7 @@ export function snapshotInstrument(instrument: Instrument): InstrumentSnapshot {
     maxVoices: instrument.maxVoices,
     mono: instrument.mono,
     legato: instrument.legato,
+    pitchBendRangeSemitones: instrument.pitchBendRangeSemitones,
     ampLevel: instrument.ampLevel,
     ampPan: instrument.ampPan,
     wavetable: instrument.wavetable ? structuredClone(instrument.wavetable) : undefined,
@@ -2236,6 +2254,7 @@ function normalizeInstrument(instrument: Instrument): Instrument {
     : instrument.setId ?? (instrument.userCreated ? USER_INSTRUMENT_SET_ID : FACTORY_SYNTH_SET_ID);
   return {
     ...instrument,
+    pitchBendRangeSemitones: clampNumber(instrument.pitchBendRangeSemitones, 0, 24, 2),
     sampleMap,
     setId,
     source,
@@ -2451,7 +2470,7 @@ export const useInstrumentStore = create<InstrumentLibrarySlice>()(
         // System instruments (userCreated === false) are not deletable.
         const target = s.instruments.find((i) => i.id === id);
         if (!target || !target.userCreated) return;
-        s.deletedInstrumentStack.push(structuredClone(target));
+        s.deletedInstrumentStack.push(structuredClone(current(target)));
         s.instruments = s.instruments.filter((i) => i.id !== id);
       }),
     undoLastInstrumentDelete: () => {
@@ -2476,6 +2495,7 @@ export const useInstrumentStore = create<InstrumentLibrarySlice>()(
             nextPatch.name = uniqueInstrumentName(nextPatch.name, s.instruments, id);
           }
           Object.assign(i, nextPatch);
+          i.updatedAt = Date.now();
           i.descriptors = characterizeInstrument(i);
         }
       }),
@@ -2486,6 +2506,8 @@ export const useInstrumentStore = create<InstrumentLibrarySlice>()(
         ...structuredClone(src),
         id: nanoid(),
         name: uniqueInstrumentName(`${src.name} copy`, get().instruments),
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
         userCreated: true,
         setId: src.setId ?? USER_INSTRUMENT_SET_ID,
         source: { kind: "derived", label: `Derived from ${src.name}`, edited: false },
@@ -2603,8 +2625,8 @@ export const useInstrumentStore = create<InstrumentLibrarySlice>()(
         kind: "created",
         label: "Made in Beat",
       };
-      const lumusTestSeeds: Instrument[] = FACTORY_SYNTH_PRESETS
-        .filter((preset) => preset.tags.includes("mvp-test") && preset.patch.instrumentType === "lumus-hybrid-synth")
+      const lumenTestSeeds: Instrument[] = FACTORY_SYNTH_PRESETS
+        .filter((preset) => preset.tags.includes("mvp-test") && preset.patch.instrumentType === "lumen-hybrid-synth")
         .map((preset) => {
           const patch = synthDraftToInstrumentPatch(preset.patch);
           return withOriginal({
@@ -2616,9 +2638,9 @@ export const useInstrumentStore = create<InstrumentLibrarySlice>()(
             kind: "wavetable",
             waveform: "wavetable",
             sampleIds: patch.sampleIds ?? [],
-            setId: LUMUS_TEST_INSTRUMENT_SET_ID,
-            source: { kind: "created", label: "Made in Beat / Lumus" },
-            descriptors: ["lumus", "mvp-test", preset.category.toLowerCase()],
+            setId: LUMEN_TEST_INSTRUMENT_SET_ID,
+            source: { kind: "created", label: "Made in Beat / Lumen v16 capability bank" },
+            descriptors: ["lumen", "mvp-test", "lumen-test-bank", "v16", preset.category.toLowerCase()],
             userCreated: false,
           });
         });
@@ -2772,7 +2794,7 @@ export const useInstrumentStore = create<InstrumentLibrarySlice>()(
           source: beatSource,
           userCreated: false,
         }),
-        ...lumusTestSeeds,
+        ...lumenTestSeeds,
       ];
       seeds.push(...createAurumTestInstruments(AURUM_TEST_SET_ID).map(withOriginal));
       const deprecatedBreakcoreAetherInstrumentNames = new Set([
@@ -2819,23 +2841,26 @@ export const useInstrumentStore = create<InstrumentLibrarySlice>()(
           .map((instrument) => normalizeInstrument(instrument))
           .filter((instrument) => instrument.userCreated || !isDeprecatedBreakcoreAetherInstrument(instrument));
         const seedByName = new Map(activeSeeds.map((instrument) => [instrument.name, instrument]));
+        const seedById = new Map(activeSeeds.map((instrument) => [instrument.id, instrument]));
         for (const instrument of s.instruments) {
           if (instrument.userCreated) continue;
-          const replacement = seedByName.get(instrument.name);
+          const replacement = seedById.get(instrument.id) ?? seedByName.get(instrument.name);
           if (replacement && (
             instrument.descriptors?.includes("breakcore")
             || replacement.descriptors?.includes("aurum-test-bank")
+            || replacement.descriptors?.includes("lumen-test-bank")
           )) {
             const existingId = instrument.id;
             Object.assign(instrument, structuredClone(replacement), { id: existingId });
           }
         }
+        const existingIds = new Set(s.instruments.filter((instrument) => !instrument.userCreated).map((instrument) => instrument.id));
         const existingKeys = new Set(
           s.instruments
             .filter((instrument) => !instrument.userCreated)
             .map((instrument) => instrument.sampleUrl ?? instrument.name),
         );
-        const missingSeeds = activeSeeds.filter((instrument) => !existingKeys.has(instrument.sampleUrl ?? instrument.name));
+        const missingSeeds = activeSeeds.filter((instrument) => !existingIds.has(instrument.id) && !existingKeys.has(instrument.sampleUrl ?? instrument.name));
         for (const instrument of s.instruments) {
           if (!instrument.userCreated && instrument.name === "808 Bass Kick" && instrument.kind === "synth") {
             instrument.name = "Sub Kick (Synth)";
@@ -2984,7 +3009,22 @@ function restoreSoloAutoMutes(tracks: Track[]) {
 
 function normalizeSegmentLayers(track: Track) {
   const ordered = [...track.segments].sort((a, b) => a.startBeat - b.startBeat || a.id.localeCompare(b.id));
+  const recordingGroups = new Map<Id, Segment[]>();
+  for (const segment of ordered) {
+    if (!segment.recordingGroupId) continue;
+    const takes = recordingGroups.get(segment.recordingGroupId) ?? [];
+    takes.push(segment);
+    recordingGroups.set(segment.recordingGroupId, takes);
+  }
+  for (const takes of recordingGroups.values()) {
+    takes
+      .sort((a, b) => (a.recordingTakeNumber ?? 0) - (b.recordingTakeNumber ?? 0) || (a.recordedAt ?? 0) - (b.recordedAt ?? 0) || a.id.localeCompare(b.id))
+      .forEach((segment, index) => {
+        segment.layer = index;
+      });
+  }
   for (const seg of ordered) {
+    if (seg.recordingGroupId) continue;
     const segEnd = seg.startBeat + seg.lengthBeats;
     const fullyCoveredByEarlier = ordered.some((candidate) => {
       if (candidate === seg || candidate.startBeat > seg.startBeat) return false;

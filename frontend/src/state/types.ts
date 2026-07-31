@@ -13,7 +13,16 @@ export type DrumSpeed = 1 | 2 | 3 | 4 | 5 | 6;
 export type TrackKind = "audio" | "midi" | "mixed" | "group";
 export type AudioStemKind = "drums" | "bass" | "vocals" | "other";
 
-export type WavetableWarpMode = "shape" | "fold" | "pinch" | "mirror";
+export type WavetableWarpMode =
+  | "shape"
+  | "fold"
+  | "pinch"
+  | "mirror"
+  | "harmonic-shift"
+  | "harmonic-stretch"
+  | "spectral-smear"
+  | "spectral-skew"
+  | "spectral-filter";
 export type SamplerComplexity = "single" | "layered" | "mapped" | "performance";
 
 export type MidiAutomationTarget =
@@ -140,6 +149,15 @@ export interface Segment {
   groupId?: Id;
   /** Source-separation role used to select safe downstream transcription tools. */
   stemKind?: AudioStemKind;
+  /** Stable owner for audio takes captured into the same Live Record segment. */
+  recordingGroupId?: Id;
+  /** One-based take order within a Live Record segment. */
+  recordingTakeNumber?: number;
+  /** Capture timestamp used to keep the take list stable across reloads. */
+  recordedAt?: number;
+  /** Input identity retained with the take for later troubleshooting/re-recording. */
+  recordingInputDeviceId?: string;
+  recordingInputDeviceName?: string;
   /** Bound instrument from the library (renders this segment). */
   instrumentId?: Id;
   /** MIDI playback transpose in semitones. */
@@ -156,7 +174,7 @@ export interface Segment {
   fadeInBeats?: Beats;
   /** Linear fade-out duration at the segment tail, in beats. */
   fadeOutBeats?: Beats;
-  /** When > 0, repeat this segment until the next segment / end of track. */
+  /** Number of additional plays after the original segment. */
   repeats: number;
   payload: SegmentPayload;
   /** Segment-local Aether/instrument parameter automation, stored in beats relative to segment start. */
@@ -310,6 +328,10 @@ export interface AdsrEnvelope {
 export interface Instrument {
   id: Id;
   name: string;
+  /** Creation timestamp used by library ordering. Older factory instruments may omit it. */
+  createdAt?: number;
+  /** Most recent user edit timestamp used by library ordering. */
+  updatedAt?: number;
   /** User-facing library/editor icon, stored as an Iconify icon name. */
   icon?: string;
   kind: "synth" | "sampler" | "hybrid" | "wavetable";
@@ -346,6 +368,7 @@ export interface Instrument {
   maxVoices?: number;     // 1..32 — synth voice allocation cap
   mono?: boolean;          // true caps synth playback to one active voice
   legato?: boolean;        // true retunes active mono voices without envelope retrigger
+  pitchBendRangeSemitones?: number; // 0..24 — patch bend range before RPN/MPE overrides
   ampLevel?: number;      // 0..1 — final synth voice level
   ampPan?: number;        // -1..1 — final synth voice pan
 
@@ -371,6 +394,7 @@ export interface Instrument {
   lfoPhase?: number;        // 0..1 cycle offset
   lfoRetrigger?: boolean;   // true = restart LFO per note
   lfoOneShot?: boolean;     // true = stop at the end of one cycle
+  lfoKeytrackRate?: number; // -1..1 — octave-rate tracking around MIDI C4
   lfo2Waveform?: "sine" | "triangle" | "saw" | "square";
   lfo2RateHz?: number;
   lfo2Sync?: boolean;
@@ -381,6 +405,7 @@ export interface Instrument {
   lfo2Phase?: number;
   lfo2Retrigger?: boolean;
   lfo2OneShot?: boolean;
+  lfo2KeytrackRate?: number;
   lfoPositionBipolar?: boolean;
   lfoPitchBipolar?: boolean;
   lfoFilterBipolar?: boolean;
@@ -516,6 +541,13 @@ export interface AetherSampleSlotConfig {
   loopEnabled: boolean;
   loopStartRatio: number;
   loopEndRatio: number;
+  /** Lumen-only slot transforms. Aether omits these fields and remains forward at 1x with its established loop/release policy. */
+  direction?: "forward" | "reverse";
+  playbackRate?: number;
+  loopMode?: "forward" | "pingPong";
+  releaseTailMs?: number;
+  selectedSliceId?: string;
+  slices?: Array<{ id: string; startRatio: number; endRatio: number }>;
   fxSends?: [number, number];
   zones?: AetherSampleZoneConfig[];
   managedSfz?: ManagedSfzAssetConfig;
@@ -605,6 +637,20 @@ export interface AetherSynthConfig {
 
 export type AurumOperatorWaveform = "sine" | "triangle" | "saw" | "square" | "additive";
 export type AurumFilterRouting = "serial" | "parallel";
+export type ModulationRemapCurve = "linear" | "ease-in" | "ease-out" | "s-curve";
+
+/** Shared modulation-route wire shape used by synth engines. Engines retain
+ * their own bounded source/target policies while reusing this data contract. */
+export interface SharedModulationRoute {
+  id: string;
+  source: string;
+  target: string;
+  amount: number;
+  bipolar: boolean;
+  enabled: boolean;
+  /** Optional for backward compatibility; omitted routes render linearly. */
+  curve?: ModulationRemapCurve;
+}
 
 export interface AurumFilterConfig {
   enabled: boolean;
@@ -640,7 +686,7 @@ export interface AurumOperatorConfig {
  * are FM destinations and column 6 is direct output. Diagonal values are
  * operator feedback. */
 export interface AurumSynthConfig {
-  version: 10;
+  version: 13;
   operators: AurumOperatorConfig[];
   matrix: number[][];
   rmMatrix: number[][];
@@ -652,6 +698,10 @@ export interface AurumSynthConfig {
   filterRouting: AurumFilterRouting;
   /** Rows are operators; columns are Filter A, Filter B, and Direct. */
   outputSends: number[][];
+  /** Bounded shared-source bridge; v12 adds operator level/pan and output-filter cutoff. */
+  modulation: SharedModulationRoute[];
+  /** Shared macro source values. Only Macro 1 is exposed by the first bridge. */
+  macroValues: number[];
 }
 
 export type SynthPatchParameterValue = boolean | number | string;
@@ -730,14 +780,7 @@ export interface WavemapDefinition {
 /** Legacy name kept while older saved synth patches still use customWavetables. */
 export type CustomWavetableDefinition = WavemapDefinition;
 
-export interface SynthPatchModulationRoute {
-  id: string;
-  source: string;
-  target: string;
-  amount: number;
-  bipolar: boolean;
-  enabled: boolean;
-}
+export type SynthPatchModulationRoute = SharedModulationRoute;
 
 export interface SynthPatchMacroDefinition {
   id: string;
@@ -748,10 +791,10 @@ export interface SynthPatchMacroDefinition {
 }
 
 export interface SynthPatchSnapshot {
-  /** Aether remains v5; Lumus v10 adds the bounded synth-owned clip sequence. */
-  schemaVersion: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
-  instrumentType: "wavetable-synth" | "lumus-hybrid-synth";
-  namespace: "synth" | "lumus";
+  /** Aether remains v5; Lumen v16 adds keytracked LFO rates. */
+  schemaVersion: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16;
+  instrumentType: "wavetable-synth" | "lumen-hybrid-synth" | "lumus-hybrid-synth";
+  namespace: "synth" | "lumen" | "lumus";
   name: string;
   taxonomy?: InstrumentTaxonomyAssignment;
   parameters: Record<string, SynthPatchParameterValue>;
@@ -769,25 +812,35 @@ export interface SynthPatchSnapshot {
     sampleSlot1Zones?: AetherSampleZoneConfig[];
     managedSfz?: ManagedSfzAssetConfig;
     managedGranular?: ManagedGranularAssetConfig;
-    lumusSampleSlots?: Partial<Record<"a" | "b" | "c", {
-      schemaVersion: 1;
+    lumenSourceRack?: {
+      schemaVersion: 2;
+      slots: Array<{ id: "a" | "b" | "c"; mode: "wavetable" | "sample" | "multisample" | "granular" }>;
+    };
+    lumenSampleSlots?: Partial<Record<"a" | "b" | "c", {
+      schemaVersion: 2;
       zones: AetherSampleZoneConfig[];
+      slices: Array<{ id: string; startRatio: number; endRatio: number }>;
       managedSfz?: ManagedSfzAssetConfig;
     }>>;
-    lumusGranularSlots?: Partial<Record<"a" | "b" | "c", {
+    lumenGranularSlots?: Partial<Record<"a" | "b" | "c", {
       schemaVersion: 1;
       managedAsset?: ManagedGranularAssetConfig;
     }>>;
-    lumusClip?: {
-      schemaVersion: 1;
+    lumenClip?: {
+      schemaVersion: 2;
       lengthSteps: number;
-      steps: Array<{
-        enabled: boolean;
+      notes: Array<{
+        startStep: number;
         pitchOffset: number;
         lengthSteps: number;
         velocity: number;
       }>;
     };
+    /** Read-only aliases accepted from pre-Lumen project documents. */
+    lumusSourceRack?: unknown;
+    lumusSampleSlots?: unknown;
+    lumusGranularSlots?: unknown;
+    lumusClip?: unknown;
   };
 }
 
@@ -962,6 +1015,7 @@ export interface InstrumentSnapshot {
   maxVoices?: number;
   mono?: boolean;
   legato?: boolean;
+  pitchBendRangeSemitones?: number;
   ampLevel?: number;
   ampPan?: number;
   wavetable?: WavetableConfig;
@@ -979,6 +1033,7 @@ export interface InstrumentSnapshot {
   lfoPhase?: number;
   lfoRetrigger?: boolean;
   lfoOneShot?: boolean;
+  lfoKeytrackRate?: number;
   lfo2Waveform?: Instrument["lfo2Waveform"];
   lfo2RateHz?: number;
   lfo2Sync?: boolean;
@@ -989,6 +1044,7 @@ export interface InstrumentSnapshot {
   lfo2Phase?: number;
   lfo2Retrigger?: boolean;
   lfo2OneShot?: boolean;
+  lfo2KeytrackRate?: number;
   lfoPositionBipolar?: boolean;
   lfoPitchBipolar?: boolean;
   lfoFilterBipolar?: boolean;
@@ -1141,7 +1197,7 @@ export interface UiState {
     | { kind: "samplerInstrument"; instrumentId: Id; draftInstrument?: Instrument }
     | { kind: "synthInstrument"; instrumentId: Id; draftInstrument?: Instrument }
     | { kind: "synth" }
-    | { kind: "lumus" }
+    | { kind: "lumen" }
     | { kind: "track"; trackId: Id }
     | { kind: "segment"; segmentId: Id; discardIfUntouched?: boolean }
     | { kind: "component"; componentId: Id }

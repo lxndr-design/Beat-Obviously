@@ -2,7 +2,7 @@ import { createEffect, createMemo, createSignal, onCleanup, Show } from "solid-j
 import { DRUM_MAX_STEPS } from "../../ai/drumBeatGenerator";
 import { createInstrumentBufferSource, noteFrequency } from "../../audio/synthPreview";
 import { useModalStack } from "../../solid-ui";
-import { Button, FloatingSelect, Icon, Modal, NumberInput, TextInput } from "../../solid-ui";
+import { Button, Icon, Modal, NumberInput, TextInput } from "../../solid-ui";
 import { useComponentStore, type BeatComponent, type DrumComponent, type MidiComponent } from "../../state/components";
 import { useInstrumentStore, useProjectStore, useUiStore } from "../../state/store";
 import type { DrumRow, DrumSpeed, MidiNote, TimeSignature } from "../../state/types";
@@ -25,7 +25,6 @@ export function ComponentEditorModal(props: ComponentEditorModalProps) {
   const requestDirtyClose = useModalStack.getState().requestDirtyClose;
   const scopeId = () => `component-${props.componentId}`;
   const [draft, setDraft] = createSignal<BeatComponent | undefined>(source() ? structuredClone(source()) : undefined, { equals: false });
-  const [instrumentSelectOpen, setInstrumentSelectOpen] = createSignal(false);
   let previewCtx: AudioContext | null = null;
 
   createEffect(() => {
@@ -67,7 +66,6 @@ export function ComponentEditorModal(props: ComponentEditorModalProps) {
         name: midiDraft.name,
         notes: midiDraft.notes,
         lengthBeats: midiDraft.lengthBeats,
-        instrumentId: midiDraft.instrumentId,
       });
     }
     close();
@@ -98,7 +96,7 @@ export function ComponentEditorModal(props: ComponentEditorModalProps) {
     if (!previewCtx) previewCtx = new Ctor();
     const ctx = previewCtx;
     if (ctx.state === "suspended") void ctx.resume();
-    const instrument = instruments().find((item) => item.id === current.instrumentId) ?? fallbackInstrument;
+    const instrument = fallbackInstrument;
     const now = ctx.currentTime;
     const gain = ctx.createGain();
     gain.gain.setValueAtTime(0, now);
@@ -158,25 +156,11 @@ export function ComponentEditorModal(props: ComponentEditorModalProps) {
                   step={0.25}
                   onChange={(lengthBeats) => setMidiPatch({ lengthBeats: Math.max(0.25, lengthBeats) })}
                 />
-                <FloatingSelect
-                  layout="inline"
-                  label="Instrument"
-                  value={midiDraft().instrumentId ?? ""}
-                  ariaLabel="Component instrument"
-                  options={[
-                    { value: "", label: "-- none --" },
-                    ...instruments().map((instrument) => ({ value: instrument.id, label: instrument.name })),
-                  ]}
-                  open={instrumentSelectOpen()}
-                  onOpenChange={setInstrumentSelectOpen}
-                  onChange={(instrumentId) => setMidiPatch({ instrumentId: instrumentId || undefined })}
-                />
                 <div class={styles.transportSlot}>
                   <MidiTransport
                     notes={midiDraft().notes}
                     lengthBeats={midiDraft().lengthBeats}
                     bpm={project().bpm}
-                    instrument={instruments().find((instrument) => instrument.id === midiDraft().instrumentId)}
                     hotkeyScopeId={scopeId()}
                   />
                 </div>
@@ -189,7 +173,6 @@ export function ComponentEditorModal(props: ComponentEditorModalProps) {
           {(midiDraft) => (
             <PianoRoll
               notes={midiDraft().notes}
-              instrument={instruments().find((instrument) => instrument.id === midiDraft().instrumentId)}
               lengthBeats={midiDraft().lengthBeats}
               playheadBeat={null}
               onChange={(notes: MidiNote[]) => setMidiPatch({ notes })}

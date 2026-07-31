@@ -4,7 +4,7 @@ import type { DrumGenre, GeneratedDrumBeat, GenerateDrumBeatOptions } from "../a
 import type { BeatComponent, ComponentFolder } from "../state/components";
 import { normalizeAetherEffectPresetRecord, type AetherEffectPresetRecord } from "../state/effectPresets";
 import { pruneDevFixtureInstruments } from "../state/instrumentLibraryGuards";
-import { normalizeSynthPresetRecord, type SynthPresetRecord } from "../state/synthPresets";
+import { normalizeAurumPresetRecord, normalizeSynthPresetRecord, type AurumPresetRecord, type InstrumentPresetRecord, type SynthPresetRecord } from "../state/synthPresets";
 import type { AudioFile, Instrument, InstrumentSet, MidiNote, Project, Segment } from "../state/types";
 
 export interface DrumBeatFeedback {
@@ -107,7 +107,7 @@ export class BeatDB extends Dexie {
   drumBeatFeedback!: Table<DrumBeatFeedback, string>;
   instrumentGenerationFeedback!: Table<InstrumentGenerationFeedback, string>;
   midiSongFeedback!: Table<MidiSongFeedback, string>;
-  synthPresets!: Table<SynthPresetRecord, string>;
+  synthPresets!: Table<InstrumentPresetRecord, string>;
   effectPresets!: Table<AetherEffectPresetRecord, string>;
 
   constructor() {
@@ -281,6 +281,23 @@ export async function listSynthPresets(): Promise<SynthPresetRecord[]> {
 }
 
 export async function deleteSynthPreset(id: string) {
+  await db.synthPresets.delete(id);
+}
+
+export async function saveAurumPreset(record: AurumPresetRecord) {
+  const normalized = normalizeAurumPresetRecord(record);
+  if (!normalized) throw new Error("Aurum preset is missing a compatible patch.");
+  await db.synthPresets.put(normalized);
+}
+
+export async function listAurumPresets(): Promise<AurumPresetRecord[]> {
+  const records = await db.synthPresets.orderBy("updatedAt").reverse().toArray();
+  return records
+    .map(normalizeAurumPresetRecord)
+    .filter((record): record is AurumPresetRecord => record !== null);
+}
+
+export async function deleteAurumPreset(id: string) {
   await db.synthPresets.delete(id);
 }
 

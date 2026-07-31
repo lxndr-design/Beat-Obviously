@@ -1,5 +1,5 @@
 import { AURUM_DIRECT_BUS, AURUM_FILTER_A_BUS, AURUM_FILTER_B_BUS, AURUM_OPERATOR_COUNT, AURUM_OUTPUT_BUS_COUNT, AURUM_OUTPUT_COLUMN, createAurumInstrument } from "./aurum";
-import type { AurumOperatorConfig, AurumSynthConfig, Instrument } from "./types";
+import type { AurumOperatorConfig, AurumSynthConfig, Instrument, SharedModulationRoute } from "./types";
 
 export const AURUM_TEST_INSTRUMENT_NAMES = [
   "Aurum_Bass_01",
@@ -28,9 +28,9 @@ export function createAurumTestInstruments(setId: string): Instrument[] {
 function makeBase(name: typeof AURUM_TEST_INSTRUMENT_NAMES[number], setId: string, descriptors: string[]) {
   const instrument = createAurumInstrument(`factory-${name.toLowerCase().replaceAll("_", "-")}`, name);
   instrument.setId = setId;
-  instrument.source = { kind: "factory", label: "Beat / Aurum MVP test bank" };
+  instrument.source = { kind: "factory", label: "Beat / Aurum v13 capability bank" };
   instrument.userCreated = false;
-  instrument.descriptors = ["aurum", "test", "aurum-test-bank", ...descriptors];
+  instrument.descriptors = ["aurum", "test", "aurum-test-bank", "v13", "modulation-bridge", ...descriptors];
   instrument.ampLevel = 0.76;
   instrument.maxVoices = 16;
   instrument.aurum = blankAurum(instrument.aurum!);
@@ -73,6 +73,17 @@ function output(config: AurumSynthConfig, source: number, bus: number, depth: nu
   if (bus === AURUM_FILTER_A_BUS) config.matrix[source][AURUM_OUTPUT_COLUMN] = depth;
 }
 
+function mod(
+  config: AurumSynthConfig,
+  id: string,
+  source: SharedModulationRoute["source"],
+  target: SharedModulationRoute["target"],
+  amount: number,
+  bipolar = false,
+) {
+  config.modulation.push({ id, source, target, amount, bipolar, enabled: true });
+}
+
 function makeBass(setId: string) {
   const instrument = makeBase("Aurum_Bass_01", setId, ["bass", "fm", "low"]);
   const config = instrument.aurum!;
@@ -88,6 +99,8 @@ function makeBass(setId: string) {
     { enabled: false, type: "highpass", cutoff: 0.08, resonance: 0, drive: 0 },
   ];
   config.unison = 1;
+  mod(config, "aurum.bass.mod-wheel-filter", "modWheel", "aurum.filter.a.cutoff", 0.18);
+  mod(config, "aurum.bass.pressure-body", "pressure", "aurum.op.2.level", 0.16);
   instrument.mono = true;
   instrument.legato = true;
   instrument.glideMs = 42;
@@ -108,6 +121,8 @@ function makeBell(setId: string) {
   output(config, 0, AURUM_DIRECT_BUS, 0.18);
   config.filters[0] = { enabled: true, type: "bandpass", cutoff: 0.72, resonance: 0.28, drive: 0.04 };
   config.oversampling = 4;
+  mod(config, "aurum.bell.pressure-brightness", "pressure", "aurum.filter.a.cutoff", 0.12);
+  mod(config, "aurum.bell.macro-shimmer", "macro.1", "aurum.op.4.level", 0.18);
   return instrument;
 }
 
@@ -130,6 +145,8 @@ function makeKeys(setId: string) {
   config.unison = 2;
   config.detuneCents = 5;
   config.stereoSpread = 0.28;
+  mod(config, "aurum.keys.mod-wheel-tines", "modWheel", "aurum.op.3.level", 0.16);
+  mod(config, "aurum.keys.pressure-pan", "pressure", "aurum.op.1.pan", -0.14);
   return instrument;
 }
 
@@ -150,6 +167,9 @@ function makePad(setId: string) {
   config.unison = 5;
   config.detuneCents = 18;
   config.stereoSpread = 0.82;
+  mod(config, "aurum.pad.macro-tone", "macro.1", "aurum.filter.a.cutoff", 0.18);
+  mod(config, "aurum.pad.pressure-air", "pressure", "aurum.filter.b.cutoff", 0.16);
+  mod(config, "aurum.pad.mod-wheel-haze", "modWheel", "aurum.op.3.level", 0.14);
   return instrument;
 }
 
@@ -172,6 +192,9 @@ function makeLead(setId: string) {
   config.unison = 3;
   config.detuneCents = 12;
   config.stereoSpread = 0.5;
+  mod(config, "aurum.lead.pressure-cutoff", "pressure", "aurum.filter.a.cutoff", 0.16);
+  mod(config, "aurum.lead.mod-wheel-edge", "modWheel", "aurum.op.2.level", 0.18);
+  mod(config, "aurum.lead.macro-pan", "macro.1", "amp.pan", 0.12);
   instrument.mono = true;
   instrument.legato = true;
   instrument.glideMs = 68;
@@ -189,6 +212,8 @@ function makePercussion(setId: string) {
   output(config, 0, AURUM_FILTER_A_BUS, 0.88);
   config.filters[0] = { enabled: true, type: "bandpass", cutoff: 0.64, resonance: 0.34, drive: 0.12 };
   config.oversampling = 4;
+  mod(config, "aurum.percussion.macro-transient", "macro.1", "aurum.op.2.level", 0.2);
+  mod(config, "aurum.percussion.pressure-tone", "pressure", "aurum.filter.a.cutoff", 0.1);
   return instrument;
 }
 
@@ -208,6 +233,8 @@ function makeOrgan(setId: string) {
     output(config, index, AURUM_FILTER_A_BUS, levels[index] * 0.75);
   }
   config.filters[0] = { enabled: true, type: "lowpass", cutoff: 0.88, resonance: 0.08, drive: 0.04 };
+  mod(config, "aurum.organ.mod-wheel-upper", "modWheel", "aurum.op.5.level", 0.16);
+  mod(config, "aurum.organ.macro-rotor", "macro.1", "aurum.op.6.pan", 0.18);
   return instrument;
 }
 
@@ -233,6 +260,9 @@ function makeFx(setId: string) {
   config.unison = 2;
   config.detuneCents = 21;
   config.stereoSpread = 0.72;
+  mod(config, "aurum.fx.macro-orbit", "macro.1", "amp.pan", 0.2);
+  mod(config, "aurum.fx.pressure-filter", "pressure", "aurum.filter.b.cutoff", 0.18);
+  mod(config, "aurum.fx.mod-wheel-pan", "modWheel", "aurum.op.2.pan", 0.24);
   return instrument;
 }
 

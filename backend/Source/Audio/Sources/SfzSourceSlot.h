@@ -36,7 +36,7 @@ namespace beat
                 || next.maximumBlockSize <= 0 || next.outputChannels <= 0)
                 return false;
             prepared = next;
-            releaseSamples = std::clamp((int) std::round(next.sampleRate * 0.004), 8, 1024);
+            rebuildReleaseSamples();
             return true;
         }
 
@@ -64,6 +64,29 @@ namespace beat
 
             if (bankReaders[oldBank].load(std::memory_order_acquire) == 0)
                 retireBank(oldBank);
+            version.fetch_add(1, std::memory_order_release);
+            return true;
+        }
+
+        bool configurePlayback(bool reverse, float rate, bool pingPong = false,
+                               float tailMs = 4.0f, float trimStart = 0.0f,
+                               float trimEnd = 1.0f) noexcept
+        {
+            if (activeVoices.load(std::memory_order_acquire) != 0)
+                return false;
+            playbackReverse = reverse;
+            playbackRate = std::clamp(std::isfinite(rate) ? rate : 1.0f, 0.25f, 4.0f);
+            pingPongLoop = pingPong;
+            releaseTailMs = std::clamp(std::isfinite(tailMs) ? tailMs : 4.0f, 1.0f, 2000.0f);
+            trimStartRatio = std::clamp(std::isfinite(trimStart) ? trimStart : 0.0f, 0.0f, 1.0f);
+            trimEndRatio = std::clamp(std::isfinite(trimEnd) ? trimEnd : 1.0f,
+                trimStartRatio, 1.0f);
+            if (trimEndRatio <= trimStartRatio)
+            {
+                trimStartRatio = 0.0f;
+                trimEndRatio = 1.0f;
+            }
+            rebuildReleaseSamples();
             version.fetch_add(1, std::memory_order_release);
             return true;
         }
@@ -248,6 +271,7 @@ namespace beat
             int attackRemaining { transitionSamples };
             int releaseRemaining { 0 };
             LoopMode loopMode { LoopMode::none };
+            bool pingPongActive { false };
         };
 
         struct RegionSelection
@@ -423,8 +447,15 @@ namespace beat
             const auto& definition = region.definition;
             const auto& sample = instrument.samples[region.sampleIndex];
             const int frames = sample.audio->getNumSamples();
-            const int start = (int) definition.offsetFrames;
-            const int end = definition.endFrame > 0 ? (int) definition.endFrame + 1 : frames;
+            const int originalStart = (int) definition.offsetFrames;
+            const int originalEnd = definition.endFrame > 0 ? (int) definition.endFrame + 1 : frames;
+            const int originalLength = originalEnd - originalStart;
+            const int start = std::clamp(originalStart
+                + (int) std::round((double) originalLength * trimStartRatio),
+                originalStart, originalEnd - 2);
+            const int end = std::clamp(originalStart
+                + (int) std::round((double) originalLength * trimEndRatio),
+                start + 2, originalEnd);
             const float pan = std::clamp((float) definition.panPercent / 100.0f, -1.0f, 1.0f);
             const float velocity = std::clamp(event.velocity, 0.0f, 1.0f);
             const double semitones = (double) (event.midiNote - definition.rootNote)
@@ -437,9 +468,9 @@ namespace beat
             voice.bank = bank;
             voice.regionIndex = (uint16_t) regionIndex;
             voice.stableNoteId = event.stableNoteId;
-            voice.position = (double) start;
-            voice.rate = (sample.sourceSampleRate / prepared.sampleRate)
-                * std::exp2(semitones / 12.0);
+            voice.position = playbackReverse ? (double) (end - 1) : (double) start;
+            voice.rate = (playbackReverse ? -1.0 : 1.0) * (double) playbackRate
+                * (sample.sourceSampleRate / prepared.sampleRate) * std::exp2(semitones / 12.0);
             voice.gain = velocity * selectionGain
                 * std::pow(10.0f, (float) definition.volumeDb / 20.0f);
             voice.leftPan = std::sqrt(0.5f * (1.0f - pan));
@@ -447,9 +478,14 @@ namespace beat
             voice.playbackStart = start;
             voice.playbackEnd = end;
             voice.loopStart = mode == LoopMode::continuous || mode == LoopMode::sustain
-                ? (int) definition.loopStartFrame : start;
+                ? std::max(start, (int) definition.loopStartFrame) : start;
             voice.loopEnd = mode == LoopMode::continuous || mode == LoopMode::sustain
-                ? (int) definition.loopEndFrame + 1 : end;
+                ? std::min(end, (int) definition.loopEndFrame + 1) : end;
+            if (voice.loopEnd - voice.loopStart < 2)
+            {
+                voice.loopStart = start;
+                voice.loopEnd = end;
+            }
             voice.loopCrossfade = mode == LoopMode::continuous || mode == LoopMode::sustain
                 ? std::min(transitionSamples, (voice.loopEnd - voice.loopStart) / 2) : 0;
             voice.attackRemaining = transitionSamples;
@@ -477,13 +513,23 @@ namespace beat
                 const auto& audio = *instrument->samples[region.sampleIndex].audio;
                 const bool looping = voice.loopMode == LoopMode::continuous
                     || (voice.loopMode == LoopMode::sustain && !voice.releasing);
-                if (!looping && voice.position >= (double) (voice.playbackEnd - 1))
+                const bool reverseLeg = voice.rate < 0.0;
+                if (!looping
+                    && ((!reverseLeg && voice.position >= (double) (voice.playbackEnd - 1))
+                        || (reverseLeg && voice.position <= (double) voice.playbackStart)))
                 {
                     stopVoice(voice);
                     continue;
                 }
-                if (looping && voice.position >= (double) voice.loopEnd)
-                    voice.position = wrapLoopPosition(voice);
+                if (looping)
+                {
+                    if (pingPongLoop)
+                        reflectPingPongPosition(voice);
+                    else if (!reverseLeg && voice.position >= (double) voice.loopEnd)
+                        voice.position = wrapLoopPosition(voice);
+                    else if (reverseLeg && voice.position < (double) voice.loopStart)
+                        voice.position = wrapReverseLoopPosition(voice);
+                }
 
                 const auto interpolate = [&](double position, bool wrap,
                                              StereoFrame& output)
@@ -504,20 +550,27 @@ namespace beat
                 };
 
                 StereoFrame source;
-                interpolate(voice.position, looping, source);
-                if (looping && voice.loopCrossfade > 0
-                    && voice.position >= (double) (voice.loopEnd - voice.loopCrossfade))
+                interpolate(voice.position, looping && !pingPongLoop, source);
+                const bool renderingReverseLeg = voice.rate < 0.0;
+                if (looping && !pingPongLoop && voice.loopCrossfade > 0
+                    && ((!renderingReverseLeg && voice.position >= (double) (voice.loopEnd - voice.loopCrossfade))
+                        || (renderingReverseLeg && voice.position <= (double) (voice.loopStart + voice.loopCrossfade))))
                 {
-                    const double offset = voice.position
-                        - (double) (voice.loopEnd - voice.loopCrossfade);
+                    const double offset = renderingReverseLeg
+                        ? (double) (voice.loopStart + voice.loopCrossfade) - voice.position
+                        : voice.position - (double) (voice.loopEnd - voice.loopCrossfade);
                     const float blend = std::clamp((float) (offset / voice.loopCrossfade), 0.0f, 1.0f);
                     StereoFrame incoming;
-                    interpolate((double) voice.loopStart + offset, false, incoming);
+                    interpolate(renderingReverseLeg
+                        ? (double) (voice.loopEnd - 1) - offset
+                        : (double) voice.loopStart + offset, false, incoming);
                     source.left += (incoming.left - source.left) * blend;
                     source.right += (incoming.right - source.right) * blend;
                 }
 
-                const int samplesToEnd = voice.playbackEnd - 1 - (int) voice.position;
+                const int samplesToEnd = renderingReverseLeg
+                    ? (int) voice.position - voice.playbackStart
+                    : voice.playbackEnd - 1 - (int) voice.position;
                 const float endGain = !looping && samplesToEnd < transitionSamples
                     ? std::clamp((float) samplesToEnd / transitionSamples, 0.0f, 1.0f) : 1.0f;
                 const float attackGain = voice.attackRemaining > 0
@@ -530,8 +583,16 @@ namespace beat
                 result.right += source.right * gain * voice.rightPan;
                 if (voice.attackRemaining > 0) --voice.attackRemaining;
                 voice.position += voice.rate;
-                if (looping && voice.position >= (double) voice.loopEnd)
-                    voice.position = wrapLoopPosition(voice);
+                if (looping)
+                {
+                    const bool nextReverseLeg = voice.rate < 0.0;
+                    if (pingPongLoop)
+                        reflectPingPongPosition(voice);
+                    else if (!nextReverseLeg && voice.position >= (double) voice.loopEnd)
+                        voice.position = wrapLoopPosition(voice);
+                    else if (nextReverseLeg && voice.position < (double) voice.loopStart)
+                        voice.position = wrapReverseLoopPosition(voice);
+                }
                 ++renderTelemetry.renderedVoiceSamples;
                 if (voice.releasing && --voice.releaseRemaining <= 0)
                     stopVoice(voice);
@@ -547,6 +608,75 @@ namespace beat
             if (length <= 0.0) return (double) voice.loopStart;
             return startAfterCrossfade
                 + std::fmod(voice.position - (double) voice.loopEnd, length);
+        }
+
+        static double wrapReverseLoopPosition(const Voice& voice) noexcept
+        {
+            const double endBeforeCrossfade = (double) (voice.loopEnd - 1 - voice.loopCrossfade);
+            const double length = endBeforeCrossfade - (double) voice.loopStart;
+            if (length <= 0.0) return (double) (voice.loopEnd - 1);
+            return endBeforeCrossfade
+                - std::fmod((double) voice.loopStart - voice.position, length);
+        }
+
+        void reflectPingPongPosition(Voice& voice) const noexcept
+        {
+            const double low = (double) voice.loopStart;
+            const double high = (double) (voice.loopEnd - 1);
+            const double span = high - low;
+            if (!pingPongLoop || span <= 0.0)
+                return;
+            if (!voice.pingPongActive)
+            {
+                if ((voice.rate >= 0.0 && voice.position < high)
+                    || (voice.rate < 0.0 && voice.position > low))
+                    return;
+                voice.pingPongActive = true;
+            }
+            const double magnitude = std::abs(voice.rate);
+            if (voice.rate >= 0.0)
+            {
+                if (voice.position < high)
+                    return;
+                const double period = span * 2.0;
+                const double folded = std::fmod(
+                    std::max(0.0, voice.position - high), period);
+                if (folded <= span)
+                {
+                    voice.position = high - folded;
+                    voice.rate = -magnitude;
+                }
+                else
+                {
+                    voice.position = low + (folded - span);
+                    voice.rate = magnitude;
+                }
+            }
+            else
+            {
+                if (voice.position > low)
+                    return;
+                const double period = span * 2.0;
+                const double folded = std::fmod(
+                    std::max(0.0, low - voice.position), period);
+                if (folded <= span)
+                {
+                    voice.position = low + folded;
+                    voice.rate = magnitude;
+                }
+                else
+                {
+                    voice.position = high - (folded - span);
+                    voice.rate = -magnitude;
+                }
+            }
+        }
+
+        void rebuildReleaseSamples() noexcept
+        {
+            const double engineRate = prepared.sampleRate > 0.0 ? prepared.sampleRate : 44100.0;
+            releaseSamples = std::clamp((int) std::round(
+                engineRate * (double) releaseTailMs * 0.001), 8, 384000);
         }
 
         void stopVoice(Voice& voice) noexcept
@@ -598,5 +728,11 @@ namespace beat
         std::atomic<uint64_t> retiredPublications { 0 };
         SourceRenderTelemetry renderTelemetry;
         int releaseSamples { 176 };
+        bool playbackReverse { false };
+        bool pingPongLoop { false };
+        float playbackRate { 1.0f };
+        float releaseTailMs { 4.0f };
+        float trimStartRatio { 0.0f };
+        float trimEndRatio { 1.0f };
     };
 }

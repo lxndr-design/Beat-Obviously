@@ -3,12 +3,19 @@
 #include "WavetableUnisonConfig.h"
 
 #include <juce_core/juce_core.h>
+#include <juce_dsp/juce_dsp.h>
 
 #include <array>
 #include <cmath>
 
 namespace beat::WavetableUnison
 {
+    using SimdFloat = juce::dsp::SIMDRegister<float>;
+    inline constexpr int simdWidth = (int) SimdFloat::SIMDNumElements;
+    static_assert(maxVoices % simdWidth == 0,
+                  "The fixed unison bank must divide evenly into native SIMD groups");
+    inline constexpr int simdGroupCapacity = (maxVoices + simdWidth - 1) / simdWidth;
+
     struct Plan
     {
         int unison { 0 };
@@ -16,20 +23,53 @@ namespace beat::WavetableUnison
         float spread { -1.0f };
         float weightSum { 1.0f };
         float appliedBasePan { 2.0f };
+        int requestedUnison { 0 };
+        float requestedDetuneCents { -1.0f };
+        float requestedBlend { -1.0f };
+        float requestedDetuneMod { -1000.0f };
+        float requestedSpreadMod { -1000.0f };
+        double requestedFrequencyHz { -1.0 };
+        double requestedSampleRate { -1.0 };
+        float requestedPosition { -1.0f };
         std::array<double, capacity> rates {};
         std::array<double, capacity> appliedFrequencyHz {};
         std::array<float, capacity> centered {};
-        std::array<float, capacity> weights {};
+        alignas(64) std::array<float, capacity> weights {};
         std::array<float, capacity> phaseSpread {};
         std::array<float, capacity> appliedPosition {};
-        std::array<float, capacity> leftGains {};
-        std::array<float, capacity> rightGains {};
+        alignas(64) std::array<float, capacity> leftGains {};
+        alignas(64) std::array<float, capacity> rightGains {};
+        std::array<SimdFloat, simdGroupCapacity> simdWeights {};
+        std::array<SimdFloat, simdGroupCapacity> simdWeightedLeftGains {};
+        std::array<SimdFloat, simdGroupCapacity> simdWeightedRightGains {};
     };
+
+    inline void refreshSimdWeights(Plan& plan) noexcept
+    {
+        for (int group = 0; group < simdGroupCapacity; ++group)
+            plan.simdWeights[(size_t) group] = SimdFloat::fromRawArray(
+                plan.weights.data() + (size_t) group * (size_t) simdWidth);
+    }
+
+    inline void refreshSimdStereoGains(Plan& plan) noexcept
+    {
+        for (int group = 0; group < simdGroupCapacity; ++group)
+        {
+            const auto weights = plan.simdWeights[(size_t) group];
+            plan.simdWeightedLeftGains[(size_t) group] = weights * SimdFloat::fromRawArray(
+                plan.leftGains.data() + (size_t) group * (size_t) simdWidth);
+            plan.simdWeightedRightGains[(size_t) group] = weights * SimdFloat::fromRawArray(
+                plan.rightGains.data() + (size_t) group * (size_t) simdWidth);
+        }
+    }
 
     inline void invalidate(Plan& plan) noexcept
     {
         plan.appliedFrequencyHz.fill(-1.0);
         plan.appliedPosition.fill(-1.0f);
+        plan.requestedFrequencyHz = -1.0;
+        plan.requestedSampleRate = -1.0;
+        plan.requestedPosition = -1.0f;
     }
 
     inline Plan& update(Plan& plan,
@@ -39,6 +79,18 @@ namespace beat::WavetableUnison
                         float detuneCentsMod,
                         float spreadMod) noexcept
     {
+        if (plan.requestedUnison == configUnison
+            && plan.requestedDetuneCents == configDetuneCents
+            && plan.requestedBlend == configBlend
+            && plan.requestedDetuneMod == detuneCentsMod
+            && plan.requestedSpreadMod == spreadMod)
+            return plan;
+
+        plan.requestedUnison = configUnison;
+        plan.requestedDetuneCents = configDetuneCents;
+        plan.requestedBlend = configBlend;
+        plan.requestedDetuneMod = detuneCentsMod;
+        plan.requestedSpreadMod = spreadMod;
         const int unison = juce::jlimit(1, maxVoices, configUnison);
         const float rawDetuneCents = juce::jlimit(0.0f, 100.0f, configDetuneCents + detuneCentsMod);
         const float rawSpread = juce::jlimit(0.0f, 1.0f, configBlend + spreadMod);
@@ -73,6 +125,7 @@ namespace beat::WavetableUnison
         }
 
         plan.weightSum = juce::jmax(1.0f, plan.weightSum);
+        refreshSimdWeights(plan);
         invalidate(plan);
         return plan;
     }

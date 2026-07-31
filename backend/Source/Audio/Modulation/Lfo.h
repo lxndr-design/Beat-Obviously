@@ -9,17 +9,22 @@ namespace beat::Lfo
     inline float value(int waveform, double phase, float smoothing = 0.0f, bool oneShot = false) noexcept
     {
         const float p = oneShot ? juce::jlimit(0.0f, 1.0f, (float) phase) : (float) (phase - std::floor(phase));
-        const float sine = std::sin(p * juce::MathConstants<float>::twoPi);
+        const float mix = juce::jlimit(0.0f, 1.0f, smoothing);
+        if (waveform == 0)
+            return std::sin(p * juce::MathConstants<float>::twoPi);
+
         float shaped;
         switch (waveform)
         {
             case 1: shaped = p < 0.5f ? p * 4.0f - 1.0f : 3.0f - p * 4.0f; break;
             case 2: shaped = p * 2.0f - 1.0f; break;
             case 3: shaped = p < 0.5f ? 1.0f : -1.0f; break;
-            case 0:
-            default: return sine;
+            default: return std::sin(p * juce::MathConstants<float>::twoPi);
         }
-        const float mix = juce::jlimit(0.0f, 1.0f, smoothing);
+        if (mix <= 0.0f)
+            return shaped;
+
+        const float sine = std::sin(p * juce::MathConstants<float>::twoPi);
         return shaped + (sine - shaped) * mix;
     }
 
@@ -57,5 +62,17 @@ namespace beat::Lfo
             return juce::jlimit(0.01f, 50.0f, rateHz);
         const double cyclesPerSecond = (juce::jmax(1.0, bpm) / 60.0) / syncedDivisionBeats(division);
         return juce::jlimit(0.01f, 50.0f, (float) cyclesPerSecond);
+    }
+
+    inline float keytrackedRateHz(float baseRateHz, float amount, float normalizedKeytrack) noexcept
+    {
+        const float boundedBase = juce::jlimit(0.01f, 50.0f, baseRateHz);
+        const float boundedAmount = juce::jlimit(-1.0f, 1.0f, amount);
+        if (boundedAmount == 0.0f)
+            return boundedBase;
+        const float midiNote = juce::jlimit(0.0f, 127.0f, normalizedKeytrack * 127.0f);
+        const float octaveOffset = (midiNote - 60.0f) / 12.0f;
+        return juce::jlimit(0.01f, 50.0f,
+            boundedBase * std::exp2(boundedAmount * octaveOffset));
     }
 }

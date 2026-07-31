@@ -19,13 +19,17 @@ import {
   analyzeInstrumentNodeGraph,
   cableIsValid,
   compileNodeGraphToInstrumentPatch,
+  CV_SOURCE_NODE_OPTIONS,
   createInstrumentNode,
   createNodeGraphTemplate,
+  isCvSourceNodeKind,
   nodeDefinition,
   NODE_BROWSER_GROUPS,
   NODE_DEFINITIONS,
   NODE_GRAPH_TEMPLATES,
   normalizeInstrumentNodeGraph,
+  replaceNodeWithCompatibleKind,
+  type CvSourceNodeKind,
   type NodeGraphIssue,
   type NodeGraphTemplateId,
   type NodeParameterSpec,
@@ -373,6 +377,11 @@ function NodeInstrumentEditorView({ props }: NodeInstrumentEditorInternalProps) 
     });
   }
 
+  function changeNodeKind(node: InstrumentNode, kind: InstrumentNodeKind) {
+    const replacement = replaceNodeWithCompatibleKind(node, kind);
+    updateNode(node.id, replacement);
+  }
+
   function removeNode(nodeId: string) {
     const node = graph().nodes.find((candidate) => candidate.id === nodeId);
     if (node?.kind === "output") return;
@@ -610,6 +619,7 @@ function NodeInstrumentEditorView({ props }: NodeInstrumentEditorInternalProps) 
                 const node = selectedNode();
                 if (node) updateNode(node.id, { label });
               }}
+              onKindChange={changeNodeKind}
               onParameterChange={updateParameter}
             />
           </div>
@@ -692,6 +702,8 @@ function NodeBrowser(props: {
   onAddNode: (kind: InstrumentNodeKind) => void;
   onApplyTemplate: (id: NodeGraphTemplateId) => void;
 }) {
+  const [cvSourceKind, setCvSourceKind] = createSignal<CvSourceNodeKind>("lfo");
+
   return (
     <aside class={styles.nodeBrowser} aria-label="Node browser">
       <div class={styles.browserSection}>
@@ -717,6 +729,26 @@ function NodeBrowser(props: {
           <div class={styles.browserSection}>
             <h3>{group.label}</h3>
             <div class={styles.nodePalette} aria-label={`${group.label} nodes`}>
+              <Show when={group.id === "sole_cv_out_modulation_sources"}>
+                <div class={styles.nodeFamilyPicker}>
+                  <FloatingSelect
+                    label="CV Source"
+                    layout="inline"
+                    value={cvSourceKind()}
+                    ariaLabel="CV source type"
+                    options={CV_SOURCE_NODE_OPTIONS}
+                    onChange={(value) => setCvSourceKind(value as CvSourceNodeKind)}
+                  />
+                  <Button
+                    iconOnly
+                    size="sm"
+                    onClick={() => props.onAddNode(cvSourceKind())}
+                    aria-label={`Add ${nodeDefinition(cvSourceKind()).label} CV source`}
+                  >
+                    <Icon name="ph:plus" size={18} decorative />
+                  </Button>
+                </div>
+              </Show>
               <For each={group.nodeKinds}>
                 {(kind) => (
                   <Button size="sm" class={styles.nodePaletteButton} onClick={() => props.onAddNode(kind)}>
@@ -742,6 +774,7 @@ function NodeDetails(props: {
   issues: NodeGraphIssue[];
   onRenameInstrument: (name: string) => void;
   onRenameNode: (label: string) => void;
+  onKindChange: (node: InstrumentNode, kind: InstrumentNodeKind) => void;
   onParameterChange: (node: InstrumentNode, spec: NodeParameterSpec, value: InstrumentNodeParameterValue) => void;
 }) {
   const selectedDefinition = createMemo(() => props.selectedNode ? nodeDefinition(props.selectedNode.kind) : null);
@@ -781,6 +814,16 @@ function NodeDetails(props: {
                 />
               </div>
               <p>{selectedDefinition()?.description}</p>
+              <Show when={isCvSourceNodeKind(node().kind)}>
+                <FloatingSelect
+                  label="CV Type"
+                  layout="inline"
+                  value={node().kind}
+                  ariaLabel="Selected node CV type"
+                  options={CV_SOURCE_NODE_OPTIONS}
+                  onChange={(value) => props.onKindChange(node(), value as CvSourceNodeKind)}
+                />
+              </Show>
             </>
           )}
         </Show>

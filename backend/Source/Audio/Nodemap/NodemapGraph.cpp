@@ -22,6 +22,18 @@ namespace beat::Nodemap
 
         struct EvalContext
         {
+            struct AudioMemo
+            {
+                StereoFrame value;
+                uint64_t generation { 0 };
+            };
+
+            struct CvMemo
+            {
+                float value { 0.0f };
+                uint64_t generation { 0 };
+            };
+
             struct IncomingPort
             {
                 const Node* destination { nullptr };
@@ -33,13 +45,58 @@ namespace beat::Nodemap
             const AuditionOptions& options;
             double timeSeconds { 0.0 };
             double noteFrequency { 261.6255653005986 };
+            uint64_t generation { 1 };
             std::unordered_map<std::string, const Node*> nodesById;
             std::vector<IncomingPort> incoming;
-            std::unordered_map<const Node*, StereoFrame> audioMemo;
-            std::unordered_map<const Node*, float> cvMemo;
-            std::unordered_set<const Node*> audioVisiting;
-            std::unordered_set<const Node*> cvVisiting;
+            std::unordered_map<const Node*, AudioMemo> audioMemo;
+            std::unordered_map<const Node*, CvMemo> cvMemo;
+            std::unordered_map<const Node*, uint64_t> audioVisiting;
+            std::unordered_map<const Node*, uint64_t> cvVisiting;
         };
+
+        void beginEvalSample(EvalContext& context) noexcept
+        {
+            ++context.generation;
+            if (context.generation != 0)
+                return;
+            context.generation = 1;
+            for (auto& [node, memo] : context.audioMemo) memo.generation = 0;
+            for (auto& [node, memo] : context.cvMemo) memo.generation = 0;
+            for (auto& [node, generation] : context.audioVisiting) generation = 0;
+            for (auto& [node, generation] : context.cvVisiting) generation = 0;
+        }
+
+        void prepareEvalContext(EvalContext& context)
+        {
+            context.nodesById.reserve(context.graph.nodes.size());
+            context.incoming.reserve(context.graph.cables.size());
+            context.audioMemo.reserve(context.graph.nodes.size());
+            context.cvMemo.reserve(context.graph.nodes.size());
+            context.audioVisiting.reserve(context.graph.nodes.size());
+            context.cvVisiting.reserve(context.graph.nodes.size());
+            for (const auto& node : context.graph.nodes)
+            {
+                context.nodesById[node.id] = &node;
+                context.audioMemo.emplace(&node, EvalContext::AudioMemo {});
+                context.cvMemo.emplace(&node, EvalContext::CvMemo {});
+                context.audioVisiting.emplace(&node, 0);
+                context.cvVisiting.emplace(&node, 0);
+            }
+            for (const auto& cable : context.graph.cables)
+            {
+                const auto destination = context.nodesById.find(cable.toNodeId);
+                if (destination == context.nodesById.end()) continue;
+                auto incoming = std::find_if(context.incoming.begin(), context.incoming.end(), [&](const EvalContext::IncomingPort& entry) {
+                    return entry.destination == destination->second && entry.portId == cable.toPortId;
+                });
+                if (incoming == context.incoming.end())
+                {
+                    context.incoming.push_back({ destination->second, cable.toPortId, {} });
+                    incoming = std::prev(context.incoming.end());
+                }
+                incoming->cables.push_back(&cable);
+            }
+        }
 
         float clamp01(float value) noexcept
         {
@@ -141,7 +198,7 @@ namespace beat::Nodemap
 
         float sumCvInputs(EvalContext& context, const Node& node, std::string_view portId, float fallback = 0.0f)
         {
-            const auto cables = incomingCables(context, node, portId);
+            const auto& cables = incomingCables(context, node, portId);
             if (cables.empty())
                 return fallback;
 
@@ -161,7 +218,7 @@ namespace beat::Nodemap
             float sum = 0.0f;
             for (const auto portId : portIds)
             {
-                const auto cables = incomingCables(context, node, portId);
+                const auto& cables = incomingCables(context, node, portId);
                 if (cables.empty())
                     continue;
                 routed = true;
@@ -198,12 +255,14 @@ namespace beat::Nodemap
         float evalCv(EvalContext& context, const Node& node, std::string_view portId)
         {
             const auto* key = &node;
-            if (const auto found = context.cvMemo.find(key); found != context.cvMemo.end())
-                return found->second;
-            if (context.cvVisiting.contains(key))
+            auto& memo = context.cvMemo.at(key);
+            if (memo.generation == context.generation)
+                return memo.value;
+            auto& visitingGeneration = context.cvVisiting.at(key);
+            if (visitingGeneration == context.generation)
                 return 0.0f;
 
-            context.cvVisiting.insert(key);
+            visitingGeneration = context.generation;
             float value = 0.0f;
 
             switch (node.kind)
@@ -264,20 +323,23 @@ namespace beat::Nodemap
                     break;
             }
 
-            context.cvVisiting.erase(key);
-            context.cvMemo[key] = value;
+            visitingGeneration = 0;
+            memo.value = value;
+            memo.generation = context.generation;
             return value;
         }
 
         StereoFrame evalAudio(EvalContext& context, const Node& node, std::string_view portId)
         {
             const auto* key = &node;
-            if (const auto found = context.audioMemo.find(key); found != context.audioMemo.end())
-                return found->second;
-            if (context.audioVisiting.contains(key))
+            auto& memo = context.audioMemo.at(key);
+            if (memo.generation == context.generation)
+                return memo.value;
+            auto& visitingGeneration = context.audioVisiting.at(key);
+            if (visitingGeneration == context.generation)
                 return {};
 
-            context.audioVisiting.insert(key);
+            visitingGeneration = context.generation;
             StereoFrame frame;
 
             switch (node.kind)
@@ -392,8 +454,9 @@ namespace beat::Nodemap
             if (!std::isfinite(frame.right)) frame.right = 0.0f;
             frame.left = clampBipolar(frame.left);
             frame.right = clampBipolar(frame.right);
-            context.audioVisiting.erase(key);
-            context.audioMemo[key] = frame;
+            visitingGeneration = 0;
+            memo.value = frame;
+            memo.generation = context.generation;
             return frame;
         }
 
@@ -743,6 +806,97 @@ namespace beat::Nodemap
         return result;
     }
 
+    struct RealtimeRenderer::Impl
+    {
+        Graph graph;
+        AuditionOptions options;
+        std::unique_ptr<EvalContext> context;
+        const Node* output { nullptr };
+        int sampleIndex { 0 };
+        int sampleCount { 0 };
+        bool active { false };
+
+        Impl(const Graph& source, double sampleRate)
+        {
+            auto validation = validateAndNormalize(source);
+            graph = std::move(validation.graph);
+            options.sampleRate = sampleRate > 0.0 ? sampleRate : 48000.0;
+            if (!validation.hasAudioPathToOutput)
+                return;
+            const auto found = std::find_if(graph.nodes.begin(), graph.nodes.end(), [](const Node& node) {
+                return node.kind == NodeKind::InstrumentOut;
+            });
+            if (found == graph.nodes.end())
+                return;
+            output = &*found;
+            context = std::make_unique<EvalContext>(EvalContext { graph, options });
+            prepareEvalContext(*context);
+        }
+    };
+
+    RealtimeRenderer::RealtimeRenderer() = default;
+    RealtimeRenderer::~RealtimeRenderer() = default;
+    RealtimeRenderer::RealtimeRenderer(RealtimeRenderer&&) noexcept = default;
+    RealtimeRenderer& RealtimeRenderer::operator=(RealtimeRenderer&&) noexcept = default;
+
+    bool RealtimeRenderer::prepare(const Graph& graph, double sampleRate)
+    {
+        auto next = std::make_unique<Impl>(graph, sampleRate);
+        if (next->context == nullptr || next->output == nullptr)
+        {
+            impl.reset();
+            return false;
+        }
+        impl = std::move(next);
+        return true;
+    }
+
+    bool RealtimeRenderer::startNote(const AuditionOptions& nextOptions) noexcept
+    {
+        if (impl == nullptr || impl->context == nullptr || impl->output == nullptr)
+            return false;
+        impl->options = nextOptions;
+        impl->options.sampleRate = impl->options.sampleRate > 0.0
+            ? impl->options.sampleRate : 48000.0;
+        impl->sampleIndex = 0;
+        impl->sampleCount = std::max(1, impl->options.sampleCount);
+        impl->context->noteFrequency = 440.0
+            * std::pow(2.0, ((double) impl->options.midiNote - 69.0) / 12.0);
+        impl->context->timeSeconds = 0.0;
+        impl->active = true;
+        return true;
+    }
+
+    void RealtimeRenderer::stop(bool allowTailOff) noexcept
+    {
+        if (impl != nullptr && !allowTailOff)
+            impl->active = false;
+    }
+
+    RealtimeFrame RealtimeRenderer::renderFrame() noexcept
+    {
+        if (impl == nullptr || !impl->active || impl->context == nullptr || impl->output == nullptr)
+            return {};
+        if (impl->sampleIndex >= impl->sampleCount)
+        {
+            impl->active = false;
+            return {};
+        }
+
+        impl->context->timeSeconds = (double) impl->sampleIndex / impl->options.sampleRate;
+        beginEvalSample(*impl->context);
+        const auto frame = evalAudio(*impl->context, *impl->output, "audio-in");
+        ++impl->sampleIndex;
+        if (impl->sampleIndex >= impl->sampleCount)
+            impl->active = false;
+        return { frame.left, frame.right };
+    }
+
+    bool RealtimeRenderer::isActive() const noexcept
+    {
+        return impl != nullptr && impl->active;
+    }
+
     AuditionResult renderOneNote(const Graph& graph, const AuditionOptions& options)
     {
         const auto validation = validateAndNormalize(graph);
@@ -763,36 +917,12 @@ namespace beat::Nodemap
 
         EvalContext context { validation.graph, options };
         context.noteFrequency = frequency;
-        context.nodesById.reserve(validation.graph.nodes.size());
-        context.incoming.reserve(validation.graph.cables.size());
-        context.audioMemo.reserve(validation.graph.nodes.size());
-        context.cvMemo.reserve(validation.graph.nodes.size());
-        context.audioVisiting.reserve(validation.graph.nodes.size());
-        context.cvVisiting.reserve(validation.graph.nodes.size());
-        for (const auto& node : validation.graph.nodes)
-            context.nodesById[node.id] = &node;
-        for (const auto& cable : validation.graph.cables)
-        {
-            const auto destination = context.nodesById.find(cable.toNodeId);
-            if (destination == context.nodesById.end()) continue;
-            auto incoming = std::find_if(context.incoming.begin(), context.incoming.end(), [&](const EvalContext::IncomingPort& entry) {
-                return entry.destination == destination->second && entry.portId == cable.toPortId;
-            });
-            if (incoming == context.incoming.end())
-            {
-                context.incoming.push_back({ destination->second, cable.toPortId, {} });
-                incoming = std::prev(context.incoming.end());
-            }
-            incoming->cables.push_back(&cable);
-        }
+        prepareEvalContext(context);
 
         for (int sample = 0; sample < options.sampleCount; ++sample)
         {
             context.timeSeconds = (double) sample / options.sampleRate;
-            context.audioMemo.clear();
-            context.cvMemo.clear();
-            context.audioVisiting.clear();
-            context.cvVisiting.clear();
+            beginEvalSample(context);
 
             const auto frame = evalAudio(context, *output, "audio-in");
             result.left[(size_t) sample] = frame.left;

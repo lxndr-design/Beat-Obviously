@@ -847,6 +847,14 @@
   opacity: 0.72;
 }
 
+.selectionStatus {
+  min-width: 81px;
+  color: color-mix(in srgb, var(--color-fg) 66%, transparent);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-ui);
+  white-space: nowrap;
+}
+
 .samplerPanel {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(180px, 261px);

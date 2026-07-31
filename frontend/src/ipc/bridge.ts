@@ -80,6 +80,19 @@ async function mockResponse<R extends OutboundRequest>(
   // eslint-disable-next-line no-console
   console.debug("[Beat IPC mock]", req.kind, req);
   switch (req.kind) {
+    case "diagnostics.readLog":
+      return {
+        path: "~/Library/Logs/Beat/Beat-debug.log",
+        text: "Preview mode: native diagnostic entries appear in the packaged Beat app.",
+        lineCount: 1,
+        truncated: false,
+      } as unknown as ResponseFor<R>;
+    case "diagnostics.clearLog":
+      return { ok: true, path: "~/Library/Logs/Beat/Beat-debug.log" } as unknown as ResponseFor<R>;
+    case "diagnostics.saveLog":
+      return { path: "~/Documents/Beat-debug-preview.log", cancelled: false } as unknown as ResponseFor<R>;
+    case "diagnostics.write":
+      return { ok: true } as unknown as ResponseFor<R>;
     case "ping":
       return { pong: true, backendVersion: "mock" } as ResponseFor<R>;
     case "project.list":
@@ -212,6 +225,8 @@ async function mockResponse<R extends OutboundRequest>(
           bucketCount: req.bucketCount ?? 256,
         },
       } as unknown as ResponseFor<R>;
+    case "audio.previewData":
+      return { error: "Native audio preview data is only available in the packaged app." } as unknown as ResponseFor<R>;
     case "audio.stemsStart":
     case "audio.stemsStatus":
     case "audio.stemsCancel":
@@ -295,11 +310,6 @@ async function mockResponse<R extends OutboundRequest>(
           outputChannelNames: ["L", "R"],
           devices: [],
         },
-      } as unknown as ResponseFor<R>;
-    case "training.run":
-      return {
-        started: false,
-        reason: "Training runner is only available in the native app.",
       } as unknown as ResponseFor<R>;
     default:
       return { ok: true } as unknown as ResponseFor<R>;

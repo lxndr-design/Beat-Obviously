@@ -1,4 +1,5 @@
 import { FACTORY_SYNTH_PRESETS, type SynthFactoryPresetRecord } from "./synthStore";
+import { instrumentPresetSearchTokens } from "./instrumentPresetLibrary";
 import type { SynthPresetRecord } from "./synthPresets";
 import type { Instrument } from "./types";
 
@@ -52,7 +53,7 @@ export function filterAetherPresetLibraryEntries(
   entries: AetherPresetLibraryEntry[],
   filters: AetherPresetLibraryFilters,
 ): AetherPresetLibraryEntry[] {
-  const searchTokens = normalizeSearch(filters.search ?? "").split(/\s+/).filter(Boolean);
+  const searchTokens = instrumentPresetSearchTokens(filters.search ?? "");
   const category = normalizeSearch(filters.category ?? "");
   const filtered = entries.filter((entry) => {
     if (filters.favoritesOnly && !entry.favorite) return false;

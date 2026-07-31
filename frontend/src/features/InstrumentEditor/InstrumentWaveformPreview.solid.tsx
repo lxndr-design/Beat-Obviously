@@ -1,10 +1,12 @@
 import { createEffect, createMemo, createSignal, onCleanup, Show, type Accessor } from "solid-js";
-import { FieldActionButton, HoverInfo, Icon } from "../../solid-ui";
+import { appAlert, FieldActionButton, HoverInfo, Icon } from "../../solid-ui";
 import { registerGlobalAudioStop } from "../../audio/globalAudioSafety";
 import {
   cachedInstrumentSampleBuffer,
   createInstrumentBufferSource,
   createSynthRenderState,
+  hasCachedInstrumentSample,
+  instrumentRequiresSamplePlayback,
   modulationAtTime,
   preloadInstrumentSample,
   previewFrequency,
@@ -146,8 +148,16 @@ function InstrumentWaveformPreviewRuntime(props: { state: Accessor<InstrumentWav
     }
 
     ctx.strokeStyle = fg;
-    if (shouldDrawSample() && activeSampleEnvelope) {
-      drawSampleEnvelope(ctx, normalizeEnvelope(activeSampleEnvelope.values), w, h, mid);
+    if (shouldDrawSample()) {
+      if (activeSampleEnvelope) drawSampleEnvelope(ctx, normalizeEnvelope(activeSampleEnvelope.values), w, h, mid);
+      else {
+        ctx.strokeStyle = faint;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(0, mid);
+        ctx.lineTo(w, mid);
+        ctx.stroke();
+      }
     } else {
       const values = normalize(makeWaveform(instrument));
       ctx.lineWidth = 1.5;
@@ -214,9 +224,18 @@ function InstrumentWaveformPreviewRuntime(props: { state: Accessor<InstrumentWav
     const instrument = props.state().instrument;
     const bpm = useProjectStore.getState().project.bpm;
     if (ctx.state === "suspended") void ctx.resume();
-    await preloadInstrumentSample(ctx, instrument).catch(() => {
-      // Synth fallback remains useful when a sample cannot be decoded.
-    });
+    try {
+      await preloadInstrumentSample(ctx, instrument);
+    } catch {
+      if (instrumentRequiresSamplePlayback(instrument)) {
+        void appAlert("This sampler's audio file could not be loaded.");
+        return;
+      }
+    }
+    if (instrumentRequiresSamplePlayback(instrument) && !hasCachedInstrumentSample(instrument)) {
+      void appAlert("This sampler has no playable audio file.");
+      return;
+    }
 
     const length = Math.ceil(ctx.sampleRate * PREVIEW_SECONDS);
     const nextSource = createInstrumentBufferSource(ctx, instrument, length / ctx.sampleRate, previewFrequency(instrument), undefined, 127, bpm);
@@ -251,11 +270,20 @@ function InstrumentWaveformPreviewRuntime(props: { state: Accessor<InstrumentWav
     const ctx = getAudioContext();
     const bpm = useProjectStore.getState().project.bpm;
     if (ctx.state === "suspended") void ctx.resume();
-    await preloadInstrumentSample(ctx, latestInstrument).catch(() => {
-      // Synth fallback remains useful when a sample cannot be decoded.
-    });
+    try {
+      await preloadInstrumentSample(ctx, latestInstrument);
+    } catch {
+      if (instrumentRequiresSamplePlayback(latestInstrument)) {
+        void appAlert("This sampler's audio file could not be loaded.");
+        return;
+      }
+    }
+    if (instrumentRequiresSamplePlayback(latestInstrument) && !hasCachedInstrumentSample(latestInstrument)) {
+      void appAlert("This sampler has no playable audio file.");
+      return;
+    }
 
-    const sampleInstrument = latestInstrument.sampleUrl ? latestInstrument : null;
+    const sampleInstrument = instrumentRequiresSamplePlayback(latestInstrument) ? latestInstrument : null;
     if (sampleInstrument) {
       const nextSource = createInstrumentBufferSource(
         ctx,

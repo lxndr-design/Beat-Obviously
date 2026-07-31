@@ -263,6 +263,7 @@
   --z-scrim: 4000;        /* unsaved-check shadow */
   --z-toast: 5000;
   --z-startup-splash: 12000;
+  --z-diagnostics: 13000;     /* global support overlay, including Home and startup */
 
   /* === Component-specific tokens ====================================== */
 

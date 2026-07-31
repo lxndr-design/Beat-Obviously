@@ -54,6 +54,14 @@ const HIDDEN_COMPATIBILITY_NODE_KINDS = new Set([
   "shaper",
   "distortion",
   "modWheel",
+  "lfo",
+  "envelope",
+  "velocity",
+  "keytrack",
+  "midiControl",
+  "macro",
+  "random",
+  "constant",
 ]);
 
 const EXPECTED_BROWSER_NODE_KINDS = EXPECTED_NODE_KINDS
@@ -941,6 +949,16 @@ function assertNodeReleaseRules(nodeGraph) {
   );
 
   const groupedNodeKinds = nodeGraph.NODE_BROWSER_GROUPS.flatMap((group) => group.nodeKinds);
+  assert.deepEqual(
+    [...nodeGraph.CV_SOURCE_NODE_KINDS].sort(),
+    ["constant", "envelope", "keytrack", "lfo", "macro", "midiControl", "modWheel", "random", "velocity"],
+    "The consolidated CV Source picker must retain every compatibility-stable CV source type",
+  );
+  assert.deepEqual(
+    nodeGraph.CV_SOURCE_NODE_OPTIONS.map((option) => option.value).sort(),
+    [...nodeGraph.CV_SOURCE_NODE_KINDS].sort(),
+    "The consolidated CV Source picker must expose every supported CV source exactly once",
+  );
   assert.equal(new Set(groupedNodeKinds).size, groupedNodeKinds.length, "Node browser groups must not duplicate node kinds");
   assert.equal(groupedNodeKinds.includes("output"), false, "Instrument Out is protected and must not be user-creatable from the browser");
   assert.deepEqual(

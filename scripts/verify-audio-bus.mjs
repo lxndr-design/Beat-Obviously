@@ -27,6 +27,7 @@ try {
   assert.ok(panelSource.includes('label="Mode"') && panelSource.includes("channelLayout"), "Bus panel should expose mono/stereo channel mode");
   assert.ok(panelSource.includes("BusInputRow") && panelSource.includes('title="Inputs"'), "Bus panel should identify routed track, bus, and send inputs");
   assert.ok(panelSource.includes("<SectionRibbon") && panelSource.includes("<RowItem"), "Bus panel should reuse shared section-header and row primitives");
+  assert.ok(!panelSource.includes("styles.sectionTitle") && !/\.sectionTitle\s*\{/.test(panelCss), "Bus section headers should retain the shared SectionRibbon geometry instead of feature-local overrides");
   assert.ok(!panelSource.includes("<button"), "Bus panel should not introduce raw feature-local buttons");
   const inputRowSource = panelSource.slice(panelSource.indexOf("function BusInputRow"), panelSource.indexOf("function BusEditorPanel"));
   assert.ok(inputRowSource.includes("<Knob") && inputRowSource.includes("props.source.onLevelChange"), "input rows should use the shared Knob as a functional per-input volume control");
@@ -44,7 +45,8 @@ try {
   assert.ok(masterPanelSource.includes("No buses routed to Master"), "Master should explain an empty bus-input list without showing direct Tracks");
   assert.ok(!masterPanelSource.includes("styles.outputSection"), "Master workspace should not expose a redundant Output section");
   assert.ok(!masterEqSource.includes("Presets") && !masterEqSource.includes("FACTORY_PRESETS"), "Master EQ presets should not remain in the interface");
-  assert.ok(panelSource.includes("index() === props.buses.length - 1") && panelSource.indexOf("<AddBusTabButton") < panelSource.indexOf('role="tab"', panelSource.indexOf("<For each={props.buses}")), "Create Bus should sit immediately before the final Bus tab");
+  const busTabsSource = panelSource.slice(panelSource.indexOf("function BusTabs"), panelSource.indexOf("function AddBusTabButton"));
+  assert.ok(busTabsSource.indexOf("</For>") < busTabsSource.indexOf("<AddBusTabButton"), "Create Bus should sit after every Bus tab");
   assert.ok(panelCss.includes(".ribbon::after") && panelCss.includes("border-bottom: var(--border-fg)"), "Bus tab ribbon should preserve a continuous bottom rule");
   assert.ok(panelSource.includes("styles.insertPower") && panelSource.includes('"ph:power-fill"') && panelSource.includes('"ph:power"'), "Insert bypass controls should reuse the existing selected power button");
   assert.ok(panelCss.includes("flex-direction: column") && panelCss.includes("overflow-y: auto") && panelCss.includes("overscroll-behavior: contain"), "Insert cards should form an independently scrollable vertical stack");

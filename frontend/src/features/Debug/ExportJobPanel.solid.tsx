@@ -10,6 +10,7 @@ export function ExportJobPanel() {
   const label = () => {
     const current = job();
     if (!current) return "";
+    if (current.finished && current.cancelled) return "Export Cancelled";
     if (current.finished) return current.ok ? "Export Complete" : "Export Failed";
     return `Exporting ${current.type ?? "project"}`;
   };

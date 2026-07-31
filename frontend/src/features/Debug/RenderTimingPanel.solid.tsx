@@ -2,6 +2,7 @@ import { createMemo, createSignal, For, Show } from "solid-js";
 import { createStoreSelector } from "../../solid-utils/store";
 import { Button, HoverInfo, Icon } from "../../solid-ui";
 import { useAnalyzerStore } from "../../state/analyzerStore";
+import { useProjectStore } from "../../state/store";
 import styles from "./RenderTimingPanel.module.css";
 
 const rows = [
@@ -28,6 +29,10 @@ const countRows = [
 export function RenderTimingPanel() {
   const [collapsed, setCollapsed] = createSignal(true);
   const timing = createStoreSelector(useAnalyzerStore, (state) => state.renderTiming);
+  const projectTracks = createStoreSelector(useProjectStore, (state) => state.project.tracks);
+  const routeNames = createMemo(() => projectTracks()
+    .filter((track) => track.kind !== "group")
+    .map((track) => track.name));
   const stale = createMemo(() => timing().sequence === 0);
   const maxMs = createMemo(() => Math.max(0.1, ...rows.map(([, key]) => timing()[key]), timing().totalMs));
 
@@ -79,6 +84,13 @@ export function RenderTimingPanel() {
             label="Load"
             fill={stale() ? 0 : Math.min(100, timing().loadPercent)}
             value={stale() ? "--" : formatPercent(timing().loadPercent)}
+          />
+          <StaticRow
+            label="Hot Route"
+            staticValue={stale() || timing().hottestRouteIndex < 0
+              ? "--"
+              : routeNames()[timing().hottestRouteIndex] ?? `Route ${timing().hottestRouteIndex + 1}`}
+            value={stale() ? "--" : formatMs(timing().hottestRouteMs)}
           />
           <StaticRow label="Block" staticValue={stale() ? "--" : `${timing().blockSamples} samples`} value={stale() ? "--" : formatHz(timing().sampleRate)} />
           <StaticRow label="Seq" staticValue={stale() ? "--" : `${timing().sequence}`} value={stale() ? "--" : `${timing().blockSamples}`} />

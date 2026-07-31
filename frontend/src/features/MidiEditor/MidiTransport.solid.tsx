@@ -8,8 +8,11 @@ import {
   type SynthAutomationTarget,
 } from "../../audio/synthPreview";
 import { createSynthWorkletPreviewNode } from "../../audio/synthWorkletPreview";
-import { registerGlobalAudioStop } from "../../audio/globalAudioSafety";
+import { registerGlobalAudioStop, stopAllBrowserAudio } from "../../audio/globalAudioSafety";
+import { pauseTransport } from "../../audio/transportActions";
 import { useContextualHotkeyStore } from "../../hotkeys/contextualHotkeys";
+import { isNative, send } from "../../ipc/bridge";
+import { useTransportStore } from "../../state/store";
 import type { Instrument, MidiAutomationLane, MidiAutomationTarget, MidiNote } from "../../state/types";
 import styles from "./MidiTransport.module.css";
 
@@ -19,6 +22,8 @@ export interface MidiTransportProps {
   lengthBeats: number;
   bpm: number;
   instrument?: Instrument;
+  trackId?: string;
+  transpose?: number;
   hotkeyScopeId?: string;
   captureSpaceKey?: boolean;
   onPositionChange?: (beat: number | null) => void;
@@ -29,7 +34,7 @@ export function MidiTransport(props: MidiTransportProps) {
 }
 
 function MidiTransportRuntime(props: { state: Accessor<MidiTransportProps> }) {
-  onCleanup(registerGlobalAudioStop(stopPreviewAudio));
+  onCleanup(registerGlobalAudioStop(stopPlayback));
   const [playing, setPlaying] = createSignal(false);
   let ctx: AudioContext | null = null;
   let startMs: number | null = null;
@@ -40,6 +45,7 @@ function MidiTransportRuntime(props: { state: Accessor<MidiTransportProps> }) {
   let activeGains = new Set<GainNode>();
   let stopToken = 0;
   let raf: number | null = null;
+  let playbackStateSignature = "";
 
   function getCtx(): AudioContext {
     if (!ctx) {
@@ -50,12 +56,52 @@ function MidiTransportRuntime(props: { state: Accessor<MidiTransportProps> }) {
     return ctx;
   }
 
-  function scheduleNote(note: MidiNote, atTimeS: number, durS: number, vel: number, target?: MidiNote) {
-    const audioCtx = getCtx();
+  function usesNativeTrackPreview(): boolean {
+    const latest = props.state();
+    return isNative() && Boolean(latest.trackId && latest.instrument?.id);
+  }
+
+  function scheduleNote(note: MidiNote, delayS: number, durS: number, vel: number, target?: MidiNote, forceBrowser = false) {
     const synth = props.state().instrument ?? fallbackInstrument;
-    const frequency = note.frequencyHz ?? noteFrequency(note.pitch, synth);
-    const targetFrequency = target ? target.frequencyHz ?? noteFrequency(target.pitch, synth) : undefined;
-    const curve = midiCurveToFrequencies(note, synth, durS);
+    const transpose = props.state().transpose ?? 0;
+    const previewNote = transposeMidiNote(note, transpose);
+    if (usesNativeTrackPreview() && !forceBrowser) {
+      const latest = props.state();
+      const requestToken = stopToken;
+      const requestStartedMs = performance.now();
+      void send({
+        kind: "engine.previewMidiNote",
+        trackId: latest.trackId!,
+        instrumentId: synth.id,
+        pitch: previewNote.pitch,
+        velocity: Math.round(vel),
+        delaySeconds: Math.max(0, delayS),
+        durationSeconds: Math.max(0.01, durS),
+        note: previewNote,
+        gainDb: latest.gainDb ?? 0,
+        glideTargetPitch: target ? Math.max(0, Math.min(127, target.pitch + transpose)) : undefined,
+        glideMs: synth.glideMs ?? 0,
+      })
+        .then((accepted) => {
+          if (accepted !== false || requestToken !== stopToken) return;
+          const elapsedS = (performance.now() - requestStartedMs) / 1000;
+          scheduleNote(note, Math.max(0, delayS - elapsedS), durS, vel, target, true);
+        })
+        .catch(() => {
+          if (requestToken !== stopToken) return;
+          const elapsedS = (performance.now() - requestStartedMs) / 1000;
+          scheduleNote(note, Math.max(0, delayS - elapsedS), durS, vel, target, true);
+        });
+      return;
+    }
+
+    const audioCtx = getCtx();
+    if (audioCtx.state === "suspended") void audioCtx.resume();
+    const atTimeS = audioCtx.currentTime + delayS;
+    const frequency = note.frequencyHz ?? noteFrequency(previewNote.pitch, synth);
+    const targetPitch = target ? Math.max(0, Math.min(127, target.pitch + transpose)) : undefined;
+    const targetFrequency = target ? target.frequencyHz ?? noteFrequency(targetPitch!, synth) : undefined;
+    const curve = midiCurveToFrequencies(note, synth, durS, transpose);
     const automation = midiAutomationToSynthLanes(note, durS);
 
     if (synth.aether) {
@@ -185,6 +231,9 @@ function MidiTransportRuntime(props: { state: Accessor<MidiTransportProps> }) {
 
   function stopPreviewAudio() {
     stopToken += 1;
+    const latest = props.state();
+    if (isNative() && latest.trackId)
+      void send({ kind: "engine.stopMidiPreview", trackId: latest.trackId });
     for (const source of Array.from(activeSources)) {
       try {
         source.stop();
@@ -198,9 +247,25 @@ function MidiTransportRuntime(props: { state: Accessor<MidiTransportProps> }) {
     activeGains.clear();
   }
 
+  function stopPlayback() {
+    setPlaying(false);
+    if (raf) cancelAnimationFrame(raf);
+    raf = null;
+    stopPreviewAudio();
+    props.state().onPositionChange?.(null);
+  }
+
+  function prepareExclusivePreview() {
+    if (useTransportStore.getState().playing) pauseTransport();
+    else stopAllBrowserAudio();
+  }
+
   function play() {
-    const audioCtx = getCtx();
-    if (audioCtx.state === "suspended") void audioCtx.resume();
+    prepareExclusivePreview();
+    if (!usesNativeTrackPreview()) {
+      const audioCtx = getCtx();
+      if (audioCtx.state === "suspended") void audioCtx.resume();
+    }
     startMs = performance.now();
     startBeat = positionBeat;
     scheduled = new Set();
@@ -215,6 +280,7 @@ function MidiTransportRuntime(props: { state: Accessor<MidiTransportProps> }) {
   }
 
   function restart() {
+    prepareExclusivePreview();
     positionBeat = 0;
     stopPreviewAudio();
     startMs = performance.now();
@@ -234,6 +300,31 @@ function MidiTransportRuntime(props: { state: Accessor<MidiTransportProps> }) {
     if (!scopeId) return;
     useContextualHotkeyStore.getState().register(scopeId, "space", togglePlayback);
     onCleanup(() => useContextualHotkeyStore.getState().unregister(scopeId, "space"));
+  });
+
+  createEffect(() => {
+    const latest = props.state();
+    const signature = JSON.stringify({
+      notes: latest.notes,
+      lengthBeats: latest.lengthBeats,
+      bpm: latest.bpm,
+      instrumentId: latest.instrument?.id ?? "",
+      transpose: latest.transpose ?? 0,
+      gainDb: latest.gainDb ?? 0,
+    });
+    if (!playbackStateSignature) {
+      playbackStateSignature = signature;
+      return;
+    }
+    if (signature === playbackStateSignature) return;
+    playbackStateSignature = signature;
+    if (!playing()) return;
+    positionBeat = Math.max(0, Math.min(positionBeat, Math.max(0, latest.lengthBeats - 0.000001)));
+    stopPreviewAudio();
+    scheduled.clear();
+    startMs = performance.now();
+    startBeat = positionBeat;
+    latest.onPositionChange?.(positionBeat);
   });
 
   createEffect(() => {
@@ -265,6 +356,7 @@ function MidiTransportRuntime(props: { state: Accessor<MidiTransportProps> }) {
       const beatsPerSec = latest.bpm / 60;
       let pos = startBeat + elapsedSec * beatsPerSec;
       if (pos >= latest.lengthBeats) {
+        stopPreviewAudio();
         startMs = now;
         startBeat = 0;
         scheduled.clear();
@@ -273,17 +365,16 @@ function MidiTransportRuntime(props: { state: Accessor<MidiTransportProps> }) {
       positionBeat = pos;
       latest.onPositionChange?.(pos);
 
-      const audioCtx = getCtx();
       const lookaheadBeats = 0.25 * beatsPerSec;
       latest.notes.forEach((note, index) => {
-        const key = `${note.pitch}:${note.startBeat}:${note.lengthBeats}`;
+        const key = midiPreviewScheduleKey(note, index);
         if (scheduled.has(key)) return;
         if (note.startBeat >= pos && note.startBeat <= pos + lookaheadBeats) {
           const target = connectedLaterNote(latest.notes, index);
           const noteDelaySec = (note.startBeat - pos) / beatsPerSec;
           const durBeats = target ? Math.max(0.03, target.startBeat - note.startBeat) : note.lengthBeats;
           const durSec = durBeats / beatsPerSec;
-          scheduleNote(note, audioCtx.currentTime + noteDelaySec, durSec, applyGainToVelocity(note.velocity, latest.gainDb ?? 0), target);
+          scheduleNote(note, noteDelaySec, durSec, applyGainToVelocity(note.velocity, latest.gainDb ?? 0), target);
           scheduled.add(key);
         }
       });
@@ -353,16 +444,12 @@ const fallbackInstrument: Instrument = {
 
 function connectedLaterNote(notes: MidiNote[], index: number): MidiNote | undefined {
   const note = notes[index];
-  const direct = note.connectToIndex == null ? undefined : notes[note.connectToIndex];
-  const incoming = notes.find((candidate) => candidate.connectToIndex === index);
-  const target = [direct, incoming]
-    .filter((candidate): candidate is MidiNote => Boolean(candidate))
-    .sort((a, b) => a.startBeat - b.startBeat)[0];
+  const target = note.connectToIndex == null ? undefined : notes[note.connectToIndex];
   if (!target || target.startBeat <= note.startBeat) return undefined;
   return target;
 }
 
-function midiCurveToFrequencies(note: MidiNote, instrument: Instrument, durationS: number): Array<{ timeS: number; frequency: number }> {
+function midiCurveToFrequencies(note: MidiNote, instrument: Instrument, durationS: number, transpose = 0): Array<{ timeS: number; frequency: number }> {
   if (!note.curve || note.curve.length < 2 || note.lengthBeats <= 0) return [];
   const beatStart = note.startBeat;
   const beatEnd = note.startBeat + note.lengthBeats;
@@ -370,8 +457,24 @@ function midiCurveToFrequencies(note: MidiNote, instrument: Instrument, duration
     .filter((point) => point.beat >= beatStart && point.beat <= beatEnd)
     .map((point) => ({
       timeS: ((point.beat - beatStart) / Math.max(0.001, note.lengthBeats)) * durationS,
-      frequency: noteFrequency(point.pitch, instrument),
+      frequency: noteFrequency(Math.max(0, Math.min(127, point.pitch + transpose)), instrument),
     }));
+}
+
+export function midiPreviewScheduleKey(note: MidiNote, index: number): string {
+  return `${index}:${note.pitch}:${note.startBeat}:${note.lengthBeats}`;
+}
+
+export function transposeMidiNote(note: MidiNote, transpose: number): MidiNote {
+  if (!transpose) return { ...note };
+  return {
+    ...note,
+    pitch: Math.max(0, Math.min(127, note.pitch + transpose)),
+    curve: note.curve?.map((point) => ({
+      ...point,
+      pitch: Math.max(0, Math.min(127, point.pitch + transpose)),
+    })),
+  };
 }
 
 function midiAutomationToSynthLanes(note: MidiNote, durationS: number): SynthAutomationLane[] {

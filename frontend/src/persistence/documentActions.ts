@@ -59,7 +59,7 @@ export async function openDocumentFromUserChoice(): Promise<"opened" | "cancelle
     if (!result.document) return "cancelled";
     const { document, missingAssets } = await relinkMissingAssetsBeforeOpen(result.document, result.missingAssets ?? []);
     stopPlaybackForDocumentSwitch();
-    await applyBeatDocument(document, result.path || null);
+    await applyBeatDocument(document, result.path || null, { persistInBackground: true });
     const documentStore = useDocumentStore.getState();
     documentStore.setMissingAssets(missingAssets);
     documentStore.setIntegrityReport(result.integrityReport ?? null);
@@ -81,7 +81,7 @@ export async function openDocumentFromUserChoice(): Promise<"opened" | "cancelle
     return "cancelled";
   }
   stopPlaybackForDocumentSwitch();
-  await applyBeatDocument(document, null);
+  await applyBeatDocument(document, null, { persistInBackground: true });
   return "opened";
 }
 
@@ -100,7 +100,7 @@ export async function openRecentDocument(path: string): Promise<"opened" | "canc
   if (!result.document) return "cancelled";
   const { document, missingAssets } = await relinkMissingAssetsBeforeOpen(result.document, result.missingAssets ?? []);
   stopPlaybackForDocumentSwitch();
-  await applyBeatDocument(document, result.path || path);
+  await applyBeatDocument(document, result.path || path, { persistInBackground: true });
   const documentStore = useDocumentStore.getState();
   documentStore.setMissingAssets(missingAssets);
   documentStore.setIntegrityReport(result.integrityReport ?? null);
@@ -156,7 +156,7 @@ export async function recoverCurrentDocumentFromBackup(): Promise<"restored" | "
     restoreResult.missingAssets ?? [],
   );
   stopPlaybackForDocumentSwitch();
-  await applyBeatDocument(document, restoreResult.path || currentFilePath);
+  await applyBeatDocument(document, restoreResult.path || currentFilePath, { persistInBackground: true });
   const documentStore = useDocumentStore.getState();
   documentStore.setMissingAssets(missingAssets);
   documentStore.setIntegrityReport(restoreResult.integrityReport ?? null);

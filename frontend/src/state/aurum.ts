@@ -1,4 +1,4 @@
-import type { AurumFilterConfig, AurumOperatorConfig, AurumSynthConfig, Instrument } from "./types";
+import type { AurumFilterConfig, AurumOperatorConfig, AurumSynthConfig, Instrument, ModulationRemapCurve, SharedModulationRoute } from "./types";
 
 export const AURUM_OPERATOR_COUNT = 6;
 export const AURUM_OUTPUT_COLUMN = AURUM_OPERATOR_COUNT;
@@ -8,6 +8,51 @@ export const AURUM_FILTER_B_BUS = 1;
 export const AURUM_DIRECT_BUS = 2;
 export const AURUM_HARMONIC_COUNT = 16;
 export const AURUM_RESPONSE_CURVE_POINT_COUNT = 5;
+export const AURUM_MODULATION_MAX_ROUTES = 8;
+export const AURUM_MODULATION_SOURCES = ["lfo.1", "env.1", "macro.1", "macro.2", "velocity", "keytrack", "modWheel", "pressure"] as const;
+export const AURUM_V11_MODULATION_TARGETS = ["amp.level", "amp.pan"] as const;
+export const AURUM_V12_MODULATION_TARGETS = [
+  ...AURUM_V11_MODULATION_TARGETS,
+  ...Array.from({ length: AURUM_OPERATOR_COUNT }, (_, index) => [
+    `aurum.op.${index + 1}.level`,
+    `aurum.op.${index + 1}.pan`,
+  ]).flat(),
+  "aurum.filter.a.cutoff",
+  "aurum.filter.b.cutoff",
+] as const;
+export const AURUM_OPERATOR_MODULATION_TARGETS = Array.from({ length: AURUM_OPERATOR_COUNT }, (_, index) => [
+  `aurum.op.${index + 1}.level`,
+  `aurum.op.${index + 1}.pan`,
+]).flat();
+export const AURUM_FILTER_MODULATION_TARGETS = [
+  "aurum.filter.a.cutoff", "aurum.filter.a.resonance", "aurum.filter.a.drive",
+  "aurum.filter.b.cutoff", "aurum.filter.b.resonance", "aurum.filter.b.drive",
+] as const;
+export const AURUM_MODULATION_TARGETS: readonly string[] = [
+  ...AURUM_V11_MODULATION_TARGETS,
+  ...AURUM_OPERATOR_MODULATION_TARGETS,
+  ...AURUM_FILTER_MODULATION_TARGETS,
+];
+
+export function aurumOperatorModulationTarget(index: number, parameter: "level" | "pan") {
+  return `aurum.op.${Math.max(0, Math.min(AURUM_OPERATOR_COUNT - 1, Math.trunc(index))) + 1}.${parameter}`;
+}
+
+export function aurumFilterCutoffModulationTarget(index: number) {
+  return `aurum.filter.${index <= 0 ? "a" : "b"}.cutoff`;
+}
+
+export function aurumFilterModulationTarget(index: number, parameter: "cutoff" | "resonance" | "drive") {
+  return `aurum.filter.${index <= 0 ? "a" : "b"}.${parameter}`;
+}
+
+export function aurumModulationTargetLabel(target: string) {
+  const operator = /^aurum\.op\.([1-6])\.(level|pan)$/.exec(target);
+  if (operator) return `OP ${operator[1]} ${operator[2] === "level" ? "Level" : "Pan"}`;
+  const filter = /^aurum\.filter\.([ab])\.(cutoff|resonance|drive)$/.exec(target);
+  if (filter) return `Filter ${filter[1].toUpperCase()} ${filter[2][0].toUpperCase()}${filter[2].slice(1)}`;
+  return target;
+}
 
 type AurumLegacyFilter = Pick<AurumFilterConfig, "type" | "cutoff" | "resonance" | "drive">;
 
@@ -62,7 +107,7 @@ export function defaultAurumConfig(): AurumSynthConfig {
   matrix[0][AURUM_OUTPUT_COLUMN] = 0.86;
   matrix[1][0] = 0.42;
   return {
-    version: 10,
+    version: 13,
     operators: Array.from({ length: AURUM_OPERATOR_COUNT }, (_, index) => defaultAurumOperator(index)),
     matrix,
     rmMatrix,
@@ -73,6 +118,8 @@ export function defaultAurumConfig(): AurumSynthConfig {
     filters: [{ ...DEFAULT_FILTER_A }, { ...DEFAULT_FILTER_B }],
     filterRouting: "serial",
     outputSends: matrix.map((row) => [row[AURUM_OUTPUT_COLUMN], 0, 0]),
+    modulation: [],
+    macroValues: Array(8).fill(0),
   };
 }
 
@@ -93,6 +140,7 @@ export function createAurumInstrument(id: string, name = "Aurum Patch"): Instrum
     maxVoices: 16,
     mono: false,
     legato: false,
+    pitchBendRangeSemitones: 2,
     ampLevel: 0.82,
     ampPan: 0,
     aurum: defaultAurumConfig(),
@@ -112,7 +160,7 @@ export function normalizedAurumConfig(config: AurumSynthConfig | undefined, lega
   return {
     ...fallback,
     ...config,
-    version: 10,
+    version: 13,
     operators: fallback.operators.map((operator, index) => {
       const incoming = config.operators?.[index];
       return {
@@ -145,7 +193,46 @@ export function normalizedAurumConfig(config: AurumSynthConfig | undefined, lega
           ? config.matrix?.[source]?.[AURUM_OUTPUT_COLUMN] ?? value
           : 0,
     ))),
+    modulation: normalizeAurumModulationRoutes(
+      incomingVersion >= 11 ? config.modulation : [],
+      incomingVersion >= 13
+        ? AURUM_MODULATION_TARGETS
+        : incomingVersion >= 12
+          ? AURUM_V12_MODULATION_TARGETS
+          : AURUM_V11_MODULATION_TARGETS,
+    ),
+    macroValues: Array.from({ length: 8 }, (_, index) => clamp01(incomingVersion >= 11 ? config.macroValues?.[index] ?? 0 : 0)),
   };
+}
+
+export function normalizeAurumModulationRoutes(
+  routes: SharedModulationRoute[] | undefined,
+  allowedTargets: readonly string[] = AURUM_MODULATION_TARGETS,
+): SharedModulationRoute[] {
+  const ids = new Set<string>();
+  const normalized: SharedModulationRoute[] = [];
+  for (const route of Array.isArray(routes) ? routes : []) {
+    if (!route || typeof route !== "object" || normalized.length >= AURUM_MODULATION_MAX_ROUTES) continue;
+    const source = AURUM_MODULATION_SOURCES.includes(route.source as typeof AURUM_MODULATION_SOURCES[number]) ? route.source : null;
+    const target = allowedTargets.includes(route.target) ? route.target : null;
+    const id = typeof route.id === "string" ? route.id.trim().slice(0, 64) : "";
+    if (!source || !target || !id || ids.has(id)) continue;
+    ids.add(id);
+    normalized.push({
+      id,
+      source,
+      target,
+      amount: clampBipolar(route.amount),
+      bipolar: Boolean(route.bipolar),
+      enabled: route.enabled !== false,
+      curve: normalizeModulationRemapCurve(route.curve),
+    });
+  }
+  return normalized;
+}
+
+function normalizeModulationRemapCurve(curve: unknown): ModulationRemapCurve {
+  return curve === "ease-in" || curve === "ease-out" || curve === "s-curve" ? curve : "linear";
 }
 
 export function normalizedAurumConfigForInstrument(instrument: Instrument): AurumSynthConfig {

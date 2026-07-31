@@ -19,7 +19,12 @@ namespace beat
         Shape,
         Fold,
         Pinch,
-        Mirror
+        Mirror,
+        HarmonicShift,
+        HarmonicStretch,
+        SpectralSmear,
+        SpectralSkew,
+        SpectralFilter
     };
 
     class WavetableFactory

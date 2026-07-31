@@ -36,14 +36,23 @@ namespace beat
                 : 0.0f;
         }
 
+        float normalizedTriangleFold(float input) noexcept
+        {
+            const float wrapped = input - 4.0f * std::floor((input + 2.0f) * 0.25f);
+            if (wrapped > 1.0f)
+                return 2.0f - wrapped;
+            if (wrapped < -1.0f)
+                return -2.0f - wrapped;
+            return wrapped;
+        }
+
         float aurumWavefold(float sample, float amount) noexcept
         {
             const float depth = VoiceMath::clamp01(amount);
             if (depth <= 0.0001f)
                 return sample;
             const float driven = juce::jlimit(-1.0f, 1.0f, sample) * (1.0f + depth * 3.0f);
-            return std::asin(std::sin(driven * juce::MathConstants<float>::halfPi))
-                / juce::MathConstants<float>::halfPi;
+            return normalizedTriangleFold(driven);
         }
 
         float aurumHeldEnvelope(float attackMs, float decayMs, float sustain, float timeMs) noexcept
@@ -108,42 +117,83 @@ namespace beat
             return aurumWavefold(weight > 0.0f ? sample / weight : 0.0f, op.wavefold);
         }
 
-        float runtimeWarpShape(float input, float amount, int mode) noexcept
+        struct RuntimeWarpConfig
         {
-            const float drive = VoiceMath::clamp01(amount);
-            if (drive <= 0.0001f)
+            float drive { 0.0f };
+            float gain { 1.0f };
+            float mix { 0.0f };
+            float exponent { 1.0f };
+            float mirrorScale { juce::MathConstants<float>::pi };
+            float tanhGain { 1.0f };
+            int mode { 0 };
+            bool active { false };
+        };
+
+        RuntimeWarpConfig makeRuntimeWarpConfig(float amount, int mode) noexcept
+        {
+            RuntimeWarpConfig config;
+            config.drive = VoiceMath::clamp01(amount);
+            config.mode = mode;
+            config.active = config.drive > 0.0001f;
+            if (!config.active)
+                return config;
+
+            if (mode == 1)
+            {
+                config.gain = 1.0f + config.drive * 5.5f;
+                config.mix = 0.35f + config.drive * 0.65f;
+            }
+            else if (mode == 2)
+            {
+                config.exponent = 1.0f + config.drive * 3.2f;
+                config.mix = 0.4f + config.drive * 0.6f;
+            }
+            else if (mode == 3)
+            {
+                config.mirrorScale = juce::MathConstants<float>::pi * (1.0f + config.drive * 2.2f);
+                config.mix = 0.32f + config.drive * 0.68f;
+            }
+            else
+            {
+                config.gain = 1.0f + config.drive * 8.0f;
+                config.tanhGain = std::tanh(config.gain);
+            }
+            return config;
+        }
+
+        float runtimeWarpShape(float input, const RuntimeWarpConfig& config) noexcept
+        {
+            if (!config.active)
                 return input;
 
             const float x = juce::jlimit(-1.0f, 1.0f, input);
-            if (mode == 1)
+            if (config.mode == 1)
             {
-                const float gain = 1.0f + drive * 5.5f;
-                const float folded = std::asin(std::sin(x * gain)) / juce::MathConstants<float>::halfPi;
-                return juce::jlimit(-1.0f, 1.0f, x + (folded - x) * (0.35f + drive * 0.65f));
+                const float folded = normalizedTriangleFold(x * config.gain);
+                return juce::jlimit(-1.0f, 1.0f, x + (folded - x) * config.mix);
             }
-            if (mode == 2)
+            if (config.mode == 2)
             {
-                const float shaped = (x < 0.0f ? -1.0f : 1.0f) * std::pow(std::abs(x), 1.0f + drive * 3.2f);
-                return juce::jlimit(-1.0f, 1.0f, x + (shaped - x) * (0.4f + drive * 0.6f));
+                const float shaped = (x < 0.0f ? -1.0f : 1.0f) * std::pow(std::abs(x), config.exponent);
+                return juce::jlimit(-1.0f, 1.0f, x + (shaped - x) * config.mix);
             }
-            if (mode == 3)
+            if (config.mode == 3)
             {
-                const float mirrored = std::sin(x * juce::MathConstants<float>::pi * (1.0f + drive * 2.2f))
-                    * (1.0f - std::abs(x) * drive * 0.35f);
-                return juce::jlimit(-1.0f, 1.0f, x + (mirrored - x) * (0.32f + drive * 0.68f));
+                const float mirrored = std::sin(x * config.mirrorScale)
+                    * (1.0f - std::abs(x) * config.drive * 0.35f);
+                return juce::jlimit(-1.0f, 1.0f, x + (mirrored - x) * config.mix);
             }
 
-            const float gain = 1.0f + drive * 8.0f;
-            return juce::jlimit(-1.0f, 1.0f, std::tanh(x * gain) / std::tanh(gain));
+            return juce::jlimit(-1.0f, 1.0f, std::tanh(x * config.gain) / config.tanhGain);
         }
 
-        float runtimeWarpMonoOversampled(DriveStage::State& state, float sample, float amount, int mode) noexcept
+        float runtimeWarpMonoOversampled(DriveStage::State& state, float sample, const RuntimeWarpConfig& config) noexcept
         {
             constexpr float downsampleAlpha = 0.72f;
             const float midpoint = 0.5f * (state.previousInput.left + sample);
             const float downsampled = 0.5f * (
-                runtimeWarpShape(midpoint, amount, mode)
-                + runtimeWarpShape(sample, amount, mode));
+                runtimeWarpShape(midpoint, config)
+                + runtimeWarpShape(sample, config));
 
             state.downsample.left = DriveStage::denormalSafe(state.downsample.left
                 + downsampleAlpha * (downsampled - state.downsample.left));
@@ -154,21 +204,34 @@ namespace beat
         DriveStage::StereoFrame processRuntimeWarpOversampled(
             DriveStage::State& state,
             DriveStage::StereoFrame sample,
-            float amount,
-            int mode) noexcept
+            const RuntimeWarpConfig& config) noexcept
         {
+            if (sample.left == 0.0f && sample.right == 0.0f
+                && state.previousInput.left == 0.0f && state.previousInput.right == 0.0f
+                && state.downsample.left == 0.0f && state.downsample.right == 0.0f)
+                return {};
+
             DriveStage::State rightState;
             rightState.previousInput.left = state.previousInput.right;
             rightState.downsample.left = state.downsample.right;
 
             const DriveStage::StereoFrame processed {
-                runtimeWarpMonoOversampled(state, sample.left, amount, mode),
-                runtimeWarpMonoOversampled(rightState, sample.right, amount, mode),
+                runtimeWarpMonoOversampled(state, sample.left, config),
+                runtimeWarpMonoOversampled(rightState, sample.right, config),
             };
 
             state.previousInput.right = rightState.previousInput.left;
             state.downsample.right = rightState.downsample.left;
             return processed;
+        }
+
+        bool runtimeWarpNeedsWork(
+            const DriveStage::State& state,
+            DriveStage::StereoFrame sample) noexcept
+        {
+            return sample.left != 0.0f || sample.right != 0.0f
+                || state.previousInput.left != 0.0f || state.previousInput.right != 0.0f
+                || state.downsample.left != 0.0f || state.downsample.right != 0.0f;
         }
     }
 
@@ -182,6 +245,64 @@ namespace beat
         return VoiceRenderStats::consume();
     }
 
+    void InstrumentVoice::refreshPreparedRenderTopology() noexcept
+    {
+        PreparedRenderTopology next;
+        next.kernel = params.hasAurum ? RenderKernel::Aurum
+            : params.hasLumen ? RenderKernel::Lumen
+            : params.hasAether ? RenderKernel::Aether
+            : RenderKernel::Legacy;
+        next.routeLaneMask = next.kernel == RenderKernel::Aether || next.kernel == RenderKernel::Lumen
+            ? 0u : 1u;
+
+        const auto includeRoute = [&next](bool active, int route)
+        {
+            if (active && route >= 0 && route < 4)
+                next.routeLaneMask = (uint8_t) (next.routeLaneMask | (uint8_t) (1u << route));
+        };
+
+        if (next.kernel == RenderKernel::Aether || next.kernel == RenderKernel::Lumen)
+        {
+            includeRoute(params.aetherOscA.enabled, params.aetherOscA.routing);
+            includeRoute(params.aetherOscB.enabled, params.aetherOscB.routing);
+            includeRoute(params.aetherSub.enabled, params.aetherSub.routing);
+            includeRoute(params.aetherNoise.enabled, params.aetherNoise.routing);
+
+            next.aetherSample = params.aetherSampleSlot1.enabled
+                && (params.aetherSampleSlot1.source || params.aetherSampleSlot1.sfzSource);
+            next.aetherSampleUsesSfz = next.aetherSample && params.aetherSampleSlot1.sfzSource != nullptr;
+            includeRoute(next.aetherSample, params.aetherSampleSlot1.routing);
+
+            next.aetherGranular = params.aetherGranularSlot2.enabled
+                && params.aetherGranularSlot2.source != nullptr;
+            includeRoute(next.aetherGranular, params.aetherGranularSlot2.routing);
+            next.sourceSends = params.hasAetherSourceSends;
+        }
+
+        if (next.kernel == RenderKernel::Lumen)
+        {
+            next.lumenOscC = params.lumenOscC.enabled;
+            includeRoute(next.lumenOscC, params.lumenOscC.routing);
+            for (size_t index = 0; index < params.lumenSampleSlots.size(); ++index)
+            {
+                const auto& slot = params.lumenSampleSlots[index];
+                if (slot.enabled && (slot.source || slot.sfzSource))
+                {
+                    next.lumenSampleIndices[(size_t) next.lumenSampleCount++] = (uint8_t) index;
+                    includeRoute(true, slot.routing);
+                }
+                const auto& granular = params.lumenGranularSlots[index];
+                if (granular.enabled && granular.source)
+                {
+                    next.lumenGranularIndices[(size_t) next.lumenGranularCount++] = (uint8_t) index;
+                    includeRoute(true, granular.routing);
+                }
+            }
+        }
+
+        preparedTopology = next;
+    }
+
     void InstrumentVoice::prepare(double sr, int blockSize)
     {
         sampleRate = std::isfinite(sr) && sr > 0.0 ? sr : 44100.0;
@@ -192,7 +313,7 @@ namespace beat
             osc.prepare(sampleRate);
         for (auto& osc : aetherOscillatorsB)
             osc.prepare(sampleRate);
-        for (auto& osc : lumusOscillatorsC)
+        for (auto& osc : lumenOscillatorsC)
             osc.prepare(sampleRate);
         aetherInteractionState.prepare(sampleRate, processingQuality);
         adsr.setSampleRate(sr);
@@ -209,10 +330,10 @@ namespace beat
             transition.prepare(sampleRate);
         aetherSampleSlot1.prepare({ sampleRate, blockSize, 2 });
         aetherSfzSlot1.prepare({ sampleRate, blockSize, 2 });
-        for (auto& slot : lumusSampleSlots) slot.prepare({ sampleRate, blockSize, 2 });
-        for (auto& slot : lumusSfzSlots) slot.prepare({ sampleRate, blockSize, 2 });
+        for (auto& slot : lumenSampleSlots) slot.prepare({ sampleRate, blockSize, 2 });
+        for (auto& slot : lumenSfzSlots) slot.prepare({ sampleRate, blockSize, 2 });
         aetherGranularSlot2.prepare({ sampleRate, blockSize, 2 });
-        for (auto& slot : lumusGranularSlots) slot.prepare({ sampleRate, blockSize, 2 });
+        for (auto& slot : lumenGranularSlots) slot.prepare({ sampleRate, blockSize, 2 });
     }
 
     void InstrumentVoice::setProcessingQuality(AudioQuality quality) noexcept
@@ -221,7 +342,7 @@ namespace beat
         for (auto& oscillator : wavetableOscillators) oscillator.setQuality(quality);
         for (auto& oscillator : aetherOscillatorsA) oscillator.setQuality(quality);
         for (auto& oscillator : aetherOscillatorsB) oscillator.setQuality(quality);
-        for (auto& oscillator : lumusOscillatorsC) oscillator.setQuality(quality);
+        for (auto& oscillator : lumenOscillatorsC) oscillator.setQuality(quality);
         aetherInteractionState.prepare(sampleRate, quality);
     }
 
@@ -239,7 +360,7 @@ namespace beat
         if (params.hasAurum)
         {
             params.hasAether = false;
-            params.hasLumus = false;
+            params.hasLumen = false;
             const auto& filterA = params.aurumFilters[0];
             const auto& filterB = params.aurumFilters[1];
             params.filterType = filterA.type;
@@ -314,45 +435,51 @@ namespace beat
             retiredAetherTableB = std::move(aetherTableB);
             WavetableOscillatorBank::clear(aetherOscillatorsB, aetherUnisonPlanB);
         }
-        if (params.hasLumus && aetherOscillatorNeedsWavetable(params.lumusOscC))
+        if (params.hasLumen && aetherOscillatorNeedsWavetable(params.lumenOscC))
         {
-            auto nextTable = WavetableVoiceCache::sharedTableForConfig(params.lumusOscC.wavetable);
-            if (nextTable.get() != lumusTableC.get())
+            auto nextTable = WavetableVoiceCache::sharedTableForConfig(params.lumenOscC.wavetable);
+            if (nextTable.get() != lumenTableC.get())
             {
-                retiredLumusTableC = std::move(lumusTableC);
-                lumusTableC = std::move(nextTable);
+                retiredLumenTableC = std::move(lumenTableC);
+                lumenTableC = std::move(nextTable);
             }
-            WavetableOscillatorBank::configure(lumusOscillatorsC, lumusTableC.get(),
-                params.lumusOscC.wavetable, sampleRate, baseFrequencyHz);
+            WavetableOscillatorBank::configure(lumenOscillatorsC, lumenTableC.get(),
+                params.lumenOscC.wavetable, sampleRate, baseFrequencyHz);
         }
         else
         {
-            retiredLumusTableC = std::move(lumusTableC);
-            WavetableOscillatorBank::clear(lumusOscillatorsC, lumusUnisonPlanC);
+            retiredLumenTableC = std::move(lumenTableC);
+            WavetableOscillatorBank::clear(lumenOscillatorsC, lumenUnisonPlanC);
         }
         aetherInteractionState.configure(aetherTableA.get(), params.aetherOscA,
                                          aetherTableB.get(), params.aetherOscB,
                                          baseFrequencyHz);
         aetherSampleSlot1.allNotesOff(true);
+        aetherSampleSlot1.configurePlayback(false, 1.0f, false, 4.0f);
         aetherSampleSlot1.publish(params.aetherSampleSlot1.enabled ? params.aetherSampleSlot1.source : nullptr);
         aetherSfzSlot1.allNotesOff(true);
+        aetherSfzSlot1.configurePlayback(false, 1.0f, false, 4.0f, 0.0f, 1.0f);
         aetherSfzSlot1.publish(params.aetherSampleSlot1.enabled ? params.aetherSampleSlot1.sfzSource : nullptr);
-        for (size_t index = 0; index < lumusSampleSlots.size(); ++index)
+        for (size_t index = 0; index < lumenSampleSlots.size(); ++index)
         {
-            lumusSampleSlots[index].allNotesOff(true);
-            lumusSampleSlots[index].publish(params.lumusSampleSlots[index].enabled
-                ? params.lumusSampleSlots[index].source : nullptr);
-            lumusSfzSlots[index].allNotesOff(true);
-            lumusSfzSlots[index].publish(params.lumusSampleSlots[index].enabled
-                ? params.lumusSampleSlots[index].sfzSource : nullptr);
+            const auto& slotParams = params.lumenSampleSlots[index];
+            lumenSampleSlots[index].allNotesOff(true);
+            lumenSampleSlots[index].configurePlayback(slotParams.reverse, slotParams.playbackRate,
+                slotParams.pingPongLoop, slotParams.releaseTailMs);
+            lumenSampleSlots[index].publish(slotParams.enabled ? slotParams.source : nullptr);
+            lumenSfzSlots[index].allNotesOff(true);
+            lumenSfzSlots[index].configurePlayback(slotParams.reverse, slotParams.playbackRate,
+                slotParams.pingPongLoop, slotParams.releaseTailMs,
+                slotParams.sfzTrimStartRatio, slotParams.sfzTrimEndRatio);
+            lumenSfzSlots[index].publish(slotParams.enabled ? slotParams.sfzSource : nullptr);
         }
         aetherGranularSlot2.allNotesOff(true);
         aetherGranularSlot2.publish(params.aetherGranularSlot2.enabled ? params.aetherGranularSlot2.source : nullptr);
-        for (size_t index = 0; index < lumusGranularSlots.size(); ++index)
+        for (size_t index = 0; index < lumenGranularSlots.size(); ++index)
         {
-            lumusGranularSlots[index].allNotesOff(true);
-            lumusGranularSlots[index].publish(params.lumusGranularSlots[index].enabled
-                ? params.lumusGranularSlots[index].source : nullptr);
+            lumenGranularSlots[index].allNotesOff(true);
+            lumenGranularSlots[index].publish(params.lumenGranularSlots[index].enabled
+                ? params.lumenGranularSlots[index].source : nullptr);
         }
         adsrParams.attack  = juce::jmax(0.001f, p.attackMs  * 0.001f);
         adsrParams.decay   = juce::jmax(0.001f, p.decayMs   * 0.001f);
@@ -378,6 +505,7 @@ namespace beat
         refreshCachedPanGains();
         refreshCachedPitchRates();
         refreshCachedDynamicModulationFlags();
+        refreshPreparedRenderTopology();
         realtimeRampState.resetFromParams(params);
     }
 
@@ -560,6 +688,7 @@ namespace beat
         stealPrepared = false;
         const bool legatoRetune = baseParams.legato && adsr.isActive();
         params = baseParams;
+        aurumNoteActive = params.hasAurum;
         realtimeRampState.resetFromParams(params);
         baseFrequencyHz = juce::MidiMessage::getMidiNoteInHertz(midiNoteNumber);
         level = velocity;
@@ -568,10 +697,10 @@ namespace beat
         pitchWheelMoved(currentPitchWheel == 0 ? 8192 : currentPitchWheel);
         aetherSampleSlot1.allNotesOff(true);
         aetherSfzSlot1.allNotesOff(true);
-        for (auto& slot : lumusSampleSlots) slot.allNotesOff(true);
-        for (auto& slot : lumusSfzSlots) slot.allNotesOff(true);
+        for (auto& slot : lumenSampleSlots) slot.allNotesOff(true);
+        for (auto& slot : lumenSfzSlots) slot.allNotesOff(true);
         aetherGranularSlot2.allNotesOff(true);
-        for (auto& slot : lumusGranularSlots) slot.allNotesOff(true);
+        for (auto& slot : lumenGranularSlots) slot.allNotesOff(true);
         if (params.hasAether && params.aetherSampleSlot1.enabled)
         {
             if (params.aetherSampleSlot1.sfzSource)
@@ -579,22 +708,22 @@ namespace beat
             else if (params.aetherSampleSlot1.source)
                 aetherSampleSlot1.noteOn({ midiNoteNumber, velocity, (uint64_t) stableVoiceId });
         }
-        if (params.hasLumus)
+        if (params.hasLumen)
         {
-            for (size_t index = 0; index < lumusSampleSlots.size(); ++index)
+            for (size_t index = 0; index < lumenSampleSlots.size(); ++index)
             {
-                const auto& slot = params.lumusSampleSlots[index];
+                const auto& slot = params.lumenSampleSlots[index];
                 if (!slot.enabled) continue;
-                if (slot.sfzSource) lumusSfzSlots[index].noteOn({ midiNoteNumber, velocity, (uint64_t) stableVoiceId });
-                else if (slot.source) lumusSampleSlots[index].noteOn({ midiNoteNumber, velocity, (uint64_t) stableVoiceId });
+                if (slot.sfzSource) lumenSfzSlots[index].noteOn({ midiNoteNumber, velocity, (uint64_t) stableVoiceId });
+                else if (slot.source) lumenSampleSlots[index].noteOn({ midiNoteNumber, velocity, (uint64_t) stableVoiceId });
             }
         }
         if (params.hasAether && params.aetherGranularSlot2.enabled && params.aetherGranularSlot2.source)
             aetherGranularSlot2.noteOn({ midiNoteNumber, velocity, (uint64_t) stableVoiceId });
-        if (params.hasLumus)
-            for (size_t index = 0; index < lumusGranularSlots.size(); ++index)
-                if (params.lumusGranularSlots[index].enabled && params.lumusGranularSlots[index].source)
-                    lumusGranularSlots[index].noteOn({ midiNoteNumber, velocity, (uint64_t) stableVoiceId });
+        if (params.hasLumen)
+            for (size_t index = 0; index < lumenGranularSlots.size(); ++index)
+                if (params.lumenGranularSlots[index].enabled && params.lumenGranularSlots[index].source)
+                    lumenGranularSlots[index].noteOn({ midiNoteNumber, velocity, (uint64_t) stableVoiceId });
 
         if (legatoRetune)
         {
@@ -605,6 +734,8 @@ namespace beat
             filter2State.configure(params.filter2Type, params.filter2Cutoff01, params.filter2Resonance01, sampleRate, params.filterKeytrack, baseFrequencyHz);
             filter1RouteState.configure(params.filterType, params.cutoff01, params.resonance01, sampleRate, params.filterKeytrack, baseFrequencyHz);
             filter2RouteState.configure(params.filter2Type, params.filter2Cutoff01, params.filter2Resonance01, sampleRate, params.filterKeytrack, baseFrequencyHz);
+            aurumFilterBState.configure(params.aurumFilters[1].type, params.aurumFilters[1].cutoff01,
+                params.aurumFilters[1].resonance01, sampleRate, params.filterKeytrack, baseFrequencyHz);
             refreshCachedPanGains();
             refreshCachedDynamicModulationFlags();
             refreshCachedPitchRates();
@@ -618,17 +749,19 @@ namespace beat
         filter2State.configure(params.filter2Type, params.filter2Cutoff01, params.filter2Resonance01, sampleRate, params.filterKeytrack, baseFrequencyHz);
         filter1RouteState.configure(params.filterType, params.cutoff01, params.resonance01, sampleRate, params.filterKeytrack, baseFrequencyHz);
         filter2RouteState.configure(params.filter2Type, params.filter2Cutoff01, params.filter2Resonance01, sampleRate, params.filterKeytrack, baseFrequencyHz);
+        aurumFilterBState.configure(params.aurumFilters[1].type, params.aurumFilters[1].cutoff01,
+            params.aurumFilters[1].resonance01, sampleRate, params.filterKeytrack, baseFrequencyHz);
         refreshCachedPanGains();
         refreshCachedDynamicModulationFlags();
 
         WavetableUnison::PhaseArray rememberedAetherPhasesA {};
         WavetableUnison::PhaseArray rememberedAetherPhasesB {};
-        WavetableUnison::PhaseArray rememberedLumusPhasesC {};
+        WavetableUnison::PhaseArray rememberedLumenPhasesC {};
         for (size_t index = 0; index < rememberedAetherPhasesA.size(); ++index)
         {
             rememberedAetherPhasesA[index] = aetherOscillatorsA[index].getPhase();
             rememberedAetherPhasesB[index] = aetherOscillatorsB[index].getPhase();
-            rememberedLumusPhasesC[index] = lumusOscillatorsC[index].getPhase();
+            rememberedLumenPhasesC[index] = lumenOscillatorsC[index].getPhase();
         }
         phase     = 0.0;
         noiseState = (juce::uint32) (midiNoteNumber * 747796405u + 2891336453u);
@@ -644,11 +777,11 @@ namespace beat
             aetherOscBPhaseOffset = juce::jlimit(0.0, 1.0, (double) params.aetherOscB.phase)
                 + VoiceMath::deterministicPhaseJitter(noiseState ^ 0x6c8e9cf5u) * juce::jlimit(0.0, 1.0, (double) params.aetherOscB.randomPhase);
         }
-        if (params.hasLumus && params.lumusOscC.phaseMode == 0)
+        if (params.hasLumen && params.lumenOscC.phaseMode == 0)
         {
-            lumusOscCPhaseOffset = juce::jlimit(0.0, 1.0, (double) params.lumusOscC.phase)
+            lumenOscCPhaseOffset = juce::jlimit(0.0, 1.0, (double) params.lumenOscC.phase)
                 + VoiceMath::deterministicPhaseJitter(noiseState ^ 0xd4e12b87u)
-                    * juce::jlimit(0.0, 1.0, (double) params.lumusOscC.randomPhase);
+                    * juce::jlimit(0.0, 1.0, (double) params.lumenOscC.randomPhase);
         }
         aurumAgeSamples = 0;
         aurumReleaseAgeSamples = -1;
@@ -722,17 +855,17 @@ namespace beat
         }
         else
             WavetableOscillatorBank::clear(aetherOscillatorsB, aetherUnisonPlanB);
-        if (params.hasLumus && aetherOscillatorNeedsWavetable(params.lumusOscC))
+        if (params.hasLumen && aetherOscillatorNeedsWavetable(params.lumenOscC))
         {
-            WavetableOscillatorBank::configure(lumusOscillatorsC, lumusTableC.get(),
-                params.lumusOscC.wavetable, sampleRate, baseFrequencyHz);
-            for (size_t index = 0; index < lumusOscillatorsC.size(); ++index)
-                lumusOscillatorsC[index].setPhase(params.lumusOscC.phaseMode == 1
-                    ? rememberedLumusPhasesC[index]
-                    : lumusOscCPhaseOffset);
+            WavetableOscillatorBank::configure(lumenOscillatorsC, lumenTableC.get(),
+                params.lumenOscC.wavetable, sampleRate, baseFrequencyHz);
+            for (size_t index = 0; index < lumenOscillatorsC.size(); ++index)
+                lumenOscillatorsC[index].setPhase(params.lumenOscC.phaseMode == 1
+                    ? rememberedLumenPhasesC[index]
+                    : lumenOscCPhaseOffset);
         }
         else
-            WavetableOscillatorBank::clear(lumusOscillatorsC, lumusUnisonPlanC);
+            WavetableOscillatorBank::clear(lumenOscillatorsC, lumenUnisonPlanC);
         WavetableUnison::PhaseArray interactionPhasesA {};
         WavetableUnison::PhaseArray interactionPhasesB {};
         for (size_t index = 0; index < interactionPhasesA.size(); ++index)
@@ -758,19 +891,19 @@ namespace beat
         {
             aetherSampleSlot1.noteOff((uint64_t) stableVoiceId);
             aetherSfzSlot1.noteOff((uint64_t) stableVoiceId);
-            for (auto& slot : lumusSampleSlots) slot.noteOff((uint64_t) stableVoiceId);
-            for (auto& slot : lumusSfzSlots) slot.noteOff((uint64_t) stableVoiceId);
+            for (auto& slot : lumenSampleSlots) slot.noteOff((uint64_t) stableVoiceId);
+            for (auto& slot : lumenSfzSlots) slot.noteOff((uint64_t) stableVoiceId);
             aetherGranularSlot2.noteOff((uint64_t) stableVoiceId);
-            for (auto& slot : lumusGranularSlots) slot.noteOff((uint64_t) stableVoiceId);
+            for (auto& slot : lumenGranularSlots) slot.noteOff((uint64_t) stableVoiceId);
         }
         else
         {
             aetherSampleSlot1.allNotesOff(true);
             aetherSfzSlot1.allNotesOff(true);
-            for (auto& slot : lumusSampleSlots) slot.allNotesOff(true);
-            for (auto& slot : lumusSfzSlots) slot.allNotesOff(true);
+            for (auto& slot : lumenSampleSlots) slot.allNotesOff(true);
+            for (auto& slot : lumenSfzSlots) slot.allNotesOff(true);
             aetherGranularSlot2.allNotesOff(true);
-            for (auto& slot : lumusGranularSlots) slot.allNotesOff(true);
+            for (auto& slot : lumenGranularSlots) slot.allNotesOff(true);
         }
         if (allowTailOff)
         {
@@ -822,6 +955,7 @@ namespace beat
             env3LoopState.reset();
             env4LoopState.reset();
             aurumReleaseAgeSamples = -1;
+            aurumNoteActive = false;
             aurumReleaseLevels.fill(0.0f);
             aurumPitchReleaseLevels.fill(0.0f);
             aurumPhaseReleaseLevels.fill(0.0f);
@@ -843,10 +977,17 @@ namespace beat
                                           int startSample, int numSamples)
     {
         juce::ScopedNoDenormals noDenormals;
-        if (params.hasAurum)
+        if (preparedTopology.kernel == RenderKernel::Aurum)
         {
+            // juce::Synthesiser calls renderNextBlock for every allocated
+            // voice. Aurum owns its envelope rather than using the JUCE ADSR
+            // active flag, so track note ownership explicitly and reject an
+            // unassigned voice before doing any DSP work.
+            if (!aurumNoteActive)
+                return;
             if (aurumReleaseAgeSamples >= 0 && !aurumReleaseTailActive())
             {
+                aurumNoteActive = false;
                 clearCurrentNote();
                 return;
             }
@@ -855,6 +996,32 @@ namespace beat
         {
             return;
         }
+
+        switch (preparedTopology.kernel)
+        {
+            case RenderKernel::Aurum:
+                renderPreparedBlock<RenderKernel::Aurum>(out, startSample, numSamples);
+                break;
+            case RenderKernel::Lumen:
+                renderPreparedBlock<RenderKernel::Lumen>(out, startSample, numSamples);
+                break;
+            case RenderKernel::Aether:
+                renderPreparedBlock<RenderKernel::Aether>(out, startSample, numSamples);
+                break;
+            case RenderKernel::Legacy:
+                renderPreparedBlock<RenderKernel::Legacy>(out, startSample, numSamples);
+                break;
+        }
+    }
+
+    template <InstrumentVoice::RenderKernel kernel>
+    void InstrumentVoice::renderPreparedBlock(juce::AudioBuffer<float>& out,
+                                               int startSample,
+                                               int numSamples)
+    {
+        constexpr bool rendersAurum = kernel == RenderKernel::Aurum;
+        constexpr bool rendersAether = kernel == RenderKernel::Aether || kernel == RenderKernel::Lumen;
+        constexpr bool rendersLumen = kernel == RenderKernel::Lumen;
 
         const auto modulationPlan = DynamicModulation::makeRenderPlan(
             cachedDynamicTargets,
@@ -875,8 +1042,14 @@ namespace beat
         const bool needsEnv3Value = modulationPlan.needsEnv3Value;
         const bool needsEnv4Value = modulationPlan.needsEnv4Value;
         const bool hasAmpPanMod = modulationPlan.hasAmpPanMod;
-        const double lfoPhaseDelta = juce::jmax(0.01f, params.lfoRateHz) / sampleRate;
-        const double lfo2PhaseDelta = juce::jmax(0.01f, params.lfo2RateHz) / sampleRate;
+        const float lfoRateHz = rendersLumen
+            ? Lfo::keytrackedRateHz(params.lfoRateHz, params.lfoKeytrackRate, noteKeytrack)
+            : juce::jmax(0.01f, params.lfoRateHz);
+        const float lfo2RateHz = rendersLumen
+            ? Lfo::keytrackedRateHz(params.lfo2RateHz, params.lfo2KeytrackRate, noteKeytrack)
+            : juce::jmax(0.01f, params.lfo2RateHz);
+        const double lfoPhaseDelta = lfoRateHz / sampleRate;
+        const double lfo2PhaseDelta = lfo2RateHz / sampleRate;
         std::array<double, 8> extraLfoPhaseDeltas {};
         std::array<bool, 8> needsExtraLfoValues {};
         int activeExtraLfoCount = 0;
@@ -884,10 +1057,114 @@ namespace beat
         {
             needsExtraLfoValues[index] = modulationPlan.needsExtraLfoValue[index] && params.extraLfos[index].enabled;
             activeExtraLfoCount += needsExtraLfoValues[index] ? 1 : 0;
-            extraLfoPhaseDeltas[index] = juce::jmax(0.01f, params.extraLfos[index].rateHz) / sampleRate;
+            const float rateHz = rendersLumen
+                ? Lfo::keytrackedRateHz(params.extraLfos[index].rateHz,
+                    params.extraLfos[index].keytrackRate, noteKeytrack)
+                : juce::jmax(0.01f, params.extraLfos[index].rateHz);
+            extraLfoPhaseDeltas[index] = rateHz / sampleRate;
         }
         const bool hasVoiceAutomation = noteAutomationState.active();
         currentBlockWork.begin(numSamples, 2);
+
+        const double pitchWheelRate = std::exp2(
+            (double) (pitchWheelSemitones + masterPitchWheelSemitones) / 12.0);
+        const auto runtimeWarpConfig = makeRuntimeWarpConfig(
+            params.aetherRuntimeWarp, params.aetherRuntimeWarpMode);
+        const auto runtimeWarp2Config = makeRuntimeWarpConfig(
+            params.aetherRuntimeWarp2, params.aetherRuntimeWarp2Mode);
+        const int aurumVoiceCount = juce::jlimit(1, 8, params.aurumUnison);
+        const int aurumOversampling = params.aurumOversampling >= 4 ? 4 : params.aurumOversampling >= 2 ? 2 : 1;
+        const float aurumNormalization = 1.0f
+            / (std::sqrt((float) aurumVoiceCount) * (float) aurumOversampling);
+        std::array<int, 6> aurumEnabledOperators {};
+        int aurumEnabledOperatorCount = 0;
+        std::array<double, 8> aurumVoiceRates {};
+        std::array<double, 6> aurumTuningRates {};
+        std::array<double, 6> aurumRatios {};
+        std::array<float, 6> aurumPitchEnvelopeDepths {};
+        std::array<float, 6> aurumPhaseEnvelopeTurns {};
+        std::array<float, 6> aurumOperatorLevels {};
+        std::array<float, 6> aurumResponseGains {};
+        std::array<std::array<float, 2>, 48> aurumPanGains {};
+        std::array<std::array<float, 6>, 6> aurumFmAmounts {};
+        std::array<std::array<float, 6>, 6> aurumRmAmounts {};
+        std::array<std::array<int, 6>, 6> aurumFmSources {};
+        std::array<std::array<int, 6>, 6> aurumRmSources {};
+        std::array<int, 6> aurumFmSourceCounts {};
+        std::array<int, 6> aurumRmSourceCounts {};
+        std::array<std::array<float, 3>, 6> aurumOutputAmounts {};
+        std::array<std::array<float, 2>, 4> aetherSourceSendGains {};
+        std::array<float, 2> aetherSampleSendGains {};
+        std::array<std::array<float, 2>, 3> lumenSampleSendGains {};
+        std::array<float, 2> aetherGranularSendGains {};
+        std::array<std::array<float, 2>, 3> lumenGranularSendGains {};
+        std::array<float, 2> lumenOscCSendGains {};
+        if constexpr (rendersAurum)
+        {
+            for (size_t opIndex = 0; opIndex < params.aurumOperators.size(); ++opIndex)
+            {
+                const auto& op = params.aurumOperators[opIndex];
+                if (op.enabled)
+                    aurumEnabledOperators[(size_t) aurumEnabledOperatorCount++] = (int) opIndex;
+                aurumTuningRates[opIndex] = std::exp2((double) op.coarse / 12.0 + (double) op.fineCents / 1200.0);
+                aurumRatios[opIndex] = juce::jlimit(0.125, 32.0, (double) op.ratio);
+                aurumPitchEnvelopeDepths[opIndex] = juce::jlimit(-48.0f, 48.0f, op.pitchEnvelopeSemitones);
+                aurumPhaseEnvelopeTurns[opIndex] = juce::jlimit(-180.0f, 180.0f, op.phaseEnvelopeDegrees) / 360.0f;
+                aurumOperatorLevels[opIndex] = VoiceMath::clamp01(op.level);
+                aurumResponseGains[opIndex] = aurumResponseCurve(op.velocityCurve, level)
+                    * aurumResponseCurve(op.keytrackCurve, noteKeytrack);
+                for (size_t source = 0; source < 6; ++source)
+                {
+                    aurumFmAmounts[source][opIndex] = aurumRouteAmount(params.aurumMatrix[source][opIndex]);
+                    aurumRmAmounts[source][opIndex] = aurumRouteAmount(params.aurumRmMatrix[source][opIndex]);
+                    if (std::abs(aurumFmAmounts[source][opIndex]) > 0.0001f)
+                        aurumFmSources[opIndex][(size_t) aurumFmSourceCounts[opIndex]++] = (int) source;
+                    if (std::abs(aurumRmAmounts[source][opIndex]) > 0.0001f)
+                        aurumRmSources[opIndex][(size_t) aurumRmSourceCounts[opIndex]++] = (int) source;
+                }
+                for (size_t bus = 0; bus < 3; ++bus)
+                    aurumOutputAmounts[opIndex][bus] = aurumRouteAmount(params.aurumOutputSends[opIndex][bus]);
+            }
+            for (int voice = 0; voice < aurumVoiceCount; ++voice)
+            {
+                const float centered = aurumVoiceCount == 1 ? 0.0f
+                    : ((float) voice / (float) (aurumVoiceCount - 1)) * 2.0f - 1.0f;
+                aurumVoiceRates[(size_t) voice] = std::exp2((double) centered * params.aurumDetuneCents / 1200.0);
+                for (size_t opIndex = 0; opIndex < 6; ++opIndex)
+                {
+                    const float pan = juce::jlimit(-1.0f, 1.0f,
+                        params.aurumOperators[opIndex].pan + centered * params.aurumStereoSpread);
+                    const float angle = (pan + 1.0f) * juce::MathConstants<float>::pi * 0.25f;
+                    aurumPanGains[(size_t) voice * 6 + opIndex] = { std::cos(angle), std::sin(angle) };
+                }
+            }
+        }
+        if constexpr (rendersAether)
+        {
+          if (preparedTopology.sourceSends)
+          {
+            const std::array<std::array<float, 2>, 4> sourceSendLevels {{
+                params.aetherOscA.fxSends,
+                params.aetherOscB.fxSends,
+                params.aetherSub.fxSends,
+                params.aetherNoise.fxSends,
+            }};
+            for (size_t source = 0; source < sourceSendLevels.size(); ++source)
+                for (size_t bus = 0; bus < AetherSourceBusContext::busCount; ++bus)
+                    aetherSourceSendGains[source][bus] = VoiceMath::clamp01(sourceSendLevels[source][bus]);
+            for (size_t bus = 0; bus < AetherSourceBusContext::busCount; ++bus)
+            {
+                aetherSampleSendGains[bus] = VoiceMath::clamp01(params.aetherSampleSlot1.fxSends[bus]);
+                aetherGranularSendGains[bus] = VoiceMath::clamp01(params.aetherGranularSlot2.fxSends[bus]);
+                lumenOscCSendGains[bus] = VoiceMath::clamp01(params.lumenOscC.fxSends[bus]);
+                for (size_t index = 0; index < lumenSampleSendGains.size(); ++index)
+                {
+                    lumenSampleSendGains[index][bus] = VoiceMath::clamp01(params.lumenSampleSlots[index].fxSends[bus]);
+                    lumenGranularSendGains[index][bus] = VoiceMath::clamp01(params.lumenGranularSlots[index].fxSends[bus]);
+                }
+            }
+          }
+        }
 
         for (int i = 0; i < numSamples; ++i)
         {
@@ -936,25 +1213,33 @@ namespace beat
                 ? (params.env4Loop ? env4LoopValue() : EnvelopeShaper::shapeAdsrSample(env4Adsr.getNextSample(), previousRawEnv4Envelope,
                     params.env4Sustain, params.env4AttackCurve, params.env4DecayCurve, params.env4ReleaseCurve))
                 : 0.0f;
+            DynamicModulation::InputFrame modulationFrame;
+            if (useDynamicModulation)
+                modulationFrame = DynamicModulation::makeInputFrame(
+                    rawLfo, rawLfo2, rawExtraLfos, env, env2, env3, env4,
+                    level, noteKeytrack, modWheel, pressure, timbre, params.macroValues);
             const double currentPitchFrequency = juce::jmax(1.0f, pitchFrequencyRamp.next())
-                * std::exp2((double) (pitchWheelSemitones + masterPitchWheelSemitones) / 12.0);
+                * pitchWheelRate;
             double currentPhaseDelta = currentPitchFrequency / sampleRate;
             if (hasPitchMod)
                 currentPhaseDelta *= std::exp2((pitchLfo * pitchMod) / 12.0);
-            if (useDynamicModulation && !params.hasAether && !params.hasAurum)
+            if constexpr (!rendersAether && !rendersAurum)
             {
-                const float oscAFineCents = DynamicModulation::targetOffset(params.dynamicModulation.oscAFine, rawLfo, rawLfo2, rawExtraLfos, env, env2, env3, env4, level, noteKeytrack, modWheel, pressure, timbre, params.macroValues, 100.0f);
-                currentPhaseDelta *= std::exp2(oscAFineCents / 1200.0f);
+                if (useDynamicModulation)
+                {
+                    const float oscAFineCents = cachedPreparedDynamicModulation.oscAFine.evaluate(modulationFrame, 100.0f);
+                    currentPhaseDelta *= std::exp2(oscAFineCents / 1200.0f);
+                }
             }
             const double currentFrequency = currentPhaseDelta * sampleRate;
             const float dynamicOscAPosition = useDynamicModulation && cachedDynamicTargets.oscAPosition
-                ? DynamicModulation::targetOffset(params.dynamicModulation.oscAPosition, rawLfo, rawLfo2, rawExtraLfos, env, env2, env3, env4, level, noteKeytrack, modWheel, pressure, timbre, params.macroValues, 1.0f)
+                ? cachedPreparedDynamicModulation.oscAPosition.evaluate(modulationFrame, 1.0f)
                 : 0.0f;
             const float dynamicUnisonDetune = useDynamicModulation && cachedDynamicTargets.unisonDetune
-                ? DynamicModulation::targetOffset(params.dynamicModulation.unisonDetune, rawLfo, rawLfo2, rawExtraLfos, env, env2, env3, env4, level, noteKeytrack, modWheel, pressure, timbre, params.macroValues, 100.0f)
+                ? cachedPreparedDynamicModulation.unisonDetune.evaluate(modulationFrame, 100.0f)
                 : 0.0f;
             const float dynamicUnisonSpread = useDynamicModulation && cachedDynamicTargets.unisonSpread
-                ? DynamicModulation::targetOffset(params.dynamicModulation.unisonSpread, rawLfo, rawLfo2, rawExtraLfos, env, env2, env3, env4, level, noteKeytrack, modWheel, pressure, timbre, params.macroValues, 1.0f)
+                ? cachedPreparedDynamicModulation.unisonSpread.evaluate(modulationFrame, 1.0f)
                 : 0.0f;
 
             // Oscillator
@@ -963,63 +1248,101 @@ namespace beat
             StereoSample filter1Raw;
             StereoSample filter2Raw;
             AetherTableStackRenderer::StereoFrame sampleSourceFrame {};
-            std::array<AetherTableStackRenderer::StereoFrame, 3> lumusSampleFrames {};
+            std::array<AetherTableStackRenderer::StereoFrame, 3> lumenSampleFrames {};
             AetherTableStackRenderer::StereoFrame granularSourceFrame {};
-            std::array<AetherTableStackRenderer::StereoFrame, 3> lumusGranularFrames {};
-            AetherTableStackRenderer::StereoFrame lumusSourceFrameC {};
+            std::array<AetherTableStackRenderer::StereoFrame, 3> lumenGranularFrames {};
+            AetherTableStackRenderer::StereoFrame lumenSourceFrameC {};
             std::array<AetherTableStackRenderer::StereoFrame, 4> sourceFrames {};
-            if (params.hasAurum)
+            if constexpr (rendersAurum)
             {
+                auto currentOperatorLevels = aurumOperatorLevels;
+                std::array<float, 6> currentOperatorPanOffsets {};
+                std::array<float, 2> currentFilterCutoffOffsets {};
+                std::array<float, 2> currentFilterResonanceOffsets {};
+                std::array<float, 2> currentFilterDriveOffsets {};
+                if (useDynamicModulation)
+                {
+                    for (size_t index = 0; index < currentOperatorLevels.size(); ++index)
+                    {
+                        if (cachedDynamicTargets.aurumOperatorLevel[index])
+                            currentOperatorLevels[index] = VoiceMath::clamp01(currentOperatorLevels[index]
+                                + cachedPreparedDynamicModulation.aurumOperatorLevel[index].evaluate(modulationFrame, 1.0f));
+                        if (cachedDynamicTargets.aurumOperatorPan[index])
+                            currentOperatorPanOffsets[index] = cachedPreparedDynamicModulation.aurumOperatorPan[index].evaluate(modulationFrame, 1.0f);
+                    }
+                    for (size_t index = 0; index < currentFilterCutoffOffsets.size(); ++index)
+                    {
+                        if (cachedDynamicTargets.aurumFilterCutoff[index])
+                            currentFilterCutoffOffsets[index] = cachedPreparedDynamicModulation.aurumFilterCutoff[index].evaluate(modulationFrame, 1.0f);
+                        if (cachedDynamicTargets.aurumFilterResonance[index])
+                            currentFilterResonanceOffsets[index] = cachedPreparedDynamicModulation.aurumFilterResonance[index].evaluate(modulationFrame, 1.0f);
+                        if (cachedDynamicTargets.aurumFilterDrive[index])
+                            currentFilterDriveOffsets[index] = cachedPreparedDynamicModulation.aurumFilterDrive[index].evaluate(modulationFrame, 1.0f);
+                    }
+                }
                 const float timeMs = (float) ((double) aurumAgeSamples * 1000.0 / sampleRate);
-                const int voiceCount = juce::jlimit(1, 8, params.aurumUnison);
-                const int oversampling = params.aurumOversampling >= 4 ? 4 : params.aurumOversampling >= 2 ? 2 : 1;
+                const bool releasing = aurumReleaseAgeSamples >= 0;
+                const float releaseTimeMs = releasing
+                    ? (float) ((double) aurumReleaseAgeSamples * 1000.0 / sampleRate) : 0.0f;
+                std::array<float, 6> opEnvelopes {};
+                std::array<double, 6> pitchEnvelopeRates {};
+                std::array<float, 6> phaseEnvelopeTurns {};
+                for (int enabledIndex = 0; enabledIndex < aurumEnabledOperatorCount; ++enabledIndex)
+                {
+                    const auto target = (size_t) aurumEnabledOperators[(size_t) enabledIndex];
+                    const auto& op = params.aurumOperators[target];
+                    opEnvelopes[target] = aurumEnvelope(op.attackMs, op.decayMs, op.sustain,
+                        op.releaseMs, timeMs, releaseTimeMs, aurumReleaseLevels[target], releasing);
+                    if (aurumPitchEnvelopeDepths[target] != 0.0f)
+                    {
+                        const float pitchEnvelope = aurumEnvelope(op.pitchAttackMs, op.pitchDecayMs,
+                            op.pitchSustain, op.pitchReleaseMs, timeMs, releaseTimeMs,
+                            aurumPitchReleaseLevels[target], releasing);
+                        pitchEnvelopeRates[target] = std::exp2(
+                            (double) pitchEnvelope * aurumPitchEnvelopeDepths[target] / 12.0);
+                    }
+                    else pitchEnvelopeRates[target] = 1.0;
+                    if (aurumPhaseEnvelopeTurns[target] != 0.0f)
+                    {
+                        const float phaseEnvelope = aurumEnvelope(op.phaseAttackMs, op.phaseDecayMs,
+                            op.phaseSustain, op.phaseReleaseMs, timeMs, releaseTimeMs,
+                            aurumPhaseReleaseLevels[target], releasing);
+                        phaseEnvelopeTurns[target] = phaseEnvelope * aurumPhaseEnvelopeTurns[target];
+                    }
+                }
                 StereoSample busA {};
                 StereoSample busB {};
                 StereoSample direct {};
-                for (int substep = 0; substep < oversampling; ++substep)
+                for (int substep = 0; substep < aurumOversampling; ++substep)
                 {
                     std::array<float, 48> nextOutputs {};
                     StereoSample stepA {};
                     StereoSample stepB {};
                     StereoSample stepDirect {};
-                    for (int voice = 0; voice < voiceCount; ++voice)
+                    for (int voice = 0; voice < aurumVoiceCount; ++voice)
                     {
                         const size_t voiceOffset = (size_t) voice * 6;
-                        const float centered = voiceCount == 1 ? 0.0f
-                            : ((float) voice / (float) (voiceCount - 1)) * 2.0f - 1.0f;
-                        const double voiceRate = std::exp2((double) centered * params.aurumDetuneCents / 1200.0);
-                        for (size_t target = 0; target < 6; ++target)
+                        for (int enabledIndex = 0; enabledIndex < aurumEnabledOperatorCount; ++enabledIndex)
                         {
+                            const auto target = (size_t) aurumEnabledOperators[(size_t) enabledIndex];
                             const auto& op = params.aurumOperators[target];
-                            if (!op.enabled) continue;
                             float fm = 0.0f;
-                            for (size_t source = 0; source < 6; ++source)
+                            for (int routeIndex = 0; routeIndex < aurumFmSourceCounts[target]; ++routeIndex)
+                            {
+                                const auto source = (size_t) aurumFmSources[target][(size_t) routeIndex];
                                 fm += aurumFeedbackSample(aurumOutputs[voiceOffset + source])
-                                    * aurumRouteAmount(params.aurumMatrix[source][target]);
+                                    * aurumFmAmounts[source][target];
+                            }
                             fm = juce::jlimit(-aurumMaximumFmSum, aurumMaximumFmSum, fm);
 
-                            const bool releasing = aurumReleaseAgeSamples >= 0;
-                            const float releaseTimeMs = releasing
-                                ? (float) ((double) aurumReleaseAgeSamples * 1000.0 / sampleRate) : 0.0f;
-                            const float opEnvelope = aurumEnvelope(op.attackMs, op.decayMs, op.sustain,
-                                op.releaseMs, timeMs, releaseTimeMs, aurumReleaseLevels[target], releasing);
-                            const float pitchEnvelope = aurumEnvelope(op.pitchAttackMs, op.pitchDecayMs,
-                                op.pitchSustain, op.pitchReleaseMs, timeMs, releaseTimeMs,
-                                aurumPitchReleaseLevels[target], releasing);
-                            const float phaseEnvelope = aurumEnvelope(op.phaseAttackMs, op.phaseDecayMs,
-                                op.phaseSustain, op.phaseReleaseMs, timeMs, releaseTimeMs,
-                                aurumPhaseReleaseLevels[target], releasing);
-                            const double ratio = juce::jlimit(0.125, 32.0, (double) op.ratio);
-                            const double tuning = std::exp2((double) op.coarse / 12.0 + (double) op.fineCents / 1200.0);
-                            const double pitchEnvelopeRate = std::exp2(
-                                (double) pitchEnvelope * juce::jlimit(-48.0f, 48.0f, op.pitchEnvelopeSemitones) / 12.0);
-                            const double delta = currentFrequency * voiceRate * ratio * tuning * pitchEnvelopeRate
-                                / (sampleRate * (double) oversampling);
+                            const double delta = currentFrequency * aurumVoiceRates[(size_t) voice]
+                                * aurumRatios[target] * aurumTuningRates[target] * pitchEnvelopeRates[target]
+                                / (sampleRate * (double) aurumOversampling);
                             float rmGain = 1.0f;
-                            for (size_t source = 0; source < 6; ++source)
+                            for (int routeIndex = 0; routeIndex < aurumRmSourceCounts[target]; ++routeIndex)
                             {
-                                const float amount = aurumRouteAmount(params.aurumRmMatrix[source][target]);
-                                if (std::abs(amount) <= 0.0001f) continue;
+                                const auto source = (size_t) aurumRmSources[target][(size_t) routeIndex];
+                                const float amount = aurumRmAmounts[source][target];
                                 rmGain *= 1.0f - std::abs(amount)
                                     + aurumFeedbackSample(aurumOutputs[voiceOffset + source]) * amount;
                                 rmGain = juce::jlimit(-aurumMaximumRingGain, aurumMaximumRingGain, rmGain);
@@ -1027,36 +1350,46 @@ namespace beat
                             nextOutputs[voiceOffset + target] = aurumFeedbackSample(
                                 aurumOperatorSample(op,
                                     aurumPhases[voiceOffset + target]
-                                        + phaseEnvelope * juce::jlimit(-180.0f, 180.0f, op.phaseEnvelopeDegrees) / 360.0f
+                                        + phaseEnvelopeTurns[target]
                                         + fm * aurumFmPhaseScale,
                                     delta)
-                                * VoiceMath::clamp01(op.level)
-                                * opEnvelope
-                                * aurumResponseCurve(op.velocityCurve, level)
-                                * aurumResponseCurve(op.keytrackCurve, noteKeytrack)
+                                * currentOperatorLevels[target]
+                                * opEnvelopes[target]
+                                * aurumResponseGains[target]
                                 * rmGain);
-                            aurumPhases[voiceOffset + target] = std::fmod(
-                                aurumPhases[voiceOffset + target] + delta, 1.0);
+                            const double nextPhase = aurumPhases[voiceOffset + target] + delta;
+                            aurumPhases[voiceOffset + target] = nextPhase - std::floor(nextPhase);
                             currentBlockWork.addOscillatorSamples(1);
                         }
 
-                        for (size_t source = 0; source < 6; ++source)
+                        for (int enabledIndex = 0; enabledIndex < aurumEnabledOperatorCount; ++enabledIndex)
                         {
+                            const auto source = (size_t) aurumEnabledOperators[(size_t) enabledIndex];
                             const float output = nextOutputs[voiceOffset + source];
-                            const float pan = juce::jlimit(-1.0f, 1.0f,
-                                params.aurumOperators[source].pan + centered * params.aurumStereoSpread);
-                            const float angle = (pan + 1.0f) * juce::MathConstants<float>::pi * 0.25f;
-                            const float leftGain = std::cos(angle);
-                            const float rightGain = std::sin(angle);
+                            auto panGains = aurumPanGains[voiceOffset + source];
+                            if (cachedDynamicTargets.aurumOperatorPan[source])
+                            {
+                                const float centered = aurumVoiceCount == 1 ? 0.0f
+                                    : ((float) voice / (float) (aurumVoiceCount - 1)) * 2.0f - 1.0f;
+                                const float pan = juce::jlimit(-1.0f, 1.0f,
+                                    params.aurumOperators[source].pan
+                                        + centered * params.aurumStereoSpread
+                                        + currentOperatorPanOffsets[source]);
+                                const float angle = (pan + 1.0f) * juce::MathConstants<float>::pi * 0.25f;
+                                panGains = { std::cos(angle), std::sin(angle) };
+                            }
                             const auto addToBus = [&](StereoSample& bus, float amount)
                             {
-                                const float routed = output * aurumRouteAmount(amount);
-                                bus.left += routed * leftGain;
-                                bus.right += routed * rightGain;
+                                const float routed = output * amount;
+                                bus.left += routed * panGains[0];
+                                bus.right += routed * panGains[1];
                             };
-                            addToBus(stepA, params.aurumOutputSends[source][0]);
-                            addToBus(stepB, params.aurumOutputSends[source][1]);
-                            addToBus(stepDirect, params.aurumOutputSends[source][2]);
+                            if (std::abs(aurumOutputAmounts[source][0]) > 0.0001f)
+                                addToBus(stepA, aurumOutputAmounts[source][0]);
+                            if (std::abs(aurumOutputAmounts[source][1]) > 0.0001f)
+                                addToBus(stepB, aurumOutputAmounts[source][1]);
+                            if (std::abs(aurumOutputAmounts[source][2]) > 0.0001f)
+                                addToBus(stepDirect, aurumOutputAmounts[source][2]);
                         }
                     }
                     aurumOutputs = nextOutputs;
@@ -1066,30 +1399,35 @@ namespace beat
                 }
                 ++aurumAgeSamples;
                 if (aurumReleaseAgeSamples >= 0) ++aurumReleaseAgeSamples;
-                const float normalization = 1.0f / (std::sqrt((float) voiceCount) * (float) oversampling);
                 for (auto* frame : { &busA, &busB, &direct })
                 {
-                    frame->left *= normalization;
-                    frame->right *= normalization;
+                    frame->left *= aurumNormalization;
+                    frame->right *= aurumNormalization;
                 }
 
                 const auto processAurumFilter = [&](StereoSample input,
                                                     const Params::AurumFilter& config,
+                                                    size_t filterIndex,
                                                     FilterStage::State& state,
                                                     DriveStage::State& driveState)
                 {
                     if (!config.enabled) return input;
-                    if (config.drive01 > 0.0001f)
+                    if (cachedDynamicTargets.aurumFilterCutoff[filterIndex])
+                        currentBlockWork.addFilterCutoffUpdates(state.updateCutoffIfChanged(
+                            VoiceMath::clamp01(config.cutoff01 + currentFilterCutoffOffsets[filterIndex]),
+                            sampleRate, params.filterKeytrack, currentFrequency, 0.5f));
+                    if (cachedDynamicTargets.aurumFilterResonance[filterIndex])
+                        currentBlockWork.addFilterResonanceUpdates(state.updateResonanceIfChanged(
+                            VoiceMath::clamp01(config.resonance01 + currentFilterResonanceOffsets[filterIndex]), 0.001f));
+                    const float drive = VoiceMath::clamp01(config.drive01 + currentFilterDriveOffsets[filterIndex]);
+                    if (drive > 0.0001f)
                     {
                         const auto driven = DriveStage::processOversampled(
-                            driveState, input, 1.0f + config.drive01 * 6.0f);
+                            driveState, input, 1.0f + drive * 6.0f);
                         input = { driven.left, driven.right };
                         currentBlockWork.addFilterDriveSamples(DriveStage::workSamplesForChannels(2));
                     }
                     else driveState.reset(input);
-                    state.updateCutoffIfChanged(config.cutoff01, sampleRate,
-                        params.filterKeytrack, baseFrequencyHz, 6.0f);
-                    state.updateResonanceIfChanged(config.resonance01, 0.001f);
                     const auto filtered = state.process(input.left, input.right);
                     return StereoSample { filtered.left, filtered.right };
                 };
@@ -1100,10 +1438,10 @@ namespace beat
                 if (params.aurumFilterRouting == 1)
                 {
                     const auto filteredA = hasA
-                        ? processAurumFilter(busA, params.aurumFilters[0], filterState, driveState)
+                        ? processAurumFilter(busA, params.aurumFilters[0], 0, filterState, driveState)
                         : StereoSample {};
                     const auto filteredB = hasB
-                        ? processAurumFilter(busB, params.aurumFilters[1], aurumFilterBState, aurumFilterBDriveState)
+                        ? processAurumFilter(busB, params.aurumFilters[1], 1, aurumFilterBState, aurumFilterBDriveState)
                         : StereoSample {};
                     const int count = (int) hasA + (int) hasB + (int) hasDirect;
                     raw = count > 0 ? StereoSample {
@@ -1114,11 +1452,11 @@ namespace beat
                 else
                 {
                     auto serial = hasA
-                        ? processAurumFilter(busA, params.aurumFilters[0], filterState, driveState)
+                        ? processAurumFilter(busA, params.aurumFilters[0], 0, filterState, driveState)
                         : StereoSample {};
                     if (hasB) { serial.left += busB.left; serial.right += busB.right; }
                     if (hasA || hasB)
-                        serial = processAurumFilter(serial, params.aurumFilters[1], aurumFilterBState, aurumFilterBDriveState);
+                        serial = processAurumFilter(serial, params.aurumFilters[1], 1, aurumFilterBState, aurumFilterBDriveState);
                     const int count = (int) (hasA || hasB) + (int) hasDirect;
                     raw = count > 0 ? StereoSample {
                         (serial.left + direct.left) / (float) count,
@@ -1126,11 +1464,13 @@ namespace beat
                     } : StereoSample {};
                 }
             }
-            else if (params.hasAether)
+            else if constexpr (rendersAether)
             {
-                const auto aetherResult = AetherTableStackRenderer::render(
+                const auto aetherResult = AetherTableStackRenderer::renderPrepared<rendersLumen>(
                     params,
                     cachedDynamicTargets,
+                    cachedPreparedDynamicModulation,
+                    modulationFrame,
                     cachedPanGains,
                     cachedPitchRates,
                     aetherOscillatorsA,
@@ -1145,19 +1485,7 @@ namespace beat
                     aetherOscBBasePhase,
                     aetherOscAPhaseOffset,
                     aetherOscBPhaseOffset,
-                    rawLfo,
-                    rawLfo2,
-                    rawExtraLfos,
-                    env,
-                    env2,
-                    env3,
-                    env4,
-                    level,
-                    noteKeytrack,
-                    modWheel,
                     noiseState,
-                    pressure,
-                    timbre,
                     &aetherInteractionState);
                 raw = { aetherResult.filteredFrame.left, aetherResult.filteredFrame.right };
                 directRaw = { aetherResult.directFrame.left, aetherResult.directFrame.right };
@@ -1165,33 +1493,29 @@ namespace beat
                 filter2Raw = { aetherResult.filter2Frame.left, aetherResult.filter2Frame.right };
                 sourceFrames = aetherResult.sourceFrames;
                 currentBlockWork.add(aetherResult.work);
-                if (params.hasLumus && params.lumusOscC.enabled)
+                if constexpr (rendersLumen)
                 {
-                    const auto targetOffset = [&](const auto& target, float scale)
-                    {
-                        return DynamicModulation::targetOffset(target, rawLfo, rawLfo2, rawExtraLfos,
-                            env, env2, env3, env4, level, noteKeytrack, modWheel, pressure, timbre,
-                            params.macroValues, scale);
-                    };
-                    const float sourceLevel = VoiceMath::clamp01(params.lumusOscC.level
+                  if (preparedTopology.lumenOscC)
+                  {
+                    const float sourceLevel = VoiceMath::clamp01(params.lumenOscC.level
                         + (useDynamicModulation && cachedDynamicTargets.oscCLevel
-                            ? targetOffset(params.dynamicModulation.oscCLevel, 1.0f) : 0.0f));
-                    const float sourcePan = juce::jlimit(-1.0f, 1.0f, params.lumusOscC.pan
+                            ? cachedPreparedDynamicModulation.oscCLevel.evaluate(modulationFrame, 1.0f) : 0.0f));
+                    const float sourcePan = juce::jlimit(-1.0f, 1.0f, params.lumenOscC.pan
                         + (useDynamicModulation && cachedDynamicTargets.oscCPan
-                            ? targetOffset(params.dynamicModulation.oscCPan, 1.0f) : 0.0f));
+                            ? cachedPreparedDynamicModulation.oscCPan.evaluate(modulationFrame, 1.0f) : 0.0f));
                     double sourceRate = cachedPitchRates.oscC;
                     if (useDynamicModulation && cachedDynamicTargets.oscCFine)
-                        sourceRate *= std::exp2((double) targetOffset(params.dynamicModulation.oscCFine, 100.0f) / 1200.0);
+                        sourceRate *= std::exp2((double) cachedPreparedDynamicModulation.oscCFine.evaluate(modulationFrame, 100.0f) / 1200.0);
                     const float positionMod = useDynamicModulation && cachedDynamicTargets.oscCPosition
-                        ? targetOffset(params.dynamicModulation.oscCPosition, 1.0f) : 0.0f;
+                        ? cachedPreparedDynamicModulation.oscCPosition.evaluate(modulationFrame, 1.0f) : 0.0f;
                     const float detuneMod = useDynamicModulation && cachedDynamicTargets.oscCUnisonDetune
-                        ? targetOffset(params.dynamicModulation.oscCUnisonDetune, 100.0f) : 0.0f;
+                        ? cachedPreparedDynamicModulation.oscCUnisonDetune.evaluate(modulationFrame, 100.0f) : 0.0f;
                     const float spreadMod = useDynamicModulation && cachedDynamicTargets.oscCUnisonSpread
-                        ? targetOffset(params.dynamicModulation.oscCUnisonSpread, 1.0f) : 0.0f;
-                    const auto tableResult = WavetableOscillatorBank::renderStereo(
-                        lumusOscillatorsC,
-                        lumusUnisonPlanC,
-                        params.lumusOscC.wavetable,
+                        ? cachedPreparedDynamicModulation.oscCUnisonSpread.evaluate(modulationFrame, 1.0f) : 0.0f;
+                    const auto tableResult = WavetableOscillatorBank::renderStereo<rendersLumen>(
+                        lumenOscillatorsC,
+                        lumenUnisonPlanC,
+                        params.lumenOscC.wavetable,
                         currentFrequency * sourceRate,
                         baseFrequencyHz,
                         sampleRate,
@@ -1199,40 +1523,40 @@ namespace beat
                         detuneMod,
                         spreadMod,
                         sourcePan);
-                    lumusSourceFrameC = {
+                    lumenSourceFrameC = {
                         tableResult.left * sourceLevel,
                         tableResult.right * sourceLevel,
                     };
                     currentBlockWork.addWavetableRender(tableResult.voiceSamples,
                         tableResult.frequencyUpdates, tableResult.positionUpdates);
-                    if (params.lumusOscC.routing == 1)
+                    if (params.lumenOscC.routing == 1)
                     {
-                        directRaw.left += lumusSourceFrameC.left;
-                        directRaw.right += lumusSourceFrameC.right;
+                        directRaw.left += lumenSourceFrameC.left;
+                        directRaw.right += lumenSourceFrameC.right;
                     }
-                    else if (params.lumusOscC.routing == 2)
+                    else if (params.lumenOscC.routing == 2)
                     {
-                        filter1Raw.left += lumusSourceFrameC.left;
-                        filter1Raw.right += lumusSourceFrameC.right;
+                        filter1Raw.left += lumenSourceFrameC.left;
+                        filter1Raw.right += lumenSourceFrameC.right;
                     }
-                    else if (params.lumusOscC.routing == 3)
+                    else if (params.lumenOscC.routing == 3)
                     {
-                        filter2Raw.left += lumusSourceFrameC.left;
-                        filter2Raw.right += lumusSourceFrameC.right;
+                        filter2Raw.left += lumenSourceFrameC.left;
+                        filter2Raw.right += lumenSourceFrameC.right;
                     }
-                    else if (params.lumusOscC.routing != 4)
+                    else if (params.lumenOscC.routing != 4)
                     {
-                        raw.left += lumusSourceFrameC.left;
-                        raw.right += lumusSourceFrameC.right;
+                        raw.left += lumenSourceFrameC.left;
+                        raw.right += lumenSourceFrameC.right;
                     }
+                  }
                 }
-                if (params.aetherSampleSlot1.enabled
-                    && (params.aetherSampleSlot1.source || params.aetherSampleSlot1.sfzSource))
+                if (preparedTopology.aetherSample)
                 {
-                    const auto mappedFrame = params.aetherSampleSlot1.sfzSource
+                    const auto mappedFrame = preparedTopology.aetherSampleUsesSfz
                         ? SampleSourceSlot::StereoFrame {}
                         : aetherSampleSlot1.renderFrame();
-                    const auto sfzFrame = params.aetherSampleSlot1.sfzSource
+                    const auto sfzFrame = preparedTopology.aetherSampleUsesSfz
                         ? aetherSfzSlot1.renderFrame() : SfzSourceSlot::StereoFrame {};
                     const float sampleLeft = mappedFrame.left + sfzFrame.left;
                     const float sampleRight = mappedFrame.right + sfzFrame.right;
@@ -1254,20 +1578,20 @@ namespace beat
                         raw.left += sampleLeft; raw.right += sampleRight;
                     }
                 }
-                if (params.hasLumus)
+                if constexpr (rendersLumen)
                 {
-                    for (size_t index = 0; index < params.lumusSampleSlots.size(); ++index)
+                    for (int activeIndex = 0; activeIndex < preparedTopology.lumenSampleCount; ++activeIndex)
                     {
-                        const auto& slot = params.lumusSampleSlots[index];
-                        if (!slot.enabled || (!slot.source && !slot.sfzSource)) continue;
+                        const auto index = (size_t) preparedTopology.lumenSampleIndices[(size_t) activeIndex];
+                        const auto& slot = params.lumenSampleSlots[index];
                         const auto mappedFrame = slot.sfzSource
                             ? SampleSourceSlot::StereoFrame {}
-                            : lumusSampleSlots[index].renderFrame();
+                            : lumenSampleSlots[index].renderFrame();
                         const auto sfzFrame = slot.sfzSource
-                            ? lumusSfzSlots[index].renderFrame() : SfzSourceSlot::StereoFrame {};
+                            ? lumenSfzSlots[index].renderFrame() : SfzSourceSlot::StereoFrame {};
                         const float sampleLeft = mappedFrame.left + sfzFrame.left;
                         const float sampleRight = mappedFrame.right + sfzFrame.right;
-                        lumusSampleFrames[index] = { sampleLeft, sampleRight };
+                        lumenSampleFrames[index] = { sampleLeft, sampleRight };
                         if (slot.routing == 1)
                         {
                             directRaw.left += sampleLeft; directRaw.right += sampleRight;
@@ -1286,7 +1610,7 @@ namespace beat
                         }
                     }
                 }
-                if (params.aetherGranularSlot2.enabled && params.aetherGranularSlot2.source)
+                if (preparedTopology.aetherGranular)
                 {
                     const auto granular = aetherGranularSlot2.renderFrame();
                     const float granularLeft = granular.left * params.aetherGranularSlot2.level;
@@ -1309,16 +1633,16 @@ namespace beat
                         raw.left += granularLeft; raw.right += granularRight;
                     }
                 }
-                if (params.hasLumus)
+                if constexpr (rendersLumen)
                 {
-                    for (size_t index = 0; index < lumusGranularSlots.size(); ++index)
+                    for (int activeIndex = 0; activeIndex < preparedTopology.lumenGranularCount; ++activeIndex)
                     {
-                        const auto& slot = params.lumusGranularSlots[index];
-                        if (!slot.enabled || !slot.source) continue;
-                        const auto granular = lumusGranularSlots[index].renderFrame();
+                        const auto index = (size_t) preparedTopology.lumenGranularIndices[(size_t) activeIndex];
+                        const auto& slot = params.lumenGranularSlots[index];
+                        const auto granular = lumenGranularSlots[index].renderFrame();
                         const float granularLeft = granular.left * slot.level;
                         const float granularRight = granular.right * slot.level;
-                        lumusGranularFrames[index] = { granularLeft, granularRight };
+                        lumenGranularFrames[index] = { granularLeft, granularRight };
                         if (slot.routing == 1) { directRaw.left += granularLeft; directRaw.right += granularRight; }
                         else if (slot.routing == 2) { filter1Raw.left += granularLeft; filter1Raw.right += granularRight; }
                         else if (slot.routing == 3) { filter2Raw.left += granularLeft; filter2Raw.right += granularRight; }
@@ -1346,31 +1670,47 @@ namespace beat
             float filter2RouteLeft = filter2Raw.left;
             float filter2RouteRight = filter2Raw.right;
 
-            if (params.hasAether && params.aetherRuntimeWarp > 0.0001f)
+            const auto processActiveWarp = [&](DriveStage::State& state,
+                                               float& laneLeft,
+                                               float& laneRight,
+                                               const RuntimeWarpConfig& config)
             {
-                currentBlockWork.addNonlinearSamples(4 * DriveStage::workSamplesForChannels(2));
-                const auto warped = processRuntimeWarpOversampled(
-                    aetherRuntimeWarpState,
-                    { left, right },
-                    params.aetherRuntimeWarp,
-                    params.aetherRuntimeWarpMode);
-                left = warped.left;
-                right = warped.right;
-                const auto directWarped = processRuntimeWarpOversampled(
-                    aetherDirectRuntimeWarpState,
-                    { directLeft, directRight },
-                    params.aetherRuntimeWarp,
-                    params.aetherRuntimeWarpMode);
-                directLeft = directWarped.left;
-                directRight = directWarped.right;
-                const auto filter1Warped = processRuntimeWarpOversampled(aetherFilter1RuntimeWarpState,
-                    { filter1RouteLeft, filter1RouteRight }, params.aetherRuntimeWarp, params.aetherRuntimeWarpMode);
-                const auto filter2Warped = processRuntimeWarpOversampled(aetherFilter2RuntimeWarpState,
-                    { filter2RouteLeft, filter2RouteRight }, params.aetherRuntimeWarp, params.aetherRuntimeWarpMode);
-                filter1RouteLeft = filter1Warped.left;
-                filter1RouteRight = filter1Warped.right;
-                filter2RouteLeft = filter2Warped.left;
-                filter2RouteRight = filter2Warped.right;
+                const StereoSample input { laneLeft, laneRight };
+                if (config.active && runtimeWarpNeedsWork(state, input))
+                {
+                    currentBlockWork.addNonlinearSamples(DriveStage::workSamplesForChannels(2));
+                    const auto warped = processRuntimeWarpOversampled(state, input, config);
+                    laneLeft = warped.left;
+                    laneRight = warped.right;
+                }
+                else if (!config.active)
+                {
+                    state.reset(input);
+                }
+            };
+
+            const auto processPreparedWarpLane = [&](uint8_t lane,
+                                                     DriveStage::State& state,
+                                                     float& laneLeft,
+                                                     float& laneRight,
+                                                     const RuntimeWarpConfig& config)
+            {
+                if ((preparedTopology.routeLaneMask & lane) != 0)
+                    processActiveWarp(state, laneLeft, laneRight, config);
+                else
+                    state.reset({ laneLeft, laneRight });
+            };
+
+            if constexpr (rendersAether)
+            {
+                processPreparedWarpLane(1u, aetherRuntimeWarpState, left, right, runtimeWarpConfig);
+                processPreparedWarpLane(2u, aetherDirectRuntimeWarpState, directLeft, directRight, runtimeWarpConfig);
+                processPreparedWarpLane(4u, aetherFilter1RuntimeWarpState, filter1RouteLeft, filter1RouteRight, runtimeWarpConfig);
+                processPreparedWarpLane(8u, aetherFilter2RuntimeWarpState, filter2RouteLeft, filter2RouteRight, runtimeWarpConfig);
+                processPreparedWarpLane(1u, aetherRuntimeWarp2State, left, right, runtimeWarp2Config);
+                processPreparedWarpLane(2u, aetherDirectRuntimeWarp2State, directLeft, directRight, runtimeWarp2Config);
+                processPreparedWarpLane(4u, aetherFilter1RuntimeWarp2State, filter1RouteLeft, filter1RouteRight, runtimeWarp2Config);
+                processPreparedWarpLane(8u, aetherFilter2RuntimeWarp2State, filter2RouteLeft, filter2RouteRight, runtimeWarp2Config);
             }
             else
             {
@@ -1378,33 +1718,20 @@ namespace beat
                 aetherDirectRuntimeWarpState.reset({ directLeft, directRight });
                 aetherFilter1RuntimeWarpState.reset({ filter1RouteLeft, filter1RouteRight });
                 aetherFilter2RuntimeWarpState.reset({ filter2RouteLeft, filter2RouteRight });
+                aetherRuntimeWarp2State.reset({ left, right });
+                aetherDirectRuntimeWarp2State.reset({ directLeft, directRight });
+                aetherFilter1RuntimeWarp2State.reset({ filter1RouteLeft, filter1RouteRight });
+                aetherFilter2RuntimeWarp2State.reset({ filter2RouteLeft, filter2RouteRight });
             }
 
-            const auto processSecondWarp = [&](DriveStage::State& state, float& laneLeft, float& laneRight)
-            {
-                if (params.hasAether && params.aetherRuntimeWarp2 > 0.0001f)
-                {
-                    currentBlockWork.addNonlinearSamples(DriveStage::workSamplesForChannels(2));
-                    const auto warped = processRuntimeWarpOversampled(state, { laneLeft, laneRight },
-                        params.aetherRuntimeWarp2, params.aetherRuntimeWarp2Mode);
-                    laneLeft = warped.left;
-                    laneRight = warped.right;
-                }
-                else state.reset({ laneLeft, laneRight });
-            };
-            processSecondWarp(aetherRuntimeWarp2State, left, right);
-            processSecondWarp(aetherDirectRuntimeWarp2State, directLeft, directRight);
-            processSecondWarp(aetherFilter1RuntimeWarp2State, filter1RouteLeft, filter1RouteRight);
-            processSecondWarp(aetherFilter2RuntimeWarp2State, filter2RouteLeft, filter2RouteRight);
-
-            if (!params.hasAurum)
+            if constexpr (!rendersAurum)
             {
             const float filterInputLeft = left;
             const float filterInputRight = right;
 
             // Drive (soft clipping)
             const float drive = VoiceMath::clamp01(params.drive01 + (useDynamicModulation && cachedDynamicTargets.filterDrive
-                ? DynamicModulation::targetOffset(params.dynamicModulation.filterDrive, rawLfo, rawLfo2, rawExtraLfos, env, env2, env3, env4, level, noteKeytrack, modWheel, pressure, timbre, params.macroValues, 1.0f)
+                ? cachedPreparedDynamicModulation.filterDrive.evaluate(modulationFrame, 1.0f)
                 : 0.0f));
             if (drive > 0.0001f)
             {
@@ -1422,7 +1749,7 @@ namespace beat
             if (hasFilterMod)
             {
                 const float cutoffMod = useDynamicModulation && cachedDynamicTargets.filterCutoff
-                    ? DynamicModulation::targetOffset(params.dynamicModulation.filterCutoff, rawLfo, rawLfo2, rawExtraLfos, env, env2, env3, env4, level, noteKeytrack, modWheel, pressure, timbre, params.macroValues, 0.35f)
+                    ? cachedPreparedDynamicModulation.filterCutoff.evaluate(modulationFrame, 0.35f)
                     : filterLfo * params.lfoToFilter * 0.35f + env * params.envToFilter * 0.35f;
                 const int cutoffUpdates = filterState.updateCutoffIfChanged(
                     params.cutoff01 + cutoffMod,
@@ -1436,7 +1763,7 @@ namespace beat
                 if (useDynamicModulation && cachedDynamicTargets.filterResonance)
                 {
                     const float resonance = VoiceMath::clamp01(params.resonance01
-                        + DynamicModulation::targetOffset(params.dynamicModulation.filterResonance, rawLfo, rawLfo2, rawExtraLfos, env, env2, env3, env4, level, noteKeytrack, modWheel, pressure, timbre, params.macroValues, 1.0f));
+                        + cachedPreparedDynamicModulation.filterResonance.evaluate(modulationFrame, 1.0f));
                     const int resonanceUpdates = filterState.updateResonanceIfChanged(resonance, 0.001f);
                     currentBlockWork.addFilterResonanceUpdates(resonanceUpdates);
                     currentBlockWork.addFilterResonanceUpdates(filter1RouteState.updateResonanceIfChanged(resonance, 0.001f));
@@ -1480,8 +1807,11 @@ namespace beat
                 filter2DriveState.reset({ left, right });
             }
 
-            if (params.hasAether && (filter1RouteLeft != 0.0f || filter1RouteRight != 0.0f))
+            if constexpr (rendersAether)
             {
+              if ((preparedTopology.routeLaneMask & 4u) != 0
+                  && (filter1RouteLeft != 0.0f || filter1RouteRight != 0.0f))
+              {
                 if (drive > 0.0001f)
                 {
                     const auto driven = DriveStage::processOversampled(filter1RouteDriveState,
@@ -1494,11 +1824,16 @@ namespace beat
                 const auto routed = filter1RouteState.process(filter1RouteLeft, filter1RouteRight);
                 left += routed.left;
                 right += routed.right;
+              }
+              else filter1RouteDriveState.reset();
             }
             else filter1RouteDriveState.reset();
 
-            if (params.hasAether && (filter2RouteLeft != 0.0f || filter2RouteRight != 0.0f))
+            if constexpr (rendersAether)
             {
+              if ((preparedTopology.routeLaneMask & 8u) != 0
+                  && (filter2RouteLeft != 0.0f || filter2RouteRight != 0.0f))
+              {
                 const float routeDrive = VoiceMath::clamp01(params.filter2Drive01);
                 if (routeDrive > 0.0001f)
                 {
@@ -1512,24 +1847,30 @@ namespace beat
                 const auto routed = filter2RouteState.process(filter2RouteLeft, filter2RouteRight);
                 left += routed.left;
                 right += routed.right;
+              }
+              else filter2RouteDriveState.reset();
             }
             else filter2RouteDriveState.reset();
 
-            if (params.hasAether && (directLeft != 0.0f || directRight != 0.0f))
+            if constexpr (rendersAether)
             {
-                left += directLeft;
-                right += directRight;
+                if ((preparedTopology.routeLaneMask & 2u) != 0
+                    && (directLeft != 0.0f || directRight != 0.0f))
+                {
+                    left += directLeft;
+                    right += directRight;
+                }
             }
             }
 
             const float ampLevel = VoiceMath::clamp01(params.ampLevel + (useDynamicModulation && cachedDynamicTargets.ampLevel
-                ? DynamicModulation::targetOffset(params.dynamicModulation.ampLevel, rawLfo, rawLfo2, rawExtraLfos, env, env2, env3, env4, level, noteKeytrack, modWheel, pressure, timbre, params.macroValues, 1.0f)
+                ? cachedPreparedDynamicModulation.ampLevel.evaluate(modulationFrame, 1.0f)
                 : 0.0f));
             const float ampPan = hasAmpPanMod
-                ? juce::jlimit(-1.0f, 1.0f, params.ampPan + DynamicModulation::targetOffset(params.dynamicModulation.ampPan, rawLfo, rawLfo2, rawExtraLfos, env, env2, env3, env4, level, noteKeytrack, modWheel, pressure, timbre, params.macroValues, 1.0f))
+                ? juce::jlimit(-1.0f, 1.0f, params.ampPan + cachedPreparedDynamicModulation.ampPan.evaluate(modulationFrame, 1.0f))
                 : params.ampPan;
             const auto panGains = hasAmpPanMod ? VoiceMath::equalPowerPanGains(ampPan) : cachedPanGains.amp;
-            const float voiceGain = (params.hasAurum ? 1.0f : env) * level * 0.4f * ampLevel;
+            const float voiceGain = (rendersAurum ? 1.0f : env) * level * 0.4f * ampLevel;
             const auto [leftGain, rightGain] = panGains;
 
             const auto transitioned = stealTransition.process({
@@ -1545,48 +1886,44 @@ namespace beat
                 out.addSample(ch, startSample + i, VoiceMath::denormalSafe(output));
             }
 
-            if (params.hasAether && params.hasAetherSourceSends)
+            if constexpr (rendersAether)
             {
-                const std::array<std::array<float, 2>, 4> sendLevels {{
-                    params.aetherOscA.fxSends,
-                    params.aetherOscB.fxSends,
-                    params.aetherSub.fxSends,
-                    params.aetherNoise.fxSends,
-                }};
+              if (preparedTopology.sourceSends)
+              {
                 for (size_t bus = 0; bus < AetherSourceBusContext::busCount; ++bus)
                 {
                     VoiceTransition::Stereo send {};
                     for (size_t source = 0; source < sourceFrames.size(); ++source)
                     {
-                        const float sendGain = VoiceMath::clamp01(sendLevels[source][bus]);
+                        const float sendGain = aetherSourceSendGains[source][bus];
                         send.left += sourceFrames[source].left * sendGain;
                         send.right += sourceFrames[source].right * sendGain;
                     }
-                    const float sampleSendGain = VoiceMath::clamp01(params.aetherSampleSlot1.fxSends[bus]);
+                    const float sampleSendGain = aetherSampleSendGains[bus];
                     send.left += sampleSourceFrame.left * sampleSendGain;
                     send.right += sampleSourceFrame.right * sampleSendGain;
-                    if (params.hasLumus)
+                    if constexpr (rendersLumen)
                     {
-                        for (size_t index = 0; index < lumusSampleFrames.size(); ++index)
+                        for (size_t index = 0; index < lumenSampleFrames.size(); ++index)
                         {
-                            const float gain = VoiceMath::clamp01(params.lumusSampleSlots[index].fxSends[bus]);
-                            send.left += lumusSampleFrames[index].left * gain;
-                            send.right += lumusSampleFrames[index].right * gain;
+                            const float gain = lumenSampleSendGains[index][bus];
+                            send.left += lumenSampleFrames[index].left * gain;
+                            send.right += lumenSampleFrames[index].right * gain;
                         }
                     }
-                    const float granularSendGain = VoiceMath::clamp01(params.aetherGranularSlot2.fxSends[bus]);
+                    const float granularSendGain = aetherGranularSendGains[bus];
                     send.left += granularSourceFrame.left * granularSendGain;
                     send.right += granularSourceFrame.right * granularSendGain;
-                    if (params.hasLumus)
-                        for (size_t index = 0; index < lumusGranularFrames.size(); ++index)
+                    if constexpr (rendersLumen)
+                        for (size_t index = 0; index < lumenGranularFrames.size(); ++index)
                         {
-                            const float gain = VoiceMath::clamp01(params.lumusGranularSlots[index].fxSends[bus]);
-                            send.left += lumusGranularFrames[index].left * gain;
-                            send.right += lumusGranularFrames[index].right * gain;
+                            const float gain = lumenGranularSendGains[index][bus];
+                            send.left += lumenGranularFrames[index].left * gain;
+                            send.right += lumenGranularFrames[index].right * gain;
                         }
-                    const float lumusSendGain = VoiceMath::clamp01(params.lumusOscC.fxSends[bus]);
-                    send.left += lumusSourceFrameC.left * lumusSendGain;
-                    send.right += lumusSourceFrameC.right * lumusSendGain;
+                    const float lumenSendGain = lumenOscCSendGains[bus];
+                    send.left += lumenSourceFrameC.left * lumenSendGain;
+                    send.right += lumenSourceFrameC.right * lumenSendGain;
                     send.left *= leftGain * voiceGain;
                     send.right *= rightGain * voiceGain;
                     const auto transitionedSend = sourceSendTransitions[bus].process(send);
@@ -1595,6 +1932,7 @@ namespace beat
                         VoiceMath::denormalSafe(transitionedSend.left),
                         VoiceMath::denormalSafe(transitionedSend.right));
                 }
+              }
             }
 
             phase += currentPhaseDelta;
@@ -1629,10 +1967,13 @@ namespace beat
             }
         }
 
-        if (params.hasAurum)
+        if constexpr (rendersAurum)
         {
             if (aurumReleaseAgeSamples >= 0 && !aurumReleaseTailActive())
+            {
+                aurumNoteActive = false;
                 clearCurrentNote();
+            }
         }
         else if (!adsr.isActive())
         {
@@ -1758,6 +2099,7 @@ namespace beat
     void InstrumentVoice::refreshCachedDynamicModulationFlags() noexcept
     {
         cachedDynamicTargets = DynamicModulation::targetActivityFlags(params.dynamicModulation);
+        cachedPreparedDynamicModulation = DynamicModulation::prepare(params.dynamicModulation);
     }
 
 }

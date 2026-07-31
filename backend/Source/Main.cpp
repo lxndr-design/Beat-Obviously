@@ -243,6 +243,12 @@ namespace
             const auto fillStart = bar.getX() + (int) std::round((double) (bar.getWidth() - fillWidth) * phase);
             g.setColour(juce::Colours::white);
             g.fillRect(juce::Rectangle<int>(fillStart, bar.getY(), fillWidth, bar.getHeight()));
+
+            g.setFont(juce::FontOptions(17.0f).withStyle("Bold"));
+            g.drawText("Starting Beat", panel.withTrimmedTop(128).withHeight(24), juce::Justification::centred);
+            g.setColour(juce::Colours::white.withAlpha(0.62f));
+            g.setFont(juce::FontOptions(13.0f));
+            g.drawText("Preparing audio engine and interface", panel.withTrimmedTop(151).withHeight(20), juce::Justification::centred);
         }
 
     private:
@@ -265,19 +271,18 @@ public:
     BeatApp() = default;
 
     const juce::String getApplicationName() override       { return "Beat"; }
-    const juce::String getApplicationVersion() override    { return "0.2.1"; }
+    const juce::String getApplicationVersion() override    { return "0.2.2"; }
     bool moreThanOneInstanceAllowed() override             { return false; }
 
     void initialise(const juce::String& commandLine) override
     {
-        const auto logDirectory = juce::File::getSpecialLocation(juce::File::userHomeDirectory)
-            .getChildFile("Library").getChildFile("Logs").getChildFile("Beat");
+        const auto logFile = beat::diagnostics::logFile();
+        const auto logDirectory = logFile.getParentDirectory();
         logDirectory.createDirectory();
-        const auto logFile = logDirectory.getChildFile("Beat-debug.log");
         diagnosticLogger = std::make_unique<juce::FileLogger>(
             logFile,
             "Beat diagnostic log",
-            4 * 1024 * 1024);
+            0);
         juce::Logger::setCurrentLogger(diagnosticLogger.get());
         beat::diagnostics::log("lifecycle", "application initialise version=" + getApplicationVersion()
             + " executable=" + juce::File::getSpecialLocation(juce::File::currentExecutableFile).getFullPathName()
@@ -293,7 +298,11 @@ public:
         macApplicationMenu.addItem(menuPreferences, "Settings...");
         juce::MenuBarModel::setMacMainMenu(this, &macApplicationMenu);
        #endif
-        mainWindow.reset(new MainWindow(getApplicationName(), findBeatProjectPathInCommandLine(commandLine)));
+        auto initialProjectPath = findBeatProjectPathInCommandLine(commandLine);
+        if (initialProjectPath.isEmpty())
+            initialProjectPath = pendingProjectPath;
+        pendingProjectPath.clear();
+        mainWindow.reset(new MainWindow(getApplicationName(), initialProjectPath));
     }
 
     void shutdown() override
@@ -317,8 +326,15 @@ public:
     void anotherInstanceStarted(const juce::String& commandLine) override
     {
         const auto projectPath = findBeatProjectPathInCommandLine(commandLine);
-        if (projectPath.isNotEmpty() && mainWindow)
+        beat::diagnostics::log("lifecycle", "another instance commandLine=" + commandLine
+            + " projectPath=" + projectPath);
+        if (projectPath.isEmpty())
+            return;
+
+        if (mainWindow)
             mainWindow->sendOpenProjectFile(projectPath);
+        else
+            pendingProjectPath = projectPath;
     }
 
     juce::StringArray getMenuBarNames() override
@@ -376,7 +392,8 @@ private:
         explicit MainWindow(const juce::String& name, const juce::String& initialProjectPath)
             : DocumentWindow(name,
                              juce::Colours::black,
-                             DocumentWindow::allButtons)
+                             DocumentWindow::allButtons),
+              pendingProjectPath(initialProjectPath)
         {
             setUsingNativeTitleBar(false);
             setTitleBarHeight(36);
@@ -384,24 +401,16 @@ private:
             setContentOwned(new MainComponent(), true);
             if (auto* main = dynamic_cast<MainComponent*>(getContentComponent()))
             {
-                main->onFrontendReady = [safeThis = juce::Component::SafePointer<MainWindow>(this)]
+                main->onFrontendShellReady = [safeThis = juce::Component::SafePointer<MainWindow>(this)]
                 {
                     if (safeThis != nullptr)
                         safeThis->hideStartupSplash();
                 };
-                if (initialProjectPath.isNotEmpty())
+                main->onFrontendReady = [safeThis = juce::Component::SafePointer<MainWindow>(this)]
                 {
-                    main->onFrontendReady = [
-                        safeThis = juce::Component::SafePointer<MainWindow>(this),
-                        initialProjectPath
-                    ]
-                    {
-                        if (safeThis == nullptr)
-                            return;
-                        safeThis->hideStartupSplash();
-                        safeThis->sendOpenProjectFile(initialProjectPath);
-                    };
-                }
+                    if (safeThis != nullptr)
+                        safeThis->handleFrontendReady();
+                };
             }
             addAndMakeVisible(&startupSplash);
 
@@ -436,6 +445,20 @@ private:
 
         void sendOpenProjectFile(const juce::String& path)
         {
+            if (path.isEmpty())
+                return;
+
+            if (!frontendReady)
+            {
+                pendingProjectPath = path;
+                beat::diagnostics::log("project", "Finder open queued until frontend ready path=" + path);
+                return;
+            }
+
+            setMinimised(false);
+            setVisible(true);
+            toFront(true);
+            beat::diagnostics::log("project", "Finder open dispatched path=" + path);
             if (auto* main = dynamic_cast<MainComponent*>(getContentComponent()))
                 main->emitOpenProjectFile(path);
         }
@@ -454,7 +477,21 @@ private:
         }
 
     private:
+        void handleFrontendReady()
+        {
+            frontendReady = true;
+            hideStartupSplash();
+            if (pendingProjectPath.isEmpty())
+                return;
+
+            const auto path = pendingProjectPath;
+            pendingProjectPath.clear();
+            sendOpenProjectFile(path);
+        }
+
         StartupSplash startupSplash;
+        juce::String pendingProjectPath;
+        bool frontendReady { false };
 
         JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MainWindow)
     };
@@ -469,6 +506,7 @@ private:
     juce::PopupMenu macApplicationMenu;
     std::unique_ptr<MainWindow> mainWindow;
     std::unique_ptr<juce::FileLogger> diagnosticLogger;
+    juce::String pendingProjectPath;
 };
 
 START_JUCE_APPLICATION(BeatApp)

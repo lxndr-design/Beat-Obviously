@@ -29,6 +29,8 @@ export interface RenderTimingSnapshot {
   copyMs: number;
   totalMs: number;
   loadPercent: number;
+  hottestRouteIndex: number;
+  hottestRouteMs: number;
   activeSynthVoices: number;
   activeSampleVoices: number;
   activeAudioClipVoices: number;
@@ -126,6 +128,8 @@ function createEmptyRenderTiming(): RenderTimingSnapshot {
     copyMs: 0,
     totalMs: 0,
     loadPercent: 0,
+    hottestRouteIndex: -1,
+    hottestRouteMs: 0,
     activeSynthVoices: 0,
     activeSampleVoices: 0,
     activeAudioClipVoices: 0,

@@ -65,6 +65,17 @@
   fill: var(--color-bg);
   stroke: var(--color-fg);
   stroke-width: 2;
+  transition: fill var(--duration-hover) var(--ease-out);
+}
+
+.knob:not([data-disabled="true"]):hover .ring {
+  fill: color-mix(in srgb, var(--color-fg) 6%, var(--color-bg));
+}
+
+.knob:not([data-disabled="true"]):active .ring,
+.knob[data-dragging="true"] .ring,
+.knob[data-editing="true"] .ring {
+  fill: color-mix(in srgb, var(--color-fg) 12%, var(--color-bg));
 }
 
 .defaultArcSegment {

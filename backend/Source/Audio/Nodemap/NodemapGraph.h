@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -148,6 +149,33 @@ namespace beat::Nodemap
         float rms { 0.0f };
         int finiteSamples { 0 };
         bool silent { true };
+    };
+
+    struct RealtimeFrame
+    {
+        float left { 0.0f };
+        float right { 0.0f };
+    };
+
+    class RealtimeRenderer
+    {
+    public:
+        RealtimeRenderer();
+        ~RealtimeRenderer();
+        RealtimeRenderer(RealtimeRenderer&&) noexcept;
+        RealtimeRenderer& operator=(RealtimeRenderer&&) noexcept;
+        RealtimeRenderer(const RealtimeRenderer&) = delete;
+        RealtimeRenderer& operator=(const RealtimeRenderer&) = delete;
+
+        bool prepare(const Graph& graph, double sampleRate);
+        bool startNote(const AuditionOptions& options) noexcept;
+        void stop(bool allowTailOff) noexcept;
+        RealtimeFrame renderFrame() noexcept;
+        bool isActive() const noexcept;
+
+    private:
+        struct Impl;
+        std::unique_ptr<Impl> impl;
     };
 
     const NodeDefinition& definitionFor(NodeKind kind);

@@ -37,7 +37,6 @@ import {
   useSynthStore,
   type MacroCurve,
   type MacroId,
-  type LumusClipStep,
   type ModulationSourceId,
   type ModulationTargetId,
   type SynthDraftPatch,
@@ -48,6 +47,7 @@ import {
 } from "../../../state/synthStore";
 import { ANALYZER_BAND_COUNT, useAnalyzerStore, type AnalyzerSnapshot } from "../../../state/analyzerStore";
 import { useAudioFileStore, useDocumentStore, useInstrumentStore, useProjectStore, useUiStore } from "../../../state/store";
+import { useComponentStore } from "../../../state/components";
 import {
   firstInstrumentTaxonomyIdForCategory,
   INSTRUMENT_TAXONOMY_CATEGORY_OPTIONS,
@@ -58,6 +58,15 @@ import type { AetherSampleZoneConfig, AudioFile, EnvelopeCurve, Instrument, Mana
 import { ModulationMatrix } from "../ModulationMatrix/ModulationMatrix.solid";
 import { OscillatorPanel } from "../OscillatorPanel/OscillatorPanel.solid";
 import { SynthCurvePreview } from "../CurvePreview/SynthCurvePreview.solid";
+import { PianoRoll } from "../../MidiEditor/PianoRoll.solid";
+import {
+  LUMEN_CLIP_BOTTOM_PITCH,
+  LUMEN_CLIP_TOP_PITCH,
+  lumenClipPitchLabel,
+  lumenClipToMidiNotes,
+  midiPatternToLumenClip,
+  midiNotesToLumenClip,
+} from "../lumenClipPianoRoll";
 import styles from "./SynthEditor.module.css";
 
 const AUDITION_SECONDS = 1.4;
@@ -121,7 +130,7 @@ export interface SynthEditorProps {
   hotkeyScopeId?: string;
 }
 
-export function SynthEditor(props: SynthEditorProps & { editorKind?: "synth" | "lumus" }) {
+export function SynthEditor(props: SynthEditorProps & { editorKind?: "synth" | "lumen" }) {
   onCleanup(registerGlobalAudioStop(stopAudition));
   const draft = createStoreSelector(useSynthStore, (state) => state.draft);
   const boundInstrumentId = createStoreSelector(useSynthStore, (state) => state.boundInstrumentId);
@@ -473,7 +482,11 @@ export function SynthEditor(props: SynthEditorProps & { editorKind?: "synth" | "
   }
 
   return (
-    <div class={`ds-editor-shell ds-fill ${styles.shell}`} role="region" aria-label="Aether engine">
+    <div
+      class={`ds-editor-shell ds-fill ${styles.shell}`}
+      role="region"
+      aria-label={draft().instrumentType === "lumen-hybrid-synth" ? "Lumen engine" : "Aether engine"}
+    >
       <div ref={bodyRef} class={`ds-editor-body ds-scroll ${styles.body}`}>
         <section
           class={`${styles.majorSection} ${styles.identitySection} ${focusedSourceTarget() === "performance" ? styles.sourceFocus : ""}`}
@@ -485,7 +498,7 @@ export function SynthEditor(props: SynthEditorProps & { editorKind?: "synth" | "
               samples={analyzerWaveform()}
               playing={auditioning()}
               onToggle={() => void onAudition()}
-              instrumentName={draft().instrumentType === "lumus-hybrid-synth" ? "Lumus" : "Aether"}
+              instrumentName={draft().instrumentType === "lumen-hybrid-synth" ? "Lumen" : "Aether"}
             />
             <div class={styles.identityFields}>
               <div class={styles.nameRow}>
@@ -594,9 +607,9 @@ export function SynthEditor(props: SynthEditorProps & { editorKind?: "synth" | "
 
         <LfoPanel focusedSourceTarget={focusedSourceTarget()} />
 
-        <Show when={draft().instrumentType === "lumus-hybrid-synth"}>
-          <LumusArpeggiatorPanel />
-          <LumusClipPanel />
+        <Show when={draft().instrumentType === "lumen-hybrid-synth"}>
+          <LumenArpeggiatorPanel />
+          <LumenClipPanel />
         </Show>
 
         <InstrumentFxRack />
@@ -632,31 +645,31 @@ export function SynthEditor(props: SynthEditorProps & { editorKind?: "synth" | "
   );
 }
 
-function LumusArpeggiatorPanel() {
+function LumenArpeggiatorPanel() {
   const draft = createStoreSelector(useSynthStore, (state) => state.draft);
   const setNumericParameter = useSynthStore.getState().setNumericParameter;
   const setBooleanParameter = useSynthStore.getState().setBooleanParameter;
   const setParameter = useSynthStore.getState().setParameter;
   const setDraft = useSynthStore.getState().setDraft;
-  const enabled = createMemo(() => draft().parameters["lumus.arp.enabled"] === true);
+  const enabled = createMemo(() => draft().parameters["lumen.arp.enabled"] === true);
 
   return (
-    <section class={`${styles.majorSection} ${enabled() ? "" : styles.disabledPanel}`} aria-label="Lumus arpeggiator">
+    <section class={`${styles.majorSection} ${enabled() ? "" : styles.disabledPanel}`} aria-label="Lumen arpeggiator">
       <div class={styles.ampFilterRibbon}>
         <Button
           iconOnly
           size="xs"
           selected={enabled()}
           className={styles.ampFilterPowerButton}
-          aria-label={`${enabled() ? "Disable" : "Enable"} Lumus arpeggiator`}
+          aria-label={`${enabled() ? "Disable" : "Enable"} Lumen arpeggiator`}
           onClick={() => {
             if (!enabled()) {
               const current = draft();
               setDraft({
                 ...current,
-                parameters: { ...current.parameters, "lumus.arp.enabled": true, "lumus.clip.enabled": false },
+                parameters: { ...current.parameters, "lumen.arp.enabled": true, "lumen.clip.enabled": false },
               });
-            } else setBooleanParameter("lumus.arp.enabled", false);
+            } else setBooleanParameter("lumen.arp.enabled", false);
           }}
         >
           <Icon name={enabled() ? "ph:power-fill" : "ph:power"} size={18} decorative />
@@ -669,14 +682,14 @@ function LumusArpeggiatorPanel() {
           <div class={styles.ampFilterShapeRow}>
             <ShapeButtonSet
               label="Arpeggiator mode"
-              value={String(draft().parameters["lumus.arp.mode"] ?? "up")}
+              value={String(draft().parameters["lumen.arp.mode"] ?? "up")}
               options={[
                 ["up", "Up", "Ascending", "ph:trend-up"],
                 ["down", "Down", "Descending", "ph:trend-down"],
                 ["upDown", "Up/Down", "Ascending and descending", "ph:wave-sine"],
                 ["random", "Random", "Deterministic random", "ph:wave-square"],
               ]}
-              onChange={(value) => setParameter("lumus.arp.mode", value)}
+              onChange={(value) => setParameter("lumen.arp.mode", value)}
             />
           </div>
         </div>
@@ -685,28 +698,28 @@ function LumusArpeggiatorPanel() {
           <div class={styles.ampFilterShapeRow}>
             <ShapeButtonSet
               label="Arpeggiator rate"
-              value={String(draft().parameters["lumus.arp.rate"] ?? "1/16")}
+              value={String(draft().parameters["lumen.arp.rate"] ?? "1/16")}
               options={[
                 ["1/4", "1/4", "Quarter notes", "ph:music-note"],
                 ["1/8", "1/8", "Eighth notes", "ph:music-note"],
                 ["1/16", "1/16", "Sixteenth notes", "ph:music-notes"],
                 ["1/32", "1/32", "Thirty-second notes", "ph:music-notes"],
               ]}
-              onChange={(value) => setParameter("lumus.arp.rate", value)}
+              onChange={(value) => setParameter("lumen.arp.rate", value)}
             />
           </div>
           <div class={styles.knobCluster}>
-            <SynthParameterKnob id="lumus.arp.gate" label="Gate" defaultValue={0.75} onChange={setNumericParameter} />
-            <SynthParameterKnob id="lumus.arp.swing" label="Swing" defaultValue={0} max={0.75} onChange={setNumericParameter} />
+            <SynthParameterKnob id="lumen.arp.gate" label="Gate" defaultValue={0.75} onChange={setNumericParameter} />
+            <SynthParameterKnob id="lumen.arp.swing" label="Swing" defaultValue={0} max={0.75} onChange={setNumericParameter} />
             <NumberInput
               label="Octaves"
               layout="inline"
-              value={getNumberParam(draft(), "lumus.arp.octaves")}
+              value={getNumberParam(draft(), "lumen.arp.octaves")}
               min={1}
               max={4}
               step={1}
               ariaLabel="Arpeggiator octave range"
-              onChange={(value) => setNumericParameter("lumus.arp.octaves", value)}
+              onChange={(value) => setNumericParameter("lumen.arp.octaves", value)}
             />
           </div>
         </div>
@@ -717,7 +730,7 @@ function LumusArpeggiatorPanel() {
               label="Key"
               layout="inline"
               className={styles.taxonomySelect}
-              value={String(draft().parameters["lumus.arp.key"] ?? "c")}
+              value={String(draft().parameters["lumen.arp.key"] ?? "c")}
               ariaLabel="Arpeggiator key"
               options={[
                 { value: "c", label: "C" }, { value: "cSharp", label: "C♯ / D♭" },
@@ -727,13 +740,13 @@ function LumusArpeggiatorPanel() {
                 { value: "gSharp", label: "G♯ / A♭" }, { value: "a", label: "A" },
                 { value: "aSharp", label: "A♯ / B♭" }, { value: "b", label: "B" },
               ]}
-              onChange={(value) => setParameter("lumus.arp.key", value)}
+              onChange={(value) => setParameter("lumen.arp.key", value)}
             />
             <FloatingSelect
               label="Scale"
               layout="inline"
               className={styles.taxonomySelect}
-              value={String(draft().parameters["lumus.arp.scale"] ?? "chromatic")}
+              value={String(draft().parameters["lumen.arp.scale"] ?? "chromatic")}
               ariaLabel="Arpeggiator scale"
               options={[
                 { value: "chromatic", label: "Chromatic" },
@@ -742,7 +755,7 @@ function LumusArpeggiatorPanel() {
                 { value: "majorPentatonic", label: "Major Pentatonic" },
                 { value: "blues", label: "Blues" },
               ]}
-              onChange={(value) => setParameter("lumus.arp.scale", value)}
+              onChange={(value) => setParameter("lumen.arp.scale", value)}
             />
           </div>
         </div>
@@ -751,21 +764,28 @@ function LumusArpeggiatorPanel() {
   );
 }
 
-function LumusClipPanel() {
+function LumenClipPanel() {
   const draft = createStoreSelector(useSynthStore, (state) => state.draft);
   const setDraft = useSynthStore.getState().setDraft;
   const setNumericParameter = useSynthStore.getState().setNumericParameter;
   const setParameter = useSynthStore.getState().setParameter;
-  const [selectedStep, setSelectedStep] = createSignal(0);
-  const clip = createMemo(() => draft().metadata.lumusClip!);
-  const enabled = createMemo(() => draft().parameters["lumus.clip.enabled"] === true);
-  const step = createMemo(() => clip().steps[Math.min(selectedStep(), clip().lengthSteps - 1)]);
+  const clip = createMemo(() => draft().metadata.lumenClip!);
+  const notes = createMemo(() => lumenClipToMidiNotes(clip()));
+  const enabled = createMemo(() => draft().parameters["lumen.clip.enabled"] === true);
+  const midiPatterns = createStoreSelector(useComponentStore, (state) => state.components.filter((component) => (component.kind ?? "midi") === "midi"));
+  const [patternSelectOpen, setPatternSelectOpen] = createSignal(false);
+  const [selectedPatternId, setSelectedPatternId] = createSignal("");
 
-  function updateStep(index: number, patch: Partial<LumusClipStep>) {
+  function updateNotes(nextNotes: Parameters<typeof midiNotesToLumenClip>[1]) {
     const current = draft();
-    const nextClip = structuredClone(current.metadata.lumusClip!);
-    nextClip.steps[index] = { ...nextClip.steps[index], ...patch };
-    setDraft({ ...current, metadata: { ...current.metadata, lumusClip: nextClip } });
+    const nextClip = midiNotesToLumenClip(current.metadata.lumenClip!, nextNotes);
+    setDraft({ ...current, metadata: { ...current.metadata, lumenClip: nextClip } });
+  }
+
+  function updateLength(nextLengthSteps: number) {
+    const current = draft();
+    const nextClip = midiNotesToLumenClip(current.metadata.lumenClip!, notes(), nextLengthSteps);
+    setDraft({ ...current, metadata: { ...current.metadata, lumenClip: nextClip } });
   }
 
   function toggleEnabled() {
@@ -774,56 +794,43 @@ function LumusClipPanel() {
       ...current,
       parameters: {
         ...current.parameters,
-        "lumus.clip.enabled": !enabled(),
-        ...(!enabled() ? { "lumus.arp.enabled": false } : {}),
+        "lumen.clip.enabled": !enabled(),
+        ...(!enabled() ? { "lumen.arp.enabled": false } : {}),
       },
     });
   }
 
+  function importSelectedPattern() {
+    const pattern = midiPatterns().find((component) => component.id === selectedPatternId());
+    if (!pattern || pattern.kind === "drum") return;
+    const current = draft();
+    const nextClip = midiPatternToLumenClip(pattern.notes, pattern.lengthBeats);
+    setDraft({ ...current, metadata: { ...current.metadata, lumenClip: nextClip } });
+  }
+
   return (
-    <section class={`${styles.majorSection} ${enabled() ? "" : styles.disabledPanel}`} aria-label="Lumus clip sequencer">
+    <section class={`${styles.majorSection} ${enabled() ? "" : styles.disabledPanel}`} aria-label="Lumen clip sequencer">
       <div class={styles.ampFilterRibbon}>
         <Button
           iconOnly
           size="xs"
           selected={enabled()}
           className={styles.ampFilterPowerButton}
-          aria-label={`${enabled() ? "Disable" : "Enable"} Lumus clip sequencer`}
+          aria-label={`${enabled() ? "Disable" : "Enable"} Lumen clip sequencer`}
           onClick={toggleEnabled}
         >
           <Icon name={enabled() ? "ph:power-fill" : "ph:power"} size={18} decorative />
         </Button>
         <div class={styles.ampFilterRibbonTitle}>Clip</div>
       </div>
-      <div class={styles.ampFilterBody}>
-        <div class={`${styles.ampFilterGroup} ${styles.ampFilterWideGroup}`}>
-          <div class={styles.ampFilterGroupTitle}>Steps</div>
-          <div class={styles.clipStepGrid} aria-label="Clip steps">
-            <For each={clip().steps}>
-              {(candidate, index) => (
-                <Button
-                  size="xs"
-                  selected={candidate.enabled}
-                  className={styles.clipStepButton}
-                  aria-label={`Step ${index() + 1}${candidate.enabled ? ", enabled" : ", rest"}`}
-                  onClick={() => {
-                    setSelectedStep(index());
-                    updateStep(index(), { enabled: !candidate.enabled });
-                  }}
-                >
-                  {index() + 1}
-                </Button>
-              )}
-            </For>
-          </div>
-        </div>
+      <div class={`${styles.ampFilterBody} ${styles.clipBody}`}>
         <div class={styles.ampFilterGroup}>
           <div class={styles.ampFilterGroupTitle}>Timing</div>
           <div class={styles.ampFilterShapeRow}>
             <FloatingSelect
               label="Rate"
               layout="inline"
-              value={String(draft().parameters["lumus.clip.rate"] ?? "1/16")}
+              value={String(draft().parameters["lumen.clip.rate"] ?? "1/16")}
               ariaLabel="Clip step rate"
               options={[
                 { value: "1/4", label: "1/4" },
@@ -831,45 +838,54 @@ function LumusClipPanel() {
                 { value: "1/16", label: "1/16" },
                 { value: "1/32", label: "1/32" },
               ]}
-              onChange={(value) => setParameter("lumus.clip.rate", value)}
+              onChange={(value) => setParameter("lumen.clip.rate", value)}
             />
-            <SynthParameterKnob id="lumus.clip.swing" label="Swing" defaultValue={0} max={0.75} onChange={setNumericParameter} />
+            <SynthParameterKnob id="lumen.clip.swing" label="Swing" defaultValue={0} max={0.75} onChange={setNumericParameter} />
           </div>
         </div>
-        <div class={styles.ampFilterGroup}>
-          <div class={styles.ampFilterGroupTitle}>Selected Step {selectedStep() + 1}</div>
-          <div class={styles.clipStepControls}>
-            <NumberInput
-              label="Pitch"
-              layout="inline"
-              value={step().pitchOffset}
-              min={-48}
-              max={48}
-              step={1}
-              ariaLabel="Selected clip step pitch offset"
-              onChange={(value) => updateStep(selectedStep(), { pitchOffset: Math.round(value) })}
-            />
-            <NumberInput
-              label="Length"
-              layout="inline"
-              value={step().lengthSteps}
-              min={1}
-              max={clip().lengthSteps - selectedStep()}
-              step={1}
-              ariaLabel="Selected clip note length in steps"
-              onChange={(value) => updateStep(selectedStep(), { lengthSteps: Math.round(value) })}
-            />
-            <NumberInput
-              label="Velocity"
-              layout="inline"
-              value={Math.round(step().velocity * 100)}
-              min={1}
-              max={100}
-              step={1}
-              ariaLabel="Selected clip step velocity percent"
-              onChange={(value) => updateStep(selectedStep(), { velocity: value / 100 })}
-            />
-          </div>
+        <div class={`${styles.ampFilterGroup} ${styles.clipSummary}`}>
+          <div class={styles.ampFilterGroupTitle}>Single Clip</div>
+          <span>{clip().lengthSteps} steps</span>
+          <span>{clip().notes.length} / 64 notes</span>
+          <span>Trigger note transposes the pattern</span>
+        </div>
+        <div class={`${styles.ampFilterGroup} ${styles.clipPatternImport}`}>
+          <div class={styles.ampFilterGroupTitle}>Pattern import</div>
+          <FloatingSelect
+            label="Pattern"
+            layout="inline"
+            value={selectedPatternId()}
+            ariaLabel="Reusable MIDI pattern"
+            options={[
+              { value: "", label: midiPatterns().length > 0 ? "Choose pattern" : "No MIDI patterns" },
+              ...midiPatterns().map((pattern) => ({ value: pattern.id, label: pattern.name })),
+            ]}
+            searchable
+            searchPlaceholder="Search MIDI patterns"
+            open={patternSelectOpen()}
+            onOpenChange={setPatternSelectOpen}
+            onChange={setSelectedPatternId}
+          />
+          <Button size="xs" disabled={!selectedPatternId()} onClick={importSelectedPattern}>
+            <Icon name="ph:download-simple" size={18} decorative />
+            Import notes
+          </Button>
+          <span>Uses notes, timing, length, and velocity; the first note becomes the trigger root.</span>
+        </div>
+        <div class={styles.clipPianoRoll} aria-label="Lumen clip piano roll">
+          <PianoRoll
+            notes={notes()}
+            lengthBeats={clip().lengthSteps}
+            onLengthChange={updateLength}
+            onChange={updateNotes}
+            bottomPitch={LUMEN_CLIP_BOTTOM_PITCH}
+            topPitch={LUMEN_CLIP_TOP_PITCH}
+            pitchLabel={lumenClipPitchLabel}
+            fixedGridStepBeats={1}
+            defaultNoteLengthBeats={1}
+            minimumNoteLengthBeats={1}
+            maxNotes={64}
+          />
         </div>
       </div>
     </section>
@@ -951,7 +967,7 @@ function InstrumentOutputPreview(props: {
   samples: number[];
   playing: boolean;
   onToggle: () => void;
-  instrumentName: "Aether" | "Lumus";
+  instrumentName: "Aether" | "Lumen";
 }) {
   return (
     <div class={styles.identityPreview} aria-label={`${props.instrumentName} output preview`}>
@@ -973,7 +989,7 @@ function InstrumentFxRack() {
   const draft = createStoreSelector(useSynthStore, (state) => state.draft);
   const setDraft = useSynthStore.getState().setDraft;
   const effects = createMemo(() => draft().effects.filters);
-  const instrumentName = createMemo(() => draft().instrumentType === "lumus-hybrid-synth" ? "Lumus" : "Aether");
+  const instrumentName = createMemo(() => draft().instrumentType === "lumen-hybrid-synth" ? "Lumen" : "Aether");
   const [draggedEffectId, setDraggedEffectId] = createSignal<string | null>(null);
   const [dragOverEffectId, setDragOverEffectId] = createSignal<string | null>(null);
 
@@ -1066,12 +1082,12 @@ function InstrumentFxRack() {
   }
 
   return (
-    <section class={`ds-panel ${styles.fxPanel}`} aria-label={instrumentName() === "Lumus" ? "Lumus instrument effects" : "Aether instrument effects"}>
+    <section class={`ds-panel ${styles.fxPanel}`} aria-label={instrumentName() === "Lumen" ? "Lumen instrument effects" : "Aether instrument effects"}>
       <header class="ds-panel-header">
         <div class="ds-panel-title">Instrument FX</div>
       </header>
       <div class={`ds-panel-body ${styles.fxBody}`}>
-        <div class={styles.fxChainSummary} aria-label={instrumentName() === "Lumus" ? "Current Lumus FX chain" : "Current Aether FX chain"}>
+        <div class={styles.fxChainSummary} aria-label={instrumentName() === "Lumen" ? "Current Lumen FX chain" : "Current Aether FX chain"}>
           <span>Current chain: {describeEffectChain(effects())}</span>
           <FloatingSelect
             layout="bare"
@@ -1353,10 +1369,12 @@ function LfoLane(props: { lfo: 1 | 2; focused?: boolean }) {
   const phaseId = `${prefix}.phase` as SynthParameterId;
   const retriggerId = `${prefix}.retrigger` as SynthParameterId;
   const oneShotId = `${prefix}.oneShot` as SynthParameterId;
+  const keytrackRateId = `${prefix}.keytrackRate` as SynthParameterId;
   const enabled = createMemo(() => draft().parameters[enabledId] === true);
   const sync = createMemo(() => draft().parameters[syncId] === true);
   const retrigger = createMemo(() => draft().parameters[retriggerId] !== false);
   const oneShot = createMemo(() => draft().parameters[oneShotId] === true);
+  const isLumen = createMemo(() => draft().instrumentType === "lumen-hybrid-synth");
 
   return (
     <div
@@ -1450,6 +1468,21 @@ function LfoLane(props: { lfo: 1 | 2; focused?: boolean }) {
           </Show>
         </div>
         <div class={styles.lfoKnobBlock}>
+          <Show when={isLumen()}>
+            <HoverInfo content="Rate tracking around C4. At +100%, each octave doubles the LFO rate; negative values invert the relationship.">
+              <Knob
+                size="sm"
+                label="Key Rate"
+                value={getNumberParam(draft(), keytrackRateId)}
+                min={-1}
+                max={1}
+                step={0.01}
+                defaultValue={0}
+                formatValue={(value) => `${value > 0 ? "+" : ""}${Math.round(value * 100)}%`}
+                onChange={(value) => setNumericParameter(keytrackRateId, value)}
+              />
+            </HoverInfo>
+          </Show>
           <Knob
             size="sm"
             label="Phase"
@@ -1586,7 +1619,10 @@ function AmpFilterPanel(props: { focusedSourceTarget?: SynthModulationSourceEdit
   const [fxBus2Open, setFxBus2Open] = createSignal(false);
   const [sampleAssetOpen, setSampleAssetOpen] = createSignal(false);
   const [sampleRouteOpen, setSampleRouteOpen] = createSignal(false);
-  const [activeLumusSampleSlot, setActiveLumusSampleSlot] = createSignal<"a" | "b" | "c">("c");
+  const [sampleDirectionOpen, setSampleDirectionOpen] = createSignal(false);
+  const [sampleLoopModeOpen, setSampleLoopModeOpen] = createSignal(false);
+  const [sampleSliceOpen, setSampleSliceOpen] = createSignal(false);
+  const [activeLumenSampleSlot, setActiveLumenSampleSlot] = createSignal<"a" | "b" | "c">("c");
   const [importingSfz, setImportingSfz] = createSignal(false);
   const [importingGranular, setImportingGranular] = createSignal(false);
   const [granularRouteOpen, setGranularRouteOpen] = createSignal(false);
@@ -1594,21 +1630,31 @@ function AmpFilterPanel(props: { focusedSourceTarget?: SynthModulationSourceEdit
     { value: "", label: "Off" },
     ...returnBuses().filter((bus) => !bus.mute).map((bus) => ({ value: bus.id, label: bus.name || bus.id })),
   ]);
-  const isLumus = createMemo(() => draft().instrumentType === "lumus-hybrid-synth");
-  const sampleParameterId = (suffix: string) => `${isLumus() ? `lumus.source.${activeLumusSampleSlot()}.sample` : "aether.sample.1"}.${suffix}` as SynthParameterId;
-  const granularParameterId = (suffix: string) => `${isLumus() ? `lumus.source.${activeLumusSampleSlot()}.granular` : "aether.granular.2"}.${suffix}` as SynthParameterId;
-  const mappedZones = createMemo(() => isLumus()
-    ? draft().metadata.lumusSampleSlots?.[activeLumusSampleSlot()]?.zones ?? []
+  const isLumen = createMemo(() => draft().instrumentType === "lumen-hybrid-synth");
+  const activeLumenSourceMode = createMemo(() => isLumen()
+    ? draft().metadata.lumenSourceRack?.slots.find((slot) => slot.id === activeLumenSampleSlot())?.mode ?? "wavetable"
+    : null);
+  const sampleParameterId = (suffix: string) => `${isLumen() ? `lumen.source.${activeLumenSampleSlot()}.sample` : "aether.sample.1"}.${suffix}` as SynthParameterId;
+  const granularParameterId = (suffix: string) => `${isLumen() ? `lumen.source.${activeLumenSampleSlot()}.granular` : "aether.granular.2"}.${suffix}` as SynthParameterId;
+  const mappedZones = createMemo(() => isLumen()
+    ? draft().metadata.lumenSampleSlots?.[activeLumenSampleSlot()]?.zones ?? []
     : draft().metadata.sampleSlot1Zones ?? []);
-  const managedSfz = createMemo(() => isLumus()
-    ? draft().metadata.lumusSampleSlots?.[activeLumusSampleSlot()]?.managedSfz
+  const sampleSlices = createMemo(() => isLumen()
+    ? draft().metadata.lumenSampleSlots?.[activeLumenSampleSlot()]?.slices ?? []
+    : []);
+  const selectedSliceId = createMemo(() => String(
+    draft().parameters[sampleParameterId("selectedSliceId")] ?? ""));
+  const selectedSlice = createMemo(() => sampleSlices().find(
+    (slice) => slice.id === selectedSliceId()));
+  const managedSfz = createMemo(() => isLumen()
+    ? draft().metadata.lumenSampleSlots?.[activeLumenSampleSlot()]?.managedSfz
     : draft().metadata.managedSfz);
-  const managedGranular = createMemo(() => isLumus()
-    ? draft().metadata.lumusGranularSlots?.[activeLumusSampleSlot()]?.managedAsset
+  const managedGranular = createMemo(() => isLumen()
+    ? draft().metadata.lumenGranularSlots?.[activeLumenSampleSlot()]?.managedAsset
     : draft().metadata.managedGranular);
   const sampleSourceAvailable = createMemo(() => Boolean(String(draft().parameters[sampleParameterId("audioFileId")] ?? "") || managedSfz()));
-  const sampleSlotLabel = createMemo(() => draft().instrumentType === "lumus-hybrid-synth"
-    ? `Source ${activeLumusSampleSlot().toUpperCase()} Sample`
+  const sampleSlotLabel = createMemo(() => draft().instrumentType === "lumen-hybrid-synth"
+    ? `Source ${activeLumenSampleSlot().toUpperCase()} Sample`
     : "Sample Slot 1");
   const granularSourceAvailable = createMemo(() => Boolean(managedGranular() || draft().parameters[granularParameterId("builtinSource")] === "benchmark"));
   const sampleSourceDescription = createMemo(() => managedSfz()
@@ -1624,19 +1670,68 @@ function AmpFilterPanel(props: { focusedSourceTarget?: SynthModulationSourceEdit
   const sampleMetadataPatch = (
     zones: AetherSampleZoneConfig[],
     nextManagedSfz: ManagedSfzAssetConfig | null | undefined = managedSfz(),
-  ) => isLumus()
-    ? { ...draft().metadata, lumusSampleSlots: {
-        ...draft().metadata.lumusSampleSlots,
-        [activeLumusSampleSlot()]: { schemaVersion: 1 as const, zones: zones.slice(0, 8), ...(nextManagedSfz ? { managedSfz: nextManagedSfz } : {}) },
+  ) => isLumen()
+    ? { ...draft().metadata, lumenSampleSlots: {
+        ...draft().metadata.lumenSampleSlots,
+        [activeLumenSampleSlot()]: {
+          ...draft().metadata.lumenSampleSlots?.[activeLumenSampleSlot()],
+          schemaVersion: 2 as const,
+          zones: zones.slice(0, 8),
+          slices: sampleSlices().slice(0, 16),
+          managedSfz: nextManagedSfz ?? undefined,
+        },
       } }
     : { ...draft().metadata, sampleSlot1Zones: zones.slice(0, 8), managedSfz: nextManagedSfz ?? undefined };
   const commitMappedZones = (zones: AetherSampleZoneConfig[]) => setDraft({
     ...draft(), metadata: sampleMetadataPatch(zones),
   });
-  const granularMetadataPatch = (nextManaged: ManagedGranularAssetConfig | null | undefined) => isLumus()
-    ? { ...draft().metadata, lumusGranularSlots: {
-        ...draft().metadata.lumusGranularSlots,
-        [activeLumusSampleSlot()]: { schemaVersion: 1 as const, ...(nextManaged ? { managedAsset: nextManaged } : {}) },
+  const commitSampleSlices = (slices: Array<{ id: string; startRatio: number; endRatio: number }>, selected = selectedSliceId()) => setDraft({
+    ...draft(),
+    parameters: { ...draft().parameters, [sampleParameterId("selectedSliceId")]: selected },
+    metadata: {
+      ...draft().metadata,
+      lumenSampleSlots: {
+        ...draft().metadata.lumenSampleSlots,
+        [activeLumenSampleSlot()]: {
+          ...draft().metadata.lumenSampleSlots?.[activeLumenSampleSlot()],
+          schemaVersion: 2 as const,
+          zones: mappedZones().slice(0, 8),
+          slices: slices.slice(0, 16),
+          ...(managedSfz() ? { managedSfz: managedSfz() } : {}),
+        },
+      },
+    },
+  });
+  const addSampleSlice = () => {
+    if (sampleSlices().length >= 16) return;
+    const startRatio = Math.max(0, Math.min(1, getNumberParam(draft(), sampleParameterId("start"))));
+    const endRatio = Math.max(0, Math.min(1, getNumberParam(draft(), sampleParameterId("end"))));
+    if (endRatio <= startRatio) return;
+    const used = new Set(sampleSlices().map((slice) => slice.id));
+    let number = 1;
+    while (used.has(`slice-${number}`)) number += 1;
+    const slice = { id: `slice-${number}`, startRatio, endRatio };
+    commitSampleSlices([...sampleSlices(), slice], slice.id);
+  };
+  const patchSelectedSlice = (patch: Partial<{ startRatio: number; endRatio: number }>) => {
+    const selected = selectedSlice();
+    if (!selected) return;
+    const startRatio = Math.max(0, Math.min(patch.startRatio ?? selected.startRatio,
+      (patch.endRatio ?? selected.endRatio) - 0.001));
+    const endRatio = Math.min(1, Math.max(patch.endRatio ?? selected.endRatio,
+      startRatio + 0.001));
+    commitSampleSlices(sampleSlices().map((slice) => slice.id === selected.id
+      ? { ...slice, startRatio, endRatio } : slice), selected.id);
+  };
+  const removeSelectedSlice = () => {
+    const selected = selectedSliceId();
+    if (!selected) return;
+    commitSampleSlices(sampleSlices().filter((slice) => slice.id !== selected), "");
+  };
+  const granularMetadataPatch = (nextManaged: ManagedGranularAssetConfig | null | undefined) => isLumen()
+    ? { ...draft().metadata, lumenGranularSlots: {
+        ...draft().metadata.lumenGranularSlots,
+        [activeLumenSampleSlot()]: { schemaVersion: 1 as const, ...(nextManaged ? { managedAsset: nextManaged } : {}) },
       } }
     : { ...draft().metadata, managedGranular: nextManaged ?? undefined };
   const importSfz = async () => {
@@ -1832,15 +1927,15 @@ function AmpFilterPanel(props: { focusedSourceTarget?: SynthModulationSourceEdit
         </div>
         <section class={`${styles.ampFilterGroup} ${styles.ampFilterWideGroup} ${styles.sourceSlotGroup}`} aria-labelledby="aether-sample-slot-1-title">
           <h3 id="aether-sample-slot-1-title" class={styles.ampFilterGroupTitle}>{sampleSlotLabel()}</h3>
-          <Show when={isLumus()}>
-            <div class={styles.ampFilterShapeRow} role="tablist" aria-label="Lumus sample source settings">
+          <Show when={isLumen()}>
+            <div class={styles.ampFilterShapeRow} role="tablist" aria-label="Lumen sample source settings">
               <For each={["a", "b", "c"] as const}>{(slot) => (
                 <Button
                   size="xs"
-                  selected={activeLumusSampleSlot() === slot}
+                  selected={activeLumenSampleSlot() === slot}
                   role="tab"
-                  aria-selected={activeLumusSampleSlot() === slot}
-                  onClick={() => setActiveLumusSampleSlot(slot)}
+                  aria-selected={activeLumenSampleSlot() === slot}
+                  onClick={() => setActiveLumenSampleSlot(slot)}
                 >Source {slot.toUpperCase()}</Button>
               )}</For>
             </div>
@@ -1899,6 +1994,21 @@ function AmpFilterPanel(props: { focusedSourceTarget?: SynthModulationSourceEdit
               onOpenChange={setSampleRouteOpen}
               onChange={(value) => setParameter(sampleParameterId("route"), value)}
             />
+            <Show when={activeLumenSourceMode() === "sample"}>
+              <FloatingSelect
+                label="Direction"
+                layout="inline"
+                value={String(draft().parameters[sampleParameterId("direction")] ?? "forward")}
+                ariaLabel={`${sampleSlotLabel()} playback direction`}
+                options={[
+                  { value: "forward", label: "Forward" },
+                  { value: "reverse", label: "Reverse" },
+                ]}
+                open={sampleDirectionOpen()}
+                onOpenChange={setSampleDirectionOpen}
+                onChange={(value) => setParameter(sampleParameterId("direction"), value)}
+              />
+            </Show>
             <Button
               ref={sampleImportButton}
               size="xs"
@@ -1920,7 +2030,7 @@ function AmpFilterPanel(props: { focusedSourceTarget?: SynthModulationSourceEdit
               }}>Remove SFZ</Button>
             </Show>
           </div>
-          <div class={styles.knobCluster}>
+          <div class={`${styles.knobCluster} ${styles.sampleControlGrid}`}>
             <NumberInput
               label="Root"
               layout="inline"
@@ -1933,15 +2043,87 @@ function AmpFilterPanel(props: { focusedSourceTarget?: SynthModulationSourceEdit
             />
             <SynthParameterKnob id={sampleParameterId("level")} label="Level" defaultValue={0.8} onChange={setNumericParameter} />
             <SynthParameterKnob id={sampleParameterId("pan")} label="Pan" defaultValue={0} bipolar onChange={setNumericParameter} />
+            <Show when={activeLumenSourceMode() === "sample"}>
+              <Knob
+                size="sm"
+                label="Rate"
+                value={getNumberParam(draft(), sampleParameterId("playbackRate"))}
+                min={0.25}
+                max={4}
+                step={0.01}
+                defaultValue={1}
+                formatValue={(value) => `${value.toFixed(2)}x`}
+                onChange={(value) => setNumericParameter(sampleParameterId("playbackRate"), value)}
+              />
+              <Knob
+                size="sm"
+                label="Release Tail"
+                value={getNumberParam(draft(), sampleParameterId("releaseTailMs"))}
+                min={1}
+                max={2000}
+                step={1}
+                defaultValue={4}
+                formatValue={(value) => `${Math.round(value)} ms`}
+                onChange={(value) => setNumericParameter(sampleParameterId("releaseTailMs"), value)}
+              />
+            </Show>
           </div>
-          <div class={styles.knobCluster}>
-            <SynthParameterKnob id={sampleParameterId("start")} label="Start" defaultValue={0} onChange={setNumericParameter} />
-            <SynthParameterKnob id={sampleParameterId("end")} label="End" defaultValue={1} onChange={setNumericParameter} />
+          <div class={`${styles.knobCluster} ${styles.sampleControlGrid}`}>
+            <Show when={activeLumenSourceMode() !== "sample" || !selectedSlice()} fallback={
+              <>
+                <Knob size="sm" label="Slice Start" value={selectedSlice()!.startRatio}
+                  min={0} max={Math.max(0, selectedSlice()!.endRatio - 0.001)} step={0.001}
+                  defaultValue={0} formatValue={(value) => `${(value * 100).toFixed(1)}%`}
+                  onChange={(value) => patchSelectedSlice({ startRatio: value })} />
+                <Knob size="sm" label="Slice End" value={selectedSlice()!.endRatio}
+                  min={Math.min(1, selectedSlice()!.startRatio + 0.001)} max={1} step={0.001}
+                  defaultValue={1} formatValue={(value) => `${(value * 100).toFixed(1)}%`}
+                  onChange={(value) => patchSelectedSlice({ endRatio: value })} />
+              </>
+            }>
+              <SynthParameterKnob id={sampleParameterId("start")} label="Start" defaultValue={0} onChange={setNumericParameter} />
+              <SynthParameterKnob id={sampleParameterId("end")} label="End" defaultValue={1} onChange={setNumericParameter} />
+            </Show>
+            <Show when={activeLumenSourceMode() === "sample"}>
+              <FloatingSelect
+                label="Slice"
+                layout="inline"
+                value={selectedSliceId()}
+                ariaLabel={`${sampleSlotLabel()} selected slice`}
+                options={[
+                  { value: "", label: "Full Region" },
+                  ...sampleSlices().map((slice, index) => ({
+                    value: slice.id,
+                    label: `Slice ${index + 1} · ${(slice.startRatio * 100).toFixed(1)}–${(slice.endRatio * 100).toFixed(1)}%`,
+                  })),
+                ]}
+                open={sampleSliceOpen()}
+                onOpenChange={setSampleSliceOpen}
+                onChange={(value) => setParameter(sampleParameterId("selectedSliceId"), value)}
+              />
+              <Button size="xs" onClick={addSampleSlice} disabled={sampleSlices().length >= 16}>Add from Full Region</Button>
+              <Button size="xs" variant="ghost" onClick={removeSelectedSlice} disabled={!selectedSliceId()}>Remove Slice</Button>
+            </Show>
             <Toggle
               label="Loop"
               checked={draft().parameters[sampleParameterId("loop.enabled")] === true}
               onChange={(value) => setBooleanParameter(sampleParameterId("loop.enabled"), value)}
             />
+            <Show when={activeLumenSourceMode() === "sample"}>
+              <FloatingSelect
+                label="Loop Mode"
+                layout="inline"
+                value={String(draft().parameters[sampleParameterId("loopMode")] ?? "forward")}
+                ariaLabel={`${sampleSlotLabel()} loop mode`}
+                options={[
+                  { value: "forward", label: "Forward" },
+                  { value: "pingPong", label: "Ping-pong" },
+                ]}
+                open={sampleLoopModeOpen()}
+                onOpenChange={setSampleLoopModeOpen}
+                onChange={(value) => setParameter(sampleParameterId("loopMode"), value)}
+              />
+            </Show>
             <SynthParameterKnob id={sampleParameterId("loop.start")} label="Loop Start" defaultValue={0} onChange={setNumericParameter} />
             <SynthParameterKnob id={sampleParameterId("loop.end")} label="Loop End" defaultValue={1} onChange={setNumericParameter} />
           </div>
@@ -1965,13 +2147,13 @@ function AmpFilterPanel(props: { focusedSourceTarget?: SynthModulationSourceEdit
           )}</For>
         </section>
         <section class={`${styles.ampFilterGroup} ${styles.ampFilterWideGroup} ${styles.sourceSlotGroup}`} aria-labelledby="aether-granular-slot-2-title">
-          <h3 id="aether-granular-slot-2-title" class={styles.ampFilterGroupTitle}>{isLumus() ? `Source ${activeLumusSampleSlot().toUpperCase()} Granular` : "Granular Slot 2"}</h3>
-          <Show when={isLumus()}>
-            <div class={styles.ampFilterShapeRow} role="tablist" aria-label="Lumus granular source settings">
+          <h3 id="aether-granular-slot-2-title" class={styles.ampFilterGroupTitle}>{isLumen() ? `Source ${activeLumenSampleSlot().toUpperCase()} Granular` : "Granular Slot 2"}</h3>
+          <Show when={isLumen()}>
+            <div class={styles.ampFilterShapeRow} role="tablist" aria-label="Lumen granular source settings">
               <For each={["a", "b", "c"] as const}>{(slot) => (
-                <Button size="xs" selected={activeLumusSampleSlot() === slot} role="tab"
-                  aria-selected={activeLumusSampleSlot() === slot}
-                  onClick={() => setActiveLumusSampleSlot(slot)}>Source {slot.toUpperCase()}</Button>
+                <Button size="xs" selected={activeLumenSampleSlot() === slot} role="tab"
+                  aria-selected={activeLumenSampleSlot() === slot}
+                  onClick={() => setActiveLumenSampleSlot(slot)}>Source {slot.toUpperCase()}</Button>
               )}</For>
             </div>
           </Show>
@@ -1986,7 +2168,7 @@ function AmpFilterPanel(props: { focusedSourceTarget?: SynthModulationSourceEdit
           <div class={styles.ampFilterShapeRow}>
             <Toggle
               label="Enabled"
-              aria-label={isLumus() ? `Enable Source ${activeLumusSampleSlot().toUpperCase()} granular` : "Enable Aether granular slot 2"}
+              aria-label={isLumen() ? `Enable Source ${activeLumenSampleSlot().toUpperCase()} granular` : "Enable Aether granular slot 2"}
               aria-describedby="aether-granular-slot-2-source-status"
               checked={draft().parameters[granularParameterId("enabled")] === true}
               disabled={!granularSourceAvailable()}
@@ -2057,14 +2239,14 @@ function AmpFilterPanel(props: { focusedSourceTarget?: SynthModulationSourceEdit
             <NumberInput label="Seed" layout="inline" value={getNumberParam(draft(), granularParameterId("randomSeed"))} min={1} max={4294967295} step={1} ariaLabel="Granular deterministic seed" onChange={(value) => setNumericParameter(granularParameterId("randomSeed"), value)} />
           </div>
         </section>
-        <div class={`${styles.ampFilterGroup} ${styles.ampFilterWideGroup}`} aria-label={`${isLumus() ? "Lumus" : "Aether"} source FX buses`}>
+        <div class={`${styles.ampFilterGroup} ${styles.ampFilterWideGroup}`} aria-label={`${isLumen() ? "Lumen" : "Aether"} source FX buses`}>
           <div class={styles.ampFilterGroupTitle}>Source FX</div>
           <div class={styles.ampFilterShapeRow}>
             <FloatingSelect
               label="Bus 1"
               layout="inline"
               value={String(draft().parameters["aether.fxBus1Id"] ?? "")}
-              ariaLabel={`${isLumus() ? "Lumus" : "Aether"} FX bus 1 target`}
+              ariaLabel={`${isLumen() ? "Lumen" : "Aether"} FX bus 1 target`}
               options={fxBusOptions()}
               open={fxBus1Open()}
               onOpenChange={setFxBus1Open}
@@ -2074,7 +2256,7 @@ function AmpFilterPanel(props: { focusedSourceTarget?: SynthModulationSourceEdit
               label="Bus 2"
               layout="inline"
               value={String(draft().parameters["aether.fxBus2Id"] ?? "")}
-              ariaLabel={`${isLumus() ? "Lumus" : "Aether"} FX bus 2 target`}
+              ariaLabel={`${isLumen() ? "Lumen" : "Aether"} FX bus 2 target`}
               options={fxBusOptions()}
               open={fxBus2Open()}
               onOpenChange={setFxBus2Open}

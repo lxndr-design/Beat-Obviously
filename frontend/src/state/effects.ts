@@ -175,7 +175,12 @@ export function normalizeTrackEffectChain(input: unknown): TrackEffectChain {
     return { filters: [] };
   }
   return {
-    filters: (input as TrackEffectChain).filters.map(normalizeTrackEffect),
+    // Unknown effect kinds are ignored by the native engine. Drop them here as
+    // well instead of silently converting them to Reverb, which changes sound
+    // and can leave editor surfaces trying to render missing effect metadata.
+    filters: (input as TrackEffectChain).filters
+      .filter((effect) => effect && typeof effect === "object" && isEffectKind((effect as Partial<TrackEffect>).kind))
+      .map(normalizeTrackEffect),
   };
 }
 

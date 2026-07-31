@@ -17,9 +17,14 @@ namespace beat
         bool ok() const noexcept { return !blocked && failedFiles == 0; }
     };
 
+    bool projectUsesFolderLayout(const juce::File& projectFile);
+    juce::File encapsulatedProjectFileFor(const juce::File& selectedFile);
     juce::File projectSidecarFolderFor(const juce::File& projectFile);
     juce::String resolveProjectRelativePath(const juce::File& projectFile, const juce::String& path);
     void resolveDocumentAssetPaths(juce::var& document, const juce::File& projectFile);
+    void relocateDocumentSidecarPaths(juce::var& document,
+                                      const juce::File& sourceProjectFile,
+                                      const juce::File& destinationProjectFile);
     juce::var buildDocumentAssetManifest(const juce::var& document);
     bool rebuildDocumentAssetManifest(juce::var& document);
     bool packageExternalDocumentAssets(juce::var& document, const juce::File& projectFile, juce::String& error);

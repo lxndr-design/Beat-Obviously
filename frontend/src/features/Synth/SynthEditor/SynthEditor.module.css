@@ -185,7 +185,43 @@
   align-items: end;
 }
 
+.clipBody {
+  grid-template-columns: repeat(3, minmax(180px, 1fr));
+}
+
+.clipSummary {
+  display: grid;
+  align-content: start;
+  gap: 3px;
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-ui);
+}
+
+.clipPatternImport {
+  align-content: start;
+  gap: 6px;
+}
+
+.clipPatternImport > span {
+  color: color-mix(in srgb, var(--color-fg) 58%, transparent);
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-hint);
+  line-height: 1.2;
+}
+
+.clipPianoRoll {
+  grid-column: 1 / -1;
+  min-width: 0;
+  max-height: 610px;
+  overflow: hidden;
+  border: var(--border-soft);
+}
+
 @media (max-width: 680px) {
+  .clipBody {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .clipStepGrid {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
@@ -351,7 +387,7 @@
 }
 
 .fxSliderInput {
-  height: 15px;
+  height: 24px;
 }
 
 .fxSliderReadout {
@@ -1274,6 +1310,19 @@
   grid-row: 3;
 }
 
+.ampFilterWideGroup.sourceSlotGroup {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto;
+  align-content: start;
+  align-items: start;
+}
+
+.ampFilterWideGroup.sourceSlotGroup > * {
+  grid-column: 1 / -1;
+  grid-row: auto;
+  min-width: 0;
+}
+
 .sourceSlotStatus:focus-visible {
   outline: 0;
   box-shadow: var(--interaction-focus-ring);
@@ -1294,6 +1343,11 @@
   gap: 3px;
   align-items: end;
   min-width: 0;
+}
+
+.sampleControlGrid {
+  grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));
+  gap: 6px;
 }
 
 .mappedSampleZone {

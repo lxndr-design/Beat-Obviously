@@ -1,10 +1,19 @@
 import { createMemo, createSignal, For, onCleanup, Show } from "solid-js";
-import { Button, FloatingSelect, Icon, Knob, NumberInput, Slider, TextInput, Toggle } from "../../solid-ui";
-import { sampleAurumOperatorWaveform, startInstrumentPreviewAudition, type InstrumentPreviewAuditionHandle } from "../../audio/synthPreview";
-import { AURUM_DIRECT_BUS, AURUM_FILTER_A_BUS, AURUM_FILTER_B_BUS, AURUM_HARMONIC_COUNT, AURUM_OPERATOR_COUNT, AURUM_OUTPUT_BUS_COUNT, AURUM_RESPONSE_CURVE_POINT_COUNT, drawAurumHarmonicLine, normalizedAurumConfigForInstrument } from "../../state/aurum";
+import { appAlert, appConfirm, appPrompt, Button, FloatingSelect, Icon, Knob, NumberInput, Slider, TextInput, Toggle } from "../../solid-ui";
+import { sampleAurumOperatorWaveform, startInstrumentPreviewAudition, type InstrumentPreviewAuditionHandle, type SynthPreviewExpression } from "../../audio/synthPreview";
+import { deleteAurumPreset, listAurumPresets, saveAurumPreset } from "../../persistence/dexie";
+import { AURUM_DIRECT_BUS, AURUM_FILTER_A_BUS, AURUM_FILTER_B_BUS, AURUM_HARMONIC_COUNT, AURUM_OPERATOR_COUNT, AURUM_OUTPUT_BUS_COUNT, AURUM_RESPONSE_CURVE_POINT_COUNT, aurumFilterCutoffModulationTarget, aurumFilterModulationTarget, aurumOperatorModulationTarget, drawAurumHarmonicLine, normalizedAurumConfigForInstrument } from "../../state/aurum";
+import { AURUM_FACTORY_PRESETS, AURUM_FACTORY_PRESET_FAVORITES_KEY, aurumFactoryPresetById, isAurumFactoryPreset } from "../../state/aurumFactoryPresets";
+import { readInstrumentPresetFavoriteIds, toggledInstrumentPresetFavoriteIds, writeInstrumentPresetFavoriteIds } from "../../state/instrumentPresetPreferences";
+import { applyAurumPresetRecord, createAurumPresetRecord, type AurumPresetRecord } from "../../state/synthPresets";
+import { useSynthStore, type SynthExpressionActivity } from "../../state/synthStore";
 import type { AurumFilterConfig, AurumOperatorConfig, AurumOperatorWaveform, Instrument } from "../../state/types";
+import { createStoreSelector } from "../../solid-utils/store";
+import { InstrumentPresetBrowser } from "../InstrumentPresetBrowser/InstrumentPresetBrowser.solid";
+import { AurumModulatedControl, AurumModulationBridge } from "./AurumModulationBridge.solid";
 import { aurumTabIndexAfterKey } from "./aurumEditorInteraction";
 import { applyAurumAlgorithmTemplate, AURUM_ALGORITHM_TEMPLATES, copyAurumOperator, initializeAurumOperator, pasteAurumOperator, resetAurumOperator, swapAurumOperators, type AurumAlgorithmTemplateId } from "./aurumEditing";
+import { createAurumEditHistory, recordAurumEdit, redoAurumEdit, undoAurumEdit } from "./aurumHistory";
 import { analyzeAurumSignalFlow, type AurumOperatorSignalState } from "./aurumSignalDiagnostics";
 import styles from "./AurumEditor.module.css";
 
@@ -27,6 +36,7 @@ export interface AurumEditorProps {
 }
 
 export function AurumEditor(props: AurumEditorProps) {
+  const liveExpressionActivities = createStoreSelector(useSynthStore, (state) => state.expressionActivityByInstrument);
   const [draft, setDraft] = createSignal(cloneInstrument(props.instrument), { equals: false });
   const [selectedOperator, setSelectedOperator] = createSignal(0);
   const [selectedPage, setSelectedPage] = createSignal<"main" | "operator">("operator");
@@ -40,16 +50,78 @@ export function AurumEditor(props: AurumEditorProps) {
   const [algorithmTemplate, setAlgorithmTemplate] = createSignal<AurumAlgorithmTemplateId | "custom">("custom");
   const [operatorClipboard, setOperatorClipboard] = createSignal<{ sourceName: string; operator: AurumOperatorConfig } | null>(null);
   const [auditioning, setAuditioning] = createSignal(false);
+  const [presetBrowserOpen, setPresetBrowserOpen] = createSignal(false);
+  const [presetRecords, setPresetRecords] = createSignal<AurumPresetRecord[]>([]);
+  const [factoryFavoriteIds, setFactoryFavoriteIds] = createSignal(readInstrumentPresetFavoriteIds(AURUM_FACTORY_PRESET_FAVORITES_KEY), { equals: false });
+  const [presetLoading, setPresetLoading] = createSignal(false);
+  const [presetBusy, setPresetBusy] = createSignal(false);
+  const [presetPreviewingId, setPresetPreviewingId] = createSignal<string | null>(null);
+  const [history, setHistory] = createSignal(createAurumEditHistory(), { equals: false });
   let audition: InstrumentPreviewAuditionHandle | null = null;
 
   const aurum = createMemo(() => normalizedAurumConfigForInstrument(draft()));
+  const liveExpression = createMemo<SynthExpressionActivity | null>(() => liveExpressionActivities()[props.instrument.id] ?? null);
   const operator = createMemo(() => aurum().operators[selectedOperator()]);
   const signalDiagnostics = createMemo(() => analyzeAurumSignalFlow(aurum()));
+  const presetBrowserEntries = createMemo(() => [
+    ...AURUM_FACTORY_PRESETS.map((record) => ({
+      ...record,
+      favorite: factoryFavoriteIds().has(record.id),
+      sourceLabel: "Factory",
+      description: record.description,
+      deletable: false,
+    })),
+    ...presetRecords().map((record) => ({
+      ...record,
+      sourceLabel: "User",
+      description: "Saved Aurum preset",
+      deletable: true,
+    })),
+  ]);
 
-  onCleanup(stopAudition);
+  function editDraft(group: string, mutator: (current: Instrument) => Instrument, coalesce = true) {
+    const current = draft();
+    setHistory(recordAurumEdit(history(), current, group, Date.now(), coalesce));
+    setDraft(mutator(current));
+  }
 
-  function updateAurum(mutator: (config: ReturnType<typeof aurum>) => ReturnType<typeof aurum>) {
-    setDraft((current) => ({ ...current, aurum: mutator(normalizedAurumConfigForInstrument(current)) }));
+  function undo() {
+    const transition = undoAurumEdit(history(), draft());
+    if (!transition) return;
+    stopAudition();
+    setHistory(transition.history);
+    setDraft(transition.draft);
+  }
+
+  function redo() {
+    const transition = redoAurumEdit(history(), draft());
+    if (!transition) return;
+    stopAudition();
+    setHistory(transition.history);
+    setDraft(transition.draft);
+  }
+
+  function onEditorKeyDown(event: KeyboardEvent) {
+    if (!(event.metaKey || event.ctrlKey) || event.altKey || event.key.toLowerCase() !== "z") return;
+    const target = event.target as HTMLElement | null;
+    if (target?.closest("textarea, select, [contenteditable='true'], input:not([type='range']):not([type='checkbox']):not([type='radio'])")) return;
+    event.preventDefault();
+    if (event.shiftKey) redo();
+    else undo();
+  }
+
+  window.addEventListener("keydown", onEditorKeyDown);
+  onCleanup(() => {
+    window.removeEventListener("keydown", onEditorKeyDown);
+    stopAudition();
+  });
+
+  function updateAurum(
+    mutator: (config: ReturnType<typeof aurum>) => ReturnType<typeof aurum>,
+    group = "aurum",
+    coalesce = true,
+  ) {
+    editDraft(group, (current) => ({ ...current, aurum: mutator(normalizedAurumConfigForInstrument(current)) }), coalesce);
   }
 
   function updateOperator(patch: Partial<AurumOperatorConfig>) {
@@ -57,14 +129,14 @@ export function AurumEditor(props: AurumEditorProps) {
     updateAurum((config) => ({
       ...config,
       operators: config.operators.map((candidate, candidateIndex) => candidateIndex === index ? { ...candidate, ...patch } : candidate),
-    }));
+    }), `operator:${index}:${Object.keys(patch).sort().join(",")}`);
   }
 
   function updateFilter(index: number, patch: Partial<AurumFilterConfig>) {
     updateAurum((config) => ({
       ...config,
       filters: config.filters.map((filter, filterIndex) => filterIndex === index ? { ...filter, ...patch } : filter) as typeof config.filters,
-    }));
+    }), `filter:${index}:${Object.keys(patch).sort().join(",")}`);
   }
 
   function selectedEnvelope() {
@@ -107,7 +179,7 @@ export function AurumEditor(props: AurumEditorProps) {
       outputSends: config.outputSends.map((row, rowIndex) => rowIndex === source
         ? row.map((cell, columnIndex) => columnIndex === target ? value : cell)
         : row),
-    }));
+    }), `matrix:${matrixMode()}:${source}:${target}`);
   }
 
   function updateOutputSend(bus: number, value: number) {
@@ -117,7 +189,7 @@ export function AurumEditor(props: AurumEditorProps) {
       outputSends: config.outputSends.map((row, rowIndex) => rowIndex === selectedOperator()
         ? row.map((cell, columnIndex) => columnIndex === bus ? value : cell)
         : row),
-    }));
+    }), `output:${selectedOperator()}:${bus}`);
   }
 
   function copySelectedOperator() {
@@ -128,31 +200,31 @@ export function AurumEditor(props: AurumEditorProps) {
     const copied = operatorClipboard();
     if (!copied) return;
     setAlgorithmTemplate("custom");
-    updateAurum((config) => pasteAurumOperator(config, selectedOperator(), copied.operator));
+    updateAurum((config) => pasteAurumOperator(config, selectedOperator(), copied.operator), `paste:${selectedOperator()}`, false);
   }
 
   function initializeSelectedOperator() {
     setAlgorithmTemplate("custom");
-    updateAurum((config) => initializeAurumOperator(config, selectedOperator()));
+    updateAurum((config) => initializeAurumOperator(config, selectedOperator()), `initialize:${selectedOperator()}`, false);
   }
 
   function resetSelectedOperator() {
     setAlgorithmTemplate("custom");
-    updateAurum((config) => resetAurumOperator(config, selectedOperator()));
+    updateAurum((config) => resetAurumOperator(config, selectedOperator()), `reset:${selectedOperator()}`, false);
   }
 
   function swapSelectedOperator(value: string) {
     const target = Number(value);
     if (!Number.isInteger(target)) return;
     setAlgorithmTemplate("custom");
-    updateAurum((config) => swapAurumOperators(config, selectedOperator(), target));
+    updateAurum((config) => swapAurumOperators(config, selectedOperator(), target), `swap:${selectedOperator()}:${target}`, false);
     setSelectedOperator(target);
   }
 
   function selectAlgorithmTemplate(value: string) {
     if (value === "custom") return;
     const id = value as AurumAlgorithmTemplateId;
-    updateAurum((config) => applyAurumAlgorithmTemplate(config, id));
+    updateAurum((config) => applyAurumAlgorithmTemplate(config, id), `algorithm:${id}`, false);
     setAlgorithmTemplate(id);
     setMatrixMode("fm");
   }
@@ -174,22 +246,155 @@ export function AurumEditor(props: AurumEditorProps) {
     queueMicrotask(() => document.querySelector<HTMLButtonElement>(`[data-aurum-tab="${nextIndex}"]`)?.focus());
   }
 
+  function startAudition(instrument: Instrument, presetId: string | null = null, durationSeconds = 2.4, velocity = 104) {
+    stopAudition();
+    setPresetPreviewingId(presetId);
+    setAuditioning(true);
+    const activity = liveExpression();
+    const expression: SynthPreviewExpression | undefined = activity ? {
+      modWheel: activity.modWheel,
+      pressure: activity.pressure,
+      timbre: activity.timbre,
+      pitchBendSemitones: activity.pitchBendSemitones,
+    } : undefined;
+    const auditionVelocity = Number.isFinite(activity?.velocity)
+      ? Math.round(Math.max(0, Math.min(1, Number(activity?.velocity))) * 127)
+      : velocity;
+    audition = startInstrumentPreviewAudition(instrument, durationSeconds, 0.22, 120, auditionVelocity, () => {
+      audition = null;
+      setPresetPreviewingId(null);
+      setAuditioning(false);
+    }, undefined, expression);
+  }
+
   function toggleAudition() {
     if (audition) {
       stopAudition();
       return;
     }
-    setAuditioning(true);
-    audition = startInstrumentPreviewAudition(draft(), 2.4, 0.22, 120, 104, () => {
-      audition = null;
-      setAuditioning(false);
-    });
+    startAudition(draft());
   }
 
   function stopAudition() {
     audition?.stop();
     audition = null;
+    setPresetPreviewingId(null);
     setAuditioning(false);
+  }
+
+  async function refreshPresetRecords() {
+    setPresetLoading(true);
+    try {
+      setPresetRecords(await listAurumPresets());
+    } catch (error) {
+      await appAlert(error instanceof Error ? error.message : "Could not load Aurum presets.", "Preset Library");
+    } finally {
+      setPresetLoading(false);
+    }
+  }
+
+  function openPresetBrowser() {
+    stopAudition();
+    setPresetBrowserOpen(true);
+    void refreshPresetRecords();
+  }
+
+  function closePresetBrowser() {
+    stopAudition();
+    setPresetBrowserOpen(false);
+  }
+
+  async function saveCurrentPreset() {
+    const name = (await appPrompt("Preset name", draft().name, "Save Aurum Preset"))?.trim();
+    if (!name) return;
+    const defaultTags = draft().descriptors?.join(", ") ?? "aurum";
+    const tagText = await appPrompt("Tags, separated by commas", defaultTags, "Preset Tags");
+    if (tagText === null) return;
+    setPresetBusy(true);
+    try {
+      await saveAurumPreset(createAurumPresetRecord({
+        name,
+        instrument: draft(),
+        tags: tagText.split(","),
+      }));
+      await refreshPresetRecords();
+    } catch (error) {
+      await appAlert(error instanceof Error ? error.message : "Could not save the Aurum preset.", "Preset Library");
+    } finally {
+      setPresetBusy(false);
+    }
+  }
+
+  function recordForId(id: string) {
+    return aurumFactoryPresetById(id) ?? presetRecords().find((record) => record.id === id) ?? null;
+  }
+
+  function applyPreset(id: string) {
+    const record = recordForId(id);
+    if (!record) return;
+    const next = applyAurumPresetRecord(draft(), record);
+    if (!next) {
+      void appAlert("This preset is not compatible with the current Aurum instrument.", "Preset Library");
+      return;
+    }
+    stopAudition();
+    editDraft(`preset:${record.id}`, () => next, false);
+    setPresetBrowserOpen(false);
+  }
+
+  function togglePresetPreview(id: string) {
+    if (presetPreviewingId() === id) {
+      stopAudition();
+      return;
+    }
+    const record = recordForId(id);
+    if (!record) return;
+    const preview = applyAurumPresetRecord(draft(), record);
+    if (!preview) return;
+    if (isAurumFactoryPreset(record)) {
+      const pitchedPreview = {
+        ...preview,
+        detuneCents: (preview.detuneCents ?? 0) + (record.audition.midiNote - 60) * 100,
+      };
+      startAudition(pitchedPreview, id, record.audition.durationSeconds, record.audition.velocity);
+      return;
+    }
+    startAudition(preview, id);
+  }
+
+  async function togglePresetFavorite(id: string) {
+    const record = recordForId(id);
+    if (!record) return;
+    if (isAurumFactoryPreset(record)) {
+      const next = toggledInstrumentPresetFavoriteIds(factoryFavoriteIds(), id);
+      setFactoryFavoriteIds(next);
+      writeInstrumentPresetFavoriteIds(AURUM_FACTORY_PRESET_FAVORITES_KEY, next);
+      return;
+    }
+    setPresetBusy(true);
+    try {
+      await saveAurumPreset({ ...record, favorite: !record.favorite, updatedAt: Date.now() });
+      await refreshPresetRecords();
+    } catch (error) {
+      await appAlert(error instanceof Error ? error.message : "Could not update the preset.", "Preset Library");
+    } finally {
+      setPresetBusy(false);
+    }
+  }
+
+  async function removePreset(id: string) {
+    const record = recordForId(id);
+    if (!record || isAurumFactoryPreset(record) || !await appConfirm(`Delete "${record.name}" from your Aurum presets?`, "Delete Preset")) return;
+    if (presetPreviewingId() === id) stopAudition();
+    setPresetBusy(true);
+    try {
+      await deleteAurumPreset(id);
+      await refreshPresetRecords();
+    } catch (error) {
+      await appAlert(error instanceof Error ? error.message : "Could not delete the preset.", "Preset Library");
+    } finally {
+      setPresetBusy(false);
+    }
   }
 
   function save() {
@@ -219,13 +424,23 @@ export function AurumEditor(props: AurumEditorProps) {
             <p>Six-operator FM, RM, and additive synthesis</p>
           </div>
         </div>
-        <TextInput
-          className={styles.nameInput}
-          label="Patch"
-          layout="inline"
-          value={draft().name}
-          onInput={(event) => setDraft((current) => ({ ...current, name: event.currentTarget.value }))}
-        />
+        <div class={styles.headerTools}>
+          <Button
+            size="sm"
+            variant="ghost"
+            aria-expanded={presetBrowserOpen()}
+            onClick={() => presetBrowserOpen() ? closePresetBrowser() : openPresetBrowser()}
+          >
+            Presets
+          </Button>
+          <TextInput
+            className={styles.nameInput}
+            label="Patch"
+            layout="inline"
+            value={draft().name}
+            onInput={(event) => editDraft("patch:name", (current) => ({ ...current, name: event.currentTarget.value }))}
+          />
+        </div>
       </header>
 
       <main class={styles.body}>
@@ -274,6 +489,58 @@ export function AurumEditor(props: AurumEditorProps) {
                 </div>
               </div>
               <div class={styles.controlBlock}>
+                <h4>Voice mode</h4>
+                <div class={styles.voiceModeGrid}>
+                  <div class={styles.voiceModeToggles} role="group" aria-label="Aurum voice mode">
+                    <Toggle
+                      label="Mono"
+                      checked={draft().mono ?? false}
+                      onChange={(mono) => editDraft("voice:mono", (current) => ({ ...current, mono }), false)}
+                    />
+                    <Toggle
+                      label="Legato"
+                      checked={draft().legato ?? false}
+                      onChange={(legato) => editDraft("voice:legato", (current) => ({ ...current, legato }), false)}
+                    />
+                  </div>
+                  <NumberInput
+                    label="Voice limit"
+                    layout="inline"
+                    min={1}
+                    max={32}
+                    step={1}
+                    value={draft().maxVoices ?? 16}
+                    onChange={(maxVoices) => editDraft("voice:maxVoices", (current) => ({
+                      ...current,
+                      maxVoices: Math.max(1, Math.min(32, Math.round(maxVoices))),
+                    }))}
+                  />
+                  <Slider
+                    label="Glide"
+                    layout="inline"
+                    min={0}
+                    max={500}
+                    step={1}
+                    value={Math.max(0, Math.min(500, draft().glideMs ?? 0))}
+                    readout={<span>{Math.round(draft().glideMs ?? 0)} ms</span>}
+                    onChange={(glideMs) => editDraft("voice:glide", (current) => ({ ...current, glideMs }))}
+                  />
+                  <NumberInput
+                    label="Pitch bend"
+                    layout="inline"
+                    min={0}
+                    max={24}
+                    step={1}
+                    unit="st"
+                    value={draft().pitchBendRangeSemitones ?? 2}
+                    onChange={(pitchBendRangeSemitones) => editDraft("voice:pitchBend", (current) => ({
+                      ...current,
+                      pitchBendRangeSemitones: Math.max(0, Math.min(24, pitchBendRangeSemitones)),
+                    }))}
+                  />
+                </div>
+              </div>
+              <div class={styles.controlBlock}>
                 <h4>Unison</h4>
                 <div class={styles.controlGrid}>
                   <NumberInput label="Voices" layout="inline" min={1} max={8} step={1} value={aurum().unison} onChange={(unison) => updateAurum((config) => ({ ...config, unison: Math.round(unison) }))} />
@@ -315,13 +582,27 @@ export function AurumEditor(props: AurumEditorProps) {
                         onOpenChange={(open) => setFilterOpen(open ? index() : null)}
                         onChange={(type) => updateFilter(index(), { type: type as AurumFilterConfig["type"] })}
                       />
-                      <Slider label="Cutoff" layout="inline" min={0} max={1} step={0.01} value={filter.cutoff} readout={<span>{Math.round(filter.cutoff * 100)}%</span>} onChange={(cutoff) => updateFilter(index(), { cutoff })} />
-                      <Slider label="Resonance" layout="inline" min={0} max={1} step={0.01} value={filter.resonance} readout={<span>{Math.round(filter.resonance * 100)}%</span>} onChange={(resonance) => updateFilter(index(), { resonance })} />
-                      <Slider label="Drive" layout="inline" min={0} max={1} step={0.01} value={filter.drive} readout={<span>{Math.round(filter.drive * 100)}%</span>} onChange={(drive) => updateFilter(index(), { drive })} />
+                      <AurumModulatedControl routes={aurum().modulation} target={aurumFilterCutoffModulationTarget(index())}>
+                        <Slider label="Cutoff" layout="inline" min={0} max={1} step={0.01} value={filter.cutoff} readout={<span>{Math.round(filter.cutoff * 100)}%</span>} onChange={(cutoff) => updateFilter(index(), { cutoff })} />
+                      </AurumModulatedControl>
+                      <AurumModulatedControl routes={aurum().modulation} target={aurumFilterModulationTarget(index(), "resonance")}>
+                        <Slider label="Resonance" layout="inline" min={0} max={1} step={0.01} value={filter.resonance} readout={<span>{Math.round(filter.resonance * 100)}%</span>} onChange={(resonance) => updateFilter(index(), { resonance })} />
+                      </AurumModulatedControl>
+                      <AurumModulatedControl routes={aurum().modulation} target={aurumFilterModulationTarget(index(), "drive")}>
+                        <Slider label="Drive" layout="inline" min={0} max={1} step={0.01} value={filter.drive} readout={<span>{Math.round(filter.drive * 100)}%</span>} onChange={(drive) => updateFilter(index(), { drive })} />
+                      </AurumModulatedControl>
                     </section>
                   )}</For>
                 </div>
               </div>
+              <AurumModulationBridge
+                instrument={draft()}
+                config={aurum()}
+                selectedOperator={selectedOperator()}
+                expressionActivity={liveExpression()}
+                onInstrumentPatch={(patch, group) => editDraft(group, (current) => ({ ...current, ...patch }))}
+                onConfigChange={(config, group) => updateAurum(() => config, group)}
+              />
             </div>
           }>
             <div id="aurum-page-panel" class={styles.operatorPanel} role="tabpanel">
@@ -390,8 +671,12 @@ export function AurumEditor(props: AurumEditorProps) {
                   <NumberInput label="Ratio" layout="inline" min={0.125} max={32} step={0.125} value={operator().ratio} onChange={(ratio) => updateOperator({ ratio })} />
                   <NumberInput label="Coarse" layout="inline" min={-48} max={48} step={1} unit="st" value={operator().coarse} onChange={(coarse) => updateOperator({ coarse })} />
                   <NumberInput label="Fine" layout="inline" min={-100} max={100} step={1} unit="ct" value={operator().fineCents} onChange={(fineCents) => updateOperator({ fineCents })} />
-                  <Slider label="Level" layout="inline" min={0} max={1} step={0.01} value={operator().level} readout={<span>{Math.round(operator().level * 100)}%</span>} onChange={(level) => updateOperator({ level })} />
-                  <Slider label="Pan" layout="inline" min={-1} max={1} step={0.01} value={operator().pan} readout={<span>{formatPan(operator().pan)}</span>} onChange={(pan) => updateOperator({ pan })} />
+                  <AurumModulatedControl routes={aurum().modulation} target={aurumOperatorModulationTarget(selectedOperator(), "level")}>
+                    <Slider label="Level" layout="inline" min={0} max={1} step={0.01} value={operator().level} readout={<span>{Math.round(operator().level * 100)}%</span>} onChange={(level) => updateOperator({ level })} />
+                  </AurumModulatedControl>
+                  <AurumModulatedControl routes={aurum().modulation} target={aurumOperatorModulationTarget(selectedOperator(), "pan")}>
+                    <Slider label="Pan" layout="inline" min={-1} max={1} step={0.01} value={operator().pan} readout={<span>{formatPan(operator().pan)}</span>} onChange={(pan) => updateOperator({ pan })} />
+                  </AurumModulatedControl>
                 </div>
               </div>
               <div class={styles.controlBlock}>
@@ -579,15 +864,34 @@ export function AurumEditor(props: AurumEditorProps) {
       </main>
 
       <footer class={styles.footer}>
-        <Button variant="ghost" selected={auditioning()} onClick={toggleAudition}>
-          <Icon name={auditioning() ? "ph:stop-fill" : "ph:play-fill"} size={18} decorative />
-          {auditioning() ? "Stop" : "Audition"}
-        </Button>
+        <div class={styles.footerActions}>
+          <Button variant="ghost" selected={auditioning()} onClick={toggleAudition}>
+            <Icon name={auditioning() ? "ph:stop-fill" : "ph:play-fill"} size={18} decorative />
+            {auditioning() ? "Stop" : "Audition"}
+          </Button>
+          <Button variant="ghost" disabled={history().undo.length === 0} onClick={undo} aria-label="Undo Aurum edit">Undo</Button>
+          <Button variant="ghost" disabled={history().redo.length === 0} onClick={redo} aria-label="Redo Aurum edit">Redo</Button>
+        </div>
         <div class={styles.footerActions}>
           <Button variant="ghost" onClick={props.onClose}>Cancel</Button>
           <Button variant="primary" onClick={save}>Save</Button>
         </div>
       </footer>
+
+      <InstrumentPresetBrowser
+        open={presetBrowserOpen()}
+        title="Aurum Presets"
+        entries={presetBrowserEntries()}
+        loading={presetLoading()}
+        busy={presetBusy()}
+        previewingId={presetPreviewingId()}
+        onClose={closePresetBrowser}
+        onSaveCurrent={() => void saveCurrentPreset()}
+        onApply={applyPreset}
+        onTogglePreview={togglePresetPreview}
+        onToggleFavorite={(id) => void togglePresetFavorite(id)}
+        onDelete={(id) => void removePreset(id)}
+      />
     </div>
   );
 }

@@ -13,7 +13,6 @@ import {
 import { clipboardStore } from "../../state/clipboard";
 import { useComponentStore } from "../../state/components";
 import { listDrumBeatFeedback, updateDrumBeatFeedback } from "../../persistence/dexie";
-import { maybeRunDueTraining } from "../../ai/trainingRunner";
 import { selectedCrossfadeCandidate } from "./arrangementActions";
 import { decentSamplerPluginForInstrument } from "../PluginLibrary/decentSamplerPluginAdapter";
 import { appPrompt, meshTintVariantFor } from "../../solid-ui";
@@ -53,6 +52,7 @@ interface Props {
   startBeat: number;
   lengthBeats: number;
   repetition: number;
+  totalPlays: number;
   layer: number;
   payloadKind: "audio" | "midi" | "drum" | "drumpad" | "mixed";
   onEdit: () => void;
@@ -95,7 +95,6 @@ export function Segment(props: Props) {
 
   const beatsToPx = createStoreSelector(useViewStore, (state) => state.beatsToPx);
   const project = createStoreSelector(useProjectStore, (state) => state.project);
-  const projectLengthBeats = createStoreSelector(useProjectStore, (state) => state.project.lengthBeats);
   const timeSignatureBeats = createStoreSelector(useProjectStore, (state) => state.project.timeSignature.num);
   const timelineSmartGrid = createStoreSelector(useSettingsStore, (state) => state.timelineSmartGrid);
   const timelineSubdivision = createStoreSelector(useSettingsStore, (state) => state.timelineSubdivision);
@@ -236,7 +235,13 @@ export function Segment(props: Props) {
       const minStart = Math.min(...currentDrag.segments.map((segment) => segment.startBeat + deltaBeats));
       if (minStart < 0) deltaBeats -= minStart;
       const targetTrackIndex = trackIndexAtClientY(event.clientY, projectState.tracks.map((track) => track.id));
-      const trackDelta = targetTrackIndex == null ? 0 : targetTrackIndex - currentDrag.originTrackIndex;
+      const requestedTrackDelta = targetTrackIndex == null ? 0 : targetTrackIndex - currentDrag.originTrackIndex;
+      const minimumTrackIndex = Math.min(...currentDrag.segments.map((segment) => segment.trackIndex));
+      const maximumTrackIndex = Math.max(...currentDrag.segments.map((segment) => segment.trackIndex));
+      const trackDelta = Math.max(
+        -minimumTrackIndex,
+        Math.min(projectState.tracks.length - 1 - maximumTrackIndex, requestedTrackDelta),
+      );
       const moves = currentDrag.segments.flatMap((segment) => {
         const targetIndex = Math.max(0, Math.min(projectState.tracks.length - 1, segment.trackIndex + trackDelta));
         const targetTrackId = projectState.tracks[targetIndex]?.id ?? segment.trackId;
@@ -411,7 +416,6 @@ export function Segment(props: Props) {
       ];
     }
     const isMidi = segment.payload.kind === "midi" || segment.payload.kind === "mixed";
-    const canLoop = isMidi || segment.payload.kind === "drum" || segment.payload.kind === "drumpad";
     const isAudio = segment.payload.kind === "audio";
     const activeStemJob = stemJob();
     const activeTranscriptionJob = transcriptionJob();
@@ -440,15 +444,25 @@ export function Segment(props: Props) {
           })();
         },
       },
-      ...(canLoop
+      {
+        label: "Set Loop Count…",
+        icon: "ph:repeat",
+        onSelect: () => {
+          void (async () => {
+            const raw = await appPrompt("Total plays (including the original)", String(segment.repeats + 1));
+            if (raw == null) return;
+            const parsed = Number(raw.trim());
+            if (!Number.isFinite(parsed)) return;
+            const totalPlays = Math.max(1, Math.min(128, Math.round(parsed)));
+            projectStore.setSegmentRepeats(props.segmentId, totalPlays - 1);
+          })();
+        },
+      },
+      ...(segment.repeats > 0
         ? [{
-            label: segment.repeats > 0 ? "Unloop" : "Loop",
-            icon: "ph:repeat",
-            onSelect: () => {
-              const remaining = Math.max(0, projectLengthBeats() - segment.startBeat - segment.lengthBeats);
-              const repeats = segment.repeats > 0 ? 0 : Math.max(0, Math.ceil(remaining / segment.lengthBeats));
-              projectStore.setSegmentRepeats(props.segmentId, repeats);
-            },
+            label: "Remove Loop",
+            icon: "ph:x-circle",
+            onSelect: () => projectStore.setSegmentRepeats(props.segmentId, 0),
           } as ContextMenuItem]
         : []),
       ...(canSplitAtPlayhead
@@ -552,7 +566,6 @@ export function Segment(props: Props) {
                       velocity: hit.velocity,
                     })),
                     lengthBeats: segment.lengthBeats,
-                    instrumentId: segment.instrumentId,
                   });
                 } else if (segment.payload.kind === "midi" || segment.payload.kind === "mixed") {
                   useComponentStore.getState().add({
@@ -560,7 +573,6 @@ export function Segment(props: Props) {
                     name,
                     notes: segment.payload.notes,
                     lengthBeats: segment.lengthBeats,
-                    instrumentId: segment.instrumentId,
                   });
                 }
               })();
@@ -725,9 +737,15 @@ export function Segment(props: Props) {
                 }}
               />
             </Show>
-            <Show when={props.repetition > 0}>
-              <span class={styles.repBadge} aria-label="Loop repeat">
+            <Show when={props.totalPlays > 1}>
+              <span
+                class={styles.repBadge}
+                aria-label={props.repetition === 0
+                  ? `Looped ${props.totalPlays} times total`
+                  : `Loop instance ${props.repetition + 1} of ${props.totalPlays}`}
+              >
                 <Icon name="ph:repeat" size={18} decorative />
+                <span>{props.repetition === 0 ? `×${props.totalPlays}` : `${props.repetition + 1}/${props.totalPlays}`}</span>
               </span>
             </Show>
             <Show when={liveSeg()?.groupId}>
@@ -893,5 +911,4 @@ async function markSavedGeneratedDrum(segment: SegmentType) {
       source: "local",
     },
   });
-  void maybeRunDueTraining("drums");
 }

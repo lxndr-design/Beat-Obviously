@@ -11,10 +11,17 @@ import {
   type ModulationSourceId,
   type ModulationTargetId,
 } from "../../../state/synthStore";
+import type { ModulationRemapCurve } from "../../../state/types";
 import styles from "./ModulationMatrix.module.css";
 
 const SOURCES = Object.keys(MODULATION_SOURCE_LABELS) as ModulationSourceId[];
 const MACRO_TARGETS = Object.keys(MODULATION_TARGET_LABELS) as ModulationTargetId[];
+const REMAP_CURVES = [
+  { value: "linear", label: "Linear" },
+  { value: "ease-in", label: "Ease In" },
+  { value: "ease-out", label: "Ease Out" },
+  { value: "s-curve", label: "S-Curve" },
+];
 const TARGETS_BY_SOURCE: Record<ModulationSourceId, ModulationTargetId[]> = {
   "env.1": MACRO_TARGETS,
   "env.2": MACRO_TARGETS,
@@ -165,7 +172,8 @@ export function ModulationMatrix(props: ModulationMatrixProps = {}) {
           <span>Target</span>
           <span />
           <span>Strength</span>
-          <span />
+          <span>Curve</span>
+          <span>Mode</span>
           <span />
         </div>
         <For each={routes()}>
@@ -267,6 +275,14 @@ export function ModulationMatrix(props: ModulationMatrixProps = {}) {
                       <span>{display().stateLabel}</span>
                     </>
                   }
+                />
+                <FloatingSelect
+                  layout="bare"
+                  triggerClassName={styles.curveSelect}
+                  value={route.curve ?? "linear"}
+                  aria-label={`Route ${routeNumber()} response curve`}
+                  options={REMAP_CURVES}
+                  onChange={(curve) => updateRoute(route.id, { curve: curve as ModulationRemapCurve })}
                 />
                 <div class={styles.modeCell}>
                   <Show

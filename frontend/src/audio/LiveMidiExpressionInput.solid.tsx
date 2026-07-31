@@ -8,7 +8,10 @@ import { createLiveMidiExpressionTracker } from "./liveMidiExpression";
 export function LiveMidiExpressionInput() {
   if (isNative()) return null;
 
-  const trackers = new Map<string, ReturnType<typeof createLiveMidiExpressionTracker>>();
+  const trackers = new Map<string, {
+    pitchBendRangeSemitones: number;
+    tracker: ReturnType<typeof createLiveMidiExpressionTracker>;
+  }>();
   const attachedInputs = new Set<MIDIInput>();
   let midiAccess: MIDIAccess | null = null;
 
@@ -62,8 +65,16 @@ export function LiveMidiExpressionInput() {
       }
     }
     for (const instrument of instruments) {
-      const tracker = trackers.get(instrument.id) ?? createLiveMidiExpressionTracker();
-      trackers.set(instrument.id, tracker);
+      const pitchBendRangeSemitones = Math.max(0, Math.min(24, instrument.pitchBendRangeSemitones ?? 2));
+      const existing = trackers.get(instrument.id);
+      const entry = existing?.pitchBendRangeSemitones === pitchBendRangeSemitones
+        ? existing
+        : {
+            pitchBendRangeSemitones,
+            tracker: createLiveMidiExpressionTracker(pitchBendRangeSemitones),
+          };
+      trackers.set(instrument.id, entry);
+      const tracker = entry.tracker;
       const snapshot = tracker.applyData(data);
       if (!snapshot) {
         useSynthStore.getState().clearInstrumentExpressionActivity(instrument.id);

@@ -100,28 +100,25 @@ function BusTabs(props: BusTabsProps) {
         >
           Master
         </Button>
-        <Show when={props.buses.length === 0}><AddBusTabButton onAdd={props.onAdd} /></Show>
         <For each={props.buses}>
-          {(bus, index) => (
-            <>
-              <Show when={index() === props.buses.length - 1}><AddBusTabButton onAdd={props.onAdd} /></Show>
-              <Button
-                role="tab"
-                id={`audio-bus-tab-${bus.id}`}
-                data-audio-bus-tab={bus.id}
-                aria-controls={`audio-bus-panel-${bus.id}`}
-                aria-selected={props.activeId === bus.id}
-                tabIndex={props.activeId === bus.id ? 0 : -1}
-                class={`${styles.tab} ${props.activeId === bus.id ? styles.tabActive : ""}`}
-                onClick={() => props.onSelect(bus.id)}
-                onKeyDown={(event) => onTabKeyDown(event, bus.id)}
-                title={bus.name}
-              >
-                {bus.name}
-              </Button>
-            </>
+          {(bus) => (
+            <Button
+              role="tab"
+              id={`audio-bus-tab-${bus.id}`}
+              data-audio-bus-tab={bus.id}
+              aria-controls={`audio-bus-panel-${bus.id}`}
+              aria-selected={props.activeId === bus.id}
+              tabIndex={props.activeId === bus.id ? 0 : -1}
+              class={`${styles.tab} ${props.activeId === bus.id ? styles.tabActive : ""}`}
+              onClick={() => props.onSelect(bus.id)}
+              onKeyDown={(event) => onTabKeyDown(event, bus.id)}
+              title={bus.name}
+            >
+              {bus.name}
+            </Button>
           )}
         </For>
+        <AddBusTabButton onAdd={props.onAdd} />
       </div>
     </div>
   );
@@ -244,7 +241,6 @@ interface BusInputSource {
 function SectionTitle(props: { title: string; meta?: string }) {
   return (
     <SectionRibbon
-      className={styles.sectionTitle}
       title={props.title}
       expanded
       showToggle={false}

@@ -1,7 +1,7 @@
 import { createSignal, For, Show } from "solid-js";
 import type { RecentProjectEntry } from "../../ipc/schema";
 import { appConfirm } from "../../solid-ui";
-import { AppLogo, Button, HoverInfo, Icon } from "../../solid-ui";
+import { AppLogo, Button, createContextMenu, HoverInfo, Icon, type ContextMenuItem } from "../../solid-ui";
 import { useComponentStore } from "../../state/components";
 import { useAudioFileStore, useDocumentStore, useInstrumentStore } from "../../state/store";
 import { createStoreSelector } from "../../solid-utils/store";
@@ -10,7 +10,7 @@ import { InstrumentsPage } from "./InstrumentsPage.solid";
 import { PatternsPage } from "./PatternsPage.solid";
 import styles from "./HomeHub.module.css";
 
-type HomePage = "home" | "audio" | "instruments" | "patterns" | "training";
+type HomePage = "home" | "audio" | "instruments" | "patterns";
 
 export interface HomeHubProps {
   onHome: () => void;
@@ -18,6 +18,7 @@ export interface HomeHubProps {
   onOpen: () => void;
   onRecent: (path: string) => void;
   onRevealRecent: (path: string) => void;
+  onDuplicateRecent: (path: string) => void;
   onRemoveRecent: (path: string) => void;
   onSave: () => void;
   onSaveAs: () => void;
@@ -45,7 +46,7 @@ export function HomeHub(props: HomeHubProps) {
     <Show
       when={page() === "home"}
       fallback={
-        <section class={styles.home} aria-label={pageTitle(page())}>
+        <section class={styles.home} aria-label={pageTitle(page())} data-beat-surface="home">
           <HomeHeader
             title={pageTitle(page())}
             onHome={() => setPage("home")}
@@ -61,13 +62,10 @@ export function HomeHub(props: HomeHubProps) {
           <Show when={page() === "patterns"}>
             <PatternsPage />
           </Show>
-          <Show when={page() === "training"}>
-            <div class={styles.blankContent} />
-          </Show>
         </section>
       }
     >
-      <section class={styles.home} aria-label="Home">
+      <section class={styles.home} aria-label="Home" data-beat-surface="home">
         <HomeHeader
           title="Beat"
           onHome={props.onHome}
@@ -100,6 +98,8 @@ export function HomeHub(props: HomeHubProps) {
                     <RecentProjectCard
                       project={project}
                       onOpen={() => props.onRecent(project.path)}
+                      onReveal={() => props.onRevealRecent(project.path)}
+                      onDuplicate={() => props.onDuplicateRecent(project.path)}
                       onRemove={() => props.onRemoveRecent(project.path)}
                     />
                   )}
@@ -134,16 +134,6 @@ export function HomeHub(props: HomeHubProps) {
               </Button>
             </section>
 
-            <section class={styles.panel}>
-              <div class={styles.ribbon}>AI</div>
-              <Button variant="ghost" class={styles.trainingRow} onClick={() => setPage("training")}>
-                <span>
-                  <Icon name="ph:sparkle" size={18} decorative />
-                  <span>AI Training</span>
-                </span>
-                <Icon name="ph:arrow-right" size={18} decorative />
-              </Button>
-            </section>
           </div>
         </div>
       </section>
@@ -190,39 +180,73 @@ function HomeHeader(props: HomeHeaderProps) {
 function RecentProjectCard(props: {
   project: RecentProjectEntry;
   onOpen: () => void;
+  onReveal: () => void;
+  onDuplicate: () => void;
   onRemove: () => void;
 }) {
   const name = () => props.project.name || fileName(props.project.path);
+  const menu = createContextMenu((): ContextMenuItem[] => [
+    {
+      label: "Reveal in Finder",
+      icon: "ph:folder-open",
+      onSelect: props.onReveal,
+    },
+    {
+      label: "Duplicate Project",
+      icon: "ph:copy",
+      onSelect: props.onDuplicate,
+    },
+    {
+      label: "Remove from Recent",
+      icon: "ph:x",
+      onSelect: props.onRemove,
+      separatorBefore: true,
+    },
+  ]);
+
+  function openMenuFromSecondaryMouseDown(event: MouseEvent) {
+    if (event.button !== 2 && !(event.button === 0 && event.ctrlKey)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const { clientX, clientY } = event;
+    // WKWebView can consume the later `contextmenu` event for a secondary click.
+    // Open after the current mousedown finishes so the menu's outside-click
+    // listener cannot immediately close the menu it just mounted.
+    window.setTimeout(() => menu.openAt(clientX, clientY), 0);
+  }
+
   return (
-    <Button variant="ghost" class={styles.recentCard} onClick={props.onOpen} title={props.project.path}>
-      <span class={styles.recentArt}>
-        <AppLogo class={styles.recentLogo} />
+    <div
+      class={styles.recentCard}
+      data-recent-project-path={props.project.path}
+      onMouseDown={openMenuFromSecondaryMouseDown}
+      onContextMenu={menu.onContextMenu}
+    >
+      <Button variant="ghost" class={styles.recentOpen} onClick={props.onOpen} title={props.project.path}>
+        <span class={styles.recentLogoFrame} aria-hidden="true">
+          <AppLogo class={styles.recentLogo} />
+        </span>
+        <span class={styles.recentMeta}>
+          <span class={styles.recentName}>{name()}</span>
+          <span class={styles.recentDate}>{formatRecentDate(props.project.openedAt)}</span>
+        </span>
+      </Button>
+      <span class={styles.recentActions}>
         <HoverInfo content="Remove from recent">
-          <span
-            role="button"
-            tabIndex={0}
+          <Button
+            variant="ghost"
+            iconOnly
+            size="xs"
             class={styles.recentRemove}
             aria-label={`Remove ${name()} from recent projects`}
-            onClick={(event) => {
-              event.stopPropagation();
-              props.onRemove();
-            }}
-            onKeyDown={(event) => {
-              if (event.key !== "Enter" && event.key !== " ") return;
-              event.preventDefault();
-              event.stopPropagation();
-              props.onRemove();
-            }}
+            onClick={props.onRemove}
           >
             <Icon name="ph:x" size={18} decorative />
-          </span>
+          </Button>
         </HoverInfo>
       </span>
-      <span class={styles.recentMeta}>
-        <span class={styles.recentName}>{name()}</span>
-        <span class={styles.recentDate}>{formatRecentDate(props.project.openedAt)}</span>
-      </span>
-    </Button>
+      {menu.menu()}
+    </div>
   );
 }
 
@@ -230,7 +254,6 @@ function pageTitle(page: HomePage): string {
   if (page === "audio") return "Audio Files";
   if (page === "instruments") return "Instruments";
   if (page === "patterns") return "Patterns";
-  if (page === "training") return "AI Training";
   return "Beat";
 }
 

@@ -438,11 +438,24 @@ if (!sliderSource.includes('type="range"') || !sliderSource.includes("onInput"))
 if (sliderSource.includes("setPointerCapture") || sliderCssSource.includes("pointer-events: none")) {
   fail("Shared Slider must not replace native human drag behavior with wrapper pointer capture.");
 }
+if (!sliderSource.includes("onPointerDown={beginPointerDrag}")
+  || !sliderSource.includes('window.addEventListener("pointermove", continuePointerDrag, true)')) {
+  fail("Shared Slider must retain its native-compatible pointer drag fallback.");
+}
 if (!sliderCssSource.includes("font-size: var(--font-size-field-label)")) {
   fail("Shared Slider labels must use the compact field-label typography token.");
 }
 if (sliderSource.includes('styles.label} ds-field-label')) {
   fail("Shared Slider labels must not inherit the oversized editorial field-label class.");
+}
+if (!knobSource.includes('data-dragging={dragging() ? "true" : "false"}')
+  || !knobSource.includes('data-editing={editing() !== null ? "true" : "false"}')) {
+  fail("Shared Knob must expose its active interaction states for consistent tint feedback.");
+}
+if (!knobSource.includes('window.addEventListener("pointermove", handlePointerMove, true)')
+  || !knobSource.includes('window.addEventListener("pointercancel", handlePointerEnd, true)')
+  || knobSource.includes("setPointerCapture")) {
+  fail("Shared Knob must retain capture-phase drag handling without relying on element pointer capture.");
 }
 
 const preferencesSource = existsSync(preferencesPath) ? readFileSync(preferencesPath, "utf8") : "";
@@ -558,7 +571,7 @@ const featureUnknownTokenAllowlist = [
     value: "--height-track-effect-row",
   },
   {
-    file: "frontend/src/features/Tracks/TrackEffectRows.module.css",
+    file: "frontend/src/features/Tracks/TimepointLane.module.css",
     value: "--transition-fast",
   },
 ];
@@ -567,6 +580,7 @@ const featureUnknownTokenAllowlist = [
 // whose behavior is not represented by a shared UI primitive.
 const rawFeatureButtonAllowlist = new Map([
   ["frontend/src/features/DrumEditor/DrumSequencer.solid.tsx", ["styles.stepCell"]],
+  ["frontend/src/features/SegmentEditor/AudioSegmentTransport.solid.tsx", ["styles.waveform"]],
   ["frontend/src/features/DrumpadEditor/DrumpadEditorModal.solid.tsx", ["styles.key", "styles.lanePlug"]],
   ["frontend/src/features/MidiEditor/PianoRoll.solid.tsx", ["styles.automationPointHandle", "styles.curveHandle"]],
   ["frontend/src/features/NodeInstrumentEditor/NodeCanvas.solid.tsx", ["data-node-port"]],
@@ -586,7 +600,7 @@ const rawFeatureInputAllowlist = new Map([
   ["frontend/src/features/PluginLibrary/PluginImportModal.solid.tsx", ["type=\"file\""]],
   ["frontend/src/features/TopBar/TopBar.solid.tsx", ["styles.projectNameInput"]],
   ["frontend/src/features/Tracks/Segment.solid.tsx", ["styles.nameInput"]],
-  ["frontend/src/features/Tracks/TrackEffectRows.solid.tsx", ["styles.pointInput"]],
+  ["frontend/src/features/Tracks/TimepointLane.solid.tsx", ["styles.input"]],
   ["frontend/src/features/Tracks/TrackHeader.solid.tsx", ["styles.nameInput"]],
 ]);
 

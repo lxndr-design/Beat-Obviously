@@ -349,9 +349,8 @@ namespace beat
                 for (const auto& seg : track.segments)
                 {
                     if (seg.muted) continue;
-                    // Compute every occurrence of this segment (including
-                    // repeats up to the next segment's start, mimicking the
-                    // frontend's expandTrackSegments).
+                    // Compute the original occurrence plus the segment's
+                    // explicit additional-repeat count, matching the frontend.
                     Beats segStart = seg.startBeat;
                     Beats segLen   = seg.lengthBeats;
                     int   maxReps  = seg.repeats > 0 ? seg.repeats + 1 : 1;

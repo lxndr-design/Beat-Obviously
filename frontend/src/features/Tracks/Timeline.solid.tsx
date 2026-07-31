@@ -6,7 +6,7 @@ import styles from "./Timeline.module.css";
 
 type LoopClamp = "start" | "end";
 
-export function Timeline() {
+export function Timeline(props: { scrollLeft?: number } = {}) {
   let stripElement: HTMLDivElement | undefined;
   const lengthBeats = createStoreSelector(useProjectStore, (state) => state.project.lengthBeats);
   const timeSignature = createStoreSelector(useProjectStore, (state) => state.project.timeSignature);
@@ -108,7 +108,10 @@ export function Timeline() {
       ref={stripElement}
       class={styles.timeline}
       data-timeline-ruler
-      style={{ width: `${displayWidthPx()}px` }}
+      style={{
+        width: `${displayWidthPx()}px`,
+        transform: `translateX(${-Math.max(0, props.scrollLeft ?? 0)}px)`,
+      }}
       onPointerDown={(event) => {
         event.currentTarget.setPointerCapture(event.pointerId);
         setDragging(true);

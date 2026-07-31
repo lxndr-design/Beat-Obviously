@@ -8,14 +8,15 @@
 
 namespace beat
 {
-    class LumusClipSequencer
+    class LumenClipSequencer
     {
     public:
         static constexpr int maxSteps = 32;
+        static constexpr int maxNotes = 64;
 
-        struct Step
+        struct Note
         {
-            bool enabled { false };
+            int startStep { 0 };
             int pitchOffset { 0 };
             int lengthSteps { 1 };
             float velocity { 1.0f };
@@ -27,7 +28,8 @@ namespace beat
             double stepSamples { 6000.0 };
             float swing { 0.0f };
             int lengthSteps { 16 };
-            std::array<Step, maxSteps> steps {};
+            int noteCount { 0 };
+            std::array<Note, maxNotes> notes {};
         };
 
         void prepare(int maximumBlockSize)
@@ -42,12 +44,14 @@ namespace beat
             next.stepSamples = std::isfinite(next.stepSamples) ? juce::jmax(1.0, next.stepSamples) : 6000.0;
             next.swing = juce::jlimit(0.0f, 0.75f, next.swing);
             next.lengthSteps = juce::jlimit(1, maxSteps, next.lengthSteps);
-            for (int index = 0; index < next.lengthSteps; ++index)
+            next.noteCount = juce::jlimit(0, maxNotes, next.noteCount);
+            for (int index = 0; index < next.noteCount; ++index)
             {
-                auto& step = next.steps[(size_t) index];
-                step.pitchOffset = juce::jlimit(-48, 48, step.pitchOffset);
-                step.lengthSteps = juce::jlimit(1, next.lengthSteps - index, step.lengthSteps);
-                step.velocity = std::isfinite(step.velocity) ? juce::jlimit(0.001f, 1.0f, step.velocity) : 1.0f;
+                auto& note = next.notes[(size_t) index];
+                note.startStep = juce::jlimit(0, next.lengthSteps - 1, note.startStep);
+                note.pitchOffset = juce::jlimit(-48, 48, note.pitchOffset);
+                note.lengthSteps = juce::jlimit(1, next.lengthSteps - note.startStep, note.lengthSteps);
+                note.velocity = std::isfinite(note.velocity) ? juce::jlimit(0.001f, 1.0f, note.velocity) : 1.0f;
             }
             if (config.enabled && !next.enabled) reset();
             config = next;
@@ -66,9 +70,8 @@ namespace beat
             currentStep = 0;
             nextStepUsesLongSwingInterval = true;
             samplesUntilStep = 0.0;
-            activeNote = -1;
-            activeChannel = 1;
-            activeLengthSteps = 0;
+            activeNoteCount = 0;
+            activeNotes.fill({});
             output.clear();
         }
 
@@ -88,7 +91,7 @@ namespace beat
                 while (iterator != end && (*iterator).samplePosition <= sample)
                 {
                     const auto message = (*iterator).getMessage();
-                    if (message.isNoteOn()) addHeld(message.getNoteNumber(), message.getFloatVelocity(), message.getChannel());
+                    if (message.isNoteOn()) addHeld(message.getNoteNumber(), message.getFloatVelocity(), message.getChannel(), sample);
                     else if (message.isNoteOff()) removeHeld(message.getNoteNumber(), sample);
                     else
                     {
@@ -100,7 +103,7 @@ namespace beat
 
                 if (triggerNote < 0)
                 {
-                    if (activeNote >= 0) emitNoteOff(sample);
+                    emitAllNoteOffs(sample);
                     currentStep = 0;
                     samplesUntilStep = 0.0;
                     nextStepUsesLongSwingInterval = true;
@@ -108,16 +111,21 @@ namespace beat
                 }
                 if (samplesUntilStep <= 0.0)
                 {
-                    advanceActiveNote(sample);
-                    const auto& step = config.steps[(size_t) currentStep];
-                    if (step.enabled)
+                    advanceActiveNotes(sample);
+                    for (int noteIndex = 0; noteIndex < config.noteCount; ++noteIndex)
                     {
-                        if (activeNote >= 0) emitNoteOff(sample);
-                        activeNote = juce::jlimit(0, 127, triggerNote + step.pitchOffset);
-                        activeChannel = triggerChannel;
-                        activeLengthSteps = step.lengthSteps;
+                        const auto& note = config.notes[(size_t) noteIndex];
+                        if (note.startStep != currentStep) continue;
+                        const int renderedNote = juce::jlimit(0, 127, triggerNote + note.pitchOffset);
+                        retireMatchingActiveNote(renderedNote, triggerChannel, sample);
+                        if (activeNoteCount >= maxNotes) continue;
+                        auto& active = activeNotes[(size_t) activeNoteCount++];
+                        active.note = renderedNote;
+                        active.channel = triggerChannel;
+                        active.remainingSteps = note.lengthSteps;
                         output.addEvent(juce::MidiMessage::noteOn(
-                            activeChannel, activeNote, juce::jlimit(0.0f, 1.0f, triggerVelocity * step.velocity)), sample);
+                            active.channel, active.note,
+                            juce::jlimit(0.0f, 1.0f, triggerVelocity * note.velocity)), sample);
                     }
                     currentStep = (currentStep + 1) % config.lengthSteps;
                     samplesUntilStep += nextStepDuration();
@@ -128,13 +136,14 @@ namespace beat
         }
 
     private:
-        void addHeld(int note, float velocity, int channel) noexcept
+        void addHeld(int note, float velocity, int channel, int sample) noexcept
         {
             if (note < 0 || note >= 128) return;
             held[(size_t) note] = true;
             velocities[(size_t) note] = juce::jlimit(0.0f, 1.0f, velocity);
             channels[(size_t) note] = (uint8_t) juce::jlimit(1, 16, channel);
             pressOrder[(size_t) note] = nextPressOrder++;
+            emitAllNoteOffs(sample);
             selectTrigger(note);
             restartPattern();
         }
@@ -156,7 +165,7 @@ namespace beat
                     replacement = candidate;
                 }
             }
-            if (activeNote >= 0) emitNoteOff(sample);
+            emitAllNoteOffs(sample);
             if (replacement >= 0)
             {
                 selectTrigger(replacement);
@@ -191,22 +200,51 @@ namespace beat
             velocities.fill(0.0f);
             pressOrder.fill(0);
             triggerNote = -1;
-            if (activeNote >= 0) emitNoteOff(sample);
+            emitAllNoteOffs(sample);
             restartPattern();
         }
 
-        void advanceActiveNote(int sample) noexcept
+        void advanceActiveNotes(int sample) noexcept
         {
-            if (activeNote < 0) return;
-            --activeLengthSteps;
-            if (activeLengthSteps <= 0) emitNoteOff(sample);
+            int write = 0;
+            for (int read = 0; read < activeNoteCount; ++read)
+            {
+                auto active = activeNotes[(size_t) read];
+                --active.remainingSteps;
+                if (active.remainingSteps <= 0)
+                {
+                    output.addEvent(juce::MidiMessage::noteOff(active.channel, active.note), sample);
+                    continue;
+                }
+                activeNotes[(size_t) write++] = active;
+            }
+            activeNoteCount = write;
         }
 
-        void emitNoteOff(int sample) noexcept
+        void emitAllNoteOffs(int sample) noexcept
         {
-            output.addEvent(juce::MidiMessage::noteOff(activeChannel, activeNote), sample);
-            activeNote = -1;
-            activeLengthSteps = 0;
+            for (int index = 0; index < activeNoteCount; ++index)
+            {
+                const auto& active = activeNotes[(size_t) index];
+                output.addEvent(juce::MidiMessage::noteOff(active.channel, active.note), sample);
+            }
+            activeNoteCount = 0;
+        }
+
+        void retireMatchingActiveNote(int note, int channel, int sample) noexcept
+        {
+            int write = 0;
+            for (int read = 0; read < activeNoteCount; ++read)
+            {
+                const auto active = activeNotes[(size_t) read];
+                if (active.note == note && active.channel == channel)
+                {
+                    output.addEvent(juce::MidiMessage::noteOff(active.channel, active.note), sample);
+                    continue;
+                }
+                activeNotes[(size_t) write++] = active;
+            }
+            activeNoteCount = write;
         }
 
         double nextStepDuration() noexcept
@@ -224,15 +262,20 @@ namespace beat
         std::array<uint8_t, 128> channels {};
         std::array<uint32_t, 128> pressOrder {};
         uint32_t nextPressOrder { 1 };
+        struct ActiveNote
+        {
+            int note { -1 };
+            int channel { 1 };
+            int remainingSteps { 0 };
+        };
         int triggerNote { -1 };
         float triggerVelocity { 0.0f };
         int triggerChannel { 1 };
         int currentStep { 0 };
         bool nextStepUsesLongSwingInterval { true };
         double samplesUntilStep { 0.0 };
-        int activeNote { -1 };
-        int activeChannel { 1 };
-        int activeLengthSteps { 0 };
+        int activeNoteCount { 0 };
+        std::array<ActiveNote, maxNotes> activeNotes {};
         juce::MidiBuffer output;
     };
 }

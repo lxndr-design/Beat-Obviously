@@ -3,10 +3,12 @@ import { Portal } from "solid-js/web";
 import { Button, FloatingLayer, FloatingSelect, HoverInfo, Icon, NumberInput, RadioGroup, Slider, TextInput } from "../../solid-ui";
 import { ai } from "../../ai/aiService";
 import { DRUM_COMPLEXITY_DEFAULT, DRUM_GENRES, DRUM_MAX_STEPS, type DrumGenre, type GeneratedDrumBeat } from "../../ai/drumBeatGenerator";
-import { maybeRunDueTraining } from "../../ai/trainingRunner";
 import { createInstrumentBufferSource, noteFrequency, preloadInstrumentSample } from "../../audio/synthPreview";
-import { registerGlobalAudioStop } from "../../audio/globalAudioSafety";
+import { registerGlobalAudioStop, stopAllBrowserAudio } from "../../audio/globalAudioSafety";
+import { pauseTransport } from "../../audio/transportActions";
+import { isNative, send } from "../../ipc/bridge";
 import { useContextualHotkey } from "../../solid-utils/contextualHotkeys.solid";
+import { useTransportStore } from "../../state/store";
 import { listDrumBeatFeedback, saveDrumBeatFeedback } from "../../persistence/dexie";
 import { TimeSignatureControl } from "../Transport/TimeSignatureControl.solid";
 import {
@@ -27,6 +29,7 @@ import {
   sanitizeVelocity,
 } from "../../state/drumSteps";
 import type { DrumCell, DrumRow, DrumSpeed, Instrument, TimeSignature } from "../../state/types";
+import { drumCellKey, drumSelectionRectangle, mergeDrumSelection, type DrumGridCoordinate } from "./drumGridSelection";
 import styles from "./DrumSequencer.module.css";
 
 interface Props {
@@ -40,6 +43,7 @@ interface Props {
   timeSignature: TimeSignature;
   segmentTimeSignature?: TimeSignature;
   instruments: Instrument[];
+  trackId?: string;
   hotkeyScopeId?: string;
   onChange: (rows: DrumRow[]) => void;
   onResize: (lengthBeats: number, rows: DrumRow[]) => void;
@@ -88,6 +92,16 @@ interface CopiedCell {
 
 interface CopiedCells {
   cells: CopiedCell[];
+}
+
+interface SelectionDragState {
+  pointerId: number;
+  anchor: DrumGridCoordinate;
+  focus: DrumGridCoordinate;
+  base: Set<string>;
+  additive: boolean;
+  startedSelected: boolean;
+  moved: boolean;
 }
 
 function createRef<T>(initial: T) {
@@ -144,8 +158,10 @@ export function DrumSequencer(props: Props) {
   const loopStartTimeRef = createRef(0);
   const stepRef = createRef(0);
   const dragRef = createRef<{ pointerId: number; setOn: boolean; touched: Set<string> } | null>(null);
+  const selectionDragRef = createRef<SelectionDragState | null>(null);
   const volumeDragRef = createRef<{ rowId: string; step: number; pointerId: number; rect: DOMRect } | null>(null);
   const cellClipboardRef = createRef<CopiedCells | null>(null);
+  let playbackContentSignature = "";
 
   const swingPercent = () => props.swingPercent ?? 50;
 
@@ -153,6 +169,17 @@ export function DrumSequencer(props: Props) {
     rowsRef.current = props.rows;
     instrumentsRef.current = props.instruments;
     defaultPitchRef.current = props.defaultPitchHz;
+  });
+
+  createEffect(() => {
+    const signature = JSON.stringify({ rows: props.rows, instruments: props.instruments.map((instrument) => instrument.id) });
+    if (!playbackContentSignature) {
+      playbackContentSignature = signature;
+      return;
+    }
+    if (signature === playbackContentSignature) return;
+    playbackContentSignature = signature;
+    if (playing()) restartPlaybackClock();
   });
 
   useContextualHotkey(
@@ -192,6 +219,7 @@ export function DrumSequencer(props: Props) {
   }, [props.stepCount, props.lengthBeats, props.bpm, props.speed, swingPercent]);
 
   createCompatEffect(() => {
+    if (usesNativePreview()) return;
     const ctx = getCtx();
     for (const instrument of props.instruments) {
       if (!instrument.sampleUrl) continue;
@@ -240,12 +268,28 @@ export function DrumSequencer(props: Props) {
     return ctxRef.current;
   }
 
+  function usesNativePreview(): boolean {
+    return isNative() && Boolean(props.trackId);
+  }
+
+  function clockNowSeconds(): number {
+    return usesNativePreview() ? performance.now() / 1000 : getCtx().currentTime;
+  }
+
+  function prepareExclusivePreview() {
+    if (useTransportStore.getState().playing) pauseTransport();
+    else stopAllBrowserAudio();
+  }
+
   function play() {
-    const ctx = getCtx();
-    if (ctx.state === "suspended") void ctx.resume();
+    prepareExclusivePreview();
+    if (!usesNativePreview()) {
+      const ctx = getCtx();
+      if (ctx.state === "suspended") void ctx.resume();
+    }
     stopDrumPreviewAudio();
     scheduledRef.current.clear();
-    loopStartTimeRef.current = ctx.currentTime;
+    loopStartTimeRef.current = clockNowSeconds();
     stepRef.current = 0;
     setPlayStep(0);
     setPlaying(true);
@@ -261,15 +305,16 @@ export function DrumSequencer(props: Props) {
   }
 
   function restartPlaybackClock() {
-    const ctx = getCtx();
     stopDrumPreviewAudio();
     scheduledRef.current.clear();
-    loopStartTimeRef.current = ctx.currentTime;
+    loopStartTimeRef.current = clockNowSeconds();
     stepRef.current = 0;
     setPlayStep(0);
   }
 
   function stopDrumPreviewAudio() {
+    if (isNative() && props.trackId)
+      void send({ kind: "engine.stopMidiPreview", trackId: props.trackId });
     for (const source of activeSourcesRef.current) {
       try {
         source.onended = null;
@@ -284,7 +329,7 @@ export function DrumSequencer(props: Props) {
     activeGainsRef.current.clear();
   }
 
-  function scheduleStep(step: number, atTimeS: number, stepSeconds: number) {
+  function scheduleStep(step: number, atTimeS: number) {
     const stepLengthBeats = drumPlaybackStepLengthBeats(props.lengthBeats, props.stepCount, props.speed);
     const beatsPerSecond = props.bpm / 60;
     for (const row of rowsRef.current) {
@@ -295,18 +340,59 @@ export function DrumSequencer(props: Props) {
         instrumentsRef.current[0] ??
         fallbackInstrument;
       const hitTimeS = atTimeS + drumTimingOffsetBeats(step, stepLengthBeats, swingPercent(), cell.leanPercent) / beatsPerSecond;
-      if (hitTimeS < getCtx().currentTime - 0.002) continue;
+      if (hitTimeS < clockNowSeconds() - 0.002) continue;
+      const frequencyHz = cell.pitchHz ?? defaultPitchRef.current ?? noteFrequency(DEFAULT_DRUM_MIDI_PITCH, instrument);
+      const noteLengthBeats = Math.max(0.02, Math.min(0.25, stepLengthBeats));
       playInstrument(
         instrument,
-        cell.pitchHz ?? defaultPitchRef.current ?? noteFrequency(DEFAULT_DRUM_MIDI_PITCH, instrument),
+        frequencyHz,
         cell.velocity,
         hitTimeS,
-        Math.max(0.05, Math.min(0.22, stepSeconds * 0.95)),
+        Math.max(0.01, noteLengthBeats / beatsPerSecond),
+        step * stepLengthBeats,
+        noteLengthBeats,
       );
     }
   }
 
-  function playInstrument(instrument: Instrument, frequencyHz: number, velocity = DEFAULT_DRUM_VELOCITY, atTimeS: number, maxDuration = 0.22) {
+  function playInstrument(
+    instrument: Instrument,
+    frequencyHz: number,
+    velocity = DEFAULT_DRUM_VELOCITY,
+    atTimeS: number,
+    maxDuration = 0.22,
+    startBeat = 0,
+    lengthBeats = 0.25,
+    forceBrowser = false,
+  ) {
+    if (usesNativePreview() && !forceBrowser) {
+      const pitch = Math.max(0, Math.min(127, Math.round(69 + 12 * Math.log2(Math.max(0.001, frequencyHz) / 440))));
+      const delaySeconds = Math.max(0, atTimeS - clockNowSeconds());
+      const requestStartedMs = performance.now();
+      void send({
+        kind: "engine.previewMidiNote",
+        trackId: props.trackId!,
+        instrumentId: instrument.id,
+        pitch,
+        velocity: Math.max(1, Math.min(127, Math.round(velocity))),
+        delaySeconds,
+        durationSeconds: Math.max(0.01, maxDuration),
+        note: { pitch, velocity, startBeat, lengthBeats, frequencyHz },
+      }).then((accepted) => {
+        if (accepted !== false || !playing()) return;
+        const remainingDelay = Math.max(0, delaySeconds - (performance.now() - requestStartedMs) / 1000);
+        const audioCtx = getCtx();
+        if (audioCtx.state === "suspended") void audioCtx.resume();
+        playInstrument(instrument, frequencyHz, velocity, audioCtx.currentTime + remainingDelay, maxDuration, startBeat, lengthBeats, true);
+      }).catch(() => {
+        if (!playing()) return;
+        const remainingDelay = Math.max(0, delaySeconds - (performance.now() - requestStartedMs) / 1000);
+        const audioCtx = getCtx();
+        if (audioCtx.state === "suspended") void audioCtx.resume();
+        playInstrument(instrument, frequencyHz, velocity, audioCtx.currentTime + remainingDelay, maxDuration, startBeat, lengthBeats, true);
+      });
+      return;
+    }
     const ctx = getCtx();
     const source = createInstrumentBufferSource(ctx, instrument, 0.2, frequencyHz, undefined, velocity, props.bpm);
     const duration = source.buffer
@@ -339,13 +425,12 @@ export function DrumSequencer(props: Props) {
       return;
     }
 
-    const ctx = getCtx();
     const tick = () => {
       const phraseSeconds = drumPlaybackDurationSeconds(props.lengthBeats, props.bpm, props.speed);
       const stepSeconds = Math.max(0.005, phraseSeconds / Math.max(1, props.stepCount));
       const stepLengthBeats = drumPlaybackStepLengthBeats(props.lengthBeats, props.stepCount, props.speed);
       const beatsPerSecond = props.bpm / 60;
-      const now = ctx.currentTime;
+      const now = clockNowSeconds();
       const elapsed = Math.max(0, now - loopStartTimeRef.current);
       const cycle = Math.floor(elapsed / phraseSeconds);
       const loopTime = elapsed - cycle * phraseSeconds;
@@ -366,7 +451,7 @@ export function DrumSequencer(props: Props) {
           const key = `${scheduleCycle}:${step}`;
           if (scheduledRef.current.has(key)) continue;
           scheduledRef.current.add(key);
-          scheduleStep(step, atTimeS, stepSeconds);
+          scheduleStep(step, atTimeS);
         }
       }
 
@@ -517,27 +602,31 @@ export function DrumSequencer(props: Props) {
       createdAt: Date.now(),
     };
     await saveDrumBeatFeedback({ id, ...entry });
-    void maybeRunDueTraining("drums");
     props.onTrainingSessionChange?.(id);
     window.setTimeout(() => setLastGeneratedBeat(null), 700);
   }
 
   function startCellPointer(e: PointerEvent, rowId: string, step: number) {
     if (e.button !== 0) return;
-    if (e.ctrlKey || e.metaKey) return;
     wrapRef.current?.focus();
     e.preventDefault();
     const target = e.currentTarget;
     if (!(target instanceof HTMLElement)) return;
     target.setPointerCapture(e.pointerId);
     const key = cellKey(rowId, step);
-    if (e.shiftKey) {
-      setSelectedCells((prev) => {
-        const next = new Set(prev);
-        if (next.has(key)) next.delete(key);
-        else next.add(key);
-        return next;
-      });
+    if (e.shiftKey || e.ctrlKey || e.metaKey) {
+      const additive = e.shiftKey || e.ctrlKey || e.metaKey;
+      const base = additive ? new Set(selectedCells()) : new Set<string>();
+      selectionDragRef.current = {
+        pointerId: e.pointerId,
+        anchor: { rowId, step },
+        focus: { rowId, step },
+        base,
+        additive,
+        startedSelected: selectedCells().has(key),
+        moved: false,
+      };
+      updateSelectionDrag(rowId, step);
       return;
     }
     const row = props.rows.find((candidate) => candidate.id === rowId);
@@ -545,6 +634,44 @@ export function DrumSequencer(props: Props) {
     dragRef.current = { pointerId: e.pointerId, setOn, touched: new Set([key]) };
     updateCells(new Set([key]), (cell) => ({ ...cell, on: setOn }));
     setSelectedCells(new Set<string>());
+  }
+
+  function moveCellPointer(e: PointerEvent) {
+    const coordinate = cellCoordinateAt(e.clientX, e.clientY);
+    if (!coordinate) return;
+    const selectionDrag = selectionDragRef.current;
+    if (selectionDrag?.pointerId === e.pointerId) {
+      e.preventDefault();
+      updateSelectionDrag(coordinate.rowId, coordinate.step);
+      return;
+    }
+    const paintDrag = dragRef.current;
+    if (paintDrag?.pointerId === e.pointerId)
+      enterCell(coordinate.rowId, coordinate.step);
+  }
+
+  function updateSelectionDrag(rowId: string, step: number) {
+    const drag = selectionDragRef.current;
+    if (!drag) return;
+    if (drag.focus.rowId !== rowId || drag.focus.step !== step)
+      drag.moved = true;
+    drag.focus = { rowId, step };
+    const rectangle = drumSelectionRectangle(
+      props.rows.map((row) => row.id),
+      props.stepCount,
+      drag.anchor,
+      drag.focus,
+    );
+    setSelectedCells(mergeDrumSelection(drag.base, rectangle, drag.additive));
+  }
+
+  function cellCoordinateAt(clientX: number, clientY: number): DrumGridCoordinate | null {
+    const element = document.elementFromPoint(clientX, clientY)?.closest<HTMLElement>("[data-drum-cell-row][data-drum-cell-step]");
+    if (!element) return null;
+    const rowId = element.dataset.drumCellRow;
+    const step = Number(element.dataset.drumCellStep);
+    if (!rowId || !Number.isInteger(step)) return null;
+    return { rowId, step };
   }
 
   function enterCell(rowId: string, step: number) {
@@ -556,7 +683,16 @@ export function DrumSequencer(props: Props) {
     updateCells(new Set([key]), (cell) => ({ ...cell, on: drag.setOn }));
   }
 
-  function endCellPointer() {
+  function endCellPointer(e: PointerEvent) {
+    const selectionDrag = selectionDragRef.current;
+    if (selectionDrag?.pointerId === e.pointerId) {
+      if (!selectionDrag.moved && selectionDrag.startedSelected && (e.metaKey || e.ctrlKey)) {
+        const next = new Set(selectionDrag.base);
+        next.delete(cellKey(selectionDrag.anchor.rowId, selectionDrag.anchor.step));
+        setSelectedCells(next);
+      }
+      selectionDragRef.current = null;
+    }
     dragRef.current = null;
   }
 
@@ -718,6 +854,17 @@ export function DrumSequencer(props: Props) {
     }
     const target = e.target as HTMLElement | null;
     if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) return;
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "a") {
+      e.preventDefault();
+      setSelectedCells(new Set(props.rows.flatMap((row) =>
+        Array.from({ length: props.stepCount }, (_, step) => cellKey(row.id, step)))));
+      return;
+    }
+    if (e.key === "Escape") {
+      e.preventDefault();
+      setSelectedCells(new Set<string>());
+      return;
+    }
     if (selectedCells().size === 0) return;
     const first = parseCellKey(Array.from(selectedCells())[0]);
     if (!first) return;
@@ -949,12 +1096,17 @@ export function DrumSequencer(props: Props) {
                           ...(customVolume ? { "--cell-volume": `${volumePercent}%` } as JSX.CSSProperties : null),
                         }}
                         onPointerDown={(e) => startCellPointer(e, row.id, step)}
+                        onPointerMove={moveCellPointer}
                         onPointerEnter={() => enterCell(row.id, step)}
                         onPointerUp={endCellPointer}
                         onPointerCancel={endCellPointer}
+                        onLostPointerCapture={endCellPointer}
                         onContextMenu={(e) => openCellMenu(e, row.id, step)}
                         aria-pressed={cell.on}
+                        aria-selected={selected}
                         aria-label={`${row.name} step ${step + 1}`}
+                        data-drum-cell-row={row.id}
+                        data-drum-cell-step={step}
                       >
                         {cell.pitchHz && (
                           <span class={styles.cellNote}>{frequencyToNoteName(cell.pitchHz)}</span>
@@ -1353,7 +1505,7 @@ function FeedbackPopover({
 }
 
 function cellKey(rowId: string, step: number): string {
-  return `${rowId}:${step}`;
+  return drumCellKey(rowId, step);
 }
 
 function parseCellKey(key: string): { rowId: string; step: number } | null {

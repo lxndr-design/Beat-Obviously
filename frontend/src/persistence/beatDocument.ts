@@ -1,10 +1,12 @@
 import type { BeatProjectAsset, BeatProjectAssetKind, BeatProjectAssetPolicy, BeatProjectDocument } from "../ipc/schema";
+import { send } from "../ipc/bridge";
 import { normalizeInstrumentNodeGraph } from "../features/NodeInstrumentEditor/nodeGraph";
 import { useAudioFileStore, useDocumentStore, useInstrumentStore, usePluginStore, useProjectStore } from "../state/store";
 import { useComponentStore } from "../state/components";
 import { saveAudioFiles, saveComponents, saveInstruments, saveProject } from "./dexie";
 import type { Instrument, Project, Track } from "../state/types";
 import { assetPolicy, buildAssetManifest, stableAssetId } from "./assetReferenceGraph";
+import { normalizeTrackEffectChain } from "../state/effects";
 
 const CURRENT_SCHEMA_VERSION = 1;
 
@@ -113,7 +115,7 @@ function sanitizeInstrument(value: unknown): Instrument {
 export async function applyBeatDocument(
   document: BeatProjectDocument,
   path?: string | null,
-  options: { markSaved?: boolean } = {},
+  options: { markSaved?: boolean; persistInBackground?: boolean } = {},
 ) {
   const migrated = migrateBeatDocument(document);
 
@@ -134,14 +136,29 @@ export async function applyBeatDocument(
   useComponentStore.getState().seedDefaultDrumLoops(useInstrumentStore.getState().instruments);
   usePluginStore.getState().hydratePlugins(plugins);
 
-  await Promise.all([
+  if (options.markSaved ?? true) {
+    useDocumentStore.getState().markSaved(path ?? null, buildCurrentBeatDocumentFingerprint());
+  }
+
+  const persistence = Promise.all([
     saveProject(migrated.project),
     saveInstruments(useInstrumentStore.getState().instruments, useInstrumentStore.getState().instrumentSets),
     saveAudioFiles(audioFiles),
     saveComponents(components, componentFolders),
   ]);
-  if (options.markSaved ?? true) {
-    useDocumentStore.getState().markSaved(path ?? null, buildCurrentBeatDocumentFingerprint());
+  if (options.persistInBackground) {
+    void persistence.catch((error) => {
+      // The in-memory document is already usable. A cache failure must not leave
+      // a successfully opened project hidden behind the Home view.
+      console.error("[Beat document] Background cache persistence failed", error);
+      void send({
+        kind: "diagnostics.write",
+        category: "project-ui",
+        message: `background cache persistence failed: ${error instanceof Error ? error.message : String(error)}`,
+      }).catch(() => undefined);
+    });
+  } else {
+    await persistence;
   }
 }
 
@@ -161,7 +178,12 @@ function sanitizeProject(value: unknown): Project {
     timeSignature: sanitizeTimeSignature(value.timeSignature),
     lengthBeats: clamp(finiteNumber(value.lengthBeats, 64), 1, 4096),
     tracks,
-    returnBuses: Array.isArray(value.returnBuses) ? structuredClone(value.returnBuses) : [],
+    returnBuses: Array.isArray(value.returnBuses)
+      ? structuredClone(value.returnBuses).map((bus) => ({
+          ...bus,
+          effects: normalizeTrackEffectChain(bus?.effects),
+        }))
+      : [],
     masterEqAutomation: Array.isArray(value.masterEqAutomation) ? structuredClone(value.masterEqAutomation) : [],
     masterChain: sanitizeMasterChain(value.masterChain),
     recordingInput: sanitizeRecordingInputProfile(value.recordingInput),
@@ -204,9 +226,7 @@ function sanitizeTrack(value: unknown): Track | null {
     inputChannelCount: Math.round(clamp(finiteNumber(value.inputChannelCount, 1), 1, 1024)),
     recordGainDb: clamp(finiteNumber(value.recordGainDb, 0), -48, 24),
     sends: Array.isArray(value.sends) ? structuredClone(value.sends) : [],
-    effects: isObject(value.effects) && Array.isArray(value.effects.filters)
-      ? { filters: structuredClone(value.effects.filters) as Track["effects"]["filters"] }
-      : { filters: [] },
+    effects: normalizeTrackEffectChain(value.effects),
     segments: Array.isArray(value.segments) ? structuredClone(value.segments) : [],
     rowHeight: value.rowHeight === "compact" ? "compact" : "normal",
   };

@@ -6,6 +6,8 @@ juce_add_gui_app(Beat
     ICON_BIG "${CMAKE_CURRENT_SOURCE_DIR}/Assets/BeatIcon.png"
     ICON_SMALL "${CMAKE_CURRENT_SOURCE_DIR}/Assets/BeatIcon.png"
     NEEDS_WEB_BROWSER TRUE
+    MICROPHONE_PERMISSION_ENABLED TRUE
+    MICROPHONE_PERMISSION_TEXT "Beat uses the microphone and connected audio inputs for Live Record segments."
 )
 
 juce_generate_juce_header(Beat)
@@ -178,6 +180,16 @@ target_link_libraries(Beat PRIVATE
 )
 
 target_compile_features(Beat PRIVATE cxx_std_20)
+
+# macOS worker threads default to a 512 KB stack. Keep individual production
+# frames well below that ceiling so large realtime state cannot accidentally be
+# reintroduced as a stack local in export or other background work.
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+    target_compile_options(Beat PRIVATE
+        -Wframe-larger-than=131072
+        -Werror=frame-larger-than
+    )
+endif()
 
 add_executable(BeatBackendStress
     Tests/RealtimeSafetyProbe.cpp

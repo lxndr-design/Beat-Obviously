@@ -12,8 +12,8 @@
 #include "../Source/Audio/InstrumentVoice.h"
 #include "../Source/Audio/Modulation/DynamicModulation.h"
 #include "../Source/Audio/Modulation/Lfo.h"
-#include "../Source/Audio/Midi/LumusArpeggiator.h"
-#include "../Source/Audio/Midi/LumusClipSequencer.h"
+#include "../Source/Audio/Midi/LumenArpeggiator.h"
+#include "../Source/Audio/Midi/LumenClipSequencer.h"
 #include "../Source/Audio/Nodemap/NodemapGraph.h"
 #include "../Source/Audio/Oscillator/AetherInteractionStage.h"
 #include "../Source/Audio/Oscillator/AetherTableStackRenderer.h"
@@ -44,6 +44,8 @@
 #include "../Source/Audio/VoiceAllocation.h"
 #include "../Source/Audio/Wavetable/WavetableFactory.h"
 #include "../Source/Audio/Wavetable/WavetableOscillator.h"
+#include "../Source/Audio/Wavetable/WavetableOscillatorBank.h"
+#include "../Source/Audio/Wavetable/WavetableVoiceCache.h"
 #include "../Source/Persistence/ProjectAssetPackage.h"
 #include "../Source/Persistence/ProjectDocumentBackup.h"
 #include "../Source/Persistence/HybridSourceDocumentValidation.h"
@@ -53,6 +55,7 @@
 #include "../Source/Persistence/ManagedSfzAsset.h"
 #include "../Source/Persistence/ManagedGranularAsset.h"
 #include "../Source/Persistence/ProjectRepository.h"
+#include "../Source/DiagnosticLog.h"
 #include "RealtimeSafetyProbe.h"
 
 #include <algorithm>
@@ -75,6 +78,62 @@
 
 namespace
 {
+    static_assert(sizeof(beat::AudioEngine) < 256 * 1024,
+                  "AudioEngine must remain small enough for bounded-stack call sites.");
+
+    bool stressDiagnosticLogTail()
+    {
+        const auto file = juce::File("/private/tmp")
+            .getNonexistentChildFile("beat-diagnostic-tail", ".log", false);
+        const bool written = file.replaceWithText("one\ntwo\nthree\nfour\nfive\n");
+        const auto tail = beat::diagnostics::readLogTail(file, 3);
+        const auto missing = beat::diagnostics::readLogTail(file.getSiblingFile("missing-diagnostic.log"), 3);
+        const bool cleared = beat::diagnostics::clearLogFile(file);
+        const bool emptyAfterClear = file.loadFileAsString().isEmpty();
+        const auto snapshot = juce::String("selected session snapshot");
+        const bool saved = beat::diagnostics::saveLogSnapshot(file, snapshot);
+        const bool snapshotMatches = file.loadFileAsString() == snapshot;
+        file.deleteFile();
+
+        const bool ok = written
+            && tail.text == "three\nfour\nfive"
+            && tail.lineCount == 3
+            && tail.truncated
+            && missing.text.isEmpty()
+            && missing.lineCount == 0
+            && !missing.truncated
+            && cleared
+            && emptyAfterClear
+            && saved
+            && snapshotMatches;
+        if (!ok)
+            std::cerr << "Diagnostic tail written=" << written
+                      << " path='" << file.getFullPathName() << "'"
+                      << " text='" << tail.text << "' lines=" << tail.lineCount
+                      << " truncated=" << tail.truncated
+                      << " missingLines=" << missing.lineCount << "\n";
+        return ok;
+    }
+
+    bool stressRealtimeDeadlineRecovery()
+    {
+        beat::AudioEngine engine;
+        engine.setRealtimeDeadlineOverrunStateForTest(8, true);
+        engine.requestPlay();
+        const bool playRecovered = engine.getConsecutiveRealtimeDeadlineOverrunsForTest() == 0
+            && !engine.isTransportSafetySilencedForTest();
+
+        engine.setRealtimeDeadlineOverrunStateForTest(8, true);
+        engine.requestRestart();
+        const bool restartRecovered = engine.getConsecutiveRealtimeDeadlineOverrunsForTest() == 0
+            && !engine.isTransportSafetySilencedForTest();
+
+        if (!playRecovered || !restartRecovered)
+            std::cerr << "Realtime deadline recovery failed play=" << playRecovered
+                      << " restart=" << restartRecovered << "\n";
+        return playRecovered && restartRecovered;
+    }
+
     bool near(float actual, float expected, float tolerance = 0.0001f)
     {
         return std::abs(actual - expected) <= tolerance;
@@ -270,6 +329,53 @@ namespace
         if (!near(expressionOffset, 0.8f))
             return false;
 
+        decltype(target) sparseTarget;
+        sparseTarget.lfo = 0.5f;
+        sparseTarget.lfoBipolar = false;
+        sparseTarget.lfo2 = -0.2f;
+        sparseTarget.extraLfo[1] = 0.3f;
+        sparseTarget.extraLfoBipolar[1] = false;
+        sparseTarget.extraLfo[7] = -0.4f;
+        sparseTarget.env = 0.25f;
+        sparseTarget.env4 = -0.15f;
+        sparseTarget.env4Bipolar = true;
+        sparseTarget.velocity = 0.1f;
+        sparseTarget.pressure = -0.2f;
+        sparseTarget.macro1 = 0.4f;
+        sparseTarget.macro8 = -0.25f;
+        std::array<float, 8> sparseExtraLfos {};
+        sparseExtraLfos[1] = 0.35f;
+        sparseExtraLfos[7] = -0.6f;
+        const std::array<float, 8> sparseMacros {{ 0.7f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.2f }};
+        const float legacySparseOffset = beat::DynamicModulation::targetOffset(
+            sparseTarget, -0.4f, 0.6f, sparseExtraLfos,
+            0.75f, 0.0f, 0.0f, 0.2f, 0.8f, 0.3f, 0.45f, 0.65f, 0.1f,
+            sparseMacros, 0.35f);
+        const auto preparedSparseTarget = beat::DynamicModulation::prepareTarget(sparseTarget);
+        const auto sparseFrame = beat::DynamicModulation::makeInputFrame(
+            -0.4f, 0.6f, sparseExtraLfos, 0.75f, 0.0f, 0.0f, 0.2f,
+            0.8f, 0.3f, 0.45f, 0.65f, 0.1f, sparseMacros);
+        if (preparedSparseTarget.routeCount() != 10
+            || !near(preparedSparseTarget.evaluate(sparseFrame, 0.35f), legacySparseOffset, 0.0000001f))
+            return false;
+
+        if (!near(beat::DynamicModulation::applyRemapCurve(-0.5f, 0), -0.5f)
+            || !near(beat::DynamicModulation::applyRemapCurve(-0.5f, 1), -0.25f)
+            || !near(beat::DynamicModulation::applyRemapCurve(0.5f, 2), 0.75f)
+            || !near(beat::DynamicModulation::applyRemapCurve(0.25f, 3), 0.15625f))
+            return false;
+
+        decltype(target) curvedTarget;
+        curvedTarget.lfo = 0.5f;
+        curvedTarget.lfoBipolar = true;
+        curvedTarget.curves[static_cast<size_t>(beat::DynamicModulation::PreparedSource::lfo)] = 1;
+        const auto preparedCurvedTarget = beat::DynamicModulation::prepareTarget(curvedTarget);
+        const auto curvedFrame = beat::DynamicModulation::makeInputFrame(
+            -0.5f, 0.0f, {}, 0.0f, 0.0f, 0.0f, 0.0f,
+            0.0f, 0.0f, 0.0f, 0.0f, 0.0f, {});
+        if (!near(preparedCurvedTarget.evaluate(curvedFrame, 1.0f), -0.125f))
+            return false;
+
         beat::DynamicModulation::TargetActivityFlags noFlags;
         const auto legacyPitchPlan = beat::DynamicModulation::makeRenderPlan(noFlags, false, true, 7.0f, 0.0f, 0.0f, 0.0f);
         if (!near(legacyPitchPlan.pitchMod, 7.0f)
@@ -297,7 +403,8 @@ namespace
 
         beat::InstrumentVoice::Params::DynamicModulation disabled;
         disabled.oscAPosition.lfo = 1.0f;
-        if (beat::DynamicModulation::targetActivityFlags(disabled).any)
+        if (beat::DynamicModulation::targetActivityFlags(disabled).any
+            || beat::DynamicModulation::prepare(disabled).activeRouteCount != 0)
             return false;
 
         beat::InstrumentVoice::Params::DynamicModulation modulation;
@@ -312,6 +419,7 @@ namespace
         modulation.filterDrive.pressure = 0.25f;
         modulation.oscALevel.timbre = 0.2f;
         const auto flags = beat::DynamicModulation::targetActivityFlags(modulation);
+        const auto preparedModulation = beat::DynamicModulation::prepare(modulation);
         const bool ok = flags.any
             && flags.oscAPosition
             && flags.oscBPan
@@ -329,7 +437,8 @@ namespace
             && flags.modWheel
             && flags.pressure
             && flags.timbre
-            && beat::DynamicModulation::hasFilterCoefficientMod(flags);
+            && beat::DynamicModulation::hasFilterCoefficientMod(flags)
+            && preparedModulation.activeRouteCount == 9;
         if (!ok)
             return false;
 
@@ -624,6 +733,55 @@ namespace
                       << " finiteSamples=" << render.finiteSamples
                       << " renderMs=" << renderMs << "\n";
         return ok;
+    }
+
+    bool stressNodemapRealtimeRenderer()
+    {
+        using namespace beat::Nodemap;
+
+        const auto graph = makeProofTemplate("moving-texture");
+        const AuditionOptions options { 48000.0, 4096, 63, 0.82f, 0.5f, 0.35f, 0.62f, 0x4312abcdu };
+        const auto reference = renderOneNote(graph, options);
+        if (reference.silent || reference.left.size() != (size_t) options.sampleCount)
+            return false;
+
+        RealtimeRenderer renderer;
+        if (!renderer.prepare(graph, options.sampleRate))
+            return false;
+        std::vector<float> left((size_t) options.sampleCount);
+        std::vector<float> right((size_t) options.sampleCount);
+
+        beat::test::beginRealtimeSafetyProbe();
+        const bool started = renderer.startNote(options);
+        for (int sample = 0; sample < options.sampleCount; ++sample)
+        {
+            const auto frame = renderer.renderFrame();
+            left[(size_t) sample] = frame.left;
+            right[(size_t) sample] = frame.right;
+        }
+        const auto violations = beat::test::endRealtimeSafetyProbe();
+
+        if (violations != 0)
+            for (size_t index = 0; index < std::min<size_t>(violations, 16); ++index)
+            {
+                Dl_info info {};
+                const auto violation = beat::test::realtimeSafetyViolation(index);
+                if (violation.callsite != nullptr && dladdr(violation.callsite, &info) != 0)
+                    std::cerr << "  Nodemap realtime violation kind=" << (int) violation.kind
+                              << " symbol=" << (info.dli_sname ? info.dli_sname : "unknown")
+                              << " offset=" << (static_cast<const char*>(violation.callsite)
+                                  - static_cast<const char*>(info.dli_saddr)) << "\n";
+            }
+
+        bool exact = started && violations == 0 && !renderer.isActive();
+        for (int sample = 0; sample < options.sampleCount && exact; ++sample)
+            exact = left[(size_t) sample] == reference.left[(size_t) sample]
+                && right[(size_t) sample] == reference.right[(size_t) sample];
+        if (!exact)
+            std::cerr << "Nodemap realtime renderer failed started=" << started
+                      << " violations=" << violations
+                      << " active=" << renderer.isActive() << "\n";
+        return exact;
     }
 
     bool stressProjectRepositoryNodemapInstrumentRoundtrip()
@@ -2307,6 +2465,97 @@ namespace
         second.lengthBeats = 0.5;
         segment.notes.push_back(second);
 
+        track.segments.push_back(std::move(segment));
+        project.tracks.push_back(std::move(track));
+        return project;
+    }
+
+    beat::Project makeAurumRealtimeLoadProject(int noteCount, int unison, int oversampling)
+    {
+        beat::Project project;
+        project.id = "aurum-realtime-load-project";
+        project.name = "Aurum Realtime Load";
+        project.bpm = 120.0;
+        project.lengthBeats = 4.0;
+
+        beat::InstrumentDefinition instrument;
+        instrument.id = "aurum-realtime-load";
+        instrument.kind = "synth";
+        instrument.hasAether = false;
+        instrument.hasAurum = true;
+        instrument.maxVoices = noteCount;
+        instrument.cutoff01 = 1.0f;
+        instrument.resonance01 = 0.0f;
+        instrument.drive01 = 0.0f;
+        instrument.attackMs = 0.0f;
+        instrument.decayMs = 0.0f;
+        instrument.sustain = 1.0f;
+        instrument.releaseMs = 120.0f;
+        instrument.ampLevel = 0.42f;
+        instrument.aurum.unison = unison;
+        instrument.aurum.detuneCents = 18.0f;
+        instrument.aurum.stereoSpread = 0.82f;
+        instrument.aurum.oversampling = oversampling;
+        instrument.aurum.filters[0] = { true, 0, 0.72f, 0.24f, 0.12f };
+        instrument.aurum.filters[1] = { true, 2, 0.08f, 0.18f, 0.08f };
+        instrument.aurum.filterRouting = 0;
+
+        for (size_t source = 0; source < instrument.aurum.operators.size(); ++source)
+        {
+            auto& op = instrument.aurum.operators[source];
+            op.enabled = true;
+            op.waveform = (int) (source % 4);
+            op.ratio = 0.5f + (float) source * 0.5f;
+            op.coarse = (int) source - 2;
+            op.fineCents = (float) source * 3.0f - 7.5f;
+            op.level = 0.68f;
+            op.pan = (float) source / 2.5f - 1.0f;
+            op.wavefold = 0.18f + (float) source * 0.08f;
+            op.attackMs = 0.0f;
+            op.decayMs = 0.0f;
+            op.sustain = 1.0f;
+            op.releaseMs = 120.0f;
+            instrument.aurum.outputSends[source] = {{
+                source % 2 == 0 ? 0.64f : -0.48f,
+                source % 3 == 0 ? 0.31f : 0.0f,
+                source == 0 ? 0.18f : 0.0f,
+            }};
+            for (size_t target = 0; target < instrument.aurum.operators.size(); ++target)
+            {
+                const float polarity = (source + target) % 2 == 0 ? 1.0f : -1.0f;
+                instrument.aurum.matrix[source][target] = polarity * 0.38f;
+                instrument.aurum.rmMatrix[source][target] = polarity * 0.21f;
+            }
+        }
+        project.instruments.push_back(std::move(instrument));
+
+        beat::Track track;
+        track.id = "aurum-realtime-load-track";
+        track.name = "Aurum Realtime Load";
+        track.kind = beat::TrackKind::Midi;
+        track.instrumentId = "aurum-realtime-load";
+        track.gainDb = -9.0f;
+
+        beat::Segment segment;
+        segment.id = "aurum-realtime-load-segment";
+        segment.trackId = track.id;
+        segment.kind = beat::SegmentPayloadKind::Midi;
+        segment.instrumentId = "aurum-realtime-load";
+        segment.startBeat = 0.0;
+        segment.lengthBeats = 4.0;
+        constexpr std::array<int, 16> pitches {
+            36, 43, 48, 52, 55, 60, 64, 67, 71, 74, 77, 81, 84, 88, 91, 95,
+        };
+        for (int noteIndex = 0; noteIndex < noteCount; ++noteIndex)
+        {
+            beat::MidiNote note;
+            note.instrumentId = "aurum-realtime-load";
+            note.pitch = pitches[(size_t) noteIndex];
+            note.velocity = 96 + noteIndex % 20;
+            note.startBeat = 0.0;
+            note.lengthBeats = 3.5;
+            segment.notes.push_back(note);
+        }
         track.segments.push_back(std::move(segment));
         project.tracks.push_back(std::move(track));
         return project;
@@ -5401,6 +5650,134 @@ namespace
         return buffer;
     }
 
+    bool stressAudioEngineMidiEditorPreview()
+    {
+        auto project = makeDenseAetherProject();
+        project.tracks.front().segments.clear();
+
+        beat::AudioEngine engine;
+        engine.prepareForOffline(48000.0, 512, 2);
+        engine.applyProject(std::move(project));
+        engine.requestPause();
+        const auto paused = renderEngineBlock(engine, 512);
+        const bool accepted = engine.requestMidiPreviewNote(
+            "dense-aether-track", "dense-aether", 64, 100, 0.0, 0.12);
+        const auto preview = renderEngineBlock(engine, 8192);
+        engine.requestStopMidiPreview("dense-aether-track");
+        const auto stopped = renderEngineBlock(engine, 512);
+
+        const auto pausedEnergy = bufferEnergy(paused);
+        const auto previewEnergy = bufferEnergy(preview);
+        const auto stoppedEnergy = bufferEnergy(stopped);
+        const bool ok = accepted
+            && pausedEnergy < 1.0e-10
+            && previewEnergy > 1.0e-6
+            && stoppedEnergy < 1.0e-10;
+        if (!ok)
+            std::cerr << "MIDI editor native preview failed accepted=" << accepted
+                      << " paused=" << pausedEnergy
+                      << " preview=" << previewEnergy
+                      << " stopped=" << stoppedEnergy << "\n";
+        return ok;
+    }
+
+    bool stressAudioEngineMidiPreviewLifecycleCleanup()
+    {
+        auto project = makeDenseAetherProject();
+        project.tracks.front().segments.clear();
+
+        beat::AudioEngine engine;
+        engine.prepareForOffline(48000.0, 256, 2);
+        engine.applyProject(std::move(project));
+        engine.requestPause();
+        renderEngineBlock(engine, 256);
+
+        const bool accepted = engine.requestMidiPreviewNote(
+            "dense-aether-track", "dense-aether", 67, 108, 0.0, 0.02);
+        const bool activeAtRequest = engine.isMidiPreviewActiveForTest();
+        bool stayedActiveIntoTail = false;
+        bool clearedAutomatically = false;
+        double previewEnergy = 0.0;
+        for (int blockIndex = 0; blockIndex < 192; ++blockIndex)
+        {
+            const auto block = renderEngineBlock(engine, 256);
+            previewEnergy += bufferEnergy(block);
+            const bool active = engine.isMidiPreviewActiveForTest();
+            if (blockIndex >= 4 && active)
+                stayedActiveIntoTail = true;
+            if (stayedActiveIntoTail && !active)
+            {
+                clearedAutomatically = true;
+                break;
+            }
+        }
+
+        const auto idle = renderEngineBlock(engine, 512);
+        const auto idleEnergy = bufferEnergy(idle);
+
+        auto sampleFile = juce::File("/private/tmp").getChildFile("BeatBackendStress-preview-lifecycle.wav");
+        const bool sampleFixtureReady = writeAudioClipFixture(sampleFile, 4096);
+        bool sampleAccepted = false;
+        bool sampleActiveAtRequest = false;
+        bool sampleClearedAutomatically = false;
+        double samplePreviewEnergy = 0.0;
+        double sampleIdleEnergy = std::numeric_limits<double>::infinity();
+        if (sampleFixtureReady)
+        {
+            auto sampleProject = makeSampleInstrumentOfflineProject(sampleFile);
+            const auto sampleNote = sampleProject.tracks.front().segments.front().notes.front();
+            sampleProject.tracks.front().segments.clear();
+            beat::AudioEngine sampleEngine;
+            sampleEngine.prepareForOffline(48000.0, 256, 2);
+            sampleEngine.applyProject(std::move(sampleProject));
+            sampleEngine.requestPause();
+            renderEngineBlock(sampleEngine, 256);
+            sampleAccepted = sampleEngine.requestMidiPreviewNote(
+                "sample-route-track", "sample-route-instrument", sampleNote.pitch, sampleNote.velocity,
+                0.0, 0.02, 0.0f, &sampleNote);
+            sampleActiveAtRequest = sampleEngine.isMidiPreviewActiveForTest();
+            for (int blockIndex = 0; blockIndex < 192; ++blockIndex)
+            {
+                const auto block = renderEngineBlock(sampleEngine, 256);
+                samplePreviewEnergy += bufferEnergy(block);
+                if (!sampleEngine.isMidiPreviewActiveForTest())
+                {
+                    sampleClearedAutomatically = true;
+                    break;
+                }
+            }
+            sampleIdleEnergy = bufferEnergy(renderEngineBlock(sampleEngine, 512));
+        }
+        sampleFile.deleteFile();
+
+        const bool ok = accepted
+            && activeAtRequest
+            && stayedActiveIntoTail
+            && clearedAutomatically
+            && previewEnergy > 1.0e-6
+            && idleEnergy < 1.0e-10
+            && sampleFixtureReady
+            && sampleAccepted
+            && sampleActiveAtRequest
+            && sampleClearedAutomatically
+            && samplePreviewEnergy > 1.0e-6
+            && sampleIdleEnergy < 1.0e-10;
+        if (!ok)
+            std::cerr << "MIDI preview lifecycle cleanup failed accepted=" << accepted
+                      << " activeAtRequest=" << activeAtRequest
+                      << " tailActive=" << stayedActiveIntoTail
+                      << " cleared=" << clearedAutomatically
+                      << " previewEnergy=" << previewEnergy
+                      << " idleEnergy=" << idleEnergy
+                      << " sampleFixture=" << sampleFixtureReady
+                      << " sampleAccepted=" << sampleAccepted
+                      << " sampleActiveAtRequest=" << sampleActiveAtRequest
+                      << " sampleCleared=" << sampleClearedAutomatically
+                      << " samplePreviewEnergy=" << samplePreviewEnergy
+                      << " sampleIdleEnergy=" << sampleIdleEnergy << "\n";
+        return ok;
+    }
+
     juce::AudioBuffer<float> renderOfflineChunks(beat::Project project, int samples, int blockSize = 256, double sampleRate = 44100.0)
     {
         beat::AudioEngine engine;
@@ -5437,36 +5814,36 @@ namespace
         return output;
     }
 
-    beat::Project makeLumusArpeggiatorOfflineProject(bool enabled)
+    beat::Project makeLumenArpeggiatorOfflineProject(bool enabled)
     {
         auto project = makeTinyOfflineProject();
         project.lengthBeats = 1.25;
         auto& instrument = project.instruments.front();
         instrument.hasAether = true;
-        instrument.synthEngine = beat::InstrumentDefinition::SynthEngine::Lumus;
+        instrument.synthEngine = beat::InstrumentDefinition::SynthEngine::Lumen;
         instrument.maxVoices = 8;
         instrument.aether.oscA.enabled = true;
         instrument.aether.oscA.level = 0.7f;
         instrument.aether.oscA.waveform = 0;
         instrument.aether.oscA.routing = 2;
-        instrument.lumus.arpeggiator.enabled = enabled;
-        instrument.lumus.arpeggiator.mode = 0;
-        instrument.lumus.arpeggiator.rateDivision = 16;
-        instrument.lumus.arpeggiator.gate = 0.5f;
-        instrument.lumus.arpeggiator.octaves = 1;
+        instrument.lumen.arpeggiator.enabled = enabled;
+        instrument.lumen.arpeggiator.mode = 0;
+        instrument.lumen.arpeggiator.rateDivision = 16;
+        instrument.lumen.arpeggiator.gate = 0.5f;
+        instrument.lumen.arpeggiator.octaves = 1;
         auto& segment = project.tracks.front().segments.front();
         segment.lengthBeats = 1.0;
         segment.notes.front().lengthBeats = 1.0;
         return project;
     }
 
-    bool stressAudioEngineLumusArpeggiator()
+    bool stressAudioEngineLumenArpeggiator()
     {
         constexpr int samples = 30000;
-        const auto disabledSmall = renderOfflineChunks(makeLumusArpeggiatorOfflineProject(false), samples, 64);
-        const auto disabled = renderOfflineChunks(makeLumusArpeggiatorOfflineProject(false), samples, 257);
-        const auto enabledSmall = renderOfflineChunks(makeLumusArpeggiatorOfflineProject(true), samples, 64);
-        const auto enabledLarge = renderOfflineChunks(makeLumusArpeggiatorOfflineProject(true), samples, 257);
+        const auto disabledSmall = renderOfflineChunks(makeLumenArpeggiatorOfflineProject(false), samples, 64);
+        const auto disabled = renderOfflineChunks(makeLumenArpeggiatorOfflineProject(false), samples, 257);
+        const auto enabledSmall = renderOfflineChunks(makeLumenArpeggiatorOfflineProject(true), samples, 64);
+        const auto enabledLarge = renderOfflineChunks(makeLumenArpeggiatorOfflineProject(true), samples, 257);
         double differenceEnergy = 0.0;
         float blockDifference = 0.0f;
         float inheritedBlockDifference = 0.0f;
@@ -5487,7 +5864,7 @@ namespace
             && differenceEnergy > 0.01
             && blockDifference <= 0.005f;
         if (!ok)
-            std::cerr << "Lumus arp render disabledEnergy=" << disabledEnergy
+            std::cerr << "Lumen arp render disabledEnergy=" << disabledEnergy
                       << " enabledEnergy=" << enabledEnergy
                       << " differenceEnergy=" << differenceEnergy
                       << " blockDifference=" << blockDifference
@@ -5495,27 +5872,27 @@ namespace
         return ok;
     }
 
-    beat::Project makeLumusClipOfflineProject(bool enabled)
+    beat::Project makeLumenClipOfflineProject(bool enabled)
     {
-        auto project = makeLumusArpeggiatorOfflineProject(false);
-        auto& clip = project.instruments.front().lumus.clip;
+        auto project = makeLumenArpeggiatorOfflineProject(false);
+        auto& clip = project.instruments.front().lumen.clip;
         clip.enabled = enabled;
         clip.rateDivision = 16;
         clip.swing = 0.2f;
         clip.lengthSteps = 4;
-        clip.steps[0] = { true, 0, 1, 1.0f };
-        clip.steps[1] = { true, 7, 1, 0.8f };
-        clip.steps[2] = { false, 0, 1, 1.0f };
-        clip.steps[3] = { true, 12, 1, 0.7f };
+        clip.noteCount = 3;
+        clip.notes[0] = { 0, 0, 1, 1.0f };
+        clip.notes[1] = { 1, 7, 1, 0.8f };
+        clip.notes[2] = { 3, 12, 1, 0.7f };
         return project;
     }
 
-    bool stressAudioEngineLumusClipSequencer()
+    bool stressAudioEngineLumenClipSequencer()
     {
         constexpr int samples = 30000;
-        const auto disabled = renderOfflineChunks(makeLumusClipOfflineProject(false), samples, 257);
-        const auto enabledSmall = renderOfflineChunks(makeLumusClipOfflineProject(true), samples, 64);
-        const auto enabledLarge = renderOfflineChunks(makeLumusClipOfflineProject(true), samples, 257);
+        const auto disabled = renderOfflineChunks(makeLumenClipOfflineProject(false), samples, 257);
+        const auto enabledSmall = renderOfflineChunks(makeLumenClipOfflineProject(true), samples, 64);
+        const auto enabledLarge = renderOfflineChunks(makeLumenClipOfflineProject(true), samples, 257);
         double differenceEnergy = 0.0;
         float blockDifference = 0.0f;
         for (int channel = 0; channel < enabledSmall.getNumChannels(); ++channel)
@@ -5533,10 +5910,357 @@ namespace
             && differenceEnergy > 0.01
             && blockDifference <= 0.005f;
         if (!ok)
-            std::cerr << "Lumus clip render disabledEnergy=" << disabledEnergy
+            std::cerr << "Lumen clip render disabledEnergy=" << disabledEnergy
                       << " enabledEnergy=" << enabledEnergy
                       << " differenceEnergy=" << differenceEnergy
                       << " blockDifference=" << blockDifference << "\n";
+        return ok;
+    }
+
+    enum class LumenPreviewParityPatch
+    {
+        DigitalKeys,
+        Arpeggiator,
+        Clip,
+        Granular,
+    };
+
+    beat::Project makeLumenPreviewParityProject(LumenPreviewParityPatch patch)
+    {
+        auto project = makeLumenArpeggiatorOfflineProject(false);
+        project.id = "lumen-midi-preview-parity";
+        project.name = "Lumen MIDI Preview Parity";
+        project.lengthBeats = 2.0;
+
+        auto& instrument = project.instruments.front();
+        instrument.id = "factory.lumen-digital-keys-01";
+        instrument.kind = "wavetable";
+        instrument.maxVoices = 16;
+        instrument.attackMs = 6.0f;
+        instrument.decayMs = 720.0f;
+        instrument.sustain = 0.48f;
+        instrument.releaseMs = 580.0f;
+        instrument.ampLevel = 0.66f;
+        instrument.dynamicModulation.active = true;
+        instrument.dynamicModulation.ampLevel.velocity = 0.22f;
+        instrument.aether.oscA = {};
+        instrument.aether.oscA.enabled = true;
+        instrument.aether.oscA.waveform = 2;
+        instrument.aether.oscA.level = 0.58f;
+        instrument.aether.oscA.routing = 2;
+        instrument.aether.oscB = {};
+        instrument.aether.oscB.enabled = true;
+        instrument.aether.oscB.waveform = 0;
+        instrument.aether.oscB.octave = 1;
+        instrument.aether.oscB.level = 0.27f;
+        instrument.aether.oscB.routing = 2;
+        instrument.lumen.oscC = {};
+        instrument.lumen.oscC.enabled = true;
+        instrument.lumen.oscC.waveform = 1;
+        instrument.lumen.oscC.octave = 2;
+        instrument.lumen.oscC.level = 0.09f;
+        instrument.lumen.oscC.tuningMode = 2;
+        instrument.lumen.oscC.ratioNumerator = 2.0f;
+        instrument.lumen.oscC.ratioDenominator = 1.0f;
+        instrument.lumen.oscC.routing = 2;
+
+        auto& track = project.tracks.front();
+        track.id = "lumen-preview-track";
+        track.instrumentId = instrument.id;
+        auto& segment = track.segments.front();
+        segment.id = "lumen-preview-segment";
+        segment.trackId = track.id;
+        segment.instrumentId = instrument.id;
+        segment.startBeat = 0.0;
+        segment.lengthBeats = 1.0;
+        auto& note = segment.notes.front();
+        note.instrumentId = instrument.id;
+        note.pitch = 64;
+        note.velocity = 103;
+        note.startBeat = 0.0;
+        note.lengthBeats = 1.0;
+
+        if (patch == LumenPreviewParityPatch::DigitalKeys)
+        {
+            note.curve = {
+                { 0.0, 64.0 },
+                { 0.5, 67.0 },
+                { 1.0, 65.0 },
+            };
+            beat::MidiAutomationLane lane;
+            lane.target = "amp.level";
+            lane.points = {
+                { 0.0, 0.72f, beat::AutomationCurve::Linear },
+                { 1.0, 0.42f, beat::AutomationCurve::EaseOut },
+            };
+            note.automation.push_back(std::move(lane));
+        }
+
+        if (patch == LumenPreviewParityPatch::Arpeggiator)
+        {
+            instrument.id = "factory.lumen-arp-pluck-01";
+            instrument.lumen.arpeggiator.enabled = true;
+            instrument.lumen.arpeggiator.mode = 2;
+            instrument.lumen.arpeggiator.rateDivision = 16;
+            instrument.lumen.arpeggiator.gate = 0.56f;
+            instrument.lumen.arpeggiator.swing = 0.12f;
+            instrument.lumen.arpeggiator.octaves = 2;
+            instrument.lumen.arpeggiator.rootPitchClass = 0;
+            instrument.lumen.arpeggiator.scale = 2;
+        }
+        else if (patch == LumenPreviewParityPatch::Clip)
+        {
+            instrument.id = "factory.lumen-clip-sequence-01";
+            auto& clip = instrument.lumen.clip;
+            clip.enabled = true;
+            clip.rateDivision = 16;
+            clip.swing = 0.16f;
+            clip.lengthSteps = 8;
+            clip.noteCount = 7;
+            clip.notes[0] = { 0, 0, 1, 1.0f };
+            clip.notes[1] = { 0, 7, 2, 0.72f };
+            clip.notes[2] = { 1, 7, 1, 0.76f };
+            clip.notes[3] = { 3, 12, 1, 0.9f };
+            clip.notes[4] = { 4, 3, 2, 0.7f };
+            clip.notes[5] = { 6, 10, 1, 0.84f };
+            clip.notes[6] = { 7, 7, 1, 0.72f };
+        }
+        else if (patch == LumenPreviewParityPatch::Granular)
+        {
+            instrument.id = "factory.lumen-granular-texture-01";
+            // Isolate the seeded built-in source so audibility cannot be
+            // satisfied by the factory patch's quiet oscillator pilot.
+            instrument.aether.oscA.enabled = false;
+            instrument.aether.oscB.enabled = false;
+            instrument.lumen.oscC.enabled = false;
+            instrument.lumen.granularModes[2] = true;
+            auto& granular = instrument.lumen.granularSlots[2];
+            granular.enabled = true;
+            granular.builtinSource = "benchmark";
+            granular.rootNote = 45;
+            granular.level = 0.62f;
+            granular.position = 0.44f;
+            granular.positionSpread = 0.3f;
+            granular.grainMilliseconds = 132.0f;
+            granular.densityHz = 22.0f;
+            granular.stereoSpread = 0.84f;
+            granular.randomSeed = 314159u;
+        }
+
+        track.instrumentId = instrument.id;
+        segment.instrumentId = instrument.id;
+        note.instrumentId = instrument.id;
+        return project;
+    }
+
+    juce::AudioBuffer<float> renderLumenMidiPreviewChunks(beat::Project project,
+                                                          int samples,
+                                                          int blockSize,
+                                                          bool& accepted)
+    {
+        const auto trackId = project.tracks.front().id;
+        const auto instrumentId = project.instruments.front().id;
+        const auto note = project.tracks.front().segments.front().notes.front();
+        project.tracks.front().segments.clear();
+
+        beat::AudioEngine engine;
+        engine.prepareForOffline(48000.0, blockSize, 2);
+        engine.applyProject(std::move(project));
+        engine.requestPause();
+        accepted = engine.requestMidiPreviewNote(
+            trackId, instrumentId, note.pitch, note.velocity, 0.0, note.lengthBeats * 0.5, 0.0f, &note);
+
+        juce::AudioBuffer<float> output(2, samples);
+        juce::AudioBuffer<float> block(2, blockSize);
+        output.clear();
+        juce::AudioIODeviceCallbackContext context;
+        int written = 0;
+        while (written < samples)
+        {
+            const int samplesThisBlock = juce::jmin(blockSize, samples - written);
+            block.setSize(2, samplesThisBlock, false, false, true);
+            block.clear();
+            std::array<float*, 2> outputs {
+                block.getWritePointer(0),
+                block.getWritePointer(1),
+            };
+            engine.audioDeviceIOCallbackWithContext(
+                nullptr, 0, outputs.data(), 2, samplesThisBlock, context);
+            for (int channel = 0; channel < output.getNumChannels(); ++channel)
+                output.copyFrom(channel, written, block, channel, 0, samplesThisBlock);
+            written += samplesThisBlock;
+        }
+        engine.requestStopMidiPreview(trackId);
+        return output;
+    }
+
+    bool stressAudioEngineLumenMidiPreviewParity()
+    {
+        constexpr int samples = 30000;
+        constexpr int blockSize = 257;
+        const std::array<std::pair<LumenPreviewParityPatch, const char*>, 4> cases {{
+            { LumenPreviewParityPatch::DigitalKeys, "Lumen_DigitalKeys_01" },
+            { LumenPreviewParityPatch::Arpeggiator, "Lumen_ArpPluck_01" },
+            { LumenPreviewParityPatch::Clip, "Lumen_ClipSequence_01" },
+            { LumenPreviewParityPatch::Granular, "Lumen_GranularTexture_01" },
+        }};
+
+        for (const auto& [patch, name] : cases)
+        {
+            const auto project = makeLumenPreviewParityProject(patch);
+            const auto track = renderOfflineChunks(project, samples, blockSize, 48000.0);
+            bool accepted = false;
+            const auto preview = renderLumenMidiPreviewChunks(project, samples, blockSize, accepted);
+            const auto residual = bufferResidualStats(track, preview, samples);
+            const auto relativeResidual = residual.sourceEnergy > 0.0
+                ? residual.residualEnergy / residual.sourceEnergy
+                : std::numeric_limits<double>::infinity();
+            const bool ok = accepted
+                && residual.ok
+                && residual.sourceEnergy > 1.0e-6
+                && residual.maxAbsDiff <= 1.0e-6f
+                && relativeResidual <= 1.0e-10;
+            if (!ok)
+            {
+                std::cerr << "Lumen MIDI preview parity failed patch=" << name
+                          << " accepted=" << accepted
+                          << " trackEnergy=" << residual.sourceEnergy
+                          << " residualEnergy=" << residual.residualEnergy
+                          << " relativeResidual=" << relativeResidual
+                          << " meanAbsDiff=" << residual.meanAbsDiff
+                          << " maxAbsDiff=" << residual.maxAbsDiff << "\n";
+                return false;
+            }
+        }
+        return true;
+    }
+
+    juce::AudioBuffer<float> renderDetailedMidiPreviewChunks(beat::Project project,
+                                                              int samples,
+                                                              int blockSize,
+                                                              bool& accepted)
+    {
+        const auto trackId = project.tracks.front().id;
+        const auto instrumentId = project.instruments.front().id;
+        const auto segment = project.tracks.front().segments.front();
+        const auto tempo = project.bpm;
+        const auto glideMs = project.instruments.front().glideMs;
+        project.tracks.front().segments.clear();
+
+        beat::AudioEngine engine;
+        engine.prepareForOffline(48000.0, blockSize, 2);
+        engine.applyProject(std::move(project));
+        engine.requestPause();
+        accepted = true;
+        for (size_t index = 0; index < segment.notes.size(); ++index)
+        {
+            const auto& note = segment.notes[index];
+            const auto* target = note.connectToIndex >= 0 && note.connectToIndex < (int) segment.notes.size()
+                ? &segment.notes[(size_t) note.connectToIndex]
+                : nullptr;
+            const auto durationBeats = target != nullptr && target->startBeat > note.startBeat
+                ? target->startBeat - note.startBeat
+                : note.lengthBeats;
+            accepted = engine.requestMidiPreviewNote(
+                trackId,
+                instrumentId,
+                note.pitch,
+                note.velocity,
+                note.startBeat * 60.0 / tempo,
+                durationBeats * 60.0 / tempo,
+                segment.audioGainDb,
+                &note,
+                target != nullptr ? target->pitch : -1,
+                glideMs) && accepted;
+        }
+
+        juce::AudioBuffer<float> output(2, samples);
+        juce::AudioBuffer<float> block(2, blockSize);
+        output.clear();
+        juce::AudioIODeviceCallbackContext context;
+        int written = 0;
+        while (written < samples)
+        {
+            const int samplesThisBlock = juce::jmin(blockSize, samples - written);
+            block.setSize(2, samplesThisBlock, false, false, true);
+            block.clear();
+            std::array<float*, 2> outputs {
+                block.getWritePointer(0),
+                block.getWritePointer(1),
+            };
+            engine.audioDeviceIOCallbackWithContext(nullptr, 0, outputs.data(), 2, samplesThisBlock, context);
+            for (int channel = 0; channel < output.getNumChannels(); ++channel)
+                output.copyFrom(channel, written, block, channel, 0, samplesThisBlock);
+            written += samplesThisBlock;
+        }
+        engine.requestStopMidiPreview(trackId);
+        return output;
+    }
+
+    bool stressAudioEngineMidiEditorDetailedParity()
+    {
+        auto project = makeLumenPreviewParityProject(LumenPreviewParityPatch::DigitalKeys);
+        auto& instrument = project.instruments.front();
+        instrument.glideMs = 84.0f;
+        auto& track = project.tracks.front();
+        beat::TrackEffect filter;
+        filter.id = "editor-parity-lowpass";
+        filter.kind = beat::TrackEffectKind::Lowpass;
+        filter.params.push_back({ "cutoffHz", 5400.0f });
+        filter.params.push_back({ "resonance", 7.0f });
+        track.effects.push_back(std::move(filter));
+        beat::TrackEffect saturator;
+        saturator.id = "editor-parity-saturator";
+        saturator.kind = beat::TrackEffectKind::Saturator;
+        saturator.params.push_back({ "drive", 14.0f });
+        saturator.params.push_back({ "mix", 19.0f });
+        track.effects.push_back(std::move(saturator));
+
+        auto& segment = track.segments.front();
+        segment.audioGainDb = -2.5f;
+        auto& first = segment.notes.front();
+        first.lengthBeats = 0.75;
+        first.connectToIndex = 1;
+        first.curve = {
+            { 0.0, 64.0 },
+            { 0.375, 66.5 },
+            { 0.75, 69.0 },
+        };
+        first.automation.front().points = {
+            { 0.0, 0.72f, beat::AutomationCurve::Linear },
+            { 0.75, 0.43f, beat::AutomationCurve::EaseOut },
+        };
+        beat::MidiNote second;
+        second.instrumentId = instrument.id;
+        second.pitch = 71;
+        second.velocity = 88;
+        second.startBeat = 0.75;
+        second.lengthBeats = 0.25;
+        segment.notes.push_back(std::move(second));
+
+        constexpr int samples = 30000;
+        constexpr int blockSize = 257;
+        const auto arrangement = renderOfflineChunks(project, samples, blockSize, 48000.0);
+        bool accepted = false;
+        const auto preview = renderDetailedMidiPreviewChunks(project, samples, blockSize, accepted);
+        const auto residual = bufferResidualStats(arrangement, preview, samples);
+        const auto relativeResidual = residual.sourceEnergy > 0.0
+            ? residual.residualEnergy / residual.sourceEnergy
+            : std::numeric_limits<double>::infinity();
+        const bool ok = accepted
+            && residual.ok
+            && residual.sourceEnergy > 1.0e-6
+            && residual.maxAbsDiff <= 1.0e-6f
+            && relativeResidual <= 1.0e-10;
+        if (!ok)
+        {
+            std::cerr << "Detailed MIDI editor/global parity failed accepted=" << accepted
+                      << " arrangementEnergy=" << residual.sourceEnergy
+                      << " residualEnergy=" << residual.residualEnergy
+                      << " relativeResidual=" << relativeResidual
+                      << " meanAbsDiff=" << residual.meanAbsDiff
+                      << " maxAbsDiff=" << residual.maxAbsDiff << "\n";
+        }
         return ok;
     }
 
@@ -5579,6 +6303,97 @@ namespace
 
         engine.requestStop();
         return output;
+    }
+
+    juce::AudioBuffer<float> renderAudioSegmentPreviewChunks(beat::Project project,
+                                                              double positionBeat,
+                                                              int samples,
+                                                              int blockSize,
+                                                              bool& accepted)
+    {
+        const auto trackId = project.tracks.front().id;
+        const auto segment = project.tracks.front().segments.front();
+        project.tracks.front().segments.clear();
+
+        beat::AudioEngine engine;
+        engine.prepareForOffline(44100.0, blockSize, 2);
+        engine.applyProject(std::move(project));
+        engine.requestPause();
+        accepted = engine.requestAudioSegmentPreview(
+            trackId,
+            segment.audioFileId,
+            segment.sourceStartBeat,
+            positionBeat,
+            segment.lengthBeats,
+            segment.fadeInBeats,
+            segment.fadeOutBeats,
+            segment.audioGainDb);
+
+        juce::AudioBuffer<float> output(2, samples);
+        juce::AudioBuffer<float> block(2, blockSize);
+        output.clear();
+        juce::AudioIODeviceCallbackContext context;
+        int written = 0;
+        while (written < samples)
+        {
+            const int samplesThisBlock = juce::jmin(blockSize, samples - written);
+            block.setSize(2, samplesThisBlock, false, false, true);
+            block.clear();
+            std::array<float*, 2> outputs {
+                block.getWritePointer(0),
+                block.getWritePointer(1),
+            };
+            engine.audioDeviceIOCallbackWithContext(nullptr, 0, outputs.data(), 2, samplesThisBlock, context);
+            for (int channel = 0; channel < output.getNumChannels(); ++channel)
+                output.copyFrom(channel, written, block, channel, 0, samplesThisBlock);
+            written += samplesThisBlock;
+        }
+        engine.requestStopAudioPreview(trackId);
+        return output;
+    }
+
+    bool stressAudioEngineAudioSegmentPreviewParity()
+    {
+        auto clipFile = juce::File("/private/tmp").getChildFile("BeatBackendStress-editor-audio-preview.wav");
+        if (!writeAudioClipFixture(clipFile))
+            return false;
+
+        auto project = makeAudioClipOfflineProject(clipFile);
+        project.lengthBeats = 0.75;
+        auto& segment = project.tracks.front().segments.front();
+        segment.lengthBeats = 0.75;
+        segment.sourceStartBeat = 0.125;
+        segment.fadeInBeats = 0.1875;
+        segment.fadeOutBeats = 0.25;
+        segment.audioGainDb = -3.5f;
+
+        constexpr double positionBeat = 0.125;
+        constexpr int samples = 12000;
+        constexpr int blockSize = 257;
+        const auto arrangement = renderOfflineRangeChunks(project, positionBeat, samples, blockSize);
+        bool accepted = false;
+        const auto preview = renderAudioSegmentPreviewChunks(project, positionBeat, samples, blockSize, accepted);
+        clipFile.deleteFile();
+
+        const auto residual = bufferResidualStats(arrangement, preview, samples);
+        const auto relativeResidual = residual.sourceEnergy > 0.0
+            ? residual.residualEnergy / residual.sourceEnergy
+            : std::numeric_limits<double>::infinity();
+        const bool ok = accepted
+            && residual.ok
+            && residual.sourceEnergy > 1.0e-6
+            && residual.maxAbsDiff <= 0.00008f
+            && relativeResidual <= 1.0e-8;
+        if (!ok)
+        {
+            std::cerr << "Audio segment editor/global preview parity failed accepted=" << accepted
+                      << " arrangementEnergy=" << residual.sourceEnergy
+                      << " residualEnergy=" << residual.residualEnergy
+                      << " relativeResidual=" << relativeResidual
+                      << " meanAbsDiff=" << residual.meanAbsDiff
+                      << " maxAbsDiff=" << residual.maxAbsDiff << "\n";
+        }
+        return ok;
     }
 
     juce::AudioBuffer<float> renderOfflineLoopRangeChunks(
@@ -6902,8 +7717,11 @@ namespace
         }
 
         auto exportFile = juce::File("/private/tmp").getChildFile("BeatBackendStress-delay-tail.wav");
-        if (exportFile.existsAsFile())
-            exportFile.deleteFile();
+        auto noTailFile = juce::File("/private/tmp").getChildFile("BeatBackendStress-delay-no-tail.wav");
+        auto noTailStemFile = juce::File("/private/tmp").getChildFile("BeatBackendStress-delay-stem-no-tail.wav");
+        for (const auto& file : { exportFile, noTailFile, noTailStemFile })
+            if (file.existsAsFile())
+                file.deleteFile();
 
         auto exportProject = makeTinyOfflineProject();
         beat::TrackEffect exportDelay;
@@ -6914,8 +7732,16 @@ namespace
         exportDelay.params.push_back({ "mix", 60.0f });
         exportProject.tracks.front().effects.push_back(std::move(exportDelay));
 
+        const auto noTailProject = exportProject;
+        const auto noTailStemProject = exportProject;
         juce::String error;
-        if (!beat::AudioEngine::renderProjectToWav(std::move(exportProject), exportFile, 44100.0, 256, 2, &error))
+        if (!beat::AudioEngine::renderProjectToWav(exportProject, exportFile, 44100.0, 256, 2, &error)
+            || !beat::AudioEngine::renderProjectToWav(
+                noTailProject, noTailFile, 44100.0, 256, 2, &error, {}, 16,
+                beat::AudioQuality::standardLive, false)
+            || !beat::AudioEngine::renderTrackToWav(
+                noTailStemProject, "offline-track", noTailStemFile, 44100.0, 256, 2, &error, {}, 16,
+                beat::AudioQuality::standardLive, false))
         {
             std::cerr << "Delay tail export error: " << error << "\n";
             return false;
@@ -6924,11 +7750,22 @@ namespace
         juce::AudioFormatManager formatManager;
         formatManager.registerBasicFormats();
         std::unique_ptr<juce::AudioFormatReader> reader(formatManager.createReaderFor(exportFile));
+        std::unique_ptr<juce::AudioFormatReader> noTailReader(formatManager.createReaderFor(noTailFile));
+        std::unique_ptr<juce::AudioFormatReader> noTailStemReader(formatManager.createReaderFor(noTailStemFile));
         const auto expectedDrySamples = (juce::int64) std::ceil(0.5 * 60.0 / 120.0 * 44100.0);
         const bool hasTail = reader != nullptr && reader->lengthInSamples > expectedDrySamples + 1000;
-        exportFile.deleteFile();
+        const bool projectTailDisabled = noTailReader != nullptr
+            && std::llabs(noTailReader->lengthInSamples - expectedDrySamples) <= 1;
+        const bool stemTailDisabled = noTailStemReader != nullptr
+            && std::llabs(noTailStemReader->lengthInSamples - expectedDrySamples) <= 1;
+        for (const auto& file : { exportFile, noTailFile, noTailStemFile })
+            file.deleteFile();
 
-        return delayDiff > 0.01 && reverbDiff > 0.01 && hasTail;
+        return delayDiff > 0.01
+            && reverbDiff > 0.01
+            && hasTail
+            && projectTailDisabled
+            && stemTailDisabled;
     }
 
     bool stressAudioEngineDenormalTailProtection()
@@ -7083,6 +7920,9 @@ namespace
         auto dryProject = makeSampleInstrumentOfflineProject(sampleFile);
         auto filteredProject = makeSampleInstrumentOfflineProject(sampleFile);
         auto quietProject = makeSampleInstrumentOfflineProject(sampleFile);
+        auto previewProject = makeSampleInstrumentOfflineProject(sampleFile);
+        const auto previewNote = previewProject.tracks.front().segments.front().notes.front();
+        previewProject.tracks.front().segments.clear();
 
         beat::TrackEffect filter;
         filter.id = "sample-route-filter";
@@ -7100,10 +7940,22 @@ namespace
         auto dry = renderOfflineBlock(std::move(dryProject), 4096);
         auto filtered = renderOfflineBlock(std::move(filteredProject), 4096);
         auto quiet = renderOfflineBlock(std::move(quietProject), 4096);
+        beat::AudioEngine previewEngine;
+        previewEngine.prepareForOffline(44100.0, 512, 2);
+        previewEngine.applyProject(std::move(previewProject));
+        previewEngine.requestPause();
+        const bool previewAccepted = previewEngine.requestMidiPreviewNote(
+            "sample-route-track", "sample-route-instrument", previewNote.pitch, previewNote.velocity,
+            0.0, previewNote.lengthBeats * 0.5, 0.0f, &previewNote);
+        auto preview = renderEngineBlock(previewEngine, 4096);
+        previewEngine.requestStopMidiPreview("sample-route-track");
+        auto previewStopped = renderEngineBlock(previewEngine, 512);
 
         double dryEnergy = 0.0;
         double quietEnergy = 0.0;
         double filterDiff = 0.0;
+        const double previewEnergy = bufferEnergy(preview);
+        const double previewStoppedEnergy = bufferEnergy(previewStopped);
         for (int ch = 0; ch < dry.getNumChannels(); ++ch)
         {
             for (int i = 0; i < dry.getNumSamples(); ++i)
@@ -7122,11 +7974,17 @@ namespace
         sampleFile.deleteFile();
         const bool ok = dryEnergy > 0.0001
             && quietEnergy < dryEnergy * 0.05
-            && filterDiff > 0.01;
+            && filterDiff > 0.01
+            && previewAccepted
+            && previewEnergy > 0.0001
+            && previewStoppedEnergy < 1.0e-10;
         if (!ok)
             std::cerr << "Sample route dryEnergy=" << dryEnergy
                       << " quietEnergy=" << quietEnergy
-                      << " filterDiff=" << filterDiff << "\n";
+                      << " filterDiff=" << filterDiff
+                      << " previewAccepted=" << previewAccepted
+                      << " previewEnergy=" << previewEnergy
+                      << " previewStoppedEnergy=" << previewStoppedEnergy << "\n";
         return ok;
     }
 
@@ -7274,13 +8132,15 @@ namespace
         const auto root = juce::File("/private/tmp")
             .getChildFile("BeatBackendStress-assets-" + juce::Uuid().toString());
         const auto sourceFolder = root.getChildFile("source");
-        const auto projectFile = root.getChildFile("Portable Project.beat");
+        const auto selectedProjectFile = root.getChildFile("Portable Project.beat");
+        const auto projectFile = beat::encapsulatedProjectFileFor(selectedProjectFile);
         const auto audioFile = sourceFolder.getChildFile("Loop Source.wav");
         const auto sampleFile = sourceFolder.getChildFile("Snare Hit.wav");
         const auto pluginFile = sourceFolder.getChildFile("Kit Plugin.dspreset");
 
         if (!root.createDirectory()
             || !sourceFolder.createDirectory()
+            || !projectFile.getParentDirectory().createDirectory()
             || !audioFile.replaceWithText("audio-fixture")
             || !sampleFile.replaceWithText("sample-fixture")
             || !pluginFile.replaceWithText("plugin-fixture"))
@@ -7500,9 +8360,12 @@ namespace
             && packagedPluginPath == pluginFile.getFullPathName()
             && packagedPluginAssetPath == pluginFile.getFullPathName()
             && packagedBundledAssetPath == "/samples/factory.wav"
-            && packagedManaged.getProperty("manifestPath", {}).toString().startsWith("./Portable Project Assets/sfz/")
-            && packagedManaged.getProperty("sourcePath", {}).toString().startsWith("./Portable Project Assets/sfz/")
-            && packagedManaged.getProperty("samplePaths", {})[0].toString().startsWith("./Portable Project Assets/sfz/");
+            && packagedManaged.getProperty("manifestPath", {}).toString().startsWith("./Assets/sfz/")
+            && packagedManaged.getProperty("sourcePath", {}).toString().startsWith("./Assets/sfz/")
+            && packagedManaged.getProperty("samplePaths", {})[0].toString().startsWith("./Assets/sfz/")
+            && projectFile == root.getChildFile("Portable Project").getChildFile("Portable Project.beat")
+            && beat::projectSidecarFolderFor(projectFile) == projectFile.getParentDirectory().getChildFile("Assets")
+            && beat::projectSidecarFolderFor(selectedProjectFile) == root.getChildFile("Portable Project Assets");
 
         const auto copiedAudio = projectFile.getParentDirectory().getChildFile(packagedAudioPath);
         const auto copiedSample = projectFile.getParentDirectory().getChildFile(packagedSamplePath);
@@ -8825,7 +9688,10 @@ namespace
         instrument.dynamicModulation.filterCutoff.macro8 = 0.27f;
         instrument.dynamicModulation.filterCutoff.env3 = 0.21f;
         instrument.dynamicModulation.filterCutoff.env4 = -0.18f;
+        instrument.lfoKeytrackRate = 0.65f;
+        instrument.lfo2KeytrackRate = -0.4f;
         instrument.extraLfos[7] = { true, 3, 3.25f, true, "1/8t", 0.2f, 0.15f, 0.3f, true, false };
+        instrument.extraLfos[7].keytrackRate = 0.35f;
         instrument.dynamicModulation.filterCutoff.extraLfo[7] = 0.29f;
         instrument.dynamicModulation.ampLevel.velocity = 0.27f;
         instrument.dynamicModulation.ampLevel.velocityBipolar = false;
@@ -8960,9 +9826,12 @@ namespace
                 && near(loadedInstrument.env3Sustain, 0.31f) && near(loadedInstrument.env3ReleaseMs, 183.0f) && loadedInstrument.env3Loop
                 && near(loadedInstrument.env4AttackMs, 34.0f) && near(loadedInstrument.env4DecayMs, 144.0f)
                 && near(loadedInstrument.env4Sustain, 0.41f) && near(loadedInstrument.env4ReleaseMs, 224.0f)
+                && near(loadedInstrument.lfoKeytrackRate, 0.65f)
+                && near(loadedInstrument.lfo2KeytrackRate, -0.4f)
                 && loadedInstrument.extraLfos[7].enabled && loadedInstrument.extraLfos[7].waveform == 3
                 && near(loadedInstrument.extraLfos[7].rateHz, 3.25f) && near(loadedInstrument.extraLfos[7].phaseOffset, 0.3f)
                 && loadedInstrument.extraLfos[7].sync && loadedInstrument.extraLfos[7].syncedRate == "1/8t"
+                && near(loadedInstrument.extraLfos[7].keytrackRate, 0.35f)
                 && near(loadedInstrument.dynamicModulation.filterCutoff.extraLfo[7], 0.29f)
                 && near(loadedInstrument.dynamicModulation.ampLevel.velocity, 0.27f)
                 && !loadedInstrument.dynamicModulation.ampLevel.velocityBipolar
@@ -9097,54 +9966,64 @@ namespace
         return ok;
     }
 
-    bool stressProjectRepositoryLumusMvpRoundtrip()
+    bool stressProjectRepositoryLumenMvpRoundtrip()
     {
         const auto root = juce::File("/private/tmp")
-            .getChildFile("BeatBackendStress-lumus-mvp-repository-" + juce::Uuid().toString());
+            .getChildFile("BeatBackendStress-lumen-mvp-repository-" + juce::Uuid().toString());
         const auto dbFile = root.getChildFile("projects.sqlite");
         if (!root.createDirectory()) return false;
 
-        auto project = makeLumusClipOfflineProject(true);
-        project.id = "lumus-mvp-roundtrip";
-        project.name = "Lumus MVP Roundtrip";
+        auto project = makeLumenClipOfflineProject(true);
+        project.id = "lumen-mvp-roundtrip";
+        project.name = "Lumen MVP Roundtrip";
         auto& instrument = project.instruments.front();
         instrument.aether.oscA.enabled = false;
-        instrument.lumus.oscC.enabled = true;
-        instrument.lumus.oscC.level = 0.62f;
-        instrument.lumus.oscC.pan = 0.27f;
-        instrument.lumus.oscC.routing = 2;
-        instrument.lumus.oscC.tuningMode = 2;
-        instrument.lumus.oscC.ratioNumerator = 3.0f;
-        instrument.lumus.oscC.ratioDenominator = 2.0f;
-        instrument.lumus.oscC.phaseMode = 1;
-        instrument.lumus.oscC.fxSends = { 0.64f, 0.0f };
-        instrument.lumus.sampleModes = { false, true, false };
-        instrument.lumus.sampleSlots[1].rootNote = 55;
-        instrument.lumus.sampleSlots[1].level = 0.43f;
-        instrument.lumus.sampleSlots[1].routing = 3;
-        instrument.lumus.granularSlots[2].rootNote = 48;
-        instrument.lumus.granularSlots[2].position = 0.31f;
-        instrument.lumus.granularSlots[2].randomSeed = 98765u;
-        instrument.aether.fxBusIds = { "lumus-source-fx", "" };
+        instrument.lumen.oscC.enabled = true;
+        instrument.lumen.oscC.level = 0.62f;
+        instrument.lumen.oscC.pan = 0.27f;
+        instrument.lumen.oscC.routing = 2;
+        instrument.lumen.oscC.tuningMode = 2;
+        instrument.lumen.oscC.ratioNumerator = 3.0f;
+        instrument.lumen.oscC.ratioDenominator = 2.0f;
+        instrument.lumen.oscC.phaseMode = 1;
+        instrument.lumen.oscC.fxSends = { 0.64f, 0.0f };
+        instrument.lumen.sampleModes = { false, true, false };
+        instrument.lumen.sampleSlots[1].rootNote = 55;
+        instrument.lumen.sampleSlots[1].level = 0.43f;
+        instrument.lumen.sampleSlots[1].routing = 3;
+        instrument.lumen.sampleSlots[1].reverse = true;
+        instrument.lumen.sampleSlots[1].playbackRate = 1.75f;
+        instrument.lumen.sampleSlots[1].pingPongLoop = true;
+        instrument.lumen.sampleSlots[1].releaseTailMs = 175.0f;
+        instrument.lumen.sampleSlots[1].startRatio = 0.08f;
+        instrument.lumen.sampleSlots[1].endRatio = 0.92f;
+        instrument.lumen.sampleSlots[1].selectedSliceId = "slice-2";
+        instrument.lumen.sampleSlots[1].slices = {
+            { "slice-1", 0.1f, 0.3f }, { "slice-2", 0.35f, 0.65f },
+        };
+        instrument.lumen.granularSlots[2].rootNote = 48;
+        instrument.lumen.granularSlots[2].position = 0.31f;
+        instrument.lumen.granularSlots[2].randomSeed = 98765u;
+        instrument.aether.fxBusIds = { "lumen-source-fx", "" };
 
         beat::TrackEffect drive;
-        drive.id = "lumus-main-drive";
+        drive.id = "lumen-main-drive";
         drive.kind = beat::TrackEffectKind::Saturator;
         drive.params.push_back({ "drive", 58.0f });
         drive.params.push_back({ "mix", 72.0f });
         instrument.effects.push_back(drive);
         beat::TrackEffect tone;
-        tone.id = "lumus-main-tone";
+        tone.id = "lumen-main-tone";
         tone.kind = beat::TrackEffectKind::Lowpass;
         tone.params.push_back({ "cutoffHz", 4200.0f });
         tone.params.push_back({ "resonance", 18.0f });
         instrument.effects.push_back(tone);
 
         beat::ReturnBus sourceBus;
-        sourceBus.id = "lumus-source-fx";
-        sourceBus.name = "Lumus Source FX";
+        sourceBus.id = "lumen-source-fx";
+        sourceBus.name = "Lumen Source FX";
         beat::TrackEffect returnDelay;
-        returnDelay.id = "lumus-return-delay";
+        returnDelay.id = "lumen-return-delay";
         returnDelay.kind = beat::TrackEffectKind::Delay;
         returnDelay.params.push_back({ "timeMs", 90.0f });
         returnDelay.params.push_back({ "feedback", 12.0f });
@@ -9163,38 +10042,86 @@ namespace
         repository.save(project);
         const auto loaded = repository.load(project.id);
 
+        std::optional<beat::Project> legacyLumusLoaded;
+        beat::Statement legacySelect(db, "SELECT json_blob FROM projects WHERE id = ?");
+        legacySelect.bind(1, project.id);
+        if (legacySelect.step())
+        {
+            const auto canonicalJson = legacySelect.columnText(0);
+            auto legacyDocument = juce::JSON::parse(canonicalJson);
+            if (auto* instruments = legacyDocument.getProperty("instruments", {}).getArray();
+                instruments != nullptr && !instruments->isEmpty())
+            {
+                auto& legacyInstrument = instruments->getReference(0);
+                if (auto* object = legacyInstrument.getDynamicObject())
+                {
+                    object->setProperty("synthEngine", "lumus");
+                    object->setProperty("lumus", legacyInstrument.getProperty("lumen", {}));
+                    object->removeProperty("lumen");
+                    beat::Statement legacyUpdate(db, "UPDATE projects SET json_blob = ? WHERE id = ?");
+                    legacyUpdate.bind(1, juce::JSON::toString(legacyDocument, false));
+                    legacyUpdate.bind(2, project.id);
+                    legacyUpdate.step();
+                    legacyLumusLoaded = repository.load(project.id);
+
+                    beat::Statement restoreUpdate(db, "UPDATE projects SET json_blob = ? WHERE id = ?");
+                    restoreUpdate.bind(1, canonicalJson);
+                    restoreUpdate.bind(2, project.id);
+                    restoreUpdate.step();
+                }
+            }
+        }
+
         bool metadataOk = loaded.has_value() && loaded->instruments.size() == 1
-            && loaded->returnBuses.size() == 1;
+            && loaded->returnBuses.size() == 1
+            && legacyLumusLoaded.has_value()
+            && legacyLumusLoaded->instruments.size() == 1
+            && legacyLumusLoaded->instruments.front().synthEngine == beat::InstrumentDefinition::SynthEngine::Lumen
+            && legacyLumusLoaded->instruments.front().lumen.oscC.enabled
+            && near(legacyLumusLoaded->instruments.front().lumen.oscC.level, 0.62f);
         if (metadataOk)
         {
             const auto& restored = loaded->instruments.front();
-            metadataOk = restored.synthEngine == beat::InstrumentDefinition::SynthEngine::Lumus
+            metadataOk = restored.synthEngine == beat::InstrumentDefinition::SynthEngine::Lumen
                 && restored.hasAether
-                && restored.lumus.oscC.enabled
-                && near(restored.lumus.oscC.level, 0.62f)
-                && near(restored.lumus.oscC.pan, 0.27f)
-                && restored.lumus.oscC.routing == 2
-                && restored.lumus.oscC.tuningMode == 2
-                && near(restored.lumus.oscC.ratioNumerator, 3.0f)
-                && near(restored.lumus.oscC.ratioDenominator, 2.0f)
-                && restored.lumus.oscC.phaseMode == 1
-                && near(restored.lumus.oscC.fxSends[0], 0.64f)
-                && restored.lumus.sampleModes[1]
-                && restored.lumus.sampleSlots[1].rootNote == 55
-                && near(restored.lumus.sampleSlots[1].level, 0.43f)
-                && restored.lumus.sampleSlots[1].routing == 3
-                && restored.lumus.granularSlots[2].rootNote == 48
-                && near(restored.lumus.granularSlots[2].position, 0.31f)
-                && restored.lumus.granularSlots[2].randomSeed == 98765u
-                && restored.lumus.clip.enabled
-                && restored.lumus.clip.lengthSteps == 4
-                && restored.lumus.clip.steps[1].pitchOffset == 7
-                && restored.aether.fxBusIds[0] == "lumus-source-fx"
+                && restored.lumen.oscC.enabled
+                && near(restored.lumen.oscC.level, 0.62f)
+                && near(restored.lumen.oscC.pan, 0.27f)
+                && restored.lumen.oscC.routing == 2
+                && restored.lumen.oscC.tuningMode == 2
+                && near(restored.lumen.oscC.ratioNumerator, 3.0f)
+                && near(restored.lumen.oscC.ratioDenominator, 2.0f)
+                && restored.lumen.oscC.phaseMode == 1
+                && near(restored.lumen.oscC.fxSends[0], 0.64f)
+                && restored.lumen.sampleModes[1]
+                && restored.lumen.sampleSlots[1].rootNote == 55
+                && near(restored.lumen.sampleSlots[1].level, 0.43f)
+                && restored.lumen.sampleSlots[1].routing == 3
+                && restored.lumen.sampleSlots[1].reverse
+                && near(restored.lumen.sampleSlots[1].playbackRate, 1.75f)
+                && restored.lumen.sampleSlots[1].pingPongLoop
+                && near(restored.lumen.sampleSlots[1].releaseTailMs, 175.0f)
+                && near(restored.lumen.sampleSlots[1].startRatio, 0.08f)
+                && near(restored.lumen.sampleSlots[1].endRatio, 0.92f)
+                && restored.lumen.sampleSlots[1].selectedSliceId == "slice-2"
+                && restored.lumen.sampleSlots[1].slices.size() == 2
+                && restored.lumen.sampleSlots[1].slices[1].id == "slice-2"
+                && near(restored.lumen.sampleSlots[1].slices[1].startRatio, 0.35f)
+                && near(restored.lumen.sampleSlots[1].slices[1].endRatio, 0.65f)
+                && restored.lumen.granularSlots[2].rootNote == 48
+                && near(restored.lumen.granularSlots[2].position, 0.31f)
+                && restored.lumen.granularSlots[2].randomSeed == 98765u
+                && restored.lumen.clip.enabled
+                && restored.lumen.clip.lengthSteps == 4
+                && restored.lumen.clip.noteCount == 3
+                && restored.lumen.clip.notes[1].startStep == 1
+                && restored.lumen.clip.notes[1].pitchOffset == 7
+                && restored.aether.fxBusIds[0] == "lumen-source-fx"
                 && restored.effects.size() == 2
-                && restored.effects[0].id == "lumus-main-drive"
-                && restored.effects[1].id == "lumus-main-tone"
+                && restored.effects[0].id == "lumen-main-drive"
+                && restored.effects[1].id == "lumen-main-tone"
                 && loaded->returnBuses.front().effects.size() == 1
-                && loaded->returnBuses.front().effects.front().id == "lumus-return-delay";
+                && loaded->returnBuses.front().effects.front().id == "lumen-return-delay";
         }
 
         double sendDifference = 0.0;
@@ -9230,8 +10157,8 @@ namespace
             if (auto* instruments = persisted.getProperty("instruments", {}).getArray();
                 instruments != nullptr && !instruments->isEmpty())
             {
-                auto lumus = instruments->getReference(0).getProperty("lumus", {});
-                if (auto* object = lumus.getDynamicObject())
+                auto lumen = instruments->getReference(0).getProperty("lumen", {});
+                if (auto* object = lumen.getDynamicObject())
                 {
                     auto clip = object->getProperty("clip");
                     if (auto* clipObject = clip.getDynamicObject())
@@ -9245,13 +10172,13 @@ namespace
                         malformedRejected = !rejected.project.has_value()
                             && std::any_of(rejected.diagnostics.begin(), rejected.diagnostics.end(), [](const auto& diagnostic)
                             {
-                                return diagnostic.code == "lumus.clip.rate"
-                                    && diagnostic.path.contains(".lumus.clip.rateDivision")
+                                return diagnostic.code == "lumen.clip.rate"
+                                    && diagnostic.path.contains(".lumen.clip.rateDivision")
                                     && diagnostic.message.isNotEmpty();
                             });
                         clipObject->setProperty("rateDivision", 16);
                     }
-                    object->setProperty("schemaVersion", 2);
+                    object->setProperty("schemaVersion", 3);
                     beat::Statement update(db, "UPDATE projects SET json_blob = ? WHERE id = ?");
                     update.bind(1, juce::JSON::toString(persisted, false));
                     update.bind(2, project.id);
@@ -9260,8 +10187,8 @@ namespace
                     futureRejected = !rejected.project.has_value()
                         && std::any_of(rejected.diagnostics.begin(), rejected.diagnostics.end(), [](const auto& diagnostic)
                         {
-                            return diagnostic.code == "lumus.config.schema-future"
-                                && diagnostic.path.contains(".lumus.schemaVersion")
+                            return diagnostic.code == "lumen.config.schema-future"
+                                && diagnostic.path.contains(".lumen.schemaVersion")
                                 && diagnostic.message.isNotEmpty();
                         });
                 }
@@ -9272,7 +10199,7 @@ namespace
             && sendDifference > 0.01 && roundtripDifference <= 0.000001
             && malformedRejected && futureRejected;
         if (!ok)
-            std::cerr << "Lumus MVP repository roundtrip failed metadata=" << metadataOk
+            std::cerr << "Lumen MVP repository roundtrip failed metadata=" << metadataOk
                       << " sendDifference=" << sendDifference
                       << " roundtripDifference=" << roundtripDifference
                       << " afterEnergy=" << afterEnergy
@@ -9440,6 +10367,7 @@ namespace
         instrument.id = "aurum-bipolar-roundtrip";
         instrument.hasAurum = true;
         instrument.hasAether = false;
+        instrument.pitchBendRangeSemitones = 12.0f;
         instrument.aurum.operators[0].enabled = true;
         instrument.aurum.operators[0].waveform = 4;
         instrument.aurum.operators[0].level = 0.8f;
@@ -9478,6 +10406,16 @@ namespace
         instrument.aurum.filterRouting = 1;
         instrument.aurum.outputSends[0] = {{ -0.72f, 0.31f, 0.18f }};
         instrument.aurum.outputSends[2] = {{ 0.14f, -0.63f, 0.42f }};
+        instrument.aurum.modulation = juce::JSON::parse(R"json([
+          { "id": "aurum-level", "source": "macro.1", "target": "amp.level", "amount": -0.5, "enabled": true },
+          { "id": "aurum-pan", "source": "lfo.1", "target": "amp.pan", "amount": 0.75, "enabled": true, "bipolar": true },
+          { "id": "aurum-op-level", "source": "macro.1", "target": "aurum.op.1.level", "amount": -0.4, "enabled": true },
+          { "id": "aurum-filter-cutoff", "source": "env.1", "target": "aurum.filter.a.cutoff", "amount": 0.7, "enabled": true }
+        ])json");
+        instrument.aurum.macroValues[0] = 0.61f;
+        instrument.dynamicModulation.active = true;
+        instrument.dynamicModulation.aurumOperatorLevel[0].macro1 = -0.4f;
+        instrument.dynamicModulation.aurumFilterCutoff[0].env = 0.7f;
         beat::TrackEffect sharedEffect;
         sharedEffect.id = "aurum-shared-effect";
         sharedEffect.kind = beat::TrackEffectKind::Chorus;
@@ -9489,10 +10427,14 @@ namespace
         beat::ProjectRepository repo(db);
         repo.save(project);
         const auto loaded = repo.load(project.id);
+        const auto* loadedModulation = loaded.has_value() && !loaded->instruments.empty()
+            ? loaded->instruments.front().aurum.modulation.getArray()
+            : nullptr;
         const bool ok = loaded.has_value()
             && loaded->instruments.size() == 1
             && loaded->instruments.front().hasAurum
             && !loaded->instruments.front().hasAether
+            && near(loaded->instruments.front().pitchBendRangeSemitones, 12.0f)
             && near(loaded->instruments.front().aurum.matrix[1][0], -0.42f)
             && near(loaded->instruments.front().aurum.matrix[0][6], -0.86f)
             && near(loaded->instruments.front().aurum.rmMatrix[1][0], 0.73f)
@@ -9536,6 +10478,19 @@ namespace
             && near(loaded->instruments.front().aurum.outputSends[2][0], 0.14f)
             && near(loaded->instruments.front().aurum.outputSends[2][1], -0.63f)
             && near(loaded->instruments.front().aurum.outputSends[2][2], 0.42f)
+            && loadedModulation != nullptr
+            && loadedModulation->size() == 4
+            && loadedModulation->getReference(0).getProperty("source", {}).toString() == "macro.1"
+            && loadedModulation->getReference(0).getProperty("target", {}).toString() == "amp.level"
+            && near((float) (double) loadedModulation->getReference(0).getProperty("amount", {}), -0.5f)
+            && loadedModulation->getReference(1).getProperty("source", {}).toString() == "lfo.1"
+            && loadedModulation->getReference(1).getProperty("target", {}).toString() == "amp.pan"
+            && loadedModulation->getReference(2).getProperty("target", {}).toString() == "aurum.op.1.level"
+            && loadedModulation->getReference(3).getProperty("target", {}).toString() == "aurum.filter.a.cutoff"
+            && near(loaded->instruments.front().aurum.macroValues[0], 0.61f)
+            && loaded->instruments.front().dynamicModulation.active
+            && near(loaded->instruments.front().dynamicModulation.aurumOperatorLevel[0].macro1, -0.4f)
+            && near(loaded->instruments.front().dynamicModulation.aurumFilterCutoff[0].env, 0.7f)
             && loaded->instruments.front().effects.size() == 1
             && loaded->instruments.front().effects.front().id == "aurum-shared-effect";
 
@@ -10314,7 +11269,7 @@ namespace
     {
         const auto root = juce::File("/private/tmp")
             .getChildFile("BeatBackendStress-backup-" + juce::Uuid().toString());
-        const auto projectFile = root.getChildFile("Backup Project.beat");
+        const auto projectFile = beat::encapsulatedProjectFileFor(root.getChildFile("Backup Project.beat"));
         const auto makeProjectDocument = [](int version, const juce::String& name)
         {
             juce::DynamicObject::Ptr track = new juce::DynamicObject();
@@ -10343,7 +11298,7 @@ namespace
             return juce::JSON::toString(juce::var(document.get()), true);
         };
 
-        if (!root.createDirectory())
+        if (!root.createDirectory() || !projectFile.getParentDirectory().createDirectory())
         {
             std::cerr << "Could not create project backup fixture at "
                       << root.getFullPathName() << "\n";
@@ -10396,7 +11351,9 @@ namespace
         bool ok = backups.size() >= 3
             && !listedBackups.empty()
             && listedBackups.front().latest
-            && beat::latestProjectBackupFileFor(projectFile).existsAsFile();
+            && beat::latestProjectBackupFileFor(projectFile).existsAsFile()
+            && beat::projectBackupFolderFor(projectFile) == projectFile.getParentDirectory().getChildFile("Backups")
+            && beat::projectBackupFolderFor(root.getChildFile("Legacy.beat")) == root.getChildFile("Legacy Backups");
 
         if (!ok)
         {
@@ -10511,6 +11468,52 @@ namespace
 
     bool stressAudioEngineOfflineExport()
     {
+        // The app runs exports on std::thread. On macOS that worker has a
+        // 512 KB stack, which is materially smaller than this test process's
+        // main stack. Exercise the real threading shape before the format and
+        // audio-content assertions below.
+        auto workerFile = juce::File("/private/tmp").getChildFile("BeatBackendStress-export-worker.wav");
+        if (workerFile.existsAsFile())
+            workerFile.deleteFile();
+        bool workerExported = false;
+        juce::String workerError;
+        std::thread exportWorker([&]
+        {
+            workerExported = beat::AudioEngine::renderProjectToWav(
+                makeTinyOfflineProject(), workerFile, 44100.0, 256, 2, &workerError);
+        });
+        exportWorker.join();
+        const bool workerFileValid = workerFile.existsAsFile() && workerFile.getSize() > 44;
+        workerFile.deleteFile();
+        if (!workerExported || !workerFileValid)
+        {
+            std::cerr << "Offline worker-thread export failed: " << workerError << "\n";
+            return false;
+        }
+
+        auto invalidFile = juce::File("/private/tmp").getChildFile("BeatBackendStress-export-invalid.wav");
+        invalidFile.deleteFile();
+        juce::String invalidError;
+        const bool invalidRateRejected = !beat::AudioEngine::renderProjectToWav(
+            makeTinyOfflineProject(),
+            invalidFile,
+            std::numeric_limits<double>::quiet_NaN(),
+            256,
+            2,
+            &invalidError)
+            && invalidError.containsIgnoreCase("sample rate")
+            && !invalidFile.existsAsFile();
+        invalidError.clear();
+        const bool invalidBlockRejected = !beat::AudioEngine::renderProjectToWav(
+            makeTinyOfflineProject(), invalidFile, 44100.0, 65536, 2, &invalidError)
+            && invalidError.containsIgnoreCase("block size")
+            && !invalidFile.existsAsFile();
+        if (!invalidRateRejected || !invalidBlockRejected)
+        {
+            std::cerr << "Offline export invalid-option rejection failed: " << invalidError << "\n";
+            return false;
+        }
+
         auto file = juce::File("/private/tmp").getChildFile("BeatBackendStress-export.wav");
         if (file.existsAsFile())
             file.deleteFile();
@@ -10613,7 +11616,50 @@ namespace
             formatFile.deleteFile();
         }
 
-        return energy > 0.0001;
+        auto stereoFile = juce::File("/private/tmp").getChildFile("BeatBackendStress-export-stereo-reference.wav");
+        auto monoFile = juce::File("/private/tmp").getChildFile("BeatBackendStress-export-mono-fold.wav");
+        if (stereoFile.existsAsFile()) stereoFile.deleteFile();
+        if (monoFile.existsAsFile()) monoFile.deleteFile();
+
+        const auto foldProject = makeTinyOfflineProject();
+        error.clear();
+        const bool stereoRendered = beat::AudioEngine::renderProjectToWav(
+            foldProject, stereoFile, 48000.0, 257, 2, &error, {}, 32,
+            beat::AudioQuality::standardLive, false);
+        const bool monoRendered = beat::AudioEngine::renderProjectToWav(
+            foldProject, monoFile, 48000.0, 257, 1, &error, {}, 32,
+            beat::AudioQuality::standardLive, false);
+        constexpr int foldCompareSamples = 6000;
+        const auto stereo = readWavPrefix(stereoFile, foldCompareSamples);
+        const auto mono = readWavPrefix(monoFile, foldCompareSamples);
+        bool monoFoldOk = stereoRendered
+            && monoRendered
+            && stereo.getNumChannels() == 2
+            && mono.getNumChannels() == 1
+            && stereo.getNumSamples() >= foldCompareSamples
+            && mono.getNumSamples() >= foldCompareSamples;
+        float monoFoldMaxDiff = 0.0f;
+        if (monoFoldOk)
+        {
+            for (int sample = 0; sample < foldCompareSamples; ++sample)
+            {
+                const float expected = 0.5f * (stereo.getSample(0, sample) + stereo.getSample(1, sample));
+                const float difference = std::abs(expected - mono.getSample(0, sample));
+                monoFoldMaxDiff = juce::jmax(monoFoldMaxDiff, difference);
+                if (!std::isfinite(difference))
+                {
+                    monoFoldOk = false;
+                    break;
+                }
+            }
+        }
+        monoFoldOk = monoFoldOk && monoFoldMaxDiff <= 0.0000005f;
+        stereoFile.deleteFile();
+        monoFile.deleteFile();
+        if (!monoFoldOk)
+            std::cerr << "Mono export fold-down failed maxDiff=" << monoFoldMaxDiff << " error=" << error << "\n";
+
+        return energy > 0.0001 && monoFoldOk;
     }
 
     bool stressAudioEngineOfflineExportProgressAndCancel()
@@ -12357,6 +13403,29 @@ namespace
                 return false;
         }
 
+        beat::SfzSourceSlot slicedSfzSlot;
+        auto slicedSfzSource = makeSfzSlotInstrument();
+        auto slicedSfzRamp = std::make_shared<juce::AudioBuffer<float>>(1, 32768);
+        for (int frame = 0; frame < slicedSfzRamp->getNumSamples(); ++frame)
+            slicedSfzRamp->setSample(0, frame, (float) frame / 32768.0f);
+        slicedSfzSource->samples[0].audio = slicedSfzRamp;
+        juce::AudioBuffer<float> slicedSfzOutput(2, 256);
+        slicedSfzOutput.clear();
+        if (!slicedSfzSlot.prepare({ sampleRate, 256, 2 })
+            || !slicedSfzSlot.configurePlayback(false, 1.0f, false, 4.0f, 0.25f, 0.5f)
+            || !slicedSfzSlot.publish(slicedSfzSource)
+            || !slicedSfzSlot.noteOn({ 69, 1.0f, 9180 }))
+            return false;
+        beat::test::beginRealtimeSafetyProbe();
+        slicedSfzSlot.render(slicedSfzOutput, 0, slicedSfzOutput.getNumSamples());
+        const auto slicedSfzViolations = beat::test::endRealtimeSafetyProbe();
+        const float expectedSfzSliceFrame = slicedSfzRamp->getSample(0, 8192 + 128)
+            * std::sqrt(0.5f);
+        if (slicedSfzViolations != 0
+            || std::abs(slicedSfzOutput.getSample(0, 128) - expectedSfzSliceFrame) > 0.00001f)
+            return false;
+        slicedSfzSlot.allNotesOff(true);
+
         auto overlap = makeSfzSlotInstrument(0.0, "no_loop", true);
         if (!slot.publish(overlap)
             || !slot.noteOn({ 69, 80.0f / 127.0f, 9201 })
@@ -12397,6 +13466,40 @@ namespace
         release.clear();
         slot.render(release, 0, release.getNumSamples());
         if (slot.activeVoiceCount() != 0)
+            return false;
+
+        beat::SfzSourceSlot pingPongSfzSlot;
+        auto pingPongSfzSource = makeSfzSlotInstrument(0.0, "loop_continuous");
+        auto pingPongSfzRamp = std::make_shared<juce::AudioBuffer<float>>(1, 32768);
+        for (int frame = 0; frame < pingPongSfzRamp->getNumSamples(); ++frame)
+            pingPongSfzRamp->setSample(0, frame, (float) frame / 32768.0f);
+        pingPongSfzSource->samples[0].audio = pingPongSfzRamp;
+        if (!pingPongSfzSlot.prepare({ sampleRate, 256, 2 })
+            || !pingPongSfzSlot.configurePlayback(false, 1.0f, true, 20.0f)
+            || !pingPongSfzSlot.publish(pingPongSfzSource)
+            || !pingPongSfzSlot.noteOn({ 69, 0.8f, 9425 }))
+            return false;
+        juce::AudioBuffer<float> pingPongSfzOutput(2, 2048);
+        pingPongSfzOutput.clear();
+        beat::test::beginRealtimeSafetyProbe();
+        pingPongSfzSlot.render(pingPongSfzOutput, 0, pingPongSfzOutput.getNumSamples());
+        const auto pingPongSfzViolations = beat::test::endRealtimeSafetyProbe();
+        pingPongSfzSlot.noteOff(9425);
+        release.clear();
+        pingPongSfzSlot.render(release, 0, release.getNumSamples());
+        if (pingPongSfzViolations != 0
+            || bufferEnergy(pingPongSfzOutput) <= 0.0001
+            || !(pingPongSfzOutput.getSample(0, 94) < pingPongSfzOutput.getSample(0, 95)
+                && pingPongSfzOutput.getSample(0, 95) > pingPongSfzOutput.getSample(0, 96)
+                && pingPongSfzOutput.getSample(0, 96) > pingPongSfzOutput.getSample(0, 97)
+                && pingPongSfzOutput.getSample(0, 157) > pingPongSfzOutput.getSample(0, 158)
+                && pingPongSfzOutput.getSample(0, 158) < pingPongSfzOutput.getSample(0, 159)
+                && pingPongSfzOutput.getSample(0, 159) < pingPongSfzOutput.getSample(0, 160))
+            || pingPongSfzSlot.activeVoiceCount() != 1)
+            return false;
+        release.clear();
+        pingPongSfzSlot.render(release, 0, release.getNumSamples());
+        if (pingPongSfzSlot.activeVoiceCount() != 0)
             return false;
 
         auto sustain = makeSfzSlotInstrument(0.0, "loop_sustain");
@@ -14099,9 +15202,13 @@ namespace
     {
         auto masterFile = juce::File("/private/tmp").getChildFile("BeatBackendStress-master-export.wav");
         auto stemFile = juce::File("/private/tmp").getChildFile("BeatBackendStress-track-stem.wav");
+        auto groupedStemFile = juce::File("/private/tmp").getChildFile("BeatBackendStress-grouped-track-stem.wav");
+        auto groupStemFile = juce::File("/private/tmp").getChildFile("BeatBackendStress-group-track-stem.wav");
         auto missingStemFile = juce::File("/private/tmp").getChildFile("BeatBackendStress-missing-stem.wav");
         if (masterFile.existsAsFile()) masterFile.deleteFile();
         if (stemFile.existsAsFile()) stemFile.deleteFile();
+        if (groupedStemFile.existsAsFile()) groupedStemFile.deleteFile();
+        if (groupStemFile.existsAsFile()) groupStemFile.deleteFile();
         if (missingStemFile.existsAsFile()) missingStemFile.deleteFile();
 
         juce::String error;
@@ -14118,6 +15225,31 @@ namespace
             std::cerr << "Track stem export error: " << error << "\n";
             return false;
         }
+
+        auto groupedProject = project;
+        beat::Track group;
+        group.id = "offline-stem-group";
+        group.name = "Offline Stem Group";
+        group.kind = beat::TrackKind::Group;
+        group.gainDb = -6.0f;
+        groupedProject.tracks.push_back(group);
+        auto groupedSource = std::find_if(groupedProject.tracks.begin(), groupedProject.tracks.end(),
+                                          [](const beat::Track& track) { return track.id == "offline-track-b"; });
+        if (groupedSource == groupedProject.tracks.end())
+            return false;
+        groupedSource->parentTrackId = group.id;
+
+        error.clear();
+        if (!beat::AudioEngine::renderTrackToWav(groupedProject, "offline-track-b", groupedStemFile, 44100.0, 256, 2, &error))
+        {
+            std::cerr << "Grouped track stem export error: " << error << "\n";
+            return false;
+        }
+
+        juce::String groupTrackError;
+        const bool groupTrackRejected = !beat::AudioEngine::renderTrackToWav(
+            groupedProject, group.id, groupStemFile, 44100.0, 256, 2, &groupTrackError)
+            && groupTrackError.containsIgnoreCase("group");
 
         juce::String missingError;
         if (beat::AudioEngine::renderTrackToWav(project,
@@ -14144,9 +15276,12 @@ namespace
         const auto exportedStem = readWavPrefix(stemFile, samples);
         const double masterEnergy = wavEnergy(masterFile);
         const double stemEnergy = wavEnergy(stemFile);
+        const double groupedStemEnergy = wavEnergy(groupedStemFile);
 
         masterFile.deleteFile();
         stemFile.deleteFile();
+        groupedStemFile.deleteFile();
+        groupStemFile.deleteFile();
         missingStemFile.deleteFile();
 
         bool parityOk = exportedStem.getNumChannels() == liveStem.getNumChannels()
@@ -14183,21 +15318,26 @@ namespace
             && std::isfinite(stemEnergy)
             && masterEnergy > 0.0001
             && stemEnergy > 0.0001
+            && groupedStemEnergy > 0.0001
+            && groupedStemEnergy < stemEnergy * 0.4
             && std::abs(masterEnergy - stemEnergy) > 0.0001
             && liveEnergy > 0.0001
             && parityOk
             && maxAbsDiff <= 0.00008f
             && meanAbsDiff <= 0.00002
-            && missingError.isNotEmpty();
+            && missingError.isNotEmpty()
+            && groupTrackRejected;
         if (!ok)
         {
             std::cerr << "Track stem export stress failed masterEnergy=" << masterEnergy
                       << " stemEnergy=" << stemEnergy
+                      << " groupedStemEnergy=" << groupedStemEnergy
                       << " liveEnergy=" << liveEnergy
                       << " parity=" << parityOk
                       << " maxAbsDiff=" << maxAbsDiff
                       << " meanAbsDiff=" << meanAbsDiff
-                      << " missingError=" << missingError << "\n";
+                      << " missingError=" << missingError
+                      << " groupTrackError=" << groupTrackError << "\n";
         }
         return ok;
     }
@@ -15186,10 +16326,44 @@ namespace
             * slicedSource->gain * std::sqrt(0.5f);
         juce::AudioBuffer<float> slicedTail(2, 3000);
         slicedTail.clear();
+        beat::test::beginRealtimeSafetyProbe();
         slicedSlot.render(slicedTail, 0, slicedTail.getNumSamples());
+        const auto slicedCallbackViolations = beat::test::endRealtimeSafetyProbe();
         if (std::abs(slicedFirst.left - expectedFirst) > 0.00001f
-            || slicedSlot.activeVoiceCount() != 0)
+            || slicedCallbackViolations != 0 || slicedSlot.activeVoiceCount() != 0)
             return false;
+
+        beat::SampleSourceSlot reverseSlot;
+        if (!reverseSlot.prepare({ 48000.0, 512, 2 })
+            || !reverseSlot.configurePlayback(true, 1.0f)
+            || !reverseSlot.publish(slicedSource)
+            || !reverseSlot.noteOn({ 69, 1.0f, 2151 }))
+            return false;
+        const auto reverseFirst = reverseSlot.renderFrame();
+        const int expectedReverseStart = (int) std::round(0.301 * sourceAudio->getNumSamples()) - 1;
+        const float expectedReverseFirst = sourceAudio->getSample(0, expectedReverseStart)
+            * slicedSource->gain * std::sqrt(0.5f);
+        if (std::abs(reverseFirst.left - expectedReverseFirst) > 0.00001f)
+            return false;
+        reverseSlot.allNotesOff(true);
+
+        beat::SampleSourceSlot doubleRateSlot;
+        juce::AudioBuffer<float> doubleRateOutput(2, 2400);
+        doubleRateOutput.clear();
+        if (!doubleRateSlot.prepare({ 48000.0, 512, 2 })
+            || !doubleRateSlot.configurePlayback(false, 2.0f)
+            || !doubleRateSlot.publish(source)
+            || !doubleRateSlot.noteOn({ 69, 1.0f, 2152 }))
+            return false;
+        doubleRateSlot.render(doubleRateOutput, 0, doubleRateOutput.getNumSamples());
+        int doubleRateCrossings = 0;
+        for (int sampleIndex = 1; sampleIndex < doubleRateOutput.getNumSamples(); ++sampleIndex)
+            if (doubleRateOutput.getSample(0, sampleIndex - 1) <= 0.0f
+                && doubleRateOutput.getSample(0, sampleIndex) > 0.0f)
+                ++doubleRateCrossings;
+        if (doubleRateCrossings < 42 || doubleRateCrossings > 46)
+            return false;
+        doubleRateSlot.allNotesOff(true);
 
         auto loopedSource = std::make_shared<beat::ImmutableSampleSource>(*source);
         loopedSource->startRatio = 0.1f;
@@ -15214,6 +16388,65 @@ namespace
         loopedSlot.render(loopedOutput, 0, 512);
         if (loopViolations != 0 || loopedSlot.activeVoiceCount() != 0
             || bufferEnergy(loopedOutput) <= 0.01 || maximumLoopStep >= 0.15f)
+            return false;
+
+        beat::SampleSourceSlot pingPongSlot;
+        juce::AudioBuffer<float> pingPongOutput(2, 20000);
+        pingPongOutput.clear();
+        if (!pingPongSlot.prepare({ 48000.0, 512, 2 })
+            || !pingPongSlot.configurePlayback(false, 1.0f, true, 100.0f)
+            || !pingPongSlot.publish(loopedSource)
+            || !pingPongSlot.noteOn({ 69, 1.0f, 2251 }))
+            return false;
+        beat::test::beginRealtimeSafetyProbe();
+        pingPongSlot.render(pingPongOutput, 0, pingPongOutput.getNumSamples());
+        const size_t pingPongViolations = beat::test::endRealtimeSafetyProbe();
+        double pingPongDifference = 0.0;
+        for (int sampleIndex = 0; sampleIndex < pingPongOutput.getNumSamples(); ++sampleIndex)
+        {
+            const double difference = pingPongOutput.getSample(0, sampleIndex)
+                - loopedOutput.getSample(0, sampleIndex);
+            pingPongDifference += difference * difference;
+        }
+        pingPongSlot.noteOff(2251);
+        juce::AudioBuffer<float> earlyTail(2, 512);
+        earlyTail.clear();
+        pingPongSlot.render(earlyTail, 0, earlyTail.getNumSamples());
+        if (pingPongViolations != 0 || pingPongDifference <= 0.01
+            || pingPongSlot.activeVoiceCount() != 1
+            || bufferEnergy(earlyTail) <= 0.000001)
+            return false;
+        juce::AudioBuffer<float> tailFinish(2, 4800);
+        tailFinish.clear();
+        pingPongSlot.render(tailFinish, 0, tailFinish.getNumSamples());
+        if (pingPongSlot.activeVoiceCount() != 0)
+            return false;
+
+        auto pingPongProbeSource = std::make_shared<beat::ImmutableSampleSource>();
+        auto pingPongProbeAudio = std::make_shared<juce::AudioBuffer<float>>(1, 16);
+        for (int frame = 0; frame < pingPongProbeAudio->getNumSamples(); ++frame)
+            pingPongProbeAudio->setSample(0, frame, (float) frame / 16.0f);
+        pingPongProbeSource->audio = pingPongProbeAudio;
+        pingPongProbeSource->sourceSampleRate = 48000.0;
+        pingPongProbeSource->rootNote = 69;
+        pingPongProbeSource->loopEnabled = true;
+        pingPongProbeSource->loopStartRatio = 0.25f;
+        pingPongProbeSource->loopEndRatio = 0.5f;
+        beat::SampleSourceSlot pingPongProbe;
+        std::array<float, 13> pingPongFrames {};
+        if (!pingPongProbe.prepare({ 48000.0, 64, 2 })
+            || !pingPongProbe.configurePlayback(false, 1.0f, true, 4.0f)
+            || !pingPongProbe.publish(pingPongProbeSource)
+            || !pingPongProbe.noteOn({ 69, 1.0f, 2252 }))
+            return false;
+        for (auto& frame : pingPongFrames)
+            frame = pingPongProbe.renderFrame().left;
+        if (!(pingPongFrames[6] < pingPongFrames[7]
+            && pingPongFrames[7] > pingPongFrames[8]
+            && pingPongFrames[8] > pingPongFrames[9]
+            && pingPongFrames[9] > pingPongFrames[10]
+            && pingPongFrames[10] < pingPongFrames[11]
+            && pingPongFrames[11] < pingPongFrames[12]))
             return false;
 
         auto invalidLoopSource = std::make_shared<beat::ImmutableSampleSource>(*source);
@@ -16501,7 +17734,7 @@ namespace
     {
         static_assert(beat::params::patchSchemaVersion == 1);
         static_assert(beat::params::instrumentTypeWavetableSynth == std::string_view("wavetable-synth"));
-        static_assert(beat::params::instrumentTypeLumusHybridSynth == std::string_view("lumus-hybrid-synth"));
+        static_assert(beat::params::instrumentTypeLumenHybridSynth == std::string_view("lumen-hybrid-synth"));
         static_assert(beat::params::oscillator::a::position == std::string_view("osc.a.position"));
         static_assert(beat::params::modulation::sourceLfo1 == std::string_view("lfo.1"));
         static_assert(beat::params::modulation::targetUnisonSpread == std::string_view("unison.spread"));
@@ -16553,16 +17786,94 @@ namespace
             const auto fold = beat::WavetableFactory::createBasic(beat::BasicWavetableShape::Saw, 0.8f, beat::WavetableWarpMode::Fold, 8, 2048);
             const auto pinch = beat::WavetableFactory::createBasic(beat::BasicWavetableShape::Saw, 0.8f, beat::WavetableWarpMode::Pinch, 8, 2048);
             const auto mirror = beat::WavetableFactory::createBasic(beat::BasicWavetableShape::Saw, 0.8f, beat::WavetableWarpMode::Mirror, 8, 2048);
+            const std::array spectralTables {
+                beat::WavetableFactory::createBasic(beat::BasicWavetableShape::Saw, 0.8f, beat::WavetableWarpMode::HarmonicShift, 8, 2048),
+                beat::WavetableFactory::createBasic(beat::BasicWavetableShape::Saw, 0.8f, beat::WavetableWarpMode::HarmonicStretch, 8, 2048),
+                beat::WavetableFactory::createBasic(beat::BasicWavetableShape::Saw, 0.8f, beat::WavetableWarpMode::SpectralSmear, 8, 2048),
+                beat::WavetableFactory::createBasic(beat::BasicWavetableShape::Saw, 0.8f, beat::WavetableWarpMode::SpectralSkew, 8, 2048),
+                beat::WavetableFactory::createBasic(beat::BasicWavetableShape::Saw, 0.8f, beat::WavetableWarpMode::SpectralFilter, 8, 2048),
+            };
             double foldDiff = 0.0;
             double pinchDiff = 0.0;
             double mirrorDiff = 0.0;
+            std::array<double, 5> spectralDiffs {};
             for (int i = 0; i < 2048; i += 8)
             {
                 foldDiff += std::abs(shape.getSample(7, i) - fold.getSample(7, i));
                 pinchDiff += std::abs(shape.getSample(7, i) - pinch.getSample(7, i));
                 mirrorDiff += std::abs(shape.getSample(7, i) - mirror.getSample(7, i));
+                for (size_t mode = 0; mode < spectralTables.size(); ++mode)
+                    spectralDiffs[mode] += std::abs(shape.getSample(7, i) - spectralTables[mode].getSample(7, i));
             }
             if (foldDiff <= 0.01 || pinchDiff <= 0.01 || mirrorDiff <= 0.01)
+                return false;
+            for (const auto difference : spectralDiffs)
+                if (difference <= 0.01)
+                    return false;
+
+            const auto triangleShapeZero = beat::WavetableFactory::createBasic(
+                beat::BasicWavetableShape::Triangle, 0.0f, beat::WavetableWarpMode::Shape, 8, 2048);
+            for (const auto spectralMode : {
+                beat::WavetableWarpMode::HarmonicShift,
+                beat::WavetableWarpMode::HarmonicStretch,
+                beat::WavetableWarpMode::SpectralSmear,
+                beat::WavetableWarpMode::SpectralSkew,
+                beat::WavetableWarpMode::SpectralFilter })
+            {
+                const auto spectralZero = beat::WavetableFactory::createBasic(
+                    beat::BasicWavetableShape::Triangle, 0.0f, spectralMode, 8, 2048);
+                for (int frame = 0; frame < triangleShapeZero.getFrameCount(); ++frame)
+                    for (int sample = 0; sample < triangleShapeZero.getFrameSize(); sample += 17)
+                        if (triangleShapeZero.getSample(frame, sample) != spectralZero.getSample(frame, sample))
+                            return false;
+            }
+
+            double maximumSpectralSpurRatio = 0.0;
+            for (const auto& spectralTable : spectralTables)
+            {
+                constexpr int fftOrder = 12;
+                constexpr int fftSize = 1 << fftOrder;
+                beat::WavetableOscillator spectralOscillator;
+                spectralOscillator.prepare(48000.0);
+                spectralOscillator.setWavetable(&spectralTable);
+                spectralOscillator.setFrequency(6000.0); // Exact FFT bin; mip limit is four harmonics.
+                spectralOscillator.setPosition(1.0f);
+                spectralOscillator.reset(0.0);
+                std::array<float, fftSize * 2> spectrum {};
+                for (int sample = 0; sample < fftSize; ++sample)
+                    spectrum[(size_t) sample] = spectralOscillator.renderSample();
+                juce::dsp::FFT fft(fftOrder);
+                fft.performFrequencyOnlyForwardTransform(spectrum.data(), true);
+                double totalEnergy = 0.0;
+                double spurEnergy = 0.0;
+                for (int bin = 1; bin < fftSize / 2; ++bin)
+                {
+                    const double energy = (double) spectrum[(size_t) bin] * spectrum[(size_t) bin];
+                    totalEnergy += energy;
+                    const bool expectedHarmonic = std::abs(bin - 512) <= 1
+                        || std::abs(bin - 1024) <= 1
+                        || std::abs(bin - 1536) <= 1;
+                    if (!expectedHarmonic) spurEnergy += energy;
+                }
+                const double spurRatio = totalEnergy > 0.0 ? spurEnergy / totalEnergy : 1.0;
+                maximumSpectralSpurRatio = std::max(maximumSpectralSpurRatio, spurRatio);
+            }
+            if (maximumSpectralSpurRatio > 0.0001)
+            {
+                std::cerr << "Lumen spectral warp exact-bin spur ratio failed ratio="
+                          << maximumSpectralSpurRatio << "\n";
+                return false;
+            }
+
+            beat::InstrumentVoice::Params::WavetableConfig cachedSpectral;
+            cachedSpectral.bank = 0;
+            cachedSpectral.warp = 0.8f;
+            cachedSpectral.warpMode = 6;
+            const auto beforeCache = beat::WavetableVoiceCache::stats();
+            const auto firstPrepared = beat::WavetableVoiceCache::sharedTableForConfig(cachedSpectral);
+            const auto secondPrepared = beat::WavetableVoiceCache::sharedTableForConfig(cachedSpectral);
+            const auto afterCache = beat::WavetableVoiceCache::stats();
+            if (!firstPrepared || firstPrepared != secondPrepared || afterCache.hits <= beforeCache.hits)
                 return false;
         }
 
@@ -16917,6 +18228,205 @@ namespace
         return true;
     }
 
+    bool stressLumenSimdWavetableUnison()
+    {
+        constexpr double sampleRate = 48000.0;
+        constexpr double frequency = 997.0;
+        constexpr int comparisonSamples = 16384;
+        beat::InstrumentVoice::Params::WavetableConfig config;
+        config.bank = 0;
+        config.position = 0.63f;
+        config.unison = 16;
+        config.detuneCents = 18.0f;
+        config.blend = 0.82f;
+        const auto table = beat::WavetableFactory::createBasic(
+            beat::BasicWavetableShape::Saw,
+            0.72f,
+            beat::WavetableWarpMode::SpectralSkew,
+            8,
+            2048);
+        if (!table.isValid()) return false;
+
+        beat::WavetableOscillatorBank::Bank scalarBank;
+        beat::WavetableOscillatorBank::Bank simdBank;
+        beat::WavetableOscillatorBank::Bank repeatedSimdBank;
+        beat::WavetableUnison::Plan scalarPlan;
+        beat::WavetableUnison::Plan simdPlan;
+        beat::WavetableUnison::Plan repeatedSimdPlan;
+        for (auto* bank : { &scalarBank, &simdBank, &repeatedSimdBank })
+            beat::WavetableOscillatorBank::configure(*bank, &table, config, sampleRate, frequency);
+
+        double errorEnergy = 0.0;
+        double signalEnergy = 0.0;
+        float maximumError = 0.0f;
+        int64_t observedSimdVoiceSamples = 0;
+        for (int sample = 0; sample < comparisonSamples; ++sample)
+        {
+            const auto scalar = beat::WavetableOscillatorBank::renderStereo<false>(
+                scalarBank, scalarPlan, config, frequency, frequency, sampleRate,
+                0.0f, 0.0f, 0.0f, -0.17f);
+            const auto simd = beat::WavetableOscillatorBank::renderStereo<true>(
+                simdBank, simdPlan, config, frequency, frequency, sampleRate,
+                0.0f, 0.0f, 0.0f, -0.17f);
+            const auto repeated = beat::WavetableOscillatorBank::renderStereo<true>(
+                repeatedSimdBank, repeatedSimdPlan, config, frequency, frequency, sampleRate,
+                0.0f, 0.0f, 0.0f, -0.17f);
+            if (!std::isfinite(scalar.left) || !std::isfinite(scalar.right)
+                || !std::isfinite(simd.left) || !std::isfinite(simd.right)
+                || simd.left != repeated.left || simd.right != repeated.right)
+                return false;
+            observedSimdVoiceSamples += simd.simdVoiceSamples;
+            for (const auto [reference, candidate] : {
+                std::pair { scalar.left, simd.left },
+                std::pair { scalar.right, simd.right } })
+            {
+                const double error = (double) candidate - (double) reference;
+                errorEnergy += error * error;
+                signalEnergy += (double) reference * (double) reference;
+                maximumError = std::max(maximumError, (float) std::abs(error));
+            }
+        }
+        for (size_t voice = 0; voice < scalarBank.size(); ++voice)
+            if (scalarBank[voice].getPhase() != simdBank[voice].getPhase())
+                return false;
+        const double relativeError = signalEnergy > 0.0
+            ? std::sqrt(errorEnergy / signalEnergy) : 1.0;
+        const double errorDb = 20.0 * std::log10(std::max(relativeError, 1.0e-20));
+        if (maximumError > 0.000002f || errorDb > -120.0
+            || observedSimdVoiceSamples != (int64_t) comparisonSamples * config.unison)
+        {
+            std::cerr << "Lumen SIMD tolerance failed maxError=" << maximumError
+                      << " relativeErrorDb=" << errorDb
+                      << " simdVoiceSamples=" << observedSimdVoiceSamples << "\n";
+            return false;
+        }
+
+        config.unison = 9;
+        beat::WavetableOscillatorBank::Bank fallbackScalarBank;
+        beat::WavetableOscillatorBank::Bank fallbackSimdBank;
+        beat::WavetableUnison::Plan fallbackScalarPlan;
+        beat::WavetableUnison::Plan fallbackSimdPlan;
+        beat::WavetableOscillatorBank::configure(fallbackScalarBank, &table, config, sampleRate, frequency);
+        beat::WavetableOscillatorBank::configure(fallbackSimdBank, &table, config, sampleRate, frequency);
+        for (int sample = 0; sample < 2048; ++sample)
+        {
+            const auto scalar = beat::WavetableOscillatorBank::renderStereo<false>(
+                fallbackScalarBank, fallbackScalarPlan, config, frequency, frequency,
+                sampleRate, 0.0f, 0.0f, 0.0f, -0.17f);
+            const auto fallback = beat::WavetableOscillatorBank::renderStereo<true>(
+                fallbackSimdBank, fallbackSimdPlan, config, frequency, frequency,
+                sampleRate, 0.0f, 0.0f, 0.0f, -0.17f);
+            if (scalar.left != fallback.left || scalar.right != fallback.right
+                || fallback.simdVoiceSamples != 0)
+                return false;
+        }
+        config.unison = 16;
+
+        beat::InstrumentVoice::Params scalarVoiceParams;
+        scalarVoiceParams.hasAether = true;
+        scalarVoiceParams.hasLumen = false;
+        scalarVoiceParams.waveform = 5;
+        scalarVoiceParams.cutoff01 = 1.0f;
+        scalarVoiceParams.resonance01 = 0.0f;
+        scalarVoiceParams.drive01 = 0.0f;
+        scalarVoiceParams.attackMs = 1.0f;
+        scalarVoiceParams.decayMs = 10.0f;
+        scalarVoiceParams.sustain = 1.0f;
+        scalarVoiceParams.releaseMs = 20.0f;
+        scalarVoiceParams.ampLevel = 0.7f;
+        scalarVoiceParams.aetherOscA.enabled = true;
+        scalarVoiceParams.aetherOscA.level = 0.8f;
+        scalarVoiceParams.aetherOscA.waveform = 5;
+        scalarVoiceParams.aetherOscA.randomPhase = 0.0f;
+        scalarVoiceParams.aetherOscA.wavetable = config;
+        scalarVoiceParams.aetherOscB.enabled = false;
+        scalarVoiceParams.aetherSub.enabled = false;
+        scalarVoiceParams.aetherNoise.enabled = false;
+        auto simdVoiceParams = scalarVoiceParams;
+        simdVoiceParams.hasLumen = true;
+
+        const auto renderVoice = [](const beat::InstrumentVoice::Params& params)
+        {
+            beat::InstrumentVoice voice;
+            voice.prepare(48000.0, 512);
+            voice.setParams(params);
+            voice.startNote(71, 0.83f, nullptr, 8192);
+            juce::AudioBuffer<float> output(2, 8192);
+            output.clear();
+            voice.renderNextBlock(output, 0, output.getNumSamples());
+            return output;
+        };
+        const auto scalarVoice = renderVoice(scalarVoiceParams);
+        const auto simdVoice = renderVoice(simdVoiceParams);
+        const auto repeatedSimdVoice = renderVoice(simdVoiceParams);
+        const auto voiceResidual = bufferResidualStats(scalarVoice, simdVoice, scalarVoice.getNumSamples());
+        const auto deterministicResidual = bufferResidualStats(simdVoice, repeatedSimdVoice, simdVoice.getNumSamples());
+        const double voiceRelativeError = voiceResidual.sourceEnergy > 0.0
+            ? std::sqrt(voiceResidual.residualEnergy / voiceResidual.sourceEnergy)
+            : std::numeric_limits<double>::infinity();
+        const double voiceErrorDb = 20.0 * std::log10(std::max(voiceRelativeError, 1.0e-20));
+        if (!voiceResidual.ok || !deterministicResidual.ok
+            || voiceResidual.sourceEnergy <= 0.0001
+            || voiceResidual.maxAbsDiff > 0.000002f
+            || voiceErrorDb > -120.0
+            || deterministicResidual.maxAbsDiff != 0.0f)
+        {
+            std::cerr << "Lumen SIMD InstrumentVoice tolerance failed"
+                      << " sourceEnergy=" << voiceResidual.sourceEnergy
+                      << " maxError=" << voiceResidual.maxAbsDiff
+                      << " relativeErrorDb=" << voiceErrorDb
+                      << " deterministicMaxError=" << deterministicResidual.maxAbsDiff
+                      << "\n";
+            return false;
+        }
+
+        const auto measure = [&](bool useSimd)
+        {
+            std::array<double, 7> durations {};
+            double checksum = 0.0;
+            for (size_t repetition = 0; repetition < durations.size(); ++repetition)
+            {
+                beat::WavetableOscillatorBank::Bank bank;
+                beat::WavetableUnison::Plan plan;
+                beat::WavetableOscillatorBank::configure(bank, &table, config, sampleRate, frequency);
+                for (int warmup = 0; warmup < 2048; ++warmup)
+                {
+                    const auto frame = useSimd
+                        ? beat::WavetableOscillatorBank::renderStereo<true>(bank, plan, config, frequency,
+                            frequency, sampleRate, 0.0f, 0.0f, 0.0f, -0.17f)
+                        : beat::WavetableOscillatorBank::renderStereo<false>(bank, plan, config, frequency,
+                            frequency, sampleRate, 0.0f, 0.0f, 0.0f, -0.17f);
+                    checksum += frame.left + frame.right;
+                }
+                const double started = juce::Time::getMillisecondCounterHiRes();
+                for (int sample = 0; sample < 262144; ++sample)
+                {
+                    const auto frame = useSimd
+                        ? beat::WavetableOscillatorBank::renderStereo<true>(bank, plan, config, frequency,
+                            frequency, sampleRate, 0.0f, 0.0f, 0.0f, -0.17f)
+                        : beat::WavetableOscillatorBank::renderStereo<false>(bank, plan, config, frequency,
+                            frequency, sampleRate, 0.0f, 0.0f, 0.0f, -0.17f);
+                    checksum += frame.left + frame.right;
+                }
+                durations[repetition] = juce::Time::getMillisecondCounterHiRes() - started;
+            }
+            std::sort(durations.begin(), durations.end());
+            if (!std::isfinite(checksum)) return std::numeric_limits<double>::infinity();
+            return durations[durations.size() / 2];
+        };
+
+        const double scalarMs = measure(false);
+        const double simdMs = measure(true);
+        const double ratio = scalarMs > 0.0 ? simdMs / scalarMs : std::numeric_limits<double>::infinity();
+        std::cerr << "Lumen SIMD unison voices=16"
+                  << " maxError=" << maximumError
+                  << " relativeErrorDb=" << errorDb
+                  << " scalarMs=" << scalarMs
+                  << " simdMs=" << simdMs
+                  << " ratio=" << ratio << "\n";
+        return std::isfinite(ratio) && ratio <= 1.02;
+    }
+
     bool stressOscillatorSampleRatePreparation()
     {
         const auto sine = beat::WavetableFactory::createBasic(beat::BasicWavetableShape::Sine, 8, 2048);
@@ -16982,7 +18492,7 @@ namespace
             && std::abs(changedRate.getPhase() - phase) <= 1.0e-12;
     }
 
-    bool stressLumusArpeggiator()
+    bool stressLumenArpeggiator()
     {
         const auto events = [](const juce::MidiBuffer& buffer)
         {
@@ -16996,7 +18506,7 @@ namespace
             return result;
         };
 
-        beat::LumusArpeggiator arp;
+        beat::LumenArpeggiator arp;
         arp.prepare(512);
         juce::MidiBuffer passthrough;
         passthrough.addEvent(juce::MidiMessage::noteOn(2, 61, 0.7f), 3);
@@ -17004,9 +18514,9 @@ namespace
         passthrough.addEvent(juce::MidiMessage::noteOff(2, 61), 11);
         if (events(arp.process(passthrough, 32)) != events(passthrough)) return false;
 
-        beat::LumusArpeggiator::Config config;
+        beat::LumenArpeggiator::Config config;
         config.enabled = true;
-        config.mode = beat::LumusArpeggiator::Mode::up;
+        config.mode = beat::LumenArpeggiator::Mode::up;
         config.stepSamples = 100.0;
         config.gate = 0.75f;
         config.octaves = 2;
@@ -17095,7 +18605,7 @@ namespace
 
         arp.reset();
         config.swing = 0.0f;
-        config.scale = beat::LumusArpeggiator::Scale::major;
+        config.scale = beat::LumenArpeggiator::Scale::major;
         config.rootPitchClass = 0;
         arp.setConfig(config);
         juce::MidiBuffer scaleChord;
@@ -17142,7 +18652,7 @@ namespace
                 splitScaled.emplace_back(block * 100 + offset, noteOn, note);
         }
         if (splitScaled != expectedScaled) return false;
-        const auto firstQuantizedNote = [&](beat::LumusArpeggiator::Scale scale, int root, int inputNote)
+        const auto firstQuantizedNote = [&](beat::LumenArpeggiator::Scale scale, int root, int inputNote)
         {
             arp.reset();
             config.scale = scale;
@@ -17153,20 +18663,20 @@ namespace
             const auto result = events(arp.process(input, 1));
             return result.empty() ? -1 : std::get<2>(result.front());
         };
-        if (firstQuantizedNote(beat::LumusArpeggiator::Scale::chromatic, 0, 61) != 61
-            || firstQuantizedNote(beat::LumusArpeggiator::Scale::major, 0, 61) != 60
-            || firstQuantizedNote(beat::LumusArpeggiator::Scale::naturalMinor, 9, 61) != 60
-            || firstQuantizedNote(beat::LumusArpeggiator::Scale::majorPentatonic, 2, 65) != 64
-            || firstQuantizedNote(beat::LumusArpeggiator::Scale::blues, 7, 69) != 70
-            || firstQuantizedNote(beat::LumusArpeggiator::Scale::major, 0, 0) != 0
-            || firstQuantizedNote(beat::LumusArpeggiator::Scale::major, 0, 127) != 127)
+        if (firstQuantizedNote(beat::LumenArpeggiator::Scale::chromatic, 0, 61) != 61
+            || firstQuantizedNote(beat::LumenArpeggiator::Scale::major, 0, 61) != 60
+            || firstQuantizedNote(beat::LumenArpeggiator::Scale::naturalMinor, 9, 61) != 60
+            || firstQuantizedNote(beat::LumenArpeggiator::Scale::majorPentatonic, 2, 65) != 64
+            || firstQuantizedNote(beat::LumenArpeggiator::Scale::blues, 7, 69) != 70
+            || firstQuantizedNote(beat::LumenArpeggiator::Scale::major, 0, 0) != 0
+            || firstQuantizedNote(beat::LumenArpeggiator::Scale::major, 0, 127) != 127)
             return false;
 
         arp.reset();
         config.gate = 0.75f;
         config.swing = 0.0f;
         config.octaves = 2;
-        config.scale = beat::LumusArpeggiator::Scale::chromatic;
+        config.scale = beat::LumenArpeggiator::Scale::chromatic;
         arp.setConfig(config);
         juce::MidiBuffer panic;
         panic.addEvent(juce::MidiMessage::noteOn(1, 60, 0.8f), 0);
@@ -17175,7 +18685,7 @@ namespace
         return panicEvents == std::vector<std::tuple<int, bool, int>> {{ 0, true, 60 }, { 20, false, 60 }};
     }
 
-    bool stressLumusClipSequencer()
+    bool stressLumenClipSequencer()
     {
         const auto events = [](const juce::MidiBuffer& buffer)
         {
@@ -17189,21 +18699,21 @@ namespace
             return result;
         };
 
-        beat::LumusClipSequencer clip;
+        beat::LumenClipSequencer clip;
         clip.prepare(512);
         juce::MidiBuffer passthrough;
         passthrough.addEvent(juce::MidiMessage::noteOn(3, 62, 0.8f), 2);
         passthrough.addEvent(juce::MidiMessage::noteOff(3, 62), 10);
         if (events(clip.process(passthrough, 16)) != events(passthrough)) return false;
 
-        beat::LumusClipSequencer::Config config;
+        beat::LumenClipSequencer::Config config;
         config.enabled = true;
         config.stepSamples = 100.0;
         config.lengthSteps = 4;
-        config.steps[0] = { true, 0, 1, 1.0f };
-        config.steps[1] = { true, 4, 2, 0.5f };
-        config.steps[2] = { false, 0, 1, 1.0f };
-        config.steps[3] = { true, 7, 1, 0.75f };
+        config.noteCount = 3;
+        config.notes[0] = { 0, 0, 1, 1.0f };
+        config.notes[1] = { 1, 4, 2, 0.5f };
+        config.notes[2] = { 3, 7, 1, 0.75f };
         clip.setConfig(config);
         juce::MidiBuffer input;
         input.addEvent(juce::MidiMessage::noteOn(3, 60, 0.8f), 0);
@@ -17223,6 +18733,24 @@ namespace
             if (metadata.getMessage().isNoteOn() && metadata.getMessage().getNoteNumber() == 64)
                 secondVelocity = metadata.getMessage().getFloatVelocity();
         if (std::abs(secondVelocity - 0.4f) > 0.01f) return false;
+
+        clip.reset();
+        auto chordConfig = config;
+        chordConfig.noteCount = 3;
+        chordConfig.notes[0] = { 0, 0, 3, 1.0f };
+        chordConfig.notes[1] = { 0, 7, 2, 0.8f };
+        chordConfig.notes[2] = { 1, 0, 2, 0.7f };
+        clip.setConfig(chordConfig);
+        juce::MidiBuffer chordInput;
+        chordInput.addEvent(juce::MidiMessage::noteOn(5, 60, 1.0f), 0);
+        chordInput.addEvent(juce::MidiMessage::noteOff(5, 60), 250);
+        const auto chordEvents = events(clip.process(chordInput, 300));
+        const std::vector<std::tuple<int, bool, int, int>> expectedChordEvents {
+            { 0, true, 60, 5 }, { 0, true, 67, 5 },
+            { 100, false, 60, 5 }, { 100, true, 60, 5 },
+            { 200, false, 67, 5 }, { 250, false, 60, 5 },
+        };
+        if (chordEvents != expectedChordEvents) return false;
 
         clip.reset();
         clip.setConfig(config);
@@ -17279,7 +18807,23 @@ namespace
         if (untouched.kind != "synth" || untouched.waveform != 1)
             return false;
 
-        const auto lumusFoundationPatch = juce::JSON::parse(R"json(
+        const auto lumenFoundationPatch = juce::JSON::parse(R"json(
+        {
+          "schemaVersion": 1,
+          "instrumentType": "lumen-hybrid-synth",
+          "namespace": "lumen",
+          "parameters": {},
+          "modulation": []
+        }
+        )json");
+        beat::InstrumentDefinition lumenFoundation;
+        if (!beat::applySynthPatchContract(lumenFoundationPatch, lumenFoundation))
+            return false;
+        if (!lumenFoundation.hasAether
+            || lumenFoundation.synthEngine != beat::InstrumentDefinition::SynthEngine::Lumen
+            || lumenFoundation.lumen.oscC.enabled)
+            return false;
+        const auto legacyLumusFoundationPatch = juce::JSON::parse(R"json(
         {
           "schemaVersion": 1,
           "instrumentType": "lumus-hybrid-synth",
@@ -17288,18 +18832,17 @@ namespace
           "modulation": []
         }
         )json");
-        beat::InstrumentDefinition lumusFoundation;
-        if (!beat::applySynthPatchContract(lumusFoundationPatch, lumusFoundation))
+        beat::InstrumentDefinition migratedLegacyLumus;
+        if (!beat::applySynthPatchContract(legacyLumusFoundationPatch, migratedLegacyLumus)
+            || !migratedLegacyLumus.hasAether
+            || migratedLegacyLumus.synthEngine != beat::InstrumentDefinition::SynthEngine::Lumen
+            || migratedLegacyLumus.lumen.oscC.enabled)
             return false;
-        if (!lumusFoundation.hasAether
-            || lumusFoundation.synthEngine != beat::InstrumentDefinition::SynthEngine::Lumus
-            || lumusFoundation.lumus.oscC.enabled)
-            return false;
-        const auto lumusThreeSlotPatch = juce::JSON::parse(R"json(
+        const auto lumenThreeSlotPatch = juce::JSON::parse(R"json(
         {
           "schemaVersion": 2,
-          "instrumentType": "lumus-hybrid-synth",
-          "namespace": "lumus",
+          "instrumentType": "lumen-hybrid-synth",
+          "namespace": "lumen",
           "parameters": {
             "osc.c.enabled": true,
             "osc.c.wavetable": "basic.square",
@@ -17310,7 +18853,7 @@ namespace
             "osc.c.unison.voices": 3
           },
           "metadata": {
-            "lumusSourceRack": {
+            "lumenSourceRack": {
               "schemaVersion": 1,
               "slots": [
                 { "id": "a", "mode": "wavetable" },
@@ -17329,33 +18872,33 @@ namespace
           ]
         }
         )json");
-        beat::InstrumentDefinition lumusThreeSlot;
-        if (!beat::applySynthPatchContract(lumusThreeSlotPatch, lumusThreeSlot)
-            || !lumusThreeSlot.lumus.oscC.enabled
-            || std::abs(lumusThreeSlot.lumus.oscC.level - 0.47f) > 0.0001f
-            || std::abs(lumusThreeSlot.lumus.oscC.pan - 0.65f) > 0.0001f
-            || lumusThreeSlot.lumus.oscC.routing != 3
-            || lumusThreeSlot.lumus.oscC.semitone != 7
-            || lumusThreeSlot.lumus.oscC.wavetable.bank != 2
-            || lumusThreeSlot.lumus.oscC.wavetable.unison != 3
-            || std::abs(lumusThreeSlot.dynamicModulation.oscCPosition.macro1 - 0.31f) > 0.0001f
-            || std::abs(lumusThreeSlot.dynamicModulation.oscCFine.macro2 + 0.22f) > 0.0001f
-            || std::abs(lumusThreeSlot.dynamicModulation.oscCLevel.macro3 - 0.17f) > 0.0001f
-            || std::abs(lumusThreeSlot.dynamicModulation.oscCPan.macro4 + 0.26f) > 0.0001f
-            || std::abs(lumusThreeSlot.dynamicModulation.oscCUnisonDetune.macro5 - 0.19f) > 0.0001f
-            || std::abs(lumusThreeSlot.dynamicModulation.oscCUnisonSpread.macro6 + 0.14f) > 0.0001f)
+        beat::InstrumentDefinition lumenThreeSlot;
+        if (!beat::applySynthPatchContract(lumenThreeSlotPatch, lumenThreeSlot)
+            || !lumenThreeSlot.lumen.oscC.enabled
+            || std::abs(lumenThreeSlot.lumen.oscC.level - 0.47f) > 0.0001f
+            || std::abs(lumenThreeSlot.lumen.oscC.pan - 0.65f) > 0.0001f
+            || lumenThreeSlot.lumen.oscC.routing != 3
+            || lumenThreeSlot.lumen.oscC.semitone != 7
+            || lumenThreeSlot.lumen.oscC.wavetable.bank != 2
+            || lumenThreeSlot.lumen.oscC.wavetable.unison != 3
+            || std::abs(lumenThreeSlot.dynamicModulation.oscCPosition.macro1 - 0.31f) > 0.0001f
+            || std::abs(lumenThreeSlot.dynamicModulation.oscCFine.macro2 + 0.22f) > 0.0001f
+            || std::abs(lumenThreeSlot.dynamicModulation.oscCLevel.macro3 - 0.17f) > 0.0001f
+            || std::abs(lumenThreeSlot.dynamicModulation.oscCPan.macro4 + 0.26f) > 0.0001f
+            || std::abs(lumenThreeSlot.dynamicModulation.oscCUnisonDetune.macro5 - 0.19f) > 0.0001f
+            || std::abs(lumenThreeSlot.dynamicModulation.oscCUnisonSpread.macro6 + 0.14f) > 0.0001f)
             return false;
-        const auto lumusSampleModePatch = juce::JSON::parse(R"json(
+        const auto lumenSampleModePatch = juce::JSON::parse(R"json(
         {
           "schemaVersion": 3,
-          "instrumentType": "lumus-hybrid-synth",
-          "namespace": "lumus",
+          "instrumentType": "lumen-hybrid-synth",
+          "namespace": "lumen",
           "parameters": {
             "osc.c.enabled": true,
             "aether.sample.1.enabled": true,
-            "aether.sample.1.audioFileId": "lumus-sample-fixture"
+            "aether.sample.1.audioFileId": "lumen-sample-fixture"
           },
-          "metadata": { "lumusSourceRack": { "schemaVersion": 2, "slots": [
+          "metadata": { "lumenSourceRack": { "schemaVersion": 2, "slots": [
             { "id": "a", "mode": "wavetable" },
             { "id": "b", "mode": "wavetable" },
             { "id": "c", "mode": "sample" }
@@ -17363,35 +18906,35 @@ namespace
           "modulation": []
         }
         )json");
-        beat::InstrumentDefinition lumusSampleMode;
-        if (!beat::applySynthPatchContract(lumusSampleModePatch, lumusSampleMode)
-            || lumusSampleMode.lumus.oscC.enabled
-            || !lumusSampleMode.aether.sampleSlot1.enabled
-            || lumusSampleMode.aether.sampleSlot1.audioFileId != "lumus-sample-fixture")
+        beat::InstrumentDefinition lumenSampleMode;
+        if (!beat::applySynthPatchContract(lumenSampleModePatch, lumenSampleMode)
+            || lumenSampleMode.lumen.oscC.enabled
+            || !lumenSampleMode.aether.sampleSlot1.enabled
+            || lumenSampleMode.aether.sampleSlot1.audioFileId != "lumen-sample-fixture")
             return false;
-        const auto lumusIndependentSamplePatch = juce::JSON::parse(R"json(
+        const auto lumenIndependentSamplePatch = juce::JSON::parse(R"json(
         {
           "schemaVersion": 4,
-          "instrumentType": "lumus-hybrid-synth",
-          "namespace": "lumus",
+          "instrumentType": "lumen-hybrid-synth",
+          "namespace": "lumen",
           "parameters": {
             "osc.c.enabled": true,
-            "lumus.source.a.sample.enabled": true,
-            "lumus.source.a.sample.audioFileId": "lumus-a-sample",
-            "lumus.source.b.sample.enabled": true,
-            "lumus.source.b.sample.audioFileId": "lumus-b-sample",
-            "lumus.source.c.sample.enabled": true,
-            "lumus.source.c.sample.audioFileId": "lumus-canonical-sample",
-            "lumus.source.c.sample.rootNote": 67,
-            "lumus.source.c.sample.level": 0.61
+            "lumen.source.a.sample.enabled": true,
+            "lumen.source.a.sample.audioFileId": "lumen-a-sample",
+            "lumen.source.b.sample.enabled": true,
+            "lumen.source.b.sample.audioFileId": "lumen-b-sample",
+            "lumen.source.c.sample.enabled": true,
+            "lumen.source.c.sample.audioFileId": "lumen-canonical-sample",
+            "lumen.source.c.sample.rootNote": 67,
+            "lumen.source.c.sample.level": 0.61
           },
           "metadata": {
-            "lumusSourceRack": { "schemaVersion": 2, "slots": [
+            "lumenSourceRack": { "schemaVersion": 2, "slots": [
               { "id": "a", "mode": "sample" },
               { "id": "b", "mode": "sample" },
               { "id": "c", "mode": "sample" }
             ] },
-            "lumusSampleSlots": {
+            "lumenSampleSlots": {
               "a": { "schemaVersion": 1, "zones": [] },
               "b": { "schemaVersion": 1, "zones": [] },
               "c": { "schemaVersion": 1, "zones": [] }
@@ -17400,34 +18943,243 @@ namespace
           "modulation": []
         }
         )json");
-        beat::InstrumentDefinition lumusIndependentSample;
-        if (!beat::applySynthPatchContract(lumusIndependentSamplePatch, lumusIndependentSample)
-            || lumusIndependentSample.aether.oscA.enabled
-            || lumusIndependentSample.aether.oscB.enabled
-            || lumusIndependentSample.lumus.oscC.enabled
-            || !lumusIndependentSample.lumus.sampleSlots[0].enabled
-            || !lumusIndependentSample.lumus.sampleSlots[1].enabled
-            || !lumusIndependentSample.lumus.sampleSlots[2].enabled
-            || lumusIndependentSample.lumus.sampleSlots[0].audioFileId != "lumus-a-sample"
-            || lumusIndependentSample.lumus.sampleSlots[1].audioFileId != "lumus-b-sample"
-            || !lumusIndependentSample.aether.sampleSlot1.enabled
-            || lumusIndependentSample.aether.sampleSlot1.audioFileId != "lumus-canonical-sample"
-            || lumusIndependentSample.aether.sampleSlot1.rootNote != 67
-            || std::abs(lumusIndependentSample.aether.sampleSlot1.level - 0.61f) > 0.0001f)
+        beat::InstrumentDefinition lumenIndependentSample;
+        if (!beat::applySynthPatchContract(lumenIndependentSamplePatch, lumenIndependentSample)
+            || lumenIndependentSample.aether.oscA.enabled
+            || lumenIndependentSample.aether.oscB.enabled
+            || lumenIndependentSample.lumen.oscC.enabled
+            || !lumenIndependentSample.lumen.sampleSlots[0].enabled
+            || !lumenIndependentSample.lumen.sampleSlots[1].enabled
+            || !lumenIndependentSample.lumen.sampleSlots[2].enabled
+            || lumenIndependentSample.lumen.sampleSlots[0].audioFileId != "lumen-a-sample"
+            || lumenIndependentSample.lumen.sampleSlots[1].audioFileId != "lumen-b-sample"
+            || !lumenIndependentSample.aether.sampleSlot1.enabled
+            || lumenIndependentSample.aether.sampleSlot1.audioFileId != "lumen-canonical-sample"
+            || lumenIndependentSample.aether.sampleSlot1.rootNote != 67
+            || std::abs(lumenIndependentSample.aether.sampleSlot1.level - 0.61f) > 0.0001f)
             return false;
-        const auto malformedLumusSamples = juce::JSON::parse(R"json(
+        const auto lumenSamplePlaybackPatch = juce::JSON::parse(R"json(
+        {
+          "schemaVersion": 13,
+          "instrumentType": "lumen-hybrid-synth",
+          "namespace": "lumen",
+          "parameters": {
+            "lumen.source.a.sample.enabled": true,
+            "lumen.source.a.sample.audioFileId": "lumen-reverse-sample",
+            "lumen.source.a.sample.direction": "reverse",
+            "lumen.source.a.sample.playbackRate": 2.5,
+            "lumen.source.a.sample.loopMode": "pingPong",
+            "lumen.source.a.sample.releaseTailMs": 275,
+            "lumen.source.b.sample.enabled": true,
+            "lumen.source.b.sample.audioFileId": "lumen-multisample",
+            "lumen.source.b.sample.direction": "reverse",
+            "lumen.source.b.sample.playbackRate": 3.0,
+            "lumen.source.b.sample.loopMode": "pingPong",
+            "lumen.source.b.sample.releaseTailMs": 800
+          },
+          "metadata": {
+            "lumenSourceRack": { "schemaVersion": 2, "slots": [
+              { "id": "a", "mode": "sample" },
+              { "id": "b", "mode": "multisample" },
+              { "id": "c", "mode": "wavetable" }
+            ] },
+            "lumenSampleSlots": {
+              "a": { "schemaVersion": 1, "zones": [] },
+              "b": { "schemaVersion": 1, "zones": [] },
+              "c": { "schemaVersion": 1, "zones": [] }
+            },
+            "lumenGranularSlots": {
+              "a": { "schemaVersion": 1 },
+              "b": { "schemaVersion": 1 },
+              "c": { "schemaVersion": 1 }
+            },
+            "lumenClip": { "schemaVersion": 2, "lengthSteps": 16, "notes": [] }
+          },
+          "modulation": []
+        }
+        )json");
+        beat::InstrumentDefinition lumenSamplePlayback;
+        const bool lumenSamplePlaybackApplied = beat::applySynthPatchContract(
+            lumenSamplePlaybackPatch, lumenSamplePlayback);
+        if (!lumenSamplePlaybackApplied
+            || !lumenSamplePlayback.lumen.sampleSlots[0].reverse
+            || std::abs(lumenSamplePlayback.lumen.sampleSlots[0].playbackRate - 2.5f) > 0.0001f
+            || !lumenSamplePlayback.lumen.sampleSlots[0].pingPongLoop
+            || std::abs(lumenSamplePlayback.lumen.sampleSlots[0].releaseTailMs - 275.0f) > 0.0001f
+            || lumenSamplePlayback.lumen.sampleSlots[1].reverse
+            || std::abs(lumenSamplePlayback.lumen.sampleSlots[1].playbackRate - 1.0f) > 0.0001f
+            || lumenSamplePlayback.lumen.sampleSlots[1].pingPongLoop
+            || std::abs(lumenSamplePlayback.lumen.sampleSlots[1].releaseTailMs - 4.0f) > 0.0001f)
+        {
+            std::cerr << "Lumen Sample playback contract failed applied=" << lumenSamplePlaybackApplied
+                      << " reverse=" << lumenSamplePlayback.lumen.sampleSlots[0].reverse
+                      << " rate=" << lumenSamplePlayback.lumen.sampleSlots[0].playbackRate
+                      << " pingPong=" << lumenSamplePlayback.lumen.sampleSlots[0].pingPongLoop
+                      << " tail=" << lumenSamplePlayback.lumen.sampleSlots[0].releaseTailMs
+                      << " multisampleReverse=" << lumenSamplePlayback.lumen.sampleSlots[1].reverse
+                      << " multisampleRate=" << lumenSamplePlayback.lumen.sampleSlots[1].playbackRate
+                      << " multisamplePingPong=" << lumenSamplePlayback.lumen.sampleSlots[1].pingPongLoop
+                      << " multisampleTail=" << lumenSamplePlayback.lumen.sampleSlots[1].releaseTailMs << "\n";
+            return false;
+        }
+        auto invalidLumenSamplePlaybackPatch = lumenSamplePlaybackPatch.clone();
+        auto invalidParameters = invalidLumenSamplePlaybackPatch.getProperty("parameters", {});
+        invalidParameters.getDynamicObject()->setProperty("lumen.source.a.sample.direction", "sideways");
+        beat::InstrumentDefinition invalidLumenSamplePlayback;
+        if (beat::applySynthPatchContract(invalidLumenSamplePlaybackPatch, invalidLumenSamplePlayback))
+        {
+            std::cerr << "Invalid Lumen Sample direction was accepted\n";
+            return false;
+        }
+        invalidLumenSamplePlaybackPatch = lumenSamplePlaybackPatch.clone();
+        invalidParameters = invalidLumenSamplePlaybackPatch.getProperty("parameters", {});
+        invalidParameters.getDynamicObject()->setProperty("lumen.source.a.sample.loopMode", "random");
+        if (beat::applySynthPatchContract(invalidLumenSamplePlaybackPatch, invalidLumenSamplePlayback))
+        {
+            std::cerr << "Invalid Lumen Sample loop mode was accepted\n";
+            return false;
+        }
+        const auto lumenSampleSlicePatch = juce::JSON::parse(R"json(
+        {
+          "schemaVersion": 14,
+          "instrumentType": "lumen-hybrid-synth",
+          "namespace": "lumen",
+          "parameters": {
+            "lumen.source.a.sample.enabled": true,
+            "lumen.source.a.sample.audioFileId": "lumen-sliced-sample",
+            "lumen.source.a.sample.start": 0.0,
+            "lumen.source.a.sample.end": 1.0,
+            "lumen.source.a.sample.loop.enabled": true,
+            "lumen.source.a.sample.loop.start": 0.1,
+            "lumen.source.a.sample.loop.end": 0.9,
+            "lumen.source.a.sample.direction": "reverse",
+            "lumen.source.a.sample.loopMode": "pingPong",
+            "lumen.source.a.sample.selectedSliceId": "slice-a2",
+            "lumen.source.b.sample.enabled": true,
+            "lumen.source.b.sample.audioFileId": "lumen-neutral-multisample",
+            "lumen.source.b.sample.selectedSliceId": "slice-b1"
+          },
+          "metadata": {
+            "lumenSourceRack": { "schemaVersion": 2, "slots": [
+              { "id": "a", "mode": "sample" },
+              { "id": "b", "mode": "multisample" },
+              { "id": "c", "mode": "wavetable" }
+            ] },
+            "lumenSampleSlots": {
+              "a": { "schemaVersion": 2, "zones": [], "slices": [
+                { "id": "slice-a1", "startRatio": 0.05, "endRatio": 0.15 },
+                { "id": "slice-a2", "startRatio": 0.2, "endRatio": 0.4 }
+              ] },
+              "b": { "schemaVersion": 2, "zones": [], "slices": [
+                { "id": "slice-b1", "startRatio": 0.3, "endRatio": 0.6 }
+              ] },
+              "c": { "schemaVersion": 2, "zones": [], "slices": [] }
+            },
+            "lumenGranularSlots": {
+              "a": { "schemaVersion": 1 }, "b": { "schemaVersion": 1 }, "c": { "schemaVersion": 1 }
+            },
+            "lumenClip": { "schemaVersion": 2, "lengthSteps": 16, "notes": [] }
+          },
+          "modulation": []
+        }
+        )json");
+        beat::InstrumentDefinition lumenSampleSlice;
+        if (!beat::applySynthPatchContract(lumenSampleSlicePatch, lumenSampleSlice)
+            || lumenSampleSlice.lumen.sampleSlots[0].selectedSliceId != "slice-a2"
+            || lumenSampleSlice.lumen.sampleSlots[0].slices.size() != 2
+            || std::abs(lumenSampleSlice.lumen.sampleSlots[0].startRatio - 0.0f) > 0.0001f
+            || std::abs(lumenSampleSlice.lumen.sampleSlots[0].endRatio - 1.0f) > 0.0001f
+            || std::abs(lumenSampleSlice.lumen.sampleSlots[0].loopStartRatio - 0.1f) > 0.0001f
+            || std::abs(lumenSampleSlice.lumen.sampleSlots[0].loopEndRatio - 0.9f) > 0.0001f
+            || !lumenSampleSlice.lumen.sampleSlots[0].reverse
+            || !lumenSampleSlice.lumen.sampleSlots[0].pingPongLoop
+            || lumenSampleSlice.lumen.sampleSlots[1].selectedSliceId.isNotEmpty()
+            || !lumenSampleSlice.lumen.sampleSlots[1].slices.empty())
+        {
+            std::cerr << "Lumen Sample slice contract failed\n";
+            return false;
+        }
+        auto lumenSpectralWarpPatch = lumenSampleSlicePatch.clone();
+        lumenSpectralWarpPatch.getDynamicObject()->setProperty("schemaVersion", 15);
+        auto lumenSpectralParameters = lumenSpectralWarpPatch.getProperty("parameters", {});
+        lumenSpectralParameters.getDynamicObject()->setProperty("osc.a.warpMode", "spectral-smear");
+        lumenSpectralParameters.getDynamicObject()->setProperty("osc.b.warpMode", "harmonic-shift");
+        lumenSpectralParameters.getDynamicObject()->setProperty("osc.c.warpMode", "spectral-filter");
+        beat::InstrumentDefinition lumenSpectralWarp;
+        if (!beat::applySynthPatchContract(lumenSpectralWarpPatch, lumenSpectralWarp)
+            || lumenSpectralWarp.aether.oscA.wavetable.warpMode != 6
+            || lumenSpectralWarp.aether.oscB.wavetable.warpMode != 4
+            || lumenSpectralWarp.lumen.oscC.wavetable.warpMode != 8)
+        {
+            std::cerr << "Lumen spectral warp contract failed\n";
+            return false;
+        }
+        auto legacyLumenSpectralWarpPatch = lumenSpectralWarpPatch.clone();
+        legacyLumenSpectralWarpPatch.getDynamicObject()->setProperty("schemaVersion", 14);
+        beat::InstrumentDefinition legacyLumenSpectralWarp;
+        if (!beat::applySynthPatchContract(legacyLumenSpectralWarpPatch, legacyLumenSpectralWarp)
+            || legacyLumenSpectralWarp.aether.oscA.wavetable.warpMode != 0
+            || legacyLumenSpectralWarp.aether.oscB.wavetable.warpMode != 0
+            || legacyLumenSpectralWarp.lumen.oscC.wavetable.warpMode != 0)
+        {
+            std::cerr << "Legacy Lumen spectral warp gate failed\n";
+            return false;
+        }
+        auto lumenKeytrackedLfoPatch = lumenSpectralWarpPatch.clone();
+        lumenKeytrackedLfoPatch.getDynamicObject()->setProperty("schemaVersion", 16);
+        auto lumenKeytrackedLfoParameters = lumenKeytrackedLfoPatch.getProperty("parameters", {});
+        lumenKeytrackedLfoParameters.getDynamicObject()->setProperty("lfo.1.keytrackRate", 0.75);
+        lumenKeytrackedLfoParameters.getDynamicObject()->setProperty("lfo.2.keytrackRate", -2.0);
+        lumenKeytrackedLfoParameters.getDynamicObject()->setProperty("lfo.3.enabled", true);
+        lumenKeytrackedLfoParameters.getDynamicObject()->setProperty("lfo.3.keytrackRate", 0.5);
+        beat::InstrumentDefinition lumenKeytrackedLfo;
+        if (!beat::applySynthPatchContract(lumenKeytrackedLfoPatch, lumenKeytrackedLfo)
+            || std::abs(lumenKeytrackedLfo.lfoKeytrackRate - 0.75f) > 0.0001f
+            || std::abs(lumenKeytrackedLfo.lfo2KeytrackRate + 1.0f) > 0.0001f
+            || std::abs(lumenKeytrackedLfo.extraLfos[0].keytrackRate - 0.5f) > 0.0001f
+            || beat::Lfo::keytrackedRateHz(2.0f, 0.0f, 1.0f) != 2.0f
+            || std::abs(beat::Lfo::keytrackedRateHz(2.0f, 1.0f, 60.0f / 127.0f) - 2.0f) > 0.0001f
+            || std::abs(beat::Lfo::keytrackedRateHz(2.0f, 1.0f, 72.0f / 127.0f) - 4.0f) > 0.0001f
+            || std::abs(beat::Lfo::keytrackedRateHz(2.0f, 1.0f, 48.0f / 127.0f) - 1.0f) > 0.0001f
+            || std::abs(beat::Lfo::keytrackedRateHz(2.0f, -1.0f, 72.0f / 127.0f) - 1.0f) > 0.0001f)
+        {
+            std::cerr << "Lumen keytracked LFO contract failed\n";
+            return false;
+        }
+        auto legacyLumenKeytrackedLfoPatch = lumenKeytrackedLfoPatch.clone();
+        legacyLumenKeytrackedLfoPatch.getDynamicObject()->setProperty("schemaVersion", 15);
+        beat::InstrumentDefinition legacyLumenKeytrackedLfo;
+        if (!beat::applySynthPatchContract(legacyLumenKeytrackedLfoPatch, legacyLumenKeytrackedLfo)
+            || legacyLumenKeytrackedLfo.lfoKeytrackRate != 0.0f
+            || legacyLumenKeytrackedLfo.lfo2KeytrackRate != 0.0f
+            || legacyLumenKeytrackedLfo.extraLfos[0].keytrackRate != 0.0f)
+        {
+            std::cerr << "Legacy Lumen keytracked LFO gate failed\n";
+            return false;
+        }
+        auto invalidLumenSampleSlicePatch = lumenSampleSlicePatch.clone();
+        auto invalidSliceParameters = invalidLumenSampleSlicePatch.getProperty("parameters", {});
+        invalidSliceParameters.getDynamicObject()->setProperty(
+            "lumen.source.a.sample.selectedSliceId", "missing-slice");
+        beat::InstrumentDefinition invalidLumenSampleSlice;
+        if (beat::applySynthPatchContract(invalidLumenSampleSlicePatch, invalidLumenSampleSlice))
+        {
+            std::cerr << "Unknown Lumen Sample slice selection was accepted\n";
+            return false;
+        }
+        const auto malformedLumenSamples = juce::JSON::parse(R"json(
         {
           "schemaVersion": 4,
-          "instrumentType": "lumus-hybrid-synth",
-          "namespace": "lumus",
+          "instrumentType": "lumen-hybrid-synth",
+          "namespace": "lumen",
           "parameters": {},
           "metadata": {
-            "lumusSourceRack": { "schemaVersion": 2, "slots": [
+            "lumenSourceRack": { "schemaVersion": 2, "slots": [
               { "id": "a", "mode": "wavetable" },
               { "id": "b", "mode": "wavetable" },
               { "id": "c", "mode": "wavetable" }
             ] },
-            "lumusSampleSlots": {
+            "lumenSampleSlots": {
               "a": { "schemaVersion": 2, "zones": [] },
               "b": { "schemaVersion": 1, "zones": [] },
               "c": { "schemaVersion": 1, "zones": [] }
@@ -17437,33 +19189,33 @@ namespace
         }
         )json");
         beat::InstrumentDefinition rejectedMalformedSamples;
-        if (beat::applySynthPatchContract(malformedLumusSamples, rejectedMalformedSamples))
+        if (beat::applySynthPatchContract(malformedLumenSamples, rejectedMalformedSamples))
             return false;
-        const auto lumusGranularPatch = juce::JSON::parse(R"json(
+        const auto lumenGranularPatch = juce::JSON::parse(R"json(
         {
           "schemaVersion": 6,
-          "instrumentType": "lumus-hybrid-synth",
-          "namespace": "lumus",
+          "instrumentType": "lumen-hybrid-synth",
+          "namespace": "lumen",
           "parameters": {
-            "lumus.source.a.sample.enabled": true,
-            "lumus.source.a.sample.audioFileId": "lumus-multisample-a",
-            "lumus.source.b.granular.enabled": true,
-            "lumus.source.b.granular.builtinSource": "benchmark",
-            "lumus.source.c.granular.enabled": true,
-            "lumus.source.c.granular.builtinSource": "benchmark"
+            "lumen.source.a.sample.enabled": true,
+            "lumen.source.a.sample.audioFileId": "lumen-multisample-a",
+            "lumen.source.b.granular.enabled": true,
+            "lumen.source.b.granular.builtinSource": "benchmark",
+            "lumen.source.c.granular.enabled": true,
+            "lumen.source.c.granular.builtinSource": "benchmark"
           },
           "metadata": {
-            "lumusSourceRack": { "schemaVersion": 2, "slots": [
+            "lumenSourceRack": { "schemaVersion": 2, "slots": [
               { "id": "a", "mode": "multisample" },
               { "id": "b", "mode": "granular" },
               { "id": "c", "mode": "granular" }
             ] },
-            "lumusSampleSlots": {
+            "lumenSampleSlots": {
               "a": { "schemaVersion": 1, "zones": [] },
               "b": { "schemaVersion": 1, "zones": [] },
               "c": { "schemaVersion": 1, "zones": [] }
             },
-            "lumusGranularSlots": {
+            "lumenGranularSlots": {
               "a": { "schemaVersion": 1 },
               "b": { "schemaVersion": 1 },
               "c": { "schemaVersion": 1 }
@@ -17472,43 +19224,43 @@ namespace
           "modulation": []
         }
         )json");
-        beat::InstrumentDefinition lumusGranular;
-        if (!beat::applySynthPatchContract(lumusGranularPatch, lumusGranular)
-            || lumusGranular.aether.oscA.enabled || lumusGranular.aether.oscB.enabled
-            || lumusGranular.lumus.oscC.enabled
-            || !lumusGranular.lumus.sampleSlots[0].enabled
-            || lumusGranular.lumus.sampleSlots[0].audioFileId != "lumus-multisample-a"
-            || lumusGranular.lumus.granularSlots[0].enabled
-            || !lumusGranular.lumus.granularSlots[1].enabled
-            || !lumusGranular.lumus.granularSlots[2].enabled)
+        beat::InstrumentDefinition lumenGranular;
+        if (!beat::applySynthPatchContract(lumenGranularPatch, lumenGranular)
+            || lumenGranular.aether.oscA.enabled || lumenGranular.aether.oscB.enabled
+            || lumenGranular.lumen.oscC.enabled
+            || !lumenGranular.lumen.sampleSlots[0].enabled
+            || lumenGranular.lumen.sampleSlots[0].audioFileId != "lumen-multisample-a"
+            || lumenGranular.lumen.granularSlots[0].enabled
+            || !lumenGranular.lumen.granularSlots[1].enabled
+            || !lumenGranular.lumen.granularSlots[2].enabled)
             return false;
-        const auto lumusArpeggiatorPatch = juce::JSON::parse(R"json(
+        const auto lumenArpeggiatorPatch = juce::JSON::parse(R"json(
         {
           "schemaVersion": 9,
-          "instrumentType": "lumus-hybrid-synth",
-          "namespace": "lumus",
+          "instrumentType": "lumen-hybrid-synth",
+          "namespace": "lumen",
           "parameters": {
-            "lumus.arp.enabled": true,
-            "lumus.arp.mode": "upDown",
-            "lumus.arp.rate": "1/8",
-            "lumus.arp.gate": 0.63,
-            "lumus.arp.swing": 0.82,
-            "lumus.arp.octaves": 3,
-            "lumus.arp.key": "fSharp",
-            "lumus.arp.scale": "blues"
+            "lumen.arp.enabled": true,
+            "lumen.arp.mode": "upDown",
+            "lumen.arp.rate": "1/8",
+            "lumen.arp.gate": 0.63,
+            "lumen.arp.swing": 0.82,
+            "lumen.arp.octaves": 3,
+            "lumen.arp.key": "fSharp",
+            "lumen.arp.scale": "blues"
           },
           "metadata": {
-            "lumusSourceRack": { "schemaVersion": 2, "slots": [
+            "lumenSourceRack": { "schemaVersion": 2, "slots": [
               { "id": "a", "mode": "wavetable" },
               { "id": "b", "mode": "wavetable" },
               { "id": "c", "mode": "wavetable" }
             ] },
-            "lumusSampleSlots": {
+            "lumenSampleSlots": {
               "a": { "schemaVersion": 1, "zones": [] },
               "b": { "schemaVersion": 1, "zones": [] },
               "c": { "schemaVersion": 1, "zones": [] }
             },
-            "lumusGranularSlots": {
+            "lumenGranularSlots": {
               "a": { "schemaVersion": 1 },
               "b": { "schemaVersion": 1 },
               "c": { "schemaVersion": 1 }
@@ -17517,51 +19269,51 @@ namespace
           "modulation": []
         }
         )json");
-        beat::InstrumentDefinition lumusArpeggiator;
-        if (!beat::applySynthPatchContract(lumusArpeggiatorPatch, lumusArpeggiator)
-            || !lumusArpeggiator.lumus.arpeggiator.enabled
-            || lumusArpeggiator.lumus.arpeggiator.mode != 2
-            || lumusArpeggiator.lumus.arpeggiator.rateDivision != 8
-            || std::abs(lumusArpeggiator.lumus.arpeggiator.gate - 0.63f) > 0.0001f
-            || std::abs(lumusArpeggiator.lumus.arpeggiator.swing - 0.75f) > 0.0001f
-            || lumusArpeggiator.lumus.arpeggiator.octaves != 3
-            || lumusArpeggiator.lumus.arpeggiator.rootPitchClass != 6
-            || lumusArpeggiator.lumus.arpeggiator.scale != 4)
+        beat::InstrumentDefinition lumenArpeggiator;
+        if (!beat::applySynthPatchContract(lumenArpeggiatorPatch, lumenArpeggiator)
+            || !lumenArpeggiator.lumen.arpeggiator.enabled
+            || lumenArpeggiator.lumen.arpeggiator.mode != 2
+            || lumenArpeggiator.lumen.arpeggiator.rateDivision != 8
+            || std::abs(lumenArpeggiator.lumen.arpeggiator.gate - 0.63f) > 0.0001f
+            || std::abs(lumenArpeggiator.lumen.arpeggiator.swing - 0.75f) > 0.0001f
+            || lumenArpeggiator.lumen.arpeggiator.octaves != 3
+            || lumenArpeggiator.lumen.arpeggiator.rootPitchClass != 6
+            || lumenArpeggiator.lumen.arpeggiator.scale != 4)
             return false;
-        auto invalidLumusScalePatch = lumusArpeggiatorPatch.clone();
-        if (auto* invalidParams = invalidLumusScalePatch.getProperty("parameters", {}).getDynamicObject())
-            invalidParams->setProperty("lumus.arp.scale", "dorian");
+        auto invalidLumenScalePatch = lumenArpeggiatorPatch.clone();
+        if (auto* invalidParams = invalidLumenScalePatch.getProperty("parameters", {}).getDynamicObject())
+            invalidParams->setProperty("lumen.arp.scale", "dorian");
         beat::InstrumentDefinition rejectedInvalidScale;
-        if (beat::applySynthPatchContract(invalidLumusScalePatch, rejectedInvalidScale))
+        if (beat::applySynthPatchContract(invalidLumenScalePatch, rejectedInvalidScale))
             return false;
-        const auto lumusClipPatch = juce::JSON::parse(R"json(
+        const auto lumenClipPatch = juce::JSON::parse(R"json(
         {
           "schemaVersion": 10,
-          "instrumentType": "lumus-hybrid-synth",
-          "namespace": "lumus",
+          "instrumentType": "lumen-hybrid-synth",
+          "namespace": "lumen",
           "parameters": {
-            "lumus.arp.enabled": false,
-            "lumus.clip.enabled": true,
-            "lumus.clip.rate": "1/8",
-            "lumus.clip.swing": 0.22
+            "lumen.arp.enabled": false,
+            "lumen.clip.enabled": true,
+            "lumen.clip.rate": "1/8",
+            "lumen.clip.swing": 0.22
           },
           "metadata": {
-            "lumusSourceRack": { "schemaVersion": 2, "slots": [
+            "lumenSourceRack": { "schemaVersion": 2, "slots": [
               { "id": "a", "mode": "wavetable" },
               { "id": "b", "mode": "wavetable" },
               { "id": "c", "mode": "wavetable" }
             ] },
-            "lumusSampleSlots": {
+            "lumenSampleSlots": {
               "a": { "schemaVersion": 1, "zones": [] },
               "b": { "schemaVersion": 1, "zones": [] },
               "c": { "schemaVersion": 1, "zones": [] }
             },
-            "lumusGranularSlots": {
+            "lumenGranularSlots": {
               "a": { "schemaVersion": 1 },
               "b": { "schemaVersion": 1 },
               "c": { "schemaVersion": 1 }
             },
-            "lumusClip": { "schemaVersion": 1, "lengthSteps": 4, "steps": [
+            "lumenClip": { "schemaVersion": 1, "lengthSteps": 4, "steps": [
               { "enabled": true, "pitchOffset": 0, "lengthSteps": 1, "velocity": 1.0 },
               { "enabled": true, "pitchOffset": 4, "lengthSteps": 2, "velocity": 0.8 },
               { "enabled": false, "pitchOffset": 0, "lengthSteps": 1, "velocity": 1.0 },
@@ -17571,38 +19323,88 @@ namespace
           "modulation": []
         }
         )json");
-        beat::InstrumentDefinition lumusClip;
-        if (!beat::applySynthPatchContract(lumusClipPatch, lumusClip)
-            || !lumusClip.lumus.clip.enabled
-            || lumusClip.lumus.arpeggiator.enabled
-            || lumusClip.lumus.clip.rateDivision != 8
-            || std::abs(lumusClip.lumus.clip.swing - 0.22f) > 0.0001f
-            || lumusClip.lumus.clip.lengthSteps != 4
-            || !lumusClip.lumus.clip.steps[1].enabled
-            || lumusClip.lumus.clip.steps[1].pitchOffset != 4
-            || lumusClip.lumus.clip.steps[1].lengthSteps != 2
-            || std::abs(lumusClip.lumus.clip.steps[1].velocity - 0.8f) > 0.0001f)
+        beat::InstrumentDefinition lumenClip;
+        if (!beat::applySynthPatchContract(lumenClipPatch, lumenClip)
+            || !lumenClip.lumen.clip.enabled
+            || lumenClip.lumen.arpeggiator.enabled
+            || lumenClip.lumen.clip.rateDivision != 8
+            || std::abs(lumenClip.lumen.clip.swing - 0.22f) > 0.0001f
+            || lumenClip.lumen.clip.lengthSteps != 4
+            || lumenClip.lumen.clip.noteCount != 3
+            || lumenClip.lumen.clip.notes[1].startStep != 1
+            || lumenClip.lumen.clip.notes[1].pitchOffset != 4
+            || lumenClip.lumen.clip.notes[1].lengthSteps != 2
+            || std::abs(lumenClip.lumen.clip.notes[1].velocity - 0.8f) > 0.0001f)
             return false;
-        auto conflictingLumusPerformance = lumusClipPatch.clone();
-        if (auto* conflictingParams = conflictingLumusPerformance.getProperty("parameters", {}).getDynamicObject())
-            conflictingParams->setProperty("lumus.arp.enabled", true);
+
+        auto lumenPolyClipPatch = lumenClipPatch.clone();
+        lumenPolyClipPatch.getDynamicObject()->setProperty("schemaVersion", 11);
+        if (auto* clipMetadata = lumenPolyClipPatch.getProperty("metadata", {}).getDynamicObject())
+        {
+            juce::DynamicObject::Ptr polyClip = new juce::DynamicObject();
+            polyClip->setProperty("schemaVersion", 2);
+            polyClip->setProperty("lengthSteps", 4);
+            juce::Array<juce::var> notes;
+            for (const auto& [startStep, pitchOffset, lengthSteps, velocity]
+                 : std::array<std::tuple<int, int, int, double>, 3> {{{ 0, 0, 2, 1.0 }, { 0, 7, 1, 0.75 }, { 2, 4, 2, 0.6 }}})
+            {
+                juce::DynamicObject::Ptr note = new juce::DynamicObject();
+                note->setProperty("startStep", startStep);
+                note->setProperty("pitchOffset", pitchOffset);
+                note->setProperty("lengthSteps", lengthSteps);
+                note->setProperty("velocity", velocity);
+                notes.add(juce::var(note.get()));
+            }
+            polyClip->setProperty("notes", notes);
+            clipMetadata->setProperty("lumenClip", juce::var(polyClip.get()));
+        }
+        beat::InstrumentDefinition lumenPolyClip;
+        if (!beat::applySynthPatchContract(lumenPolyClipPatch, lumenPolyClip)
+            || lumenPolyClip.lumen.clip.noteCount != 3
+            || lumenPolyClip.lumen.clip.notes[0].startStep != 0
+            || lumenPolyClip.lumen.clip.notes[1].startStep != 0
+            || lumenPolyClip.lumen.clip.notes[1].pitchOffset != 7
+            || lumenPolyClip.lumen.clip.notes[2].startStep != 2)
+            return false;
+        auto oversizedLumenPolyClip = lumenPolyClipPatch.clone();
+        if (auto* clipMetadata = oversizedLumenPolyClip.getProperty("metadata", {}).getDynamicObject())
+            if (auto* clipObject = clipMetadata->getProperty("lumenClip").getDynamicObject())
+            {
+                juce::Array<juce::var> oversizedNotes;
+                for (int index = 0; index < 65; ++index)
+                {
+                    juce::DynamicObject::Ptr note = new juce::DynamicObject();
+                    note->setProperty("startStep", index % 4);
+                    note->setProperty("pitchOffset", (index % 12) - 6);
+                    note->setProperty("lengthSteps", 1);
+                    note->setProperty("velocity", 0.8);
+                    oversizedNotes.add(juce::var(note.get()));
+                }
+                clipObject->setProperty("notes", oversizedNotes);
+            }
+        beat::InstrumentDefinition rejectedOversizedPolyClip;
+        if (beat::applySynthPatchContract(oversizedLumenPolyClip, rejectedOversizedPolyClip))
+            return false;
+        auto conflictingLumenPerformance = lumenClipPatch.clone();
+        if (auto* conflictingParams = conflictingLumenPerformance.getProperty("parameters", {}).getDynamicObject())
+            conflictingParams->setProperty("lumen.arp.enabled", true);
         beat::InstrumentDefinition rejectedConflict;
-        if (beat::applySynthPatchContract(conflictingLumusPerformance, rejectedConflict))
+        if (beat::applySynthPatchContract(conflictingLumenPerformance, rejectedConflict))
             return false;
-        auto malformedLumusClip = lumusClipPatch.clone();
-        if (auto* clipMetadata = malformedLumusClip.getProperty("metadata", {}).getDynamicObject())
-            if (auto* clipObject = clipMetadata->getProperty("lumusClip").getDynamicObject())
+        auto malformedLumenClip = lumenClipPatch.clone();
+        if (auto* clipMetadata = malformedLumenClip.getProperty("metadata", {}).getDynamicObject())
+            if (auto* clipObject = clipMetadata->getProperty("lumenClip").getDynamicObject())
                 clipObject->setProperty("lengthSteps", 5);
         beat::InstrumentDefinition rejectedMalformedClip;
-        if (beat::applySynthPatchContract(malformedLumusClip, rejectedMalformedClip))
+        if (beat::applySynthPatchContract(malformedLumenClip, rejectedMalformedClip))
             return false;
-        const auto malformedLumusRack = juce::JSON::parse(R"json(
+        const auto malformedLumenRack = juce::JSON::parse(R"json(
         {
           "schemaVersion": 2,
-          "instrumentType": "lumus-hybrid-synth",
-          "namespace": "lumus",
+          "instrumentType": "lumen-hybrid-synth",
+          "namespace": "lumen",
           "parameters": {},
-          "metadata": { "lumusSourceRack": { "schemaVersion": 1, "slots": [
+          "metadata": { "lumenSourceRack": { "schemaVersion": 1, "slots": [
             { "id": "a", "mode": "wavetable" },
             { "id": "c", "mode": "wavetable" },
             { "id": "b", "mode": "wavetable" }
@@ -17611,13 +19413,13 @@ namespace
         }
         )json");
         beat::InstrumentDefinition rejectedMalformedRack;
-        if (beat::applySynthPatchContract(malformedLumusRack, rejectedMalformedRack))
+        if (beat::applySynthPatchContract(malformedLumenRack, rejectedMalformedRack))
             return false;
-        const auto futureLumusPatch = juce::JSON::parse(R"json(
-        { "schemaVersion": 11, "instrumentType": "lumus-hybrid-synth", "namespace": "lumus", "parameters": {}, "modulation": [] }
+        const auto futureLumenPatch = juce::JSON::parse(R"json(
+        { "schemaVersion": 17, "instrumentType": "lumen-hybrid-synth", "namespace": "lumen", "parameters": {}, "modulation": [] }
         )json");
-        beat::InstrumentDefinition rejectedFutureLumus;
-        if (beat::applySynthPatchContract(futureLumusPatch, rejectedFutureLumus))
+        beat::InstrumentDefinition rejectedFutureLumen;
+        if (beat::applySynthPatchContract(futureLumenPatch, rejectedFutureLumen))
             return false;
 
         const auto patch = juce::JSON::parse(R"json(
@@ -18166,6 +19968,98 @@ namespace
         return true;
     }
 
+    bool stressAurumModulationContract()
+    {
+        const auto aurumModulation = juce::JSON::parse(R"json(
+        {
+          "version": 13,
+          "macroValues": [0.61, 0.42, 0, 0, 0, 0, 0, 0],
+          "modulation": [
+            { "id": "master-level", "source": "macro.1", "target": "amp.level", "amount": -0.5, "enabled": true },
+            { "id": "master-pan", "source": "lfo.1", "target": "amp.pan", "amount": 0.75, "enabled": true, "bipolar": true },
+            { "id": "op-level", "source": "macro.2", "target": "aurum.op.1.level", "amount": -0.4, "enabled": true },
+            { "id": "op-pan", "source": "lfo.1", "target": "aurum.op.2.pan", "amount": 0.6, "enabled": true, "bipolar": true },
+            { "id": "filter-a", "source": "env.1", "target": "aurum.filter.a.cutoff", "amount": 0.7, "enabled": true },
+            { "id": "filter-b", "source": "pressure", "target": "aurum.filter.b.cutoff", "amount": -0.3, "enabled": true },
+            { "id": "filter-a-resonance", "source": "macro.1", "target": "aurum.filter.a.resonance", "amount": 0.55, "enabled": true },
+            { "id": "filter-b-drive", "source": "macro.1", "target": "aurum.filter.b.drive", "amount": 0.45, "enabled": true },
+            { "id": "invalid-op", "source": "macro.1", "target": "aurum.op.1.fine", "amount": 1.0, "enabled": true },
+            { "id": "invalid-filter", "source": "macro.1", "target": "filter.cutoff", "amount": 1.0, "enabled": true }
+          ]
+        }
+        )json");
+        beat::InstrumentDefinition aurumModulationInstrument;
+        if (!beat::applyAurumModulationContract(aurumModulation, aurumModulationInstrument)
+            || !aurumModulationInstrument.dynamicModulation.active
+            || !near(aurumModulationInstrument.dynamicModulation.ampLevel.macro1, -0.5f)
+            || !near(aurumModulationInstrument.dynamicModulation.ampPan.lfo, 0.75f)
+            || !aurumModulationInstrument.dynamicModulation.ampPan.lfoBipolar
+            || !near(aurumModulationInstrument.dynamicModulation.aurumOperatorLevel[0].macro2, -0.4f)
+            || !near(aurumModulationInstrument.dynamicModulation.aurumOperatorPan[1].lfo, 0.6f)
+            || !near(aurumModulationInstrument.dynamicModulation.aurumFilterCutoff[0].env, 0.7f)
+            || !near(aurumModulationInstrument.dynamicModulation.aurumFilterCutoff[1].pressure, -0.3f)
+            || !near(aurumModulationInstrument.dynamicModulation.aurumFilterResonance[0].macro1, 0.55f)
+            || !near(aurumModulationInstrument.dynamicModulation.aurumFilterDrive[1].macro1, 0.45f)
+            || !near(aurumModulationInstrument.macroValues[0], 0.61f)
+            || !near(aurumModulationInstrument.macroValues[1], 0.42f)
+            || aurumModulationInstrument.aurum.modulation.getArray() == nullptr
+            || aurumModulationInstrument.aurum.modulation.getArray()->size() != 8
+            || !near(aurumModulationInstrument.dynamicModulation.filterCutoff.macro1, 0.0f))
+            return false;
+
+        auto versionEleven = aurumModulation.clone();
+        versionEleven.getDynamicObject()->setProperty("version", 11);
+        beat::InstrumentDefinition versionElevenInstrument;
+        if (!beat::applyAurumModulationContract(versionEleven, versionElevenInstrument)
+            || !near(versionElevenInstrument.dynamicModulation.ampLevel.macro1, -0.5f)
+            || !near(versionElevenInstrument.dynamicModulation.aurumOperatorLevel[0].macro1, 0.0f)
+            || !near(versionElevenInstrument.dynamicModulation.aurumFilterCutoff[0].env, 0.0f))
+            return false;
+
+        auto versionTwelve = aurumModulation.clone();
+        versionTwelve.getDynamicObject()->setProperty("version", 12);
+        beat::InstrumentDefinition versionTwelveInstrument;
+        if (!beat::applyAurumModulationContract(versionTwelve, versionTwelveInstrument)
+            || !near(versionTwelveInstrument.dynamicModulation.aurumFilterCutoff[0].env, 0.7f)
+            || !near(versionTwelveInstrument.dynamicModulation.aurumFilterResonance[0].macro1, 0.0f)
+            || !near(versionTwelveInstrument.dynamicModulation.aurumFilterDrive[1].macro1, 0.0f))
+            return false;
+
+        return true;
+    }
+
+    bool stressInstrumentVoiceAurumIdleVoiceGate()
+    {
+        beat::InstrumentVoice::Params params;
+        params.hasAurum = true;
+        params.aurumOperators[0].enabled = true;
+        params.aurumOperators[0].level = 1.0f;
+        params.aurumOutputSends[0][0] = 1.0f;
+
+        beat::InstrumentVoice voice;
+        voice.prepare(48000.0, 512);
+        voice.setParams(params);
+        juce::AudioBuffer<float> buffer(2, 512);
+        buffer.clear();
+        beat::InstrumentVoice::consumeRenderWorkStats();
+        voice.renderNextBlock(buffer, 0, buffer.getNumSamples());
+        const auto work = beat::InstrumentVoice::consumeRenderWorkStats();
+
+        float energy = 0.0f;
+        for (int channel = 0; channel < buffer.getNumChannels(); ++channel)
+            for (int sample = 0; sample < buffer.getNumSamples(); ++sample)
+                energy += std::abs(buffer.getSample(channel, sample));
+
+        if (energy != 0.0f || work.voiceBlocks != 0 || work.oscillatorSamples != 0)
+        {
+            std::cerr << "Aurum idle voice gate failed energy=" << energy
+                      << " voiceBlocks=" << work.voiceBlocks
+                      << " oscillatorSamples=" << work.oscillatorSamples << "\n";
+            return false;
+        }
+        return true;
+    }
+
     bool stressInstrumentVoiceAurumBipolarMatrix()
     {
         beat::InstrumentVoice::Params params;
@@ -18205,8 +20099,45 @@ namespace
         negativeOutputParams.aurumMatrix[0][6] = -params.aurumMatrix[0][6];
         negativeOutputParams.aurumOutputSends[0][0] = -params.aurumOutputSends[0][0];
         const auto negativeOutput = render(negativeOutputParams);
+        auto macroReducedParams = params;
+        macroReducedParams.dynamicModulation.active = true;
+        macroReducedParams.dynamicModulation.ampLevel.macro1 = -0.5f;
+        macroReducedParams.macroValues[0] = 1.0f;
+        const auto macroReduced = render(macroReducedParams);
+        auto operatorReducedParams = params;
+        operatorReducedParams.dynamicModulation.active = true;
+        operatorReducedParams.dynamicModulation.aurumOperatorLevel[0].macro2 = -0.7f;
+        operatorReducedParams.macroValues[1] = 1.0f;
+        const auto operatorReduced = render(operatorReducedParams);
+        auto operatorPannedParams = params;
+        operatorPannedParams.dynamicModulation.active = true;
+        operatorPannedParams.dynamicModulation.aurumOperatorPan[0].macro1 = 1.0f;
+        operatorPannedParams.macroValues[0] = 1.0f;
+        const auto operatorPanned = render(operatorPannedParams);
+        auto closedFilterParams = params;
+        closedFilterParams.aurumFilters[0] = { true, 0, 0.02f, 0.0f, 0.0f };
+        const auto closedFilter = render(closedFilterParams);
+        auto openedFilterParams = closedFilterParams;
+        openedFilterParams.dynamicModulation.active = true;
+        openedFilterParams.dynamicModulation.aurumFilterCutoff[0].macro1 = 0.8f;
+        openedFilterParams.macroValues[0] = 1.0f;
+        const auto openedFilter = render(openedFilterParams);
+        auto characterFilterParams = params;
+        characterFilterParams.aurumFilters[0] = { true, 0, 0.34f, 0.04f, 0.0f };
+        const auto neutralCharacterFilter = render(characterFilterParams);
+        characterFilterParams.dynamicModulation.active = true;
+        characterFilterParams.dynamicModulation.aurumFilterResonance[0].macro1 = 0.8f;
+        characterFilterParams.dynamicModulation.aurumFilterDrive[0].macro1 = 0.9f;
+        characterFilterParams.macroValues[0] = 1.0f;
+        const auto modulatedCharacterFilter = render(characterFilterParams);
 
         double energy = 0.0;
+        double macroReducedEnergy = 0.0;
+        double operatorReducedEnergy = 0.0;
+        double operatorPannedLeftEnergy = 0.0;
+        double operatorPannedRightEnergy = 0.0;
+        double filterDifference = 0.0;
+        double filterCharacterDifference = 0.0;
         double fmDifference = 0.0;
         double inversionResidual = 0.0;
         for (int channel = 0; channel < positive.getNumChannels(); ++channel)
@@ -18216,19 +20147,124 @@ namespace
                 const auto positiveSample = (double) positive.getSample(channel, sampleIndex);
                 const auto negativeFmSample = (double) negativeFm.getSample(channel, sampleIndex);
                 const auto negativeOutputSample = (double) negativeOutput.getSample(channel, sampleIndex);
-                if (!std::isfinite(positiveSample) || !std::isfinite(negativeFmSample) || !std::isfinite(negativeOutputSample))
+                const auto macroReducedSample = (double) macroReduced.getSample(channel, sampleIndex);
+                const auto operatorReducedSample = (double) operatorReduced.getSample(channel, sampleIndex);
+                const auto operatorPannedSample = (double) operatorPanned.getSample(channel, sampleIndex);
+                const auto closedFilterSample = (double) closedFilter.getSample(channel, sampleIndex);
+                const auto openedFilterSample = (double) openedFilter.getSample(channel, sampleIndex);
+                const auto neutralCharacterSample = (double) neutralCharacterFilter.getSample(channel, sampleIndex);
+                const auto modulatedCharacterSample = (double) modulatedCharacterFilter.getSample(channel, sampleIndex);
+                if (!std::isfinite(positiveSample) || !std::isfinite(negativeFmSample)
+                    || !std::isfinite(negativeOutputSample) || !std::isfinite(macroReducedSample)
+                    || !std::isfinite(operatorReducedSample) || !std::isfinite(operatorPannedSample)
+                    || !std::isfinite(closedFilterSample) || !std::isfinite(openedFilterSample)
+                    || !std::isfinite(neutralCharacterSample) || !std::isfinite(modulatedCharacterSample))
                     return false;
                 energy += positiveSample * positiveSample;
+                macroReducedEnergy += macroReducedSample * macroReducedSample;
+                operatorReducedEnergy += operatorReducedSample * operatorReducedSample;
+                if (channel == 0) operatorPannedLeftEnergy += operatorPannedSample * operatorPannedSample;
+                else operatorPannedRightEnergy += operatorPannedSample * operatorPannedSample;
+                filterDifference += std::abs(closedFilterSample - openedFilterSample);
+                filterCharacterDifference += std::abs(neutralCharacterSample - modulatedCharacterSample);
                 fmDifference += std::abs(positiveSample - negativeFmSample);
                 inversionResidual += std::abs(positiveSample + negativeOutputSample);
             }
         }
 
-        const bool ok = energy > 0.001 && fmDifference > 0.1 && inversionResidual < 0.001;
+        const bool ok = energy > 0.001
+            && macroReducedEnergy < energy * 0.4
+            && operatorReducedEnergy < energy * 0.2
+            && operatorPannedRightEnergy > 0.001
+            && operatorPannedLeftEnergy < operatorPannedRightEnergy * 0.01
+            && filterDifference > 0.1
+            && filterCharacterDifference > 0.1
+            && fmDifference > 0.1
+            && inversionResidual < 0.001;
         if (!ok)
             std::cerr << "Aurum bipolar voice stress failed energy=" << energy
+                      << " macroReducedEnergy=" << macroReducedEnergy
+                      << " operatorReducedEnergy=" << operatorReducedEnergy
+                      << " operatorPan=" << operatorPannedLeftEnergy << "/" << operatorPannedRightEnergy
+                      << " filterDifference=" << filterDifference
+                      << " filterCharacterDifference=" << filterCharacterDifference
                       << " fmDifference=" << fmDifference
                       << " inversionResidual=" << inversionResidual << "\n";
+        return ok;
+    }
+
+    bool stressInstrumentVoiceAurumPitchBendRange()
+    {
+        beat::InstrumentVoice::Params params;
+        params.hasAurum = true;
+        params.pitchBendRangeSemitones = 12.0f;
+        params.ampLevel = 0.7f;
+        params.cutoff01 = 1.0f;
+        params.attackMs = 0.0f;
+        params.decayMs = 0.0f;
+        params.sustain = 1.0f;
+        params.aurumOperators[0] = { true, 0, 1.0f, 0, 0.0f, 0.8f, 0.0f, 0.0f, 0.0f, 1.0f, 100.0f };
+        params.aurumMatrix[0][6] = 1.0f;
+        params.aurumOutputSends[0][0] = 1.0f;
+
+        beat::InstrumentVoice voice;
+        voice.prepare(48000.0, 512);
+        voice.setParams(params);
+        voice.startNote(57, 1.0f, nullptr, 16383);
+        const float patchRange = voice.memberPitchWheelSemitonesForTest();
+
+        voice.setMemberPitchBendRange(48.25f);
+        const float rpnOverride = voice.memberPitchWheelSemitonesForTest();
+        voice.setMemberPitchBendRange(-1.0f);
+        const float restoredPatchRange = voice.memberPitchWheelSemitonesForTest();
+
+        voice.pitchWheelMoved(8192);
+        voice.setMasterPitchWheel(16383, -1.0f);
+        const float masterPatchRange = voice.pitchWheelSemitonesForTest();
+        voice.setMasterPitchWheel(16383, 48.0f);
+        const float mpeMasterOverride = voice.pitchWheelSemitonesForTest();
+
+        const bool ok = near(patchRange, 12.0f, 0.002f)
+            && near(rpnOverride, 48.25f, 0.002f)
+            && near(restoredPatchRange, 12.0f, 0.002f)
+            && near(masterPatchRange, 12.0f, 0.002f)
+            && near(mpeMasterOverride, 48.0f, 0.002f);
+        if (!ok)
+            std::cerr << "Aurum pitch-bend range failed patch=" << patchRange
+                      << " rpn=" << rpnOverride
+                      << " restored=" << restoredPatchRange
+                      << " master=" << masterPatchRange
+                      << " mpe=" << mpeMasterOverride << "\n";
+        return ok;
+    }
+
+    bool stressAudioEngineAurumPitchBendTelemetry()
+    {
+        auto project = makeAurumParityProject();
+        project.instruments.front().pitchBendRangeSemitones = 12.0f;
+        project.tracks.front().recordArmed = true;
+        project.tracks.front().inputMonitoring = true;
+        project.tracks.front().segments.clear();
+
+        beat::AudioEngine engine;
+        std::vector<beat::AudioEngine::SynthExpressionActivity> updates;
+        engine.onSynthExpressionActivity = [&](const beat::AudioEngine::SynthExpressionActivity& activity) {
+            updates.push_back(activity);
+        };
+        engine.prepareForOffline(48000.0, 512, 2);
+        engine.applyProject(std::move(project));
+        if (!engine.injectMidiInputForTesting(juce::MidiMessage::noteOn(1, 57, (juce::uint8) 100))
+            || !engine.injectMidiInputForTesting(juce::MidiMessage::pitchWheel(1, 12288))
+            || updates.empty())
+            return false;
+
+        const bool ok = updates.back().instrumentId == "aurum-parity"
+            && near(updates.back().pitchBendSemitones, 6.0f, 0.0002f);
+        if (!ok)
+            std::cerr << "Aurum pitch-bend telemetry failed updates=" << updates.size()
+                      << " instrument=" << (updates.empty() ? juce::String() : updates.back().instrumentId)
+                      << " semitones=" << (updates.empty() ? 0.0f : updates.back().pitchBendSemitones)
+                      << "\n";
         return ok;
     }
 
@@ -18959,6 +20995,99 @@ namespace
             && malformedWork.oscillatorSamples == expectedOscillatorSamples;
     }
 
+    bool stressAudioEngineAurumRealtimeLoadGate()
+    {
+        constexpr double sampleRate = 48000.0;
+        constexpr int blockSize = 512;
+        struct Tier
+        {
+            const char* label;
+            int noteCount;
+            int unison;
+            int oversampling;
+            double maximumMedianLoadPercent;
+        };
+        constexpr std::array<Tier, 2> tiers {{
+            { "polyphony", 8, 4, 2, 80.0 },
+            { "quality", 3, 8, 4, 90.0 },
+        }};
+
+        for (const auto& tier : tiers)
+        {
+            beat::AudioEngine engine;
+            engine.prepareForOffline(sampleRate, blockSize, 2);
+            engine.applyProject(makeAurumRealtimeLoadProject(tier.noteCount, tier.unison, tier.oversampling));
+            engine.requestSeek(0.0);
+            engine.requestPlay();
+
+            std::array<double, 12> measuredLoads {};
+            int measuredCount = 0;
+            int64_t maximumOscillatorSamples = 0;
+            int maximumActiveVoices = 0;
+            int hottestRouteIndex = -1;
+            double hottestRouteMs = 0.0;
+            double renderedEnergy = 0.0;
+            int64_t initialDeadlineOverruns = 0;
+            bool capturedInitialDeadlineOverruns = false;
+
+            for (int callbackIndex = 0; callbackIndex < 16; ++callbackIndex)
+            {
+                const auto block = renderEngineBlock(engine, blockSize);
+                renderedEnergy += bufferEnergy(block);
+                beat::AudioEngine::RenderTimingSnapshot timing;
+                if (!engine.pullRenderTimingSnapshot(timing))
+                    return false;
+                if (!capturedInitialDeadlineOverruns)
+                {
+                    initialDeadlineOverruns = timing.deadlineOverruns;
+                    capturedInitialDeadlineOverruns = true;
+                }
+                maximumOscillatorSamples = juce::jmax(maximumOscillatorSamples, timing.oscillatorSamples);
+                maximumActiveVoices = juce::jmax(maximumActiveVoices, timing.activeSynthVoices);
+                if (timing.hottestRouteMs >= hottestRouteMs)
+                {
+                    hottestRouteMs = timing.hottestRouteMs;
+                    hottestRouteIndex = timing.hottestRouteIndex;
+                }
+                if (callbackIndex >= 4)
+                    measuredLoads[(size_t) measuredCount++] = timing.loadPercent;
+            }
+
+            beat::AudioEngine::RenderTimingSnapshot finalTiming;
+            if (!engine.pullRenderTimingSnapshot(finalTiming))
+                return false;
+            engine.requestStop();
+            std::sort(measuredLoads.begin(), measuredLoads.begin() + measuredCount);
+            const double medianLoadPercent = measuredLoads[(size_t) measuredCount / 2];
+            const double peakMeasuredLoadPercent = measuredLoads[(size_t) measuredCount - 1];
+            const int64_t expectedOscillatorSamples = (int64_t) blockSize
+                * tier.noteCount * tier.unison * tier.oversampling * 6;
+            const bool ok = std::isfinite(renderedEnergy)
+                && renderedEnergy > 0.000001
+                && maximumActiveVoices == tier.noteCount
+                && maximumOscillatorSamples == expectedOscillatorSamples
+                && hottestRouteIndex == 0
+                && hottestRouteMs > 0.0
+                && medianLoadPercent <= tier.maximumMedianLoadPercent
+                && initialDeadlineOverruns == 0
+                && finalTiming.deadlineOverruns == initialDeadlineOverruns;
+            std::cerr << "Aurum realtime " << tier.label
+                      << " voices=" << maximumActiveVoices
+                      << " unison=" << tier.unison
+                      << " quality=" << tier.oversampling << "x"
+                      << " oscillatorSamples=" << maximumOscillatorSamples
+                      << " medianLoad=" << medianLoadPercent << "%"
+                      << " peakLoad=" << peakMeasuredLoadPercent << "%"
+                      << " hotRoute=" << hottestRouteIndex
+                      << " hotRouteMs=" << hottestRouteMs
+                      << " deadlineOverruns=" << finalTiming.deadlineOverruns
+                      << "\n";
+            if (!ok)
+                return false;
+        }
+        return true;
+    }
+
     bool stressInstrumentVoiceWavetablePath()
     {
         beat::InstrumentVoice::Params params;
@@ -19633,9 +21762,13 @@ namespace
         beat::InstrumentVoice::consumeRenderWorkStats();
         const auto dualWarp = render(dualWarpParams);
         const auto dualWarpWork = beat::InstrumentVoice::consumeRenderWorkStats();
-        if (dualWarpWork.nonlinearSamples != dualWarpWork.voiceSamples * 32
+        if (dualWarpWork.nonlinearSamples != (dualWarpWork.voiceSamples - 1) * 8
             || beat::RenderBudgets::exceedsVoiceNonlinearWorkCeiling(dualWarpWork.nonlinearSamples, dualWarpWork.voiceSamples))
+        {
+            std::cerr << "dual warp sparse work nonlinear=" << dualWarpWork.nonlinearSamples
+                      << " voiceSamples=" << dualWarpWork.voiceSamples << "\n";
             return false;
+        }
         double serialParallelDiff = 0.0;
         double serialLegacyDiff = 0.0;
         double explicitFilterDiff = 0.0;
@@ -20038,11 +22171,11 @@ namespace
         return silentEnergy < 0.000001;
     }
 
-    bool stressInstrumentVoiceLumusThreeSlotRack()
+    bool stressInstrumentVoiceLumenThreeSlotRack()
     {
         beat::InstrumentVoice::Params base;
         base.hasAether = true;
-        base.hasLumus = true;
+        base.hasLumen = true;
         base.waveform = 5;
         base.cutoff01 = 1.0f;
         base.attackMs = 1.0f;
@@ -20055,15 +22188,15 @@ namespace
         base.aetherOscA.waveform = 5;
         base.aetherOscA.wavetable.bank = 0;
         base.aetherOscB.enabled = false;
-        base.lumusOscC.enabled = false;
-        base.lumusOscC.waveform = 5;
-        base.lumusOscC.level = 0.5f;
-        base.lumusOscC.pan = 0.7f;
-        base.lumusOscC.semitone = 7;
-        base.lumusOscC.wavetable.bank = 1;
-        base.lumusOscC.wavetable.unison = 3;
-        base.lumusOscC.wavetable.detuneCents = 6.0f;
-        base.lumusOscC.wavetable.blend = 0.6f;
+        base.lumenOscC.enabled = false;
+        base.lumenOscC.waveform = 5;
+        base.lumenOscC.level = 0.5f;
+        base.lumenOscC.pan = 0.7f;
+        base.lumenOscC.semitone = 7;
+        base.lumenOscC.wavetable.bank = 1;
+        base.lumenOscC.wavetable.unison = 3;
+        base.lumenOscC.wavetable.detuneCents = 6.0f;
+        base.lumenOscC.wavetable.blend = 0.6f;
 
         const auto render = [](const beat::InstrumentVoice::Params& params)
         {
@@ -20077,9 +22210,26 @@ namespace
             return output;
         };
 
+        const auto renderAtNote = [](const beat::InstrumentVoice::Params& params, int midiNote,
+                                     size_t* realtimeViolations)
+        {
+            beat::InstrumentVoice voice;
+            voice.prepare(48000.0, 256);
+            voice.setParams(params);
+            voice.startNote(midiNote, 0.9f, nullptr, 8192);
+            juce::AudioBuffer<float> output(2, 4096);
+            output.clear();
+            if (realtimeViolations != nullptr)
+                beat::test::beginRealtimeSafetyProbe();
+            voice.renderNextBlock(output, 0, output.getNumSamples());
+            if (realtimeViolations != nullptr)
+                *realtimeViolations = beat::test::endRealtimeSafetyProbe();
+            return output;
+        };
+
         const auto withoutC = render(base);
         auto withCParams = base;
-        withCParams.lumusOscC.enabled = true;
+        withCParams.lumenOscC.enabled = true;
         const auto withC = render(withCParams);
         auto modulatedCParams = withCParams;
         modulatedCParams.dynamicModulation.active = true;
@@ -20093,11 +22243,11 @@ namespace
         const auto modulatedC = render(modulatedCParams);
         auto noneRoutedCParams = withCParams;
         noneRoutedCParams.aetherOscA.enabled = false;
-        noneRoutedCParams.lumusOscC.routing = 4;
+        noneRoutedCParams.lumenOscC.routing = 4;
         const auto noneRoutedC = render(noneRoutedCParams);
         auto sampleModeParams = base;
         sampleModeParams.aetherOscA.enabled = false;
-        sampleModeParams.lumusOscC.enabled = false;
+        sampleModeParams.lumenOscC.enabled = false;
         auto sampleModeSource = std::make_shared<beat::ImmutableMappedSampleSource>();
         auto sampleModeZone = std::make_shared<beat::ImmutableSampleSource>();
         auto sampleModeAudio = std::make_shared<juce::AudioBuffer<float>>(1, 4096);
@@ -20108,18 +22258,18 @@ namespace
         sampleModeZone->rootNote = 60;
         sampleModeSource->zones[0] = sampleModeZone;
         sampleModeSource->zoneCount = 1;
-        sampleModeParams.lumusSampleSlots[0].enabled = true;
-        sampleModeParams.lumusSampleSlots[0].source = sampleModeSource;
-        sampleModeParams.lumusSampleSlots[1].enabled = true;
-        sampleModeParams.lumusSampleSlots[1].source = sampleModeSource;
-        sampleModeParams.lumusSampleSlots[1].routing = 1;
-        sampleModeParams.lumusSampleSlots[2].enabled = true;
-        sampleModeParams.lumusSampleSlots[2].source = sampleModeSource;
-        sampleModeParams.lumusSampleSlots[2].routing = 3;
+        sampleModeParams.lumenSampleSlots[0].enabled = true;
+        sampleModeParams.lumenSampleSlots[0].source = sampleModeSource;
+        sampleModeParams.lumenSampleSlots[1].enabled = true;
+        sampleModeParams.lumenSampleSlots[1].source = sampleModeSource;
+        sampleModeParams.lumenSampleSlots[1].routing = 1;
+        sampleModeParams.lumenSampleSlots[2].enabled = true;
+        sampleModeParams.lumenSampleSlots[2].source = sampleModeSource;
+        sampleModeParams.lumenSampleSlots[2].routing = 3;
         const auto sampleModeOutput = render(sampleModeParams);
         auto granularModeParams = base;
         granularModeParams.aetherOscA.enabled = false;
-        granularModeParams.lumusOscC.enabled = false;
+        granularModeParams.lumenOscC.enabled = false;
         auto granularModeSource = std::make_shared<beat::ImmutableGranularSource>();
         granularModeSource->audio = std::make_shared<juce::AudioBuffer<float>>(*sampleModeAudio);
         granularModeSource->sourceSampleRate = 48000.0;
@@ -20130,16 +22280,26 @@ namespace
         granularModeSource->densityHz = 48.0f;
         granularModeSource->stereoSpread = 0.7f;
         granularModeSource->randomSeed = 0x12345678u;
-        for (size_t index = 0; index < granularModeParams.lumusGranularSlots.size(); ++index)
+        for (size_t index = 0; index < granularModeParams.lumenGranularSlots.size(); ++index)
         {
-            granularModeParams.lumusGranularSlots[index].enabled = true;
-            granularModeParams.lumusGranularSlots[index].source = granularModeSource;
-            granularModeParams.lumusGranularSlots[index].level = 0.25f;
-            granularModeParams.lumusGranularSlots[index].routing = (int) index + 1;
+            granularModeParams.lumenGranularSlots[index].enabled = true;
+            granularModeParams.lumenGranularSlots[index].source = granularModeSource;
+            granularModeParams.lumenGranularSlots[index].level = 0.25f;
+            granularModeParams.lumenGranularSlots[index].routing = (int) index + 1;
         }
         const auto granularModeOutput = render(granularModeParams);
+        auto untrackedLfoParams = withCParams;
+        untrackedLfoParams.lfoRateHz = 2.0f;
+        untrackedLfoParams.lfoDepth = 0.8f;
+        untrackedLfoParams.lfoToPitch = 0.45f;
+        const auto untrackedLfoOutput = renderAtNote(untrackedLfoParams, 72, nullptr);
+        auto keytrackedLfoParams = untrackedLfoParams;
+        keytrackedLfoParams.lfoKeytrackRate = 1.0f;
+        size_t keytrackedLfoViolations = 0;
+        const auto keytrackedLfoOutput = renderAtNote(keytrackedLfoParams, 72, &keytrackedLfoViolations);
         double difference = 0.0;
         double modulationDifference = 0.0;
+        double keytrackedLfoDifference = 0.0;
         double noneRoutedEnergy = 0.0;
         double sampleModeEnergy = 0.0;
         double granularModeEnergy = 0.0;
@@ -20154,6 +22314,10 @@ namespace
             difference += std::abs((double) right - withoutC.getSample(1, sample));
             modulationDifference += std::abs((double) left - modulatedC.getSample(0, sample));
             modulationDifference += std::abs((double) right - modulatedC.getSample(1, sample));
+            keytrackedLfoDifference += std::abs((double) untrackedLfoOutput.getSample(0, sample)
+                - keytrackedLfoOutput.getSample(0, sample));
+            keytrackedLfoDifference += std::abs((double) untrackedLfoOutput.getSample(1, sample)
+                - keytrackedLfoOutput.getSample(1, sample));
             noneRoutedEnergy += std::abs((double) noneRoutedC.getSample(0, sample));
             noneRoutedEnergy += std::abs((double) noneRoutedC.getSample(1, sample));
             sampleModeEnergy += std::abs((double) sampleModeOutput.getSample(0, sample));
@@ -20164,9 +22328,62 @@ namespace
             rightEnergy += (double) right * right;
         }
         return difference > 0.1 && modulationDifference > 0.1 && noneRoutedEnergy < 0.000001
+            && keytrackedLfoDifference > 0.1
+            && keytrackedLfoViolations == 0
             && sampleModeEnergy > 0.1
             && granularModeEnergy > 0.1
             && rightEnergy > leftEnergy * 1.02;
+    }
+
+    bool stressInstrumentVoicePreparedTopology()
+    {
+        const auto inspect = [](const beat::InstrumentVoice::Params& params)
+        {
+            beat::InstrumentVoice voice;
+            voice.prepare(48000.0, 256);
+            voice.setParams(params);
+            return std::array<int, 4> {
+                voice.preparedRenderKernelForTest(),
+                voice.preparedRouteLaneMaskForTest(),
+                voice.preparedLumenSampleCountForTest(),
+                voice.preparedLumenGranularCountForTest(),
+            };
+        };
+
+        beat::InstrumentVoice::Params legacy;
+        if (inspect(legacy) != std::array<int, 4> { 0, 1, 0, 0 }) return false;
+
+        auto aether = legacy;
+        aether.hasAether = true;
+        aether.aetherOscA.enabled = true;
+        aether.aetherOscA.routing = 2;
+        if (inspect(aether) != std::array<int, 4> { 1, 4, 0, 0 }) return false;
+
+        auto lumen = aether;
+        lumen.hasLumen = true;
+        lumen.aetherOscA.routing = 0;
+        lumen.lumenOscC.enabled = true;
+        lumen.lumenOscC.routing = 1;
+        const auto sample = std::make_shared<beat::ImmutableMappedSampleSource>();
+        lumen.lumenSampleSlots[0].enabled = true;
+        lumen.lumenSampleSlots[0].source = sample;
+        lumen.lumenSampleSlots[0].routing = 2;
+        lumen.lumenSampleSlots[2].enabled = true;
+        lumen.lumenSampleSlots[2].source = sample;
+        lumen.lumenSampleSlots[2].routing = 3;
+        const auto granular = std::make_shared<beat::ImmutableGranularSource>();
+        lumen.lumenGranularSlots[1].enabled = true;
+        lumen.lumenGranularSlots[1].source = granular;
+        lumen.lumenGranularSlots[1].routing = 3;
+        if (inspect(lumen) != std::array<int, 4> { 2, 15, 2, 1 }) return false;
+
+        auto aurum = legacy;
+        aurum.hasAurum = true;
+        aurum.hasAether = true;
+        aurum.hasLumen = true;
+        if (inspect(aurum) != std::array<int, 4> { 3, 1, 0, 0 }) return false;
+
+        return true;
     }
 
     bool stressInstrumentVoiceAetherPolyphony()
@@ -20631,9 +22848,125 @@ namespace
 
 int main(int argc, char** argv)
 {
+    if (argc == 2 && juce::String(argv[1]) == "--note-automation")
+    {
+        if (!stressInstrumentVoiceLiveBaselineVsNoteAutomation()
+            || !stressInstrumentVoicePerNoteAutomation()
+            || !stressInstrumentVoiceMacroAutomation()
+            || !stressInstrumentVoicePerNotePitchCurve()
+            || !stressInstrumentVoicePerNotePhaseAutomation())
+        {
+            std::cerr << "Per-note automation focused stress failed\n";
+            return 1;
+        }
+        std::cout << "Per-note automation focused stress passed\n";
+        return 0;
+    }
+
+    if (argc == 2 && juce::String(argv[1]) == "--offline-export")
+    {
+        if (!stressAudioEngineOfflineExport()
+            || !stressAudioEngineOfflineExportProgressAndCancel()
+            || !stressAudioEngineOfflineRangeExport())
+        {
+            std::cerr << "Offline export focused stress failed\n";
+            return 1;
+        }
+        std::cout << "Offline export focused stress passed\n";
+        return 0;
+    }
+
+    if (argc == 2 && juce::String(argv[1]) == "--project-file-layout")
+    {
+        if (!stressProjectAssetSidecarPackaging() || !stressProjectDocumentBackup())
+        {
+            std::cerr << "Project folder layout focused stress failed\n";
+            return 1;
+        }
+        std::cout << "Project folder layout focused stress passed\n";
+        return 0;
+    }
+
+    if (argc == 2 && juce::String(argv[1]) == "--diagnostic-log")
+    {
+        if (!stressDiagnosticLogTail())
+        {
+            std::cerr << "Diagnostic log tail focused stress failed\n";
+            return 1;
+        }
+        std::cout << "Diagnostic log tail focused stress passed\n";
+        return 0;
+    }
+
+    if (argc == 2 && juce::String(argv[1]) == "--deadline-recovery")
+    {
+        if (!stressRealtimeDeadlineRecovery())
+        {
+            std::cerr << "Realtime deadline recovery focused stress failed\n";
+            return 1;
+        }
+        std::cout << "Realtime deadline recovery focused stress passed\n";
+        return 0;
+    }
+
+    if (argc == 2 && juce::String(argv[1]) == "--midi-preview")
+    {
+        if (!stressAudioEngineMidiEditorPreview()
+            || !stressAudioEngineMidiPreviewLifecycleCleanup()
+            || !stressAudioEngineLumenMidiPreviewParity())
+        {
+            std::cerr << "MIDI editor native preview focused stress failed\n";
+            return 1;
+        }
+        std::cout << "MIDI editor native preview focused stress passed\n";
+        return 0;
+    }
+
+    if (argc == 2 && juce::String(argv[1]) == "--editor-preview")
+    {
+        if (!stressAudioEngineMidiEditorPreview()
+            || !stressAudioEngineMidiPreviewLifecycleCleanup()
+            || !stressAudioEngineLumenMidiPreviewParity()
+            || !stressAudioEngineMidiEditorDetailedParity()
+            || !stressAudioEngineAudioSegmentPreviewParity())
+        {
+            std::cerr << "Editor native preview focused stress failed\n";
+            return 1;
+        }
+        std::cout << "Editor native preview focused stress passed\n";
+        return 0;
+    }
+
+    if (argc == 2 && juce::String(argv[1]) == "--hot-loop-audit")
+    {
+        beat::test::prepareRealtimeSafetyInterposers();
+        const bool ok = stressLfoHelper()
+            && stressNodemapRealtimeRenderer()
+            && stressAetherSampleSourceSlot()
+            && stressGranularSourceSlot()
+            && stressAudioEngineAetherRuntimeWarp()
+            && stressAudioEngineCompressorEffect()
+            && stressAudioEngineMasterChainCompressor()
+            && stressAudioEngineMasterChainBlockContinuity()
+            && stressAudioEngineAetherSourceSendBuses()
+            && stressInstrumentVoiceDualFilters()
+            && stressAudioEngineAurumRealtimeLoadGate();
+        if (!ok)
+        {
+            std::cerr << "Hot-loop audit focused stress failed\n";
+            return 1;
+        }
+        std::cout << "Hot-loop audit focused stress passed\n";
+        return 0;
+    }
+
     if (argc == 2 && juce::String(argv[1]) == "--aurum")
     {
-        const bool ok = stressInstrumentVoiceAurumBipolarMatrix()
+        const bool ok = stressAurumModulationContract()
+            && stressInstrumentVoiceAurumIdleVoiceGate()
+            && stressInstrumentVoiceAurumBipolarMatrix()
+            && stressInstrumentVoiceAurumPitchBendRange()
+            && stressAudioEngineAurumPitchBendTelemetry()
             && stressInstrumentVoiceAurumOperatorRelease()
             && stressInstrumentVoiceAurumRingMatrix()
             && stressInstrumentVoiceAurumAdditiveOperator()
@@ -20643,6 +22976,7 @@ int main(int argc, char** argv)
             && stressInstrumentVoiceAurumDualFilters()
             && stressInstrumentVoiceAurumOversamplingQuality()
             && stressInstrumentVoiceAurumDenseFeedbackStability()
+            && stressAudioEngineAurumRealtimeLoadGate()
             && stressAudioEngineAurumCrossRateLiveExportParity()
             && stressProjectRepositoryAurumInstrumentRoundtrip();
         if (!ok)
@@ -20682,22 +23016,85 @@ int main(int argc, char** argv)
         return 0;
     }
 
-    if (argc == 2 && juce::String(argv[1]) == "--lumus-arpeggiator")
+    if (argc == 2 && juce::String(argv[1]) == "--lumen-arpeggiator")
     {
         beat::test::prepareRealtimeSafetyInterposers();
-        const bool ok = stressLumusArpeggiator() && stressLumusClipSequencer()
-            && stressAudioEngineLumusArpeggiator() && stressAudioEngineLumusClipSequencer()
-            && stressProjectRepositoryLumusMvpRoundtrip();
+        const bool ok = stressLumenArpeggiator() && stressLumenClipSequencer()
+            && stressAudioEngineLumenArpeggiator() && stressAudioEngineLumenClipSequencer()
+            && stressAudioEngineLumenMidiPreviewParity()
+            && stressProjectRepositoryLumenMvpRoundtrip();
         if (!ok)
         {
-            std::cerr << "Lumus arpeggiator focused stress failed\n";
+            std::cerr << "Lumen arpeggiator focused stress failed\n";
             return 1;
         }
-        std::cout << "Lumus arpeggiator focused stress passed\n";
+        std::cout << "Lumen arpeggiator focused stress passed\n";
+        return 0;
+    }
+
+    if (argc == 2 && juce::String(argv[1]) == "--lumen-v2")
+    {
+        beat::test::prepareRealtimeSafetyInterposers();
+        const bool ok = stressSynthPatchContract()
+            && stressAetherInteractionSpectralBaseline()
+            && stressAetherTableStackRenderer()
+            && stressWavetableOscillator()
+            && stressLumenSimdWavetableUnison()
+            && stressInstrumentVoiceWavetablePath()
+            && stressInstrumentVoicePreparedTopology()
+            && stressInstrumentVoiceLumenThreeSlotRack()
+            && stressAudioEngineAetherRuntimeWarp()
+            && stressAudioEngineMaxUnisonAetherPolyphony()
+            && stressAudioEngineDenseAetherLiveExportParity()
+            && stressAudioEngineAetherDeterministicNullExport()
+            && stressAudioEngineMaxUnisonAetherDeterministicNullExport()
+            && stressAudioEngineRuntimeWarpAetherDeterministicNullExport()
+            && stressProjectRepositoryLumenMvpRoundtrip();
+        if (!ok)
+        {
+            std::cerr << "Lumen V2 focused stress failed\n";
+            return 1;
+        }
+        std::cout << "Lumen V2 focused stress passed\n";
         return 0;
     }
 
     beat::test::prepareRealtimeSafetyInterposers();
+    if (!stressDiagnosticLogTail())
+    {
+        std::cerr << "Diagnostic log tail stress failed\n";
+        return 1;
+    }
+    if (!stressRealtimeDeadlineRecovery())
+    {
+        std::cerr << "Realtime deadline recovery stress failed\n";
+        return 1;
+    }
+    if (!stressAudioEngineMidiEditorPreview())
+    {
+        std::cerr << "MIDI editor native preview stress failed\n";
+        return 1;
+    }
+    if (!stressAudioEngineMidiPreviewLifecycleCleanup())
+    {
+        std::cerr << "MIDI editor native preview lifecycle cleanup stress failed\n";
+        return 1;
+    }
+    if (!stressAudioEngineLumenMidiPreviewParity())
+    {
+        std::cerr << "Lumen MIDI editor native preview parity stress failed\n";
+        return 1;
+    }
+    if (!stressAudioEngineMidiEditorDetailedParity())
+    {
+        std::cerr << "Detailed MIDI editor/global preview parity stress failed\n";
+        return 1;
+    }
+    if (!stressAudioEngineAudioSegmentPreviewParity())
+    {
+        std::cerr << "Audio segment editor/global preview parity stress failed\n";
+        return 1;
+    }
     if (!stressRealtimeSafetyDetectorNegativeCases())
     {
         std::cerr << "Realtime safety detector negative-case stress failed\n";
@@ -20767,6 +23164,11 @@ int main(int argc, char** argv)
         std::cerr << "Nodemap native large graph timing stress failed\n";
         return 1;
     }
+    if (!stressNodemapRealtimeRenderer())
+    {
+        std::cerr << "Nodemap realtime renderer stress failed\n";
+        return 1;
+    }
     if (!stressProjectRepositoryNodemapInstrumentRoundtrip())
     {
         std::cerr << "Nodemap repository roundtrip stress failed\n";
@@ -20785,6 +23187,11 @@ int main(int argc, char** argv)
         std::cerr << "Wavetable oscillator stress failed\n";
         return 1;
     }
+    if (!stressLumenSimdWavetableUnison())
+    {
+        std::cerr << "Lumen SIMD wavetable-unison stress failed\n";
+        return 1;
+    }
     if (!stressOscillatorSampleRatePreparation())
     {
         std::cerr << "Oscillator sample-rate preparation stress failed\n";
@@ -20798,24 +23205,29 @@ int main(int argc, char** argv)
         std::cerr << "Synth patch contract stress failed\n";
         return 1;
     }
-    if (!stressLumusArpeggiator())
+    if (!stressAurumModulationContract())
     {
-        std::cerr << "Lumus arpeggiator stress failed\n";
+        std::cerr << "Aurum modulation contract stress failed\n";
         return 1;
     }
-    if (!stressLumusClipSequencer())
+    if (!stressLumenArpeggiator())
     {
-        std::cerr << "Lumus clip sequencer stress failed\n";
+        std::cerr << "Lumen arpeggiator stress failed\n";
         return 1;
     }
-    if (!stressAudioEngineLumusArpeggiator())
+    if (!stressLumenClipSequencer())
     {
-        std::cerr << "Audio engine Lumus arpeggiator stress failed\n";
+        std::cerr << "Lumen clip sequencer stress failed\n";
         return 1;
     }
-    if (!stressAudioEngineLumusClipSequencer())
+    if (!stressAudioEngineLumenArpeggiator())
     {
-        std::cerr << "Audio engine Lumus clip sequencer stress failed\n";
+        std::cerr << "Audio engine Lumen arpeggiator stress failed\n";
+        return 1;
+    }
+    if (!stressAudioEngineLumenClipSequencer())
+    {
+        std::cerr << "Audio engine Lumen clip sequencer stress failed\n";
         return 1;
     }
     std::cerr << "synth contract: done\n";
@@ -20916,6 +23328,11 @@ int main(int argc, char** argv)
         std::cerr << "Instrument voice Aurum bipolar matrix stress failed\n";
         return 1;
     }
+    if (!stressInstrumentVoiceAurumIdleVoiceGate())
+    {
+        std::cerr << "Instrument voice Aurum idle voice gate stress failed\n";
+        return 1;
+    }
     if (!stressInstrumentVoiceAurumOperatorRelease())
     {
         std::cerr << "Instrument voice Aurum operator release stress failed\n";
@@ -20981,9 +23398,14 @@ int main(int argc, char** argv)
         std::cerr << "Instrument voice Aether stress failed\n";
         return 1;
     }
-    if (!stressInstrumentVoiceLumusThreeSlotRack())
+    if (!stressInstrumentVoiceLumenThreeSlotRack())
     {
-        std::cerr << "Instrument voice Lumus three-slot rack stress failed\n";
+        std::cerr << "Instrument voice Lumen three-slot rack stress failed\n";
+        return 1;
+    }
+    if (!stressInstrumentVoicePreparedTopology())
+    {
+        std::cerr << "Instrument voice prepared topology stress failed\n";
         return 1;
     }
     if (!stressInstrumentVoiceAetherPolyphony())
@@ -21155,9 +23577,9 @@ int main(int argc, char** argv)
         std::cerr << "Project repository Aether instrument roundtrip stress failed\n";
         return 1;
     }
-    if (!stressProjectRepositoryLumusMvpRoundtrip())
+    if (!stressProjectRepositoryLumenMvpRoundtrip())
     {
-        std::cerr << "Project repository Lumus MVP roundtrip stress failed\n";
+        std::cerr << "Project repository Lumen MVP roundtrip stress failed\n";
         return 1;
     }
     if (!stressHybridSourceMigrationAndCleanupSafety())

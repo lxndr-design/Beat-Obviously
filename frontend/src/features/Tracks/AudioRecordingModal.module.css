@@ -1,6 +1,39 @@
 .recorder {
   display: grid;
-  gap: 12px;
+  gap: 9px;
+}
+
+.inputSection,
+.takesSection {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  padding: 6px;
+  border: var(--border-fg);
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 9px;
+  min-width: 0;
+  color: var(--color-fg);
+  font-size: var(--font-size-ui);
+  font-weight: var(--font-weight-bold);
+  text-transform: uppercase;
+}
+
+.sectionHeader > :last-child {
+  color: color-mix(in srgb, var(--color-fg) 62%, transparent);
+  font-weight: var(--font-weight-medium);
+}
+
+.deviceHint {
+  margin: 0;
+  color: color-mix(in srgb, var(--color-fg) 62%, transparent);
+  font-size: var(--font-size-ui);
+  line-height: 1.3;
 }
 
 .transportRow {
@@ -13,6 +46,16 @@
   color: color-mix(in srgb, var(--color-fg) 62%, transparent);
   font-family: var(--font-family-mono);
   font-size: var(--font-size-ui);
+}
+
+.recordingError {
+  border: var(--border-fg);
+  padding: 8px 10px;
+  color: var(--color-fg);
+  background: var(--surface-subtle);
+  box-shadow: inset 3px 0 0 var(--color-fg);
+  font-size: var(--font-size-ui);
+  line-height: 1.35;
 }
 
 .waveformStage {
@@ -60,8 +103,93 @@
   gap: 9px;
 }
 
+.emptyTakes {
+  display: flex;
+  align-items: center;
+  min-height: 42px;
+  padding: 6px;
+  border-top: var(--border-soft);
+  color: color-mix(in srgb, var(--color-fg) 62%, transparent);
+  font-size: var(--font-size-ui);
+}
+
+.takeList {
+  display: grid;
+  min-width: 0;
+  border-top: var(--border-soft);
+}
+
+.takeRow {
+  display: grid;
+  grid-template-columns: 21px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  min-height: 45px;
+  padding: 6px;
+  border-bottom: var(--border-soft);
+  transition: var(--interaction-transition);
+}
+
+.takeRow:last-child {
+  border-bottom: 0;
+}
+
+.takeRow:hover {
+  background: var(--interaction-hover-bg);
+}
+
+.takeRowDisabled {
+  color: color-mix(in srgb, var(--color-fg) 45%, transparent);
+}
+
+.takeIdentity,
+.takeMeta {
+  display: flex;
+  min-width: 0;
+}
+
+.takeIdentity {
+  flex-direction: column;
+  gap: 3px;
+}
+
+.takeIdentity strong,
+.takeIdentity span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.takeIdentity strong {
+  font-size: var(--font-size-ui);
+  font-weight: var(--font-weight-medium);
+}
+
+.takeIdentity span,
+.takeMeta {
+  color: color-mix(in srgb, currentColor 62%, transparent);
+  font-size: var(--font-size-ui);
+}
+
+.takeMeta {
+  align-items: flex-end;
+  flex-direction: column;
+  gap: 3px;
+  white-space: nowrap;
+}
+
 @media (max-width: 720px) {
   .cropGrid {
     grid-template-columns: 1fr;
+  }
+
+  .takeRow {
+    grid-template-columns: 21px minmax(0, 1fr);
+  }
+
+  .takeMeta {
+    grid-column: 2;
+    align-items: flex-start;
   }
 }

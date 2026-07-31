@@ -38,7 +38,7 @@
   min-width: 0;
   min-height: 27px;
   cursor: ew-resize;
-  touch-action: none;
+  touch-action: pan-y;
 }
 
 .input {
@@ -64,7 +64,7 @@
   background-size: calc(100% - var(--slider-thumb-hit-width)) var(--slider-track-height);
   cursor: ew-resize;
   pointer-events: auto;
-  touch-action: none;
+  touch-action: pan-y;
   user-select: none;
 }
 

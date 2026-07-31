@@ -126,6 +126,23 @@ try {
     ],
     "segment Aether automation lanes should survive document migration",
   );
+  assert.deepEqual(
+    {
+      group: migrated.project.tracks[0].segments[1].recordingGroupId,
+      take: migrated.project.tracks[0].segments[1].recordingTakeNumber,
+      recordedAt: migrated.project.tracks[0].segments[1].recordedAt,
+      inputId: migrated.project.tracks[0].segments[1].recordingInputDeviceId,
+      inputName: migrated.project.tracks[0].segments[1].recordingInputDeviceName,
+    },
+    {
+      group: "live-record-group",
+      take: 1,
+      recordedAt: 1780600001000,
+      inputId: "coreaudio::builtin",
+      inputName: "Built-in Microphone",
+    },
+    "Live Record take ownership and input provenance should survive document migration",
+  );
   assert.equal(migrated.instruments?.[0].source?.pluginId, "plug-decent-kit");
   assert.equal(migrated.instruments?.[0].sampleMap?.[0].loopEnabled, true);
   assert.equal(migrated.instruments?.[0].sampleMap?.[0].durationSeconds, 0.42);
@@ -548,6 +565,11 @@ function makeRepresentativeDocument() {
               fadeOutBeats: 0,
               repeats: 0,
               layer: 0,
+              recordingGroupId: "live-record-group",
+              recordingTakeNumber: 1,
+              recordedAt: 1780600001000,
+              recordingInputDeviceId: "coreaudio::builtin",
+              recordingInputDeviceName: "Built-in Microphone",
               payload: {
                 kind: "audio",
                 audioFileId: "audio-kick",

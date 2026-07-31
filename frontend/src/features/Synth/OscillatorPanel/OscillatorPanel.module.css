@@ -514,7 +514,7 @@
 
 .wavemapToolbar {
   display: grid;
-  grid-template-columns: max-content max-content max-content 1fr max-content;
+  grid-template-columns: max-content max-content 1fr max-content;
   align-items: center;
   column-gap: 33px;
   min-width: 0;
@@ -620,10 +620,25 @@
 }
 
 .analysisToggleButton {
-  grid-column: 5;
+  grid-column: 4;
   justify-self: end;
   align-self: center;
   margin-left: auto;
+}
+
+.resynthesisBar {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) max-content auto max-content;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 6px;
+  border-top: var(--border-soft);
+  border-bottom: var(--border-soft);
+}
+
+.resynthesisBar > button {
+  justify-self: end;
 }
 
 .analysisModes {

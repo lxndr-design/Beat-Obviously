@@ -291,7 +291,10 @@ namespace beat
         {
             if (kind == "plugin")
                 return "plugin";
-            return path.startsWith("/samples/") || path.contains(" Assets/sfz/")
+            return path.startsWith("/samples/")
+                || path.contains(" Assets/sfz/")
+                || path.contains("/Assets/sfz/")
+                || path.startsWith("Assets/sfz/")
                 ? "bundled" : "external";
         }
 
@@ -450,8 +453,35 @@ namespace beat
         }
     }
 
+    bool projectUsesFolderLayout(const juce::File& projectFile)
+    {
+        if (projectFile == juce::File())
+            return false;
+
+        const auto container = projectFile.getParentDirectory();
+        return container.getFileName().equalsIgnoreCase(projectFile.getFileNameWithoutExtension())
+            || container.getChildFile("Assets").isDirectory()
+            || container.getChildFile("Backups").isDirectory();
+    }
+
+    juce::File encapsulatedProjectFileFor(const juce::File& selectedFile)
+    {
+        if (selectedFile == juce::File())
+            return {};
+
+        const auto file = selectedFile.hasFileExtension(".beat")
+            ? selectedFile
+            : selectedFile.withFileExtension(".beat");
+        const auto title = file.getFileNameWithoutExtension();
+        if (file.getParentDirectory().getFileName().equalsIgnoreCase(title))
+            return file;
+        return file.getParentDirectory().getChildFile(title).getChildFile(file.getFileName());
+    }
+
     juce::File projectSidecarFolderFor(const juce::File& projectFile)
     {
+        if (projectUsesFolderLayout(projectFile))
+            return projectFile.getParentDirectory().getChildFile("Assets");
         return projectFile.getSiblingFile(projectFile.getFileNameWithoutExtension() + " Assets");
     }
 
@@ -490,6 +520,33 @@ namespace beat
                 documentObject->setProperty("assets", assetsVar);
             }
         }
+    }
+
+    void relocateDocumentSidecarPaths(juce::var& document,
+                                      const juce::File& sourceProjectFile,
+                                      const juce::File& destinationProjectFile)
+    {
+        const auto sourceSidecar = projectSidecarFolderFor(sourceProjectFile);
+        const auto destinationSidecar = projectSidecarFolderFor(destinationProjectFile);
+        if (!sourceSidecar.isDirectory())
+            return;
+
+        juce::Array<juce::File> sourceFiles;
+        sourceSidecar.findChildFiles(sourceFiles, juce::File::findFiles, true);
+        juce::StringPairArray rewrites;
+        for (const auto& sourceFile : sourceFiles)
+        {
+            const auto relativeInsideSidecar = sourceFile.getRelativePathFrom(sourceSidecar);
+            const auto destinationFile = destinationSidecar.getChildFile(relativeInsideSidecar);
+            const auto destinationPath = pathRelativeToProject(destinationProjectFile, destinationFile);
+            const auto sourceRelative = sourceFile.getRelativePathFrom(sourceProjectFile.getParentDirectory());
+            rewrites.set(sourceFile.getFullPathName(), destinationPath);
+            rewrites.set(sourceRelative, destinationPath);
+            rewrites.set("./" + sourceRelative, destinationPath);
+        }
+
+        if (rewrites.size() > 0)
+            rewriteDocumentAssetPaths(document, rewrites);
     }
 
     juce::var buildDocumentAssetManifest(const juce::var& document)

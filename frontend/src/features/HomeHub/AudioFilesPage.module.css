@@ -1,7 +1,13 @@
+.audioBrowser.audioBrowser {
+  grid-template-rows: 39px minmax(0, 1fr);
+}
+
 .browserControls {
-  display: grid;
-  grid-template-rows: 33px 33px;
+  display: flex;
+  align-items: center;
+  gap: 3px;
   min-height: 0;
+  padding: 0 6px;
   border-bottom: var(--border-fg);
 }
 
@@ -9,34 +15,47 @@
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 6px;
+  flex: 0 0 auto;
+  gap: 3px;
   min-width: 0;
-  padding: 0 6px;
-  border-bottom: var(--border-soft);
+  margin-left: 3px;
+  padding-left: 3px;
+  border-left: var(--border-soft);
 }
 
 .searchField {
   display: flex;
   align-items: center;
-  gap: 6px;
-  min-width: 0;
-  padding: 0 6px;
+  flex: 1 1 auto;
+  gap: 3px;
+  min-width: 144px;
+  height: 27px;
+  padding-left: 3px;
+  border: var(--border-fg);
   color: var(--color-fg-hover);
+  overflow: hidden;
 }
 
-.searchField input {
-  width: 100%;
+.searchInput {
   min-width: 0;
-  height: 24px;
+  height: 100%;
+  min-height: 0;
+  padding: 0 3px;
   border: 0;
-  outline: 0;
   background: transparent;
-  color: var(--color-fg);
-  font: inherit;
 }
 
-.searchField input::placeholder {
+.statusFilter {
+  flex: 0 0 120px;
+  height: 27px;
+}
+
+.searchCount {
+  flex: 0 0 auto;
+  min-width: 48px;
   color: var(--color-fg-hover);
+  font-size: var(--font-size-ui);
+  text-align: right;
 }
 
 .selectionCount {
@@ -46,7 +65,7 @@
 
 .table {
   display: grid;
-  grid-template-rows: 27px 1fr;
+  grid-template-rows: 33px minmax(0, 1fr) 33px;
   min-height: 0;
 }
 
@@ -119,6 +138,35 @@
 .rows {
   min-height: 0;
   overflow: auto;
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  min-width: 0;
+  padding: 0 6px;
+  border-top: var(--border-fg);
+  color: var(--color-fg-hover);
+  font-size: var(--font-size-ui);
+}
+
+.pageRange,
+.pageLabel {
+  white-space: nowrap;
+}
+
+.pageButtons {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.pageLabel {
+  min-width: 72px;
+  color: var(--color-fg);
+  text-align: center;
 }
 
 .row {
@@ -263,13 +311,15 @@
 }
 
 .waveformDbTop {
-  top: 6px;
-  left: 6px;
+  top: 25%;
+  left: 14px;
+  transform: translateY(-50%);
 }
 
 .waveformDbBottom {
-  bottom: 6px;
-  left: 6px;
+  top: 75%;
+  left: 14px;
+  transform: translateY(-50%);
 }
 
 .waveformLeftTick {
@@ -291,13 +341,15 @@
 }
 
 .waveformChannelLeft {
-  top: 6px;
+  top: 25%;
   right: 6px;
+  transform: translateY(-50%);
 }
 
 .waveformChannelRight {
+  top: 75%;
   right: 6px;
-  bottom: 6px;
+  transform: translateY(-50%);
 }
 
 .waveformLine {

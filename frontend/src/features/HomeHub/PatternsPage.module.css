@@ -1,3 +1,51 @@
+.browserBody {
+  display: grid;
+  grid-template-rows: 33px minmax(0, 1fr);
+  min-height: 0;
+}
+
+.browserControls {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+  padding: 0 6px;
+  border-bottom: var(--border-fg);
+}
+
+.searchWrap {
+  display: flex;
+  align-items: center;
+  flex: 1 1 180px;
+  min-width: 120px;
+  height: var(--button-square-sm);
+  padding-left: 3px;
+  border: var(--border-fg);
+  overflow: hidden;
+}
+
+.searchInput {
+  min-width: 0;
+  height: 100%;
+  min-height: 0;
+  padding: 0 3px;
+  border: 0;
+  background: transparent;
+}
+
+.toolbarSelect {
+  flex: 0 1 105px;
+  min-width: 78px;
+}
+
+.resultCount {
+  flex: 0 0 auto;
+  min-width: 24px;
+  color: var(--color-fg-hover);
+  font-size: var(--font-size-ui);
+  text-align: right;
+}
+
 .table {
   display: grid;
   grid-template-rows: 27px 1fr;

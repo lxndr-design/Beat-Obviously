@@ -5,7 +5,7 @@ import { appAlert, Button } from "../../solid-ui";
 import { isSupportedAudioFileName, SUPPORTED_AUDIO_IMPORT_LABEL } from "../../audio/audioFormats";
 import { importAudioFile } from "../../audio/audioImport";
 import { createAurumInstrument } from "../../state/aurum";
-import { createDefaultLumusDraft, createDefaultSynthDraft, synthDraftToInstrumentPatch } from "../../state/synthStore";
+import { createDefaultLumenDraft, createDefaultSynthDraft, synthDraftToInstrumentPatch } from "../../state/synthStore";
 import {
   useAudioFileStore,
   useInstrumentStore,
@@ -47,7 +47,7 @@ import type { DrumRow, Id, Instrument, Segment as SegmentModel, Track } from "..
 interface Props {
   trackId: Id;
   selected?: boolean;
-  onRequestAudioRecording?: (request: { trackId: Id; startBeat: number }) => void;
+  onRequestAudioRecording?: (request: { trackId: Id; startBeat: number; recordingGroupId: Id }) => void;
 }
 
 export function TrackLane(props: Props) {
@@ -86,13 +86,13 @@ export function TrackLane(props: Props) {
       useUiStore.getState().setSelectedSegments([segmentId]);
       openSegmentEditor(segmentId, { discardIfUntouched: true });
     };
-    const addEngineSegment = (engine: "aether" | "aurum" | "lumus") => {
-      const label = engine === "aether" ? "Aether" : engine === "aurum" ? "Aurum" : "Lumus";
+    const addEngineSegment = (engine: "aether" | "aurum" | "lumen") => {
+      const label = engine === "aether" ? "Aether" : engine === "aurum" ? "Aurum" : "Lumen";
       const instrumentStore = useInstrumentStore.getState();
       const instrumentId = engine === "aurum"
         ? instrumentStore.addInstrument(createAurumInstrument(nano(), `${label} Segment Instrument`))
         : instrumentStore.addInstrument({
-            ...synthDraftToInstrumentPatch(engine === "lumus" ? createDefaultLumusDraft() : createDefaultSynthDraft()),
+            ...synthDraftToInstrumentPatch(engine === "lumen" ? createDefaultLumenDraft() : createDefaultSynthDraft()),
             name: `${label} Segment Instrument`,
             userCreated: true,
           });
@@ -138,9 +138,9 @@ export function TrackLane(props: Props) {
         onSelect: () => addEngineSegment("aurum"),
       },
       {
-        label: "Create Lumus Segment",
+        label: "Create Lumen Segment",
         icon: "ph:sparkle",
-        onSelect: () => addEngineSegment("lumus"),
+        onSelect: () => addEngineSegment("lumen"),
       },
       {
         label: "Drum Sequencer",
@@ -215,7 +215,7 @@ export function TrackLane(props: Props) {
         label: "Live Record",
         icon: "ph:record-fill",
         onSelect: () => {
-          props.onRequestAudioRecording?.({ trackId: props.trackId, startBeat: lastClickBeat });
+          props.onRequestAudioRecording?.({ trackId: props.trackId, startBeat: lastClickBeat, recordingGroupId: nano() });
         },
       },
     ];
@@ -301,7 +301,6 @@ export function TrackLane(props: Props) {
           name: component.name || nextSegmentName(tracks(), "midi"),
           startBeat,
           lengthBeats: component.lengthBeats,
-          instrumentId: component.instrumentId,
           payload: { kind: "midi", notes: structuredClone(component.notes) },
         });
       }
@@ -543,9 +542,16 @@ export function TrackLane(props: Props) {
                     startBeat={occurrence.startBeat}
                     lengthBeats={occurrence.lengthBeats}
                     repetition={occurrence.repetition}
+                    totalPlays={segment().repeats + 1}
                     layer={segment().layer}
                     payloadKind={segment().payload.kind}
-                    onEdit={() => openSegmentEditor(occurrence.segmentId)}
+                    onEdit={() => segment().recordingGroupId
+                      ? props.onRequestAudioRecording?.({
+                          trackId: props.trackId,
+                          startBeat: segment().startBeat,
+                          recordingGroupId: segment().recordingGroupId!,
+                        })
+                      : openSegmentEditor(occurrence.segmentId)}
                   />
                 )}
               </Show>
@@ -593,7 +599,7 @@ function nextSegmentName(tracks: Track[], kind: "midi" | "audio" | "drum" | "dru
   return `${stem} ${next}`;
 }
 
-function nextEngineSegmentName(tracks: Track[], engine: "Aether" | "Aurum" | "Lumus"): string {
+function nextEngineSegmentName(tracks: Track[], engine: "Aether" | "Aurum" | "Lumen"): string {
   const stem = `${engine} Segment`;
   const used = new Set<number>();
   for (const segment of tracks.flatMap((track) => track.segments)) {

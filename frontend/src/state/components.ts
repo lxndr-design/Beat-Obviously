@@ -7,8 +7,9 @@ import type { DrumRow, DrumSpeed, DrumStep, Id, Instrument, MidiNote, TimeSignat
  * MidiComponent — a reusable MIDI pattern saved from a segment.
  *
  * Components live in the sidebar's "Components" section and can be dragged
- * onto track lanes to spawn a new MIDI segment with the same notes
- * (optionally pre-bound to an instrument).
+ * onto track lanes to spawn a new MIDI segment with the same notes and
+ * expression. MIDI components are portable performance data and never own an
+ * instrument selection.
  */
 export interface MidiComponent {
   id: Id;
@@ -16,7 +17,7 @@ export interface MidiComponent {
   name: string;
   notes: MidiNote[];
   lengthBeats: number;
-  /** Optional bound instrument carried from the source segment. */
+  /** Legacy field accepted during hydration; normalized patterns discard it. */
   instrumentId?: Id;
   /** Creation timestamp (ms since epoch). */
   createdAt: number;
@@ -82,14 +83,25 @@ export const useComponentStore = create<ComponentSlice>()(
     add: (c) => {
       const id = nanoid();
       set((s) => {
+        if (c.kind === "drum") {
+          s.components.unshift({
+            id,
+            createdAt: Date.now(),
+            folderId: USER_COMPONENT_FOLDER_ID,
+            ...c,
+            rows: structuredClone(c.rows),
+          });
+          return;
+        }
+        const midi = { ...(c as Omit<MidiComponent, "id" | "createdAt">) };
+        delete midi.instrumentId;
         s.components.unshift({
           id,
           createdAt: Date.now(),
           folderId: USER_COMPONENT_FOLDER_ID,
-          ...c,
-          ...(c.kind === "drum"
-            ? { rows: structuredClone(c.rows) }
-            : { notes: structuredClone(c.notes) }),
+          ...midi,
+          kind: "midi",
+          notes: normalizeMidiPatternNotes(midi.notes),
         });
       });
       return id;
@@ -129,8 +141,9 @@ export const useComponentStore = create<ComponentSlice>()(
         const next = {
           ...(current as MidiComponent),
           ...(patch as Partial<MidiComponent>),
-          notes: structuredClone((patch as Partial<MidiComponent>).notes ?? (current as MidiComponent).notes),
+          notes: normalizeMidiPatternNotes((patch as Partial<MidiComponent>).notes ?? (current as MidiComponent).notes),
         };
+        delete next.instrumentId;
         s.components[index] = next;
       }),
     remove: (id) =>
@@ -185,7 +198,21 @@ function normalizeComponentFolder(component: BeatComponent): BeatComponent {
   if (component.kind === "drum") {
     return { ...component, folderId: component.folderId ?? USER_COMPONENT_FOLDER_ID };
   }
-  return { ...component, kind: "midi", folderId: component.folderId ?? USER_COMPONENT_FOLDER_ID };
+  const normalized = { ...component, kind: "midi" as const, folderId: component.folderId ?? USER_COMPONENT_FOLDER_ID };
+  delete normalized.instrumentId;
+  normalized.notes = normalizeMidiPatternNotes(component.notes);
+  return normalized;
+}
+
+export function normalizeMidiPatternNotes(notes: MidiNote[]): MidiNote[] {
+  return notes.map((note) => {
+    const portable = structuredClone(note);
+    delete portable.frequencyHz;
+    delete portable.sampleZoneId;
+    delete portable.samplePath;
+    delete portable.sampleLabel;
+    return portable;
+  });
 }
 
 function makeFactoryDrumLoops(instruments: Instrument[]): DrumComponent[] {

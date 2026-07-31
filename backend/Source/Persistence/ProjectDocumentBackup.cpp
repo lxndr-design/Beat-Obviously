@@ -1,5 +1,6 @@
 #include "ProjectDocumentBackup.h"
 
+#include "ProjectAssetPackage.h"
 #include "ProjectIntegrityVerifier.h"
 
 #include <algorithm>
@@ -73,6 +74,8 @@ namespace beat
 
     juce::File projectBackupFolderFor(const juce::File& projectFile)
     {
+        if (projectUsesFolderLayout(projectFile))
+            return projectFile.getParentDirectory().getChildFile("Backups");
         return projectFile.getSiblingFile(safeProjectBackupName(projectFile) + " Backups");
     }
 

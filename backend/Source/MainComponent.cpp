@@ -197,6 +197,12 @@ MainComponent::MainComponent()
     // The bridge wires native JS handlers to engine/database operations and
     // pumps inbound events back to JS.
     bridge = std::make_unique<beat::MessageBridge>(*engine, *database, *browser);
+    bridge->onAppShellReady = [this]
+    {
+        beat::diagnostics::log("startup", "frontend shell reported ready");
+        if (onFrontendShellReady)
+            onFrontendShellReady();
+    };
     bridge->onAppReady = [this]
     {
         beat::diagnostics::log("startup", "frontend reported ready");

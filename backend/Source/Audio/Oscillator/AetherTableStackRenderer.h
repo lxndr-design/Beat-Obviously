@@ -99,10 +99,12 @@ namespace beat::AetherTableStackRenderer
         }
     };
 
-    template <typename Params, typename TargetActivityFlags>
-    Result render(
+    template <bool useSimdUnison = false, typename Params, typename TargetActivityFlags>
+    Result renderPrepared(
         const Params& params,
         const TargetActivityFlags& targets,
+        const DynamicModulation::PreparedState& prepared,
+        const DynamicModulation::InputFrame& modulationFrame,
         const VoiceAetherCache::PanGains& panGains,
         const VoiceAetherCache::PitchRates& pitchRates,
         WavetableOscillatorBank::Bank& oscillatorsA,
@@ -117,28 +119,16 @@ namespace beat::AetherTableStackRenderer
         double oscBBasePhase,
         double oscAPhaseOffset,
         double oscBPhaseOffset,
-        float rawLfo,
-        float rawLfo2,
-        const std::array<float, 8>& rawExtraLfos,
-        float env,
-        float env2,
-        float env3,
-        float env4,
-        float velocity,
-        float noteKeytrack,
-        float modWheel,
         juce::uint32& noiseState,
-        float pressure = 0.0f,
-        float timbre = 0.0f,
         InteractionState* interactionState = nullptr) noexcept
     {
         Result result;
         const bool useDynamicModulation = params.dynamicModulation.active && targets.any;
         const float unisonDetuneMod = useDynamicModulation && targets.unisonDetune
-            ? DynamicModulation::targetOffset(params.dynamicModulation.unisonDetune, rawLfo, rawLfo2, rawExtraLfos, env, env2, env3, env4, velocity, noteKeytrack, modWheel, pressure, timbre, params.macroValues, 100.0f)
+            ? prepared.unisonDetune.evaluate(modulationFrame, 100.0f)
             : 0.0f;
         const float unisonSpreadMod = useDynamicModulation && targets.unisonSpread
-            ? DynamicModulation::targetOffset(params.dynamicModulation.unisonSpread, rawLfo, rawLfo2, rawExtraLfos, env, env2, env3, env4, velocity, noteKeytrack, modWheel, pressure, timbre, params.macroValues, 1.0f)
+            ? prepared.unisonSpread.evaluate(modulationFrame, 1.0f)
             : 0.0f;
         float leftSum = 0.0f;
         float rightSum = 0.0f;
@@ -234,16 +224,16 @@ namespace beat::AetherTableStackRenderer
             StereoFrame& sourceFrame)
         {
             const float modulatedLevel = VoiceMath::clamp01(osc.level + (useDynamicModulation && levelIsDynamic
-                ? DynamicModulation::targetOffset(levelTarget, rawLfo, rawLfo2, rawExtraLfos, env, env2, env3, env4, velocity, noteKeytrack, modWheel, pressure, timbre, params.macroValues, 1.0f)
+                ? levelTarget.evaluate(modulationFrame, 1.0f)
                 : 0.0f));
             if (!osc.enabled || modulatedLevel <= 0.0f)
                 return;
             const float modulatedPan = juce::jlimit(-1.0f, 1.0f, osc.pan + (useDynamicModulation
-                ? DynamicModulation::targetOffset(panTarget, rawLfo, rawLfo2, rawExtraLfos, env, env2, env3, env4, velocity, noteKeytrack, modWheel, pressure, timbre, params.macroValues, 1.0f)
+                ? panTarget.evaluate(modulationFrame, 1.0f)
                 : 0.0f));
 
             const float positionMod = useDynamicModulation && positionIsDynamic
-                ? DynamicModulation::targetOffset(positionTarget, rawLfo, rawLfo2, rawExtraLfos, env, env2, env3, env4, velocity, noteKeytrack, modWheel, pressure, timbre, params.macroValues, 1.0f)
+                ? positionTarget.evaluate(modulationFrame, 1.0f)
                 : 0.0f;
             if (osc.waveform == 4)
             {
@@ -262,7 +252,7 @@ namespace beat::AetherTableStackRenderer
             double rate = staticRate;
             if (fineIsDynamic)
             {
-                const float fineOffsetCents = DynamicModulation::targetOffset(fineTarget, rawLfo, rawLfo2, rawExtraLfos, env, env2, env3, env4, velocity, noteKeytrack, modWheel, pressure, timbre, params.macroValues, 100.0f);
+                const float fineOffsetCents = fineTarget.evaluate(modulationFrame, 100.0f);
                 rate *= std::exp2((double) fineOffsetCents / 1200.0);
                 ++result.work.oscillatorRateCalculations;
             }
@@ -274,12 +264,12 @@ namespace beat::AetherTableStackRenderer
             if (osc.waveform == 5)
             {
                 oscillatorDetuneMod = useDynamicModulation && unisonDetuneIsDynamic
-                    ? DynamicModulation::targetOffset(unisonDetuneTarget, rawLfo, rawLfo2, rawExtraLfos, env, env2, env3, env4, velocity, noteKeytrack, modWheel, pressure, timbre, params.macroValues, 100.0f)
+                    ? unisonDetuneTarget.evaluate(modulationFrame, 100.0f)
                     : 0.0f;
                 oscillatorSpreadMod = useDynamicModulation && unisonSpreadIsDynamic
-                    ? DynamicModulation::targetOffset(unisonSpreadTarget, rawLfo, rawLfo2, rawExtraLfos, env, env2, env3, env4, velocity, noteKeytrack, modWheel, pressure, timbre, params.macroValues, 1.0f)
+                    ? unisonSpreadTarget.evaluate(modulationFrame, 1.0f)
                     : 0.0f;
-                const auto tableResult = WavetableOscillatorBank::renderStereo(
+                const auto tableResult = WavetableOscillatorBank::renderStereo<useSimdUnison>(
                     oscillators,
                     unisonPlan,
                     osc.wavetable,
@@ -316,12 +306,12 @@ namespace beat::AetherTableStackRenderer
             params.aetherOscA,
             oscillatorsA,
             unisonPlanA,
-            params.dynamicModulation.oscAPosition,
-            params.dynamicModulation.oscAFine,
-            params.dynamicModulation.oscALevel,
-            params.dynamicModulation.oscAPan,
-            params.dynamicModulation.oscAUnisonDetune,
-            params.dynamicModulation.oscAUnisonSpread,
+            prepared.oscAPosition,
+            prepared.oscAFine,
+            prepared.oscALevel,
+            prepared.oscAPan,
+            prepared.oscAUnisonDetune,
+            prepared.oscAUnisonSpread,
             panGains.oscA,
             targets.oscAPan,
             targets.oscAFine,
@@ -339,12 +329,12 @@ namespace beat::AetherTableStackRenderer
             params.aetherOscB,
             oscillatorsB,
             unisonPlanB,
-            params.dynamicModulation.oscBPosition,
-            params.dynamicModulation.oscBFine,
-            params.dynamicModulation.oscBLevel,
-            params.dynamicModulation.oscBPan,
-            params.dynamicModulation.oscBUnisonDetune,
-            params.dynamicModulation.oscBUnisonSpread,
+            prepared.oscBPosition,
+            prepared.oscBFine,
+            prepared.oscBLevel,
+            prepared.oscBPan,
+            prepared.oscBUnisonDetune,
+            prepared.oscBUnisonSpread,
             panGains.oscB,
             targets.oscBPan,
             targets.oscBFine,
@@ -385,7 +375,7 @@ namespace beat::AetherTableStackRenderer
                     }
                     if (osc.waveform == 5)
                     {
-                        const auto tableResult = WavetableOscillatorBank::render(
+                        const auto tableResult = WavetableOscillatorBank::render<useSimdUnison>(
                             oscillators, plan, osc.wavetable, frequencyHz * rendered.rate,
                             baseFrequencyHz, oversampledRate, rendered.positionMod,
                             rendered.unisonDetuneMod, rendered.unisonSpreadMod);
@@ -493,5 +483,53 @@ namespace beat::AetherTableStackRenderer
         result.frame.left = juce::jlimit(-1.0f, 1.0f, result.filteredFrame.left + result.filter1Frame.left + result.filter2Frame.left + result.directFrame.left);
         result.frame.right = juce::jlimit(-1.0f, 1.0f, result.filteredFrame.right + result.filter1Frame.right + result.filter2Frame.right + result.directFrame.right);
         return result;
+    }
+
+    // Compatibility entry point for focused helpers and callers that do not
+    // retain voice state. Production voices use renderPrepared() so route
+    // compilation never occurs in the sample loop.
+    template <typename Params, typename TargetActivityFlags>
+    Result render(
+        const Params& params,
+        const TargetActivityFlags& targets,
+        const VoiceAetherCache::PanGains& panGains,
+        const VoiceAetherCache::PitchRates& pitchRates,
+        WavetableOscillatorBank::Bank& oscillatorsA,
+        WavetableOscillatorBank::Bank& oscillatorsB,
+        WavetableUnison::Plan& unisonPlanA,
+        WavetableUnison::Plan& unisonPlanB,
+        double frequencyHz,
+        double baseFrequencyHz,
+        double sampleRate,
+        double phase,
+        double oscABasePhase,
+        double oscBBasePhase,
+        double oscAPhaseOffset,
+        double oscBPhaseOffset,
+        float rawLfo,
+        float rawLfo2,
+        const std::array<float, 8>& rawExtraLfos,
+        float env,
+        float env2,
+        float env3,
+        float env4,
+        float velocity,
+        float noteKeytrack,
+        float modWheel,
+        juce::uint32& noiseState,
+        float pressure = 0.0f,
+        float timbre = 0.0f,
+        InteractionState* interactionState = nullptr) noexcept
+    {
+        const auto prepared = DynamicModulation::prepare(params.dynamicModulation);
+        const auto frame = DynamicModulation::makeInputFrame(
+            rawLfo, rawLfo2, rawExtraLfos, env, env2, env3, env4,
+            velocity, noteKeytrack, modWheel, pressure, timbre, params.macroValues);
+        return renderPrepared(
+            params, targets, prepared, frame, panGains, pitchRates,
+            oscillatorsA, oscillatorsB, unisonPlanA, unisonPlanB,
+            frequencyHz, baseFrequencyHz, sampleRate, phase,
+            oscABasePhase, oscBBasePhase, oscAPhaseOffset, oscBPhaseOffset,
+            noiseState, interactionState);
     }
 }

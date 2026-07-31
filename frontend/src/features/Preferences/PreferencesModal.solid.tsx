@@ -1,23 +1,7 @@
-import { createMemo, createSignal, For, onCleanup, Show } from "solid-js";
+import { createMemo, createSignal, For, Show } from "solid-js";
 import { Button, FloatingSelect, Icon, Modal, RadioGroup, Toggle } from "../../solid-ui";
 import { getOllamaModel, setOllamaModel } from "../../ai/aiService";
-import {
-  exportDrumBeatFineTuneJsonl,
-  exportInstrumentFineTuneJsonl,
-  exportMidiSongFineTuneJsonl,
-  getTrainingSignalStats,
-  type TrainingSignalStats,
-} from "../../persistence/dexie";
-import {
-  makeTrainingCheckpoints,
-  maybeRunDueTraining,
-  readTrainingCheckpoints,
-  readTrainingStatuses,
-  TRAINING_BREAKPOINT,
-  type TrainingKind,
-  type TrainingStatus,
-} from "../../ai/trainingRunner";
-import { isNative, onEvent, send } from "../../ipc/bridge";
+import { isNative, send } from "../../ipc/bridge";
 import type { AudioDeviceInfo, AudioDeviceSnapshot } from "../../ipc/schema";
 import {
   useSettingsStore,
@@ -46,12 +30,7 @@ export function PreferencesModal() {
   const [contrastOpen, setContrastOpen] = createSignal(false);
   const [deviceSnapshot, setDeviceSnapshot] = createSignal<AudioDeviceSnapshot | null>(null);
   const [deviceStatus, setDeviceStatus] = createSignal("");
-  const [exportStatus, setExportStatus] = createSignal("");
-  const [trainingStats, setTrainingStats] = createSignal<TrainingSignalStats>({ drums: 0, instruments: 0, midi: 0 });
-  const [trainedAt, setTrainedAt] = createSignal<TrainingSignalStats>(readTrainingCheckpoints());
-  const [trainingStatuses, setTrainingStatuses] = createSignal<Partial<Record<TrainingKind, TrainingStatus>>>(readTrainingStatuses());
   const dirty = createMemo(() => model().trim() !== getOllamaModel());
-  const checkpoints = createMemo(() => makeTrainingCheckpoints(trainingStats(), trainedAt()));
   const nativeAudioAvailable = isNative();
   const inputOptions = createMemo(() => deviceOptions(deviceSnapshot(), "input", nativeAudioAvailable));
   const outputOptions = createMemo(() => deviceOptions(deviceSnapshot(), "output", nativeAudioAvailable));
@@ -67,13 +46,7 @@ export function PreferencesModal() {
   ));
   const activeTabLabel = createMemo(() => PREFERENCE_TABS.find((tab) => tab.id === activeTab())?.label);
 
-  void refreshTrainingStats();
   void refreshDevices();
-  const unsubscribeEvents = onEvent((event) => {
-    if (event.kind !== "training.status") return;
-    void refreshTrainingStats();
-  });
-  onCleanup(unsubscribeEvents);
 
   function close() {
     useUiStore.getState().closeEditor({ kind: "preferences" });
@@ -155,49 +128,6 @@ export function PreferencesModal() {
     } catch (error) {
       setDeviceStatus(error instanceof Error ? error.message : "Output selection unavailable");
     }
-  }
-
-  async function refreshTrainingStats() {
-    setTrainingStats(await getTrainingSignalStats());
-    setTrainedAt(readTrainingCheckpoints());
-    setTrainingStatuses(readTrainingStatuses());
-  }
-
-  async function runTraining(kind: TrainingKind) {
-    const result = await maybeRunDueTraining(kind, { force: true });
-    setTrainingStats(result.stats);
-    setTrainedAt(result.trainedAt);
-    setTrainingStatuses(result.statuses);
-  }
-
-  async function exportDataset() {
-    const jsonl = await exportDrumBeatFineTuneJsonl();
-    if (!jsonl.trim()) {
-      setExportStatus("No rated or accepted generated beats yet.");
-      return;
-    }
-    downloadJsonl(jsonl, `beat-drum-finetune-${new Date().toISOString().slice(0, 10)}.jsonl`);
-    setExportStatus("Exported JSONL training dataset.");
-  }
-
-  async function exportInstrumentDataset() {
-    const jsonl = await exportInstrumentFineTuneJsonl();
-    if (!jsonl.trim()) {
-      setExportStatus("No rated or accepted generated instruments yet.");
-      return;
-    }
-    downloadJsonl(jsonl, `beat-instrument-finetune-${new Date().toISOString().slice(0, 10)}.jsonl`);
-    setExportStatus("Exported instrument JSONL training dataset.");
-  }
-
-  async function exportMidiDataset() {
-    const jsonl = await exportMidiSongFineTuneJsonl();
-    if (!jsonl.trim()) {
-      setExportStatus("No saved MIDI components, MIDI project segments, or MIDI generation feedback yet.");
-      return;
-    }
-    downloadJsonl(jsonl, `beat-midi-song-finetune-${new Date().toISOString().slice(0, 10)}.jsonl`);
-    setExportStatus("Exported MIDI/song JSONL training dataset.");
   }
 
   return (
@@ -289,15 +219,8 @@ export function PreferencesModal() {
             <AiPreferences
               model={model()}
               modelOpen={modelOpen()}
-              checkpoints={checkpoints()}
-              trainingStatuses={trainingStatuses()}
-              exportStatus={exportStatus()}
               setModel={setModel}
               setModelOpen={setModelOpen}
-              runTraining={runTraining}
-              exportDataset={exportDataset}
-              exportInstrumentDataset={exportInstrumentDataset}
-              exportMidiDataset={exportMidiDataset}
             />
           </Show>
         </div>
@@ -477,7 +400,7 @@ function FilesPreferences(props: FilesPreferencesProps) {
           <Toggle
             className={styles.inlineToggle}
             labelClassName={styles.gridToggleLabel}
-            label="Backups"
+            label="Recovery autosave"
             checked={props.settings.autosaveBackups}
             onChange={props.settings.setAutosaveBackups}
           />
@@ -610,15 +533,8 @@ function ThemePreferences(props: ThemePreferencesProps) {
 interface AiPreferencesProps {
   model: string;
   modelOpen: boolean;
-  checkpoints: ReturnType<typeof makeTrainingCheckpoints>;
-  trainingStatuses: Partial<Record<TrainingKind, TrainingStatus>>;
-  exportStatus: string;
   setModel: (value: string) => void;
   setModelOpen: (open: boolean) => void;
-  runTraining: (kind: TrainingKind) => Promise<void>;
-  exportDataset: () => Promise<void>;
-  exportInstrumentDataset: () => Promise<void>;
-  exportMidiDataset: () => Promise<void>;
 }
 
 function AiPreferences(props: AiPreferencesProps) {
@@ -640,54 +556,8 @@ function AiPreferences(props: AiPreferencesProps) {
           />
         </div>
         <p class={styles.hint}>
-          Used for local beat generation, instrument generation, MIDI/song ideas, and training-assisted suggestions. Use a base model now, then switch to a tuned Beat model after training.
+          Used for local beat generation, instrument generation, and MIDI/song ideas.
         </p>
-      </section>
-
-      <section class={styles.section}>
-        <h3 class={styles.sectionTitle}>Local AI Training Status</h3>
-        <div class={styles.checkpointList}>
-          <For each={props.checkpoints}>
-            {(checkpoint) => (
-              <div class={styles.checkpointRow}>
-                <div class={styles.checkpointMeta}>
-                  <span class={styles.checkpointName}>{checkpoint.label}</span>
-                  <span class={styles.checkpointCount}>
-                    {checkpoint.sinceLast}/{TRAINING_BREAKPOINT} new signals
-                  </span>
-                </div>
-                <span class={checkpoint.ready ? styles.readyBadge : styles.waitingBadge}>
-                  {formatCheckpointStatus(checkpoint.ready, checkpoint.remaining, props.trainingStatuses[checkpoint.kind])}
-                </span>
-                <Button
-                  size="xs"
-                  disabled={checkpoint.sinceLast === 0}
-                  onClick={() => void props.runTraining(checkpoint.kind)}
-                >
-                  Send
-                </Button>
-              </div>
-            )}
-          </For>
-        </div>
-        <div class={styles.exportActions}>
-          <Button size="sm" onClick={() => void props.exportDataset()}>
-            <Icon name="ph:download-simple" size={18} decorative />
-            Drum training data
-          </Button>
-          <Button size="sm" onClick={() => void props.exportInstrumentDataset()}>
-            <Icon name="ph:download-simple" size={18} decorative />
-            Instrument training data
-          </Button>
-          <Button size="sm" onClick={() => void props.exportMidiDataset()}>
-            <Icon name="ph:download-simple" size={18} decorative />
-            MIDI training data
-          </Button>
-        </div>
-        <p class={styles.hint}>
-          Send queues the current JSONL dataset into the local native trainer. The buttons below only download inspectable dataset backups; they do not export project audio or MIDI files.
-        </p>
-        <Show when={props.exportStatus}><p class={styles.hint}>{props.exportStatus}</p></Show>
       </section>
     </>
   );
@@ -814,33 +684,4 @@ function formatChannelCount(channels: string[] | undefined, direction: "input" |
         : "output channels";
   const names = (channels ?? []).map((name, index) => name.trim() || `Channel ${index + 1}`);
   return `${count} ${noun}: ${names.join(", ")}`;
-}
-
-function formatCheckpointStatus(
-  ready: boolean,
-  remaining: number,
-  status: TrainingStatus | undefined,
-) {
-  if (status?.status === "running" || status?.status === "queued") return "Running";
-  if (status?.status === "failed") {
-    const message = status.message?.toLowerCase() ?? "";
-    if (message.includes("native app")) return "Native only";
-    if (message.includes("llamafactory") || message.includes("not found") || message.includes("missing")) return "Needs setup";
-    return "Failed";
-  }
-  if (status?.status === "finished") return "Trained";
-  if (ready) return "Ready";
-  return `${remaining} left`;
-}
-
-function downloadJsonl(jsonl: string, filename: string) {
-  const blob = new Blob([`${jsonl}\n`], { type: "application/jsonl" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = filename;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  URL.revokeObjectURL(url);
 }

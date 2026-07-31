@@ -2,6 +2,9 @@
 
 A beat sequencing DAW. Hybrid architecture: JUCE 8 (C++20) audio engine + Solid/TypeScript UI in an embedded WKWebView, packaged as a single macOS `.app`.
 
+For the product, workflow, and instrument-engine summary, see
+[overview.md](overview.md).
+
 ## Why this architecture
 
 - **JUCE backend** for real-time audio: sample-accurate sequencing, low-latency CoreAudio output, MIDI I/O, DSP (EQ, bitcrush), sample loading, SQLite persistence.

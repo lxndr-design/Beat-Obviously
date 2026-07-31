@@ -28,8 +28,8 @@ export const selectSegment = (id: Id): Segment | undefined => {
 };
 
 /**
- * Expand a track's segments into a played sequence, applying `repeats` so
- * a repeated segment fills the rest of the project timeline.
+ * Expand a track's segments into a played sequence using the segment's
+ * explicit additional-repeat count.
  */
 export function expandTrackSegments(
   track: Track,

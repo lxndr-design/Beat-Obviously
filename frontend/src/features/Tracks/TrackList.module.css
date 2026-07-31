@@ -1,4 +1,5 @@
 .panel {
+  position: relative;
   display: flex;
   flex: 1 1 auto;
   min-height: 0;
@@ -57,8 +58,13 @@
 
 .timelineSpacer {
   height: var(--height-timeline);
-  margin-top: auto;
-  flex-shrink: 0;
+  min-height: var(--height-timeline);
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  flex: 0 0 var(--height-timeline);
+  border-bottom: var(--border-fg);
+  background: var(--color-bg);
 }
 
 /* Wrap around the lane scroll — establishes a positioning context for the
@@ -68,9 +74,19 @@
   min-width: 0;
 }
 
+.timelineDock {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  height: var(--height-timeline);
+  overflow: hidden;
+  border-bottom: var(--border-fg);
+  background: var(--color-bg);
+}
+
 .selectionBar {
   position: absolute;
-  top: 9px;
+  top: calc(var(--height-timeline) + var(--space-3));
   right: 9px;
   z-index: 5;
   display: flex;
@@ -97,7 +113,7 @@
   overflow-x: auto;
   overflow-y: hidden;
   position: relative;
-  height: 100%;
+  height: auto;
 }
 
 /* Scoped horizontal-scrollbar framing — a 1px inset outline on the track
@@ -144,7 +160,7 @@
 .loopLaneRegion {
   position: absolute;
   top: 0;
-  bottom: var(--height-timeline);
+  bottom: 0;
   z-index: 2;
   pointer-events: none;
   background:
@@ -175,11 +191,11 @@
   flex-shrink: 0;
 }
 
-/* Floating zoom cluster — absolutely positioned on the lane *viewport*
- * (not the scroll content), 8px from the bottom-right edge. */
+/* Fixed to the visible track section so zoom remains available while the
+ * vertically scrolling track rows move beneath the sticky ruler. */
 .zoomFloat {
   position: absolute;
-  bottom: 9px;
+  top: var(--space-3);
   right: 9px;
   display: flex;
   gap: 0;

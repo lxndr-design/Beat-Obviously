@@ -138,7 +138,7 @@ namespace beat
             None,
             Aether,
             Aurum,
-            Lumus,
+            Lumen,
         };
 
         struct WavetableConfig
@@ -219,6 +219,12 @@ namespace beat
 
         struct AetherSampleSlot
         {
+            struct Slice
+            {
+                Id id;
+                float startRatio { 0.0f };
+                float endRatio { 1.0f };
+            };
             struct ManagedSfz
             {
                 int schemaVersion { 1 };
@@ -261,6 +267,12 @@ namespace beat
             std::vector<Zone> zones;
             ManagedSfz managedSfz;
             std::array<float, 2> fxSends {};
+            bool reverse { false };
+            float playbackRate { 1.0f };
+            bool pingPongLoop { false };
+            float releaseTailMs { 4.0f };
+            Id selectedSliceId;
+            std::vector<Slice> slices;
         };
 
         struct AetherGranularSlot
@@ -318,8 +330,8 @@ namespace beat
             MemberExpressionZone memberExpressionZone;
         };
 
-        // Lumus-owned source rack extension. Aether remains a fixed A/B engine.
-        struct LumusConfig
+        // Lumen-owned source rack extension. Aether remains a fixed A/B engine.
+        struct LumenConfig
         {
             struct Arpeggiator
             {
@@ -335,9 +347,11 @@ namespace beat
 
             struct Clip
             {
-                struct Step
+                static constexpr int maxNotes = 64;
+
+                struct Note
                 {
-                    bool enabled { false };
+                    int startStep { 0 };
                     int pitchOffset { 0 };
                     int lengthSteps { 1 };
                     float velocity { 1.0f };
@@ -347,7 +361,8 @@ namespace beat
                 int rateDivision { 16 };
                 float swing { 0.0f };
                 int lengthSteps { 16 };
-                std::array<Step, 32> steps {};
+                int noteCount { 0 };
+                std::array<Note, maxNotes> notes {};
             };
 
             int sourceRackSchemaVersion { 1 };
@@ -416,10 +431,13 @@ namespace beat
                 { false, 2, 0.18f, 0.08f, 0.0f },
             }};
             int filterRouting { 0 };
+            juce::var modulation;
+            std::array<float, 8> macroValues {};
         };
 
         struct DynamicModTarget
         {
+            static constexpr size_t modulationSourceCount = 27;
             float lfo { 0.0f };
             bool lfoBipolar { true };
             float lfo2 { 0.0f };
@@ -452,6 +470,9 @@ namespace beat
             float macro6 { 0.0f };
             float macro7 { 0.0f };
             float macro8 { 0.0f };
+            // Prepared-source indexed remap curves: 0 linear, 1 ease-in,
+            // 2 ease-out, 3 S-curve. Linear preserves the legacy render path.
+            std::array<uint8_t, modulationSourceCount> curves {};
         };
 
         struct DynamicModulation
@@ -482,6 +503,11 @@ namespace beat
             DynamicModTarget ampPan;
             DynamicModTarget unisonDetune;
             DynamicModTarget unisonSpread;
+            std::array<DynamicModTarget, 6> aurumOperatorLevel;
+            std::array<DynamicModTarget, 6> aurumOperatorPan;
+            std::array<DynamicModTarget, 2> aurumFilterCutoff;
+            std::array<DynamicModTarget, 2> aurumFilterResonance;
+            std::array<DynamicModTarget, 2> aurumFilterDrive;
         };
 
         struct SampleZone
@@ -561,6 +587,7 @@ namespace beat
         int maxVoices { 16 };
         bool mono { false };
         bool legato { false };
+        float pitchBendRangeSemitones { 2.0f };
         int wavetableBank { 0 };
         float wavetablePosition { 0.35f };
         float wavetableWarp { 0.2f };
@@ -578,6 +605,7 @@ namespace beat
         float lfoPhaseOffset { 0.0f };
         bool lfoRetrigger { true };
         bool lfoOneShot { false };
+        float lfoKeytrackRate { 0.0f };
         bool lfo2Enabled { false };
         int lfo2Waveform { 1 };
         float lfo2RateHz { 0.5f };
@@ -588,6 +616,7 @@ namespace beat
         float lfo2PhaseOffset { 0.0f };
         bool lfo2Retrigger { true };
         bool lfo2OneShot { false };
+        float lfo2KeytrackRate { 0.0f };
         struct ExtraLfo
         {
             bool enabled { false };
@@ -600,6 +629,7 @@ namespace beat
             float phaseOffset { 0.0f };
             bool retrigger { true };
             bool oneShot { false };
+            float keytrackRate { 0.0f };
         };
         std::array<ExtraLfo, 8> extraLfos {};
         bool lfoPositionBipolar { true };
@@ -615,7 +645,7 @@ namespace beat
         AetherConfig aether;
         bool hasAurum { false };
         AurumConfig aurum;
-        LumusConfig lumus;
+        LumenConfig lumen;
         std::optional<Nodemap::Graph> nodeGraph;
         juce::var taxonomy;
         std::vector<TrackEffect> effects;

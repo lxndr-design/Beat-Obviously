@@ -2,7 +2,6 @@ import { createEffect, createMemo, createSignal, For, onCleanup, Show } from "so
 import { appAlert, useModalStack } from "../../solid-ui";
 import { Modal, Button, FieldActionButton, FloatingSelect, HoverInfo, Icon, Knob, NumberInput, Slider, TextInput, Toggle } from "../../solid-ui";
 import { ai, type GeneratedInstrument } from "../../ai/aiService";
-import { maybeRunDueTraining } from "../../ai/trainingRunner";
 import { isSupportedAudioFileName, SUPPORTED_AUDIO_IMPORT_LABEL } from "../../audio/audioFormats";
 import { importAudioFiles } from "../../audio/audioImport";
 import { startInstrumentSampleZoneAudition, type InstrumentPreviewAuditionHandle } from "../../audio/synthPreview";
@@ -234,7 +233,6 @@ export function InstrumentEditorModal(props: Props) {
       generated: lastGenerated()!,
       finalInstrument: draft(),
     });
-    void maybeRunDueTraining("instruments");
     window.setTimeout(() => setLastGenerated(null), 700);
   }
 
@@ -1555,6 +1553,7 @@ function restoreSnapshot(snapshot: InstrumentSnapshot): Partial<Instrument> {
     maxVoices: snapshot.maxVoices,
     mono: snapshot.mono,
     legato: snapshot.legato,
+    pitchBendRangeSemitones: snapshot.pitchBendRangeSemitones,
     ampLevel: snapshot.ampLevel,
     ampPan: snapshot.ampPan,
     wavetable: snapshot.wavetable ? structuredClone(snapshot.wavetable) : undefined,

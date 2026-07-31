@@ -1,6 +1,6 @@
 import { createEffect, createMemo, createSignal, For, onCleanup, Show } from "solid-js";
 import { appAlert, appConfirm, appPrompt } from "../../solid-ui";
-import { ActionFooter, Button, HoverInfo, Icon, MarqueeText, TextInput } from "../../solid-ui";
+import { ActionFooter, Button, FloatingSelect, HoverInfo, Icon, LibrarySearch, MarqueeText } from "../../solid-ui";
 import { importAudioFiles } from "../../audio/audioImport";
 import { registerGlobalAudioStop } from "../../audio/globalAudioSafety";
 import { isNative, send } from "../../ipc/bridge";
@@ -15,6 +15,18 @@ import styles from "./AudioFilesPage.module.css";
 type SortKey = "name" | "status" | "source" | "size" | "length" | "imported";
 type SortDirection = "asc" | "desc";
 type PreviewDirection = "forward" | "reverse";
+type AudioStatusFilter = "all" | "library" | "remote" | "missing" | "asset";
+type WaveformLoadState = "idle" | "loading" | "ready" | "error";
+const AUDIO_PAGE_SIZE = 50;
+const WAVEFORM_PRIMARY_TIMEOUT_MS = 6_000;
+const WAVEFORM_LOAD_TIMEOUT_MS = 10_000;
+const AUDIO_STATUS_OPTIONS = [
+  { value: "all", label: "All Statuses" },
+  { value: "library", label: "Library" },
+  { value: "remote", label: "Remote" },
+  { value: "missing", label: "Missing" },
+  { value: "asset", label: "Asset" },
+];
 type WaveformChannelAnalysis = { upper: number[]; lower: number[] };
 type WaveformAnalysis = {
   left: WaveformChannelAnalysis;
@@ -36,22 +48,26 @@ export function AudioFilesPage() {
   const files = createStoreSelector(useAudioFileStore, (s) => s.files);
   const addFile = useAudioFileStore.getState().addFile;
   const removeFile = useAudioFileStore.getState().removeFile;
-  const updateFile = useAudioFileStore.getState().updateFile;
+  const hydrateFiles = useAudioFileStore.getState().hydrateFiles;
   const instruments = createStoreSelector(useInstrumentStore, (s) => s.instruments);
   const tracks = createStoreSelector(useProjectStore, (s) => s.project.tracks);
   const [selectMode, setSelectMode] = createSignal(false);
   const [selectedIds, setSelectedIds] = createSignal<Set<string>>(new Set(), { equals: false });
   const [activeId, setActiveId] = createSignal<string | null>(null);
   const [searchQuery, setSearchQuery] = createSignal("");
+  const [statusFilter, setStatusFilter] = createSignal<AudioStatusFilter>("all");
+  const [currentPage, setCurrentPage] = createSignal(1);
   const [sort, setSort] = createSignal<{ key: SortKey; direction: SortDirection }>({ key: "name", direction: "asc" }, { equals: false });
   const [playingId, setPlayingId] = createSignal<string | null>(null);
   const [previewSpeed, setPreviewSpeed] = createSignal<1 | 2 | 3>(1);
   const [loopPreview, setLoopPreview] = createSignal(false);
   const [waveformAnalysis, setWaveformAnalysis] = createSignal<WaveformAnalysis | null>(null, { equals: false });
+  const [waveformLoadState, setWaveformLoadState] = createSignal<WaveformLoadState>("idle");
   const [previewProgress, setPreviewProgress] = createSignal(0);
   const [previewDirection, setPreviewDirection] = createSignal<PreviewDirection>("forward");
   const [scrubbing, setScrubbing] = createSignal(false);
   let previewRef: { ctx: AudioContext; source: AudioBufferSourceNode } | null = null;
+  let previewRequestId = 0;
   let progressFrame: number | null = null;
   let playbackBarRef: HTMLDivElement | undefined;
   const nativeAvailable = isNative();
@@ -63,13 +79,31 @@ export function AudioFilesPage() {
   } };
   const bufferCache = new Map<string, AudioBuffer>();
 
-  const visibleFiles = createMemo(() => filterAudioFiles(files(), searchQuery()));
+  const visibleFiles = createMemo(() => filterAudioFiles(files(), searchQuery(), statusFilter()));
   const sortedFiles = createMemo(() => sortAudioFiles(visibleFiles(), sort().key, sort().direction));
-  const activeFile = createMemo(() => files().find((file) => file.id === activeId()) ?? files()[0] ?? null);
+  const pageCount = createMemo(() => Math.max(1, Math.ceil(sortedFiles().length / AUDIO_PAGE_SIZE)));
+  const pagedFiles = createMemo(() => {
+    const start = (currentPage() - 1) * AUDIO_PAGE_SIZE;
+    return sortedFiles().slice(start, start + AUDIO_PAGE_SIZE);
+  });
+  const pageStart = createMemo(() => sortedFiles().length === 0 ? 0 : (currentPage() - 1) * AUDIO_PAGE_SIZE + 1);
+  const pageEnd = createMemo(() => Math.min(currentPage() * AUDIO_PAGE_SIZE, sortedFiles().length));
+  const activeFile = createMemo(() => pagedFiles().find((file) => file.id === activeId()) ?? pagedFiles()[0] ?? null);
   const activeReference = createMemo(() => activeFile() ? audioReferenceState(activeFile()!) : null);
   const selectedCount = createMemo(() => selectedIds().size);
   const multipleSelected = createMemo(() => selectMode() && selectedCount() > 1);
   const previewFile = createMemo(() => multipleSelected() ? null : activeFile());
+  let previousPreviewFileId: string | null | undefined;
+
+  createEffect(() => {
+    const nextPreviewFileId = previewFile()?.id ?? null;
+    if (previousPreviewFileId !== undefined && nextPreviewFileId !== previousPreviewFileId) {
+      stopPreview();
+      setPreviewDirection("forward");
+      setScrubbing(false);
+    }
+    previousPreviewFileId = nextPreviewFileId;
+  });
 
   createEffect(() => {
     const currentFiles = files();
@@ -77,13 +111,35 @@ export function AudioFilesPage() {
     if (activeId() && !currentFiles.some((file) => file.id === activeId())) setActiveId(null);
   });
 
+  createEffect(() => {
+    searchQuery();
+    statusFilter();
+    sort();
+    setCurrentPage(1);
+  });
+
+  createEffect(() => {
+    const maximum = pageCount();
+    setCurrentPage((page) => Math.min(Math.max(1, page), maximum));
+  });
+
+  createEffect(() => {
+    const page = pagedFiles();
+    if (activeId() && page.some((file) => file.id === activeId())) return;
+    setActiveId(page[0]?.id ?? null);
+  });
+
   onCleanup(() => stopPreview());
 
   createEffect(() => {
-    for (const file of files()) {
+    const currentFiles = files();
+    const patches = new Map<string, Partial<AudioFile>>();
+    for (const file of currentFiles) {
       const patch = legacyAudioMetadataPatch(file);
-      if (patch) updateFile(file.id, patch);
+      if (patch) patches.set(file.id, patch);
     }
+    if (patches.size === 0) return;
+    hydrateFiles(currentFiles.map((file) => ({ ...file, ...(patches.get(file.id) ?? {}) })));
   });
 
   createEffect(() => {
@@ -100,51 +156,51 @@ export function AudioFilesPage() {
     let cancelled = false;
     setWaveformAnalysis(null);
     const currentPreviewFile = previewFile();
-    if (!currentPreviewFile) return;
+    if (!currentPreviewFile) {
+      setWaveformLoadState("idle");
+      return;
+    }
+    setWaveformLoadState("loading");
 
-    const loadBrowserAnalysis = () => {
+    const loadBrowserAnalysis = async () => {
       const ctx = getPreviewContext();
-      return loadAudioBuffer(ctx, bufferCache, currentPreviewFile)
-        .then((buffer) => {
-          if (!cancelled) setWaveformAnalysis(analyzeAudioBuffer(buffer, 128));
-        })
-        .finally(() => {
-          if (!previewRef || previewRef.ctx !== ctx) {
-            void ctx.close().catch(() => undefined);
-          }
-        });
+      try {
+        const buffer = await loadAudioBuffer(ctx, bufferCache, currentPreviewFile);
+        return analyzeAudioBuffer(buffer, 128);
+      } finally {
+        if (!previewRef || previewRef.ctx !== ctx) {
+          void ctx.close().catch(() => undefined);
+        }
+      }
     };
 
     const loadNativeAnalysis = async () => {
-      const response = await send({ kind: "audio.waveform", path: currentPreviewFile.path, bucketCount: 128 });
+      const path = nativeAudioFilePath(currentPreviewFile.path) ?? currentPreviewFile.path;
+      const response = await send({ kind: "audio.waveform", path, bucketCount: 128 });
       if (!response.waveform) throw new Error(response.error ?? "Waveform unavailable.");
-      if (!cancelled) setWaveformAnalysis(nativeWaveformAnalysis(currentPreviewFile, response.waveform));
+      return nativeWaveformAnalysis(currentPreviewFile, response.waveform);
     };
 
-    void (isNative() && currentPreviewFile.path && !currentPreviewFile.path.startsWith("data:")
-      ? loadNativeAnalysis().catch(() => loadBrowserAnalysis())
-      : loadBrowserAnalysis())
-      .then((buffer) => {
-        void buffer;
+    const loadPreferredAnalysis = async () => {
+      if (!isNative() || !nativeAudioFilePath(currentPreviewFile.path)) return loadBrowserAnalysis();
+      try {
+        return await withTimeout(loadBrowserAnalysis(), WAVEFORM_PRIMARY_TIMEOUT_MS, "Playable waveform decode timed out.");
+      } catch {
+        return loadNativeAnalysis();
+      }
+    };
+
+    void withTimeout(loadPreferredAnalysis(), WAVEFORM_LOAD_TIMEOUT_MS, "Waveform analysis timed out.")
+      .then((analysis) => {
+        if (cancelled) return;
+        setWaveformAnalysis(analysis);
+        setWaveformLoadState("ready");
       })
       .catch(() => {
-        if (!cancelled) {
-          setWaveformAnalysis({
-            left: { upper: [], lower: [] },
-            right: { upper: [], lower: [] },
-            leftDb: Number.NEGATIVE_INFINITY,
-            rightDb: Number.NEGATIVE_INFINITY,
-            integratedLufs: Number.NEGATIVE_INFINITY,
-            rmsDb: Number.NEGATIVE_INFINITY,
-            truePeakDb: Number.NEGATIVE_INFINITY,
-            crestDb: Number.NEGATIVE_INFINITY,
-            dcOffset: 0,
-            clippingCount: 0,
-            clippingRatio: 0,
-            stereoCorrelation: Number.NaN,
-          });
-        }
-      })
+        if (cancelled) return;
+        setWaveformAnalysis(emptyWaveformAnalysis());
+        setWaveformLoadState("error");
+      });
 
     onCleanup(() => {
       cancelled = true;
@@ -220,6 +276,7 @@ export function AudioFilesPage() {
   }
 
   function stopPreview(resetProgress = true) {
+    previewRequestId += 1;
     stopProgress(resetProgress);
     const preview = previewRef;
     previewRef = null;
@@ -277,14 +334,19 @@ export function AudioFilesPage() {
     }
     const initialProgress = clamp01(options.progress ?? (direction === "reverse" ? 1 : currentProgress));
     stopPreview(false);
+    const requestId = previewRequestId;
     setPreviewDirection(direction);
     setPreviewProgress(initialProgress);
     setPlayingId(file.id);
     try {
       const ctx = getPreviewContext();
       if (ctx.state === "suspended") await ctx.resume();
-      const source = ctx.createBufferSource();
       const sourceBuffer = await loadAudioBuffer(ctx, bufferCache, file);
+      if (requestId !== previewRequestId) {
+        void ctx.close().catch(() => undefined);
+        return;
+      }
+      const source = ctx.createBufferSource();
       const playbackBuffer = direction === "reverse" ? reverseAudioBuffer(ctx, sourceBuffer) : sourceBuffer;
       const speed = options.speed ?? previewSpeed();
       const loop = options.loop ?? loopPreview();
@@ -306,11 +368,13 @@ export function AudioFilesPage() {
       startProgress(ctx, sourceBuffer.duration, speed, direction, loop, initialProgress);
       source.start(0, Math.min(playbackBuffer.duration, Math.max(0, bufferOffset)));
     } catch (error) {
+      if (requestId !== previewRequestId) return;
       // eslint-disable-next-line no-console
       console.error("[Beat audio preview] Failed to preview audio file", { file, direction, error });
       setPlayingId(null);
       stopProgress();
-      await appAlert("This audio file could not be previewed from the current page.");
+      const detail = error instanceof Error && error.message ? ` ${error.message}` : "";
+      await appAlert(`This audio file could not be previewed.${detail}`);
     }
   }
 
@@ -394,43 +458,56 @@ export function AudioFilesPage() {
     <AssetPageShell
       variant="wide-browser"
       browserLabel="Audio file browser"
+      browserClassName={styles.audioBrowser}
       previewLabel="Audio playback"
       previewClassName={styles.preview}
       browser={
         <>
         <div class={styles.browserControls}>
+          <span class={styles.searchField}>
+            <Icon name="ph:magnifying-glass" size={18} decorative />
+            <LibrarySearch
+              className={styles.searchInput}
+              value={searchQuery()}
+              onInput={(event) => setSearchQuery(event.currentTarget.value)}
+              placeholder="Search name, path, source, format…"
+              aria-label="Search audio files"
+            />
+          </span>
+          <FloatingSelect
+            className={styles.statusFilter}
+            layout="bare"
+            fillHeight
+            value={statusFilter()}
+            options={AUDIO_STATUS_OPTIONS}
+            ariaLabel="Filter audio files by status"
+            onChange={(value) => setStatusFilter(value as AudioStatusFilter)}
+          />
+          <span class={styles.searchCount}>{sortedFiles().length}/{files().length}</span>
           <div class={styles.actions}>
             <Show when={selectMode()}>
               <span class={styles.selectionCount}>{selectedCount()} selected</span>
             </Show>
-            <Button variant={selectMode() ? "primary" : "default"} onClick={toggleSelectMode}>
+            <Button variant="ghost" selected={selectMode()} onClick={toggleSelectMode}>
               {selectMode() ? "Done" : "Select"}
             </Button>
-            <Button onClick={() => void onImport()}>
+            <Button variant="ghost" onClick={() => void onImport()}>
               <Icon name="ph:plus" size={18} decorative />
               Import Audio
             </Button>
             <HoverInfo content="Remove selected unused entries from the Beat library without deleting files">
-              <Button disabled={selectedCount() === 0} onClick={removeSelectedEntries} aria-label="Remove selected audio entries">
+              <Button variant="ghost" disabled={selectedCount() === 0} onClick={removeSelectedEntries} aria-label="Remove selected audio entries">
                 <Icon name="ph:minus" size={18} decorative />
                 Remove Entry
               </Button>
             </HoverInfo>
             <HoverInfo content="Delete selected unused files from disk and remove them from the library">
-              <Button variant="danger" disabled={selectedCount() === 0 || !nativeAvailable} onClick={deleteSelectedFiles} aria-label="Delete selected audio files from disk">
+              <Button variant="ghost" disabled={selectedCount() === 0 || !nativeAvailable} onClick={deleteSelectedFiles} aria-label="Delete selected audio files from disk">
                 <Icon name="ph:trash" size={18} decorative />
                 Delete Files
               </Button>
             </HoverInfo>
           </div>
-          <TextInput
-            className={styles.searchField}
-            layout="bare"
-            value={searchQuery()}
-            onInput={(event) => setSearchQuery(event.currentTarget.value)}
-            placeholder="Search audio files"
-            aria-label="Search audio files"
-          />
         </div>
 
         <div class={`${styles.table} ${selectMode() ? styles.tableSelectMode : ""}`} role="table" aria-label="Audio files">
@@ -456,7 +533,7 @@ export function AudioFilesPage() {
                   title={files().length > 0 ? "No Matching Audio Files" : "No Audio Files"}
                   body={files().length > 0 ? "Adjust the search text to show more files." : "Import audio to build the project library."}
                 >
-                  <Button size="sm" onClick={() => void onImport()}>
+                  <Button variant="ghost" size="sm" onClick={() => void onImport()}>
                     <Icon name="ph:plus" size={18} decorative />
                     Import Audio
                   </Button>
@@ -464,7 +541,7 @@ export function AudioFilesPage() {
               </div>
               }
             >
-            <For each={sortedFiles()}>
+            <For each={pagedFiles()}>
               {(file) => {
               const selected = () => selectedIds().has(file.id);
               const active = () => activeFile()?.id === file.id;
@@ -505,6 +582,26 @@ export function AudioFilesPage() {
             </For>
             </Show>
           </div>
+          <nav class={styles.pagination} aria-label="Audio file pages">
+            <span class={styles.pageRange}>
+              {pageStart()}–{pageEnd()} of {sortedFiles().length}
+            </span>
+            <span class={styles.pageButtons}>
+              <Button variant="ghost" iconOnly size="sm" disabled={currentPage() <= 1} onClick={() => setCurrentPage(1)} aria-label="First page">
+                <Icon name="ph:caret-double-left" size={18} decorative />
+              </Button>
+              <Button variant="ghost" iconOnly size="sm" disabled={currentPage() <= 1} onClick={() => setCurrentPage((page) => page - 1)} aria-label="Previous page">
+                <Icon name="ph:caret-left" size={18} decorative />
+              </Button>
+              <span class={styles.pageLabel}>Page {currentPage()} / {pageCount()}</span>
+              <Button variant="ghost" iconOnly size="sm" disabled={currentPage() >= pageCount()} onClick={() => setCurrentPage((page) => page + 1)} aria-label="Next page">
+                <Icon name="ph:caret-right" size={18} decorative />
+              </Button>
+              <Button variant="ghost" iconOnly size="sm" disabled={currentPage() >= pageCount()} onClick={() => setCurrentPage(pageCount())} aria-label="Last page">
+                <Icon name="ph:caret-double-right" size={18} decorative />
+              </Button>
+            </span>
+          </nav>
         </div>
         </>
       }
@@ -526,11 +623,11 @@ export function AudioFilesPage() {
             </div>
             <div class={styles.previewFileName}>–</div>
             <div class={styles.previewControls} aria-hidden="true">
-              <Button iconOnly disabled aria-label="Play from start"><Icon name="ph:skip-back" size={18} decorative /></Button>
-              <Button iconOnly disabled aria-label="Play or pause"><Icon name="ph:play-fill" size={18} decorative /></Button>
-              <Button iconOnly disabled aria-hidden="true">-</Button>
-              <Button iconOnly disabled aria-label="Play backwards"><Icon name="ph:rewind-fill" size={18} decorative /></Button>
-              <Button iconOnly disabled aria-label="Loop preview"><Icon name="ph:repeat" size={18} decorative /></Button>
+              <Button variant="ghost" iconOnly disabled aria-label="Play from start"><Icon name="ph:skip-back" size={18} decorative /></Button>
+              <Button variant="ghost" iconOnly disabled aria-label="Play or pause"><Icon name="ph:play-fill" size={18} decorative /></Button>
+              <Button variant="ghost" iconOnly disabled aria-hidden="true">-</Button>
+              <Button variant="ghost" iconOnly disabled aria-label="Play backwards"><Icon name="ph:rewind-fill" size={18} decorative /></Button>
+              <Button variant="ghost" iconOnly disabled aria-label="Loop preview"><Icon name="ph:repeat" size={18} decorative /></Button>
             </div>
             <dl class={styles.details}>
               <Info label="Source" value="–" />
@@ -544,7 +641,7 @@ export function AudioFilesPage() {
               <Info label="Format" value="–" />
             </dl>
             <ActionFooter class={styles.previewActions}>
-              <Button size="sm" disabled>
+              <Button variant="ghost" size="sm" disabled>
                 <Icon name="ph:folder-open" size={18} decorative />
                 View in Folder
               </Button>
@@ -577,10 +674,12 @@ export function AudioFilesPage() {
             <div class={styles.waveformStage}>
               <div class={styles.waveformLine} />
               <ScopeOverlay analysis={waveformAnalysis()} />
-              <WaveformPreview analysis={waveformAnalysis()} />
+              <WaveformPreview analysis={waveformAnalysis()} loading={waveformLoadState() === "loading"} />
               <div class={styles.playhead} style={{ left: `${previewProgress() * 100}%` }} />
-              <Show when={!waveformAnalysis()}>
-                <div class={styles.waveformStatus}>Loading Waveform</div>
+              <Show when={waveformLoadState() !== "ready"}>
+                <div class={styles.waveformStatus}>
+                  {waveformLoadState() === "error" ? "Waveform Unavailable" : "Loading Waveform"}
+                </div>
               </Show>
             </div>
             <div class={styles.previewFileName} title={file().name}>{file().name}</div>
@@ -602,25 +701,25 @@ export function AudioFilesPage() {
             </div>
             <div class={styles.previewControls}>
               <HoverInfo content="Play from start">
-                <Button iconOnly onClick={() => void playPreview(file(), "forward", { restart: true, progress: 0 })} aria-label="Play from start">
+                <Button variant="ghost" iconOnly onClick={() => void playPreview(file(), "forward", { restart: true, progress: 0 })} aria-label="Play from start">
                   <Icon name="ph:skip-back" size={18} decorative />
                 </Button>
               </HoverInfo>
               <HoverInfo content="Play / pause">
-                <Button iconOnly selected={playingId() === file().id} onClick={() => void playPreview(file(), "forward", { progress: previewProgress() >= 1 ? 0 : previewProgress() })} aria-label="Play or pause">
+                <Button variant="ghost" iconOnly selected={playingId() === file().id} onClick={() => void playPreview(file(), "forward", { progress: previewProgress() >= 1 ? 0 : previewProgress() })} aria-label="Play or pause">
                   <Icon name={playingId() === file().id ? "ph:pause-fill" : "ph:play-fill"} size={18} decorative />
                 </Button>
               </HoverInfo>
               <HoverInfo content="Playback speed">
-                <Button iconOnly onClick={cycleSpeed} aria-label={`Playback speed ${previewSpeed()}x`}>{previewSpeed()}x</Button>
+                <Button variant="ghost" iconOnly onClick={cycleSpeed} aria-label={`Playback speed ${previewSpeed()}x`}>{previewSpeed()}x</Button>
               </HoverInfo>
               <HoverInfo content="Play backwards">
-                <Button iconOnly selected={playingId() === file().id && previewDirection() === "reverse"} onClick={toggleReversePlayback} aria-label="Play backwards">
+                <Button variant="ghost" iconOnly selected={playingId() === file().id && previewDirection() === "reverse"} onClick={toggleReversePlayback} aria-label="Play backwards">
                   <Icon name="ph:rewind-fill" size={18} decorative />
                 </Button>
               </HoverInfo>
               <HoverInfo content="Loop preview">
-                <Button iconOnly selected={loopPreview()} onClick={toggleLoop} aria-label="Loop preview">
+                <Button variant="ghost" iconOnly selected={loopPreview()} onClick={toggleLoop} aria-label="Loop preview">
                   <Icon name="ph:repeat" size={18} decorative />
                 </Button>
               </HoverInfo>
@@ -647,13 +746,13 @@ export function AudioFilesPage() {
             </dl>
             <ActionFooter class={styles.previewActions}>
               <HoverInfo content={canRevealAudioReference(file()) ? "Reveal the referenced file in Finder" : "Reveal is available only for file references in the native app"}>
-                <Button size="sm" disabled={!canRevealAudioReference(file())} onClick={() => void viewInFolder(file())}>
+                <Button variant="ghost" size="sm" disabled={!canRevealAudioReference(file())} onClick={() => void viewInFolder(file())}>
                   <Icon name="ph:folder-open" size={18} decorative />
                   Reveal File
                 </Button>
               </HoverInfo>
               <HoverInfo content="Copy the library reference">
-                <Button size="sm" disabled={!copyableAudioReference(file())} onClick={() => void copyReference(file())}>
+                <Button variant="ghost" size="sm" disabled={!copyableAudioReference(file())} onClick={() => void copyReference(file())}>
                   <Icon name="ph:copy" size={18} decorative />
                   Copy Reference
                 </Button>
@@ -682,8 +781,9 @@ function ScopeOverlay({ analysis }: { analysis: WaveformAnalysis | null }) {
   );
 }
 
-function WaveformPreview({ analysis }: { analysis: WaveformAnalysis | null }) {
-  if (!analysis) return <div class={styles.waveformLoading} />;
+function WaveformPreview({ analysis, loading }: { analysis: WaveformAnalysis | null; loading: boolean }) {
+  if (loading) return <div class={styles.waveformLoading} />;
+  if (!analysis) return null;
   if (analysis.left.upper.length === 0 && analysis.right.upper.length === 0) return null;
 
   const left = stereoWaveformPath(channelEnvelope(analysis.left), 50, -42);
@@ -739,7 +839,11 @@ interface SortHeaderProps {
 function SortHeader({ label, sortKey, current, onSort }: SortHeaderProps) {
   const active = current.key === sortKey;
   return (
-    <Button variant="ghost" selected={active} class={styles.sortHeader} onClick={() => onSort(sortKey)}>
+    <Button
+      variant="ghost"
+      class={`${styles.sortHeader} ${active ? styles.sortHeaderActive : ""}`}
+      onClick={() => onSort(sortKey)}
+    >
       <span>{label}</span>
       {active && <Icon name={current.direction === "asc" ? "ph:caret-up" : "ph:caret-down"} size={18} decorative />}
     </Button>
@@ -822,11 +926,12 @@ function clamp01(value: number) {
   return Math.max(0, Math.min(1, value));
 }
 
-function filterAudioFiles(files: AudioFile[], query: string) {
+function filterAudioFiles(files: AudioFile[], query: string, status: AudioStatusFilter) {
   const normalized = query.trim().toLowerCase();
-  if (!normalized) return files;
   return files.filter((file) => {
     const reference = audioReferenceState(file);
+    if (status !== "all" && reference.label.toLowerCase() !== status) return false;
+    if (!normalized) return true;
     return [
       file.name,
       file.path,
@@ -885,10 +990,28 @@ function getPreviewContext(): AudioContext {
 async function loadAudioBuffer(ctx: AudioContext, cache: Map<string, AudioBuffer>, file: AudioFile) {
   const cached = cache.get(file.path);
   if (cached) return cached;
-  const response = await fetch(playableAudioUrl(file.path));
+  const nativePath = nativeAudioFilePath(file.path);
+  let url = playableAudioUrl(file.path);
+  if (isNative() && nativePath) {
+    const nativeResponse = await send({ kind: "audio.previewData", path: nativePath });
+    if (!nativeResponse.audioDataUrl) throw new Error(nativeResponse.error ?? "Native audio preview data unavailable.");
+    url = nativeResponse.audioDataUrl;
+  }
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`Audio preview request failed (${response.status}).`);
   const buffer = await ctx.decodeAudioData(await response.arrayBuffer());
   cache.set(file.path, buffer);
   return buffer;
+}
+
+function nativeAudioFilePath(path: string): string | null {
+  if (path.startsWith("/")) return path;
+  if (!path.startsWith("file:")) return null;
+  try {
+    return decodeURIComponent(new URL(path).pathname);
+  } catch {
+    return null;
+  }
 }
 
 function reverseAudioBuffer(ctx: AudioContext, source: AudioBuffer) {
@@ -956,11 +1079,14 @@ function analyzeAudioBuffer(buffer: AudioBuffer, bucketCount: number): WaveformA
 }
 
 function nativeWaveformAnalysis(file: AudioFile, waveform: AudioWaveformSummary): WaveformAnalysis {
+  const leftPeak = waveformChannelPeak(waveform.left);
+  const rightPeak = waveformChannelPeak(waveform.right);
+  const globalPeak = Math.max(leftPeak, rightPeak);
   return {
-    left: waveform.left,
-    right: waveform.right,
-    leftDb: file.leftPeakDbFS ?? Number.NEGATIVE_INFINITY,
-    rightDb: file.rightPeakDbFS ?? Number.NEGATIVE_INFINITY,
+    left: normalizeWaveformChannel(waveform.left, globalPeak),
+    right: normalizeWaveformChannel(waveform.right, globalPeak),
+    leftDb: finiteOrFallback(file.leftPeakDbFS, amplitudeToDb(leftPeak)),
+    rightDb: finiteOrFallback(file.rightPeakDbFS, amplitudeToDb(rightPeak)),
     integratedLufs: file.integratedLufs ?? Number.NEGATIVE_INFINITY,
     rmsDb: file.rmsDbFS ?? Number.NEGATIVE_INFINITY,
     truePeakDb: file.truePeakDbTP ?? Number.NEGATIVE_INFINITY,
@@ -970,6 +1096,54 @@ function nativeWaveformAnalysis(file: AudioFile, waveform: AudioWaveformSummary)
     clippingRatio: file.clippingRatio ?? 0,
     stereoCorrelation: file.stereoCorrelation ?? Number.NaN,
   };
+}
+
+function waveformChannelPeak(channel: WaveformChannelAnalysis) {
+  return Math.max(0, ...channel.upper, ...channel.lower);
+}
+
+function finiteOrFallback(value: number | undefined, fallback: number) {
+  return value != null && Number.isFinite(value) ? value : fallback;
+}
+
+function normalizeWaveformChannel(channel: WaveformChannelAnalysis, globalPeak: number): WaveformChannelAnalysis {
+  return {
+    upper: normalizePeaks(channel.upper, globalPeak),
+    lower: normalizePeaks(channel.lower, globalPeak),
+  };
+}
+
+function emptyWaveformAnalysis(): WaveformAnalysis {
+  return {
+    left: { upper: [], lower: [] },
+    right: { upper: [], lower: [] },
+    leftDb: Number.NEGATIVE_INFINITY,
+    rightDb: Number.NEGATIVE_INFINITY,
+    integratedLufs: Number.NEGATIVE_INFINITY,
+    rmsDb: Number.NEGATIVE_INFINITY,
+    truePeakDb: Number.NEGATIVE_INFINITY,
+    crestDb: Number.NEGATIVE_INFINITY,
+    dcOffset: 0,
+    clippingCount: 0,
+    clippingRatio: 0,
+    stereoCorrelation: Number.NaN,
+  };
+}
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timeout = window.setTimeout(() => reject(new Error(message)), timeoutMs);
+    promise.then(
+      (value) => {
+        window.clearTimeout(timeout);
+        resolve(value);
+      },
+      (error) => {
+        window.clearTimeout(timeout);
+        reject(error);
+      },
+    );
+  });
 }
 
 function normalizePeaks(peaks: number[], globalPeak: number) {

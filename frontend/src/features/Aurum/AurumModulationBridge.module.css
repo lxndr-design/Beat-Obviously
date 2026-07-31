@@ -1,0 +1,73 @@
+.bridge {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 9px;
+  border: var(--border-soft);
+  padding: 9px;
+  overflow-x: auto;
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.header > div { min-width: 0; }
+.header > button { flex: 0 0 auto; }
+
+.header h4,
+.header p,
+.empty {
+  margin: 0;
+}
+
+.header p,
+.empty {
+  color: var(--color-fg);
+  opacity: var(--structural-muted-opacity);
+  font-size: var(--font-size-ui);
+}
+
+.sourceGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px 15px;
+}
+
+.routeHeader,
+.route {
+  display: grid;
+  min-width: 606px;
+  grid-template-columns: 36px minmax(111px, 1fr) minmax(111px, 1fr) minmax(120px, 1.2fr) 90px 45px 33px;
+  align-items: center;
+  gap: 6px;
+}
+
+.routeHeader {
+  color: var(--color-fg);
+  opacity: var(--structural-muted-opacity);
+  font-size: var(--font-size-hint);
+  text-transform: uppercase;
+}
+
+.route {
+  min-height: 33px;
+  border-top: var(--border-soft);
+  padding-top: 6px;
+}
+
+.modulatedControl {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.modulatedControl > span:last-child {
+  justify-self: end;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

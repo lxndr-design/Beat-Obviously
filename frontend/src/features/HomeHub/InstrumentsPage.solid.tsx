@@ -1,11 +1,10 @@
 import { createEffect, createMemo, createSignal, onCleanup } from "solid-js";
-import { ActionFooter, Button, FloatingSelect, HoverInfo, Icon, MarqueeText, TextInput } from "../../solid-ui";
+import { ActionFooter, Button, FloatingSelect, HoverInfo, Icon, LibrarySearch, MarqueeText } from "../../solid-ui";
 import {
   cachedInstrumentSampleBuffer,
   createInstrumentSampleBufferSource,
   createInstrumentBufferSource,
   instrumentSampleUrls,
-  preloadInstrumentSample,
   preloadInstrumentSampleUrl,
   previewFrequency,
   renderedInstrumentBuffer,
@@ -27,8 +26,12 @@ import { AssetPageShell, AssetStateMessage } from "./AssetPageShell.solid";
 import styles from "./InstrumentsPage.module.css";
 
 const PREVIEW_SECONDS = 2.0;
+const INSTRUMENT_WAVEFORM_TIMEOUT_MS = 10_000;
 type SampleGrouping = "length" | "volume" | "hit" | "pitch" | "single";
 type SampleVariable = Exclude<SampleGrouping, "single">;
+type InstrumentSortMode = "name-asc" | "name-desc" | "edited-desc" | "usage-desc" | "type";
+type InstrumentFilterMode = "all" | "synth" | "sample" | "drum" | "user";
+type InstrumentGroupMode = "set" | "alphabetical" | "type" | "category" | "source";
 
 const SAMPLE_VARIABLE_OPTIONS: Array<{ mode: SampleVariable; label: string }> = [
   { mode: "length", label: "Length" },
@@ -39,6 +42,27 @@ const SAMPLE_VARIABLE_OPTIONS: Array<{ mode: SampleVariable; label: string }> = 
 const CATEGORY_OPTIONS = [
   { value: "", label: "Unassigned" },
   ...INSTRUMENT_TAXONOMY_CATEGORY_OPTIONS,
+];
+const INSTRUMENT_SORT_OPTIONS = [
+  { value: "name-asc", label: "Name A–Z" },
+  { value: "name-desc", label: "Name Z–A" },
+  { value: "edited-desc", label: "Last Edited" },
+  { value: "usage-desc", label: "Most Used" },
+  { value: "type", label: "Engine Type" },
+];
+const INSTRUMENT_FILTER_OPTIONS = [
+  { value: "all", label: "All" },
+  { value: "synth", label: "Synths" },
+  { value: "sample", label: "Samplers" },
+  { value: "drum", label: "Drums" },
+  { value: "user", label: "User" },
+];
+const INSTRUMENT_GROUP_OPTIONS = [
+  { value: "set", label: "By Set" },
+  { value: "alphabetical", label: "Alphabetical" },
+  { value: "type", label: "By Engine" },
+  { value: "category", label: "By Category" },
+  { value: "source", label: "By Source" },
 ];
 
 type RefValue<T> = { current: T };
@@ -69,9 +93,13 @@ export function InstrumentsPage() {
   const removeInstrument = useInstrumentStore.getState().removeInstrument;
   const [activeId, setActiveId] = createSignal<string | null>(null);
   const [playingId, setPlayingId] = createSignal<string | null>(null);
+  const [previewLoadingId, setPreviewLoadingId] = createSignal<string | null>(null);
   const [loopPreview, setLoopPreview] = createSignal(false);
-  const [searchOpen, setSearchOpen] = createSignal(false);
   const [searchQuery, setSearchQuery] = createSignal("");
+  const [sortMode, setSortMode] = createSignal<InstrumentSortMode>("name-asc");
+  const [filterMode, setFilterMode] = createSignal<InstrumentFilterMode>("all");
+  const [groupMode, setGroupMode] = createSignal<InstrumentGroupMode>("set");
+  const [collapsedGroups, setCollapsedGroups] = createSignal<Record<string, boolean>>({}, { equals: false });
   const [taxonomyCategoryOpen, setTaxonomyCategoryOpen] = createSignal(false);
   const [taxonomyInstrumentOpen, setTaxonomyInstrumentOpen] = createSignal(false);
   const [samplePreviewIndex, setSamplePreviewIndex] = createSignal<Record<string, number>>({}, { equals: false });
@@ -91,11 +119,23 @@ export function InstrumentsPage() {
     loop: false,
   } };
   const requestRef: RefValue<number> = { current: 0 };
+  const playbackRequestRef: RefValue<number> = { current: 0 };
 
   const visibleInstruments = createMemo(() => {
     const query = searchQuery().trim().toLowerCase();
-    if (!query) return instruments();
-    return instruments().filter((instrument) => instrument.name.toLowerCase().includes(query));
+    const filtered = instruments().filter((instrument) => {
+      if (!instrumentMatchesFilter(instrument, filterMode())) return false;
+      if (!query) return true;
+      const setName = instrumentSetDisplayName(sets().find((set) => set.id === (instrument.setId ?? "user-instruments")));
+      return [
+        instrument.name,
+        formatInstrumentType(instrument),
+        instrumentCategoryLabel(instrument),
+        setName,
+        instrument.userCreated ? "user" : "factory",
+      ].some((value) => value.toLowerCase().includes(query));
+    });
+    return [...filtered].sort((a, b) => compareInstruments(a, b, sortMode(), usageByInstrument()));
   });
   const activeInstrument = createMemo(() => visibleInstruments().find((instrument) => instrument.id === activeId()) ?? visibleInstruments()[0] ?? null);
   const activeSampleUrls = createMemo(() => activeInstrument() ? instrumentSampleUrls(activeInstrument()!) : []);
@@ -104,12 +144,15 @@ export function InstrumentsPage() {
   const activeSampleUrl = createMemo(() => activeInstrument() && !isSustainedPreview(activeInstrument()!) && activeSampleUrls().length > 0
     ? activeSampleUrls()[(samplePreviewIndex()[activeInstrument()!.id] ?? 0) % activeSampleUrls().length]
     : undefined);
-  const grouped = createMemo(
-    () => sets().map((set) => ({
-      set,
-      instruments: visibleInstruments().filter((instrument) => (instrument.setId ?? "user-instruments") === set.id),
-    })).filter((group) => group.instruments.length > 0),
-  );
+  const grouped = createMemo(() => groupInstruments(visibleInstruments(), sets(), groupMode()));
+
+  function collapseAllGroups() {
+    setCollapsedGroups(Object.fromEntries(grouped().map((group) => [group.key, true])));
+  }
+
+  function expandAllGroups() {
+    setCollapsedGroups({});
+  }
 
   createEffect(() => {
     if (activeId() && visibleInstruments().some((instrument) => instrument.id === activeId())) return;
@@ -152,7 +195,11 @@ export function InstrumentsPage() {
 
     if (sampleUrl) {
       const ctx = getPreviewContext(previewContextRef);
-      void loadSampleWaveform(ctx, sampleUrl, sampleZoneForUrl(instrument, sampleUrl, 112))
+      void withTimeout(
+        loadSampleWaveform(ctx, sampleUrl, sampleZoneForUrl(instrument, sampleUrl, 112)),
+        INSTRUMENT_WAVEFORM_TIMEOUT_MS,
+        "Sample waveform timed out.",
+      )
         .then((waveform) => {
           if (requestRef.current !== requestId) return;
           setRenderState({ waveform, analysis: null, loading: false });
@@ -170,7 +217,7 @@ export function InstrumentsPage() {
       return;
     }
 
-    void send({
+    void withTimeout(send({
       kind: "instrument.renderPreview",
       instrument,
       note: 60,
@@ -179,14 +226,15 @@ export function InstrumentsPage() {
       durationBeats: 2,
       bucketCount: 128,
       includeAudio: isSustainedPreview(instrument),
-    })
+    }), INSTRUMENT_WAVEFORM_TIMEOUT_MS, "Instrument waveform timed out.")
       .then((response) => {
         if (requestRef.current !== requestId) return;
-        const fallbackWaveform = response.waveform && response.waveform.left.upper.length > 0
-          ? null
-          : renderedFallbackWaveform(previewContextRef, instrument, projectBpm());
+        const responseWaveform = isUsableWaveform(response.waveform)
+          ? normalizeWaveformSummary(response.waveform)
+          : null;
+        const fallbackWaveform = responseWaveform ? null : renderedFallbackWaveform(previewContextRef, instrument, projectBpm());
         setRenderState({
-          waveform: response.waveform && response.waveform.left.upper.length > 0 ? response.waveform : fallbackWaveform,
+          waveform: responseWaveform ?? fallbackWaveform,
           analysis: response.analysis ?? null,
           audioDataUrl: response.audioDataUrl,
           loading: false,
@@ -205,6 +253,8 @@ export function InstrumentsPage() {
   });
 
   function stopPreview() {
+    playbackRequestRef.current += 1;
+    setPreviewLoadingId(null);
     stopProgress();
     const preview = previewRef.current;
     previewRef.current = null;
@@ -289,49 +339,68 @@ export function InstrumentsPage() {
   }
 
   async function playPreview(instrument: Instrument, initialProgress = 0) {
-    if (playingId() === instrument.id && initialProgress <= 0) {
+    if ((playingId() === instrument.id || previewLoadingId() === instrument.id) && initialProgress <= 0) {
       stopPreview();
       return;
     }
     stopPreview();
-    const ctx = getPreviewContext(previewContextRef);
-    if (ctx.state === "suspended") await ctx.resume();
-    await preloadInstrumentSample(ctx, instrument).catch(() => undefined);
+    const requestId = playbackRequestRef.current;
+    setPreviewLoadingId(instrument.id);
+    await nextUiTurn();
+    if (playbackRequestRef.current !== requestId) return;
 
-    const sampleUrls = instrumentSampleUrls(instrument);
-    const isSustained = isSustainedPreview(instrument);
-    let source: AudioBufferSourceNode | null = null;
-    if (!isSustained && sampleUrls.length > 0) {
-      const index = sampleCursorRef.current.get(instrument.id) ?? (samplePreviewIndex()[instrument.id] ?? 0);
-      const sampleUrl = sampleUrls[index % sampleUrls.length];
-      setSamplePreviewIndex((current) => ({ ...current, [instrument.id]: index % sampleUrls.length }));
-      sampleCursorRef.current.set(instrument.id, (index + 1) % sampleUrls.length);
-      source = createInstrumentSampleBufferSource(ctx, instrument, sampleUrl, previewFrequency(instrument), 112);
-    }
-    source ??= createInstrumentBufferSource(ctx, instrument, PREVIEW_SECONDS, previewFrequency(instrument), undefined, 112, projectBpm());
-    if (isSustained && activeInstrument()?.id === instrument.id && renderState().audioDataUrl) {
-      source = await nativePreviewSource(ctx, nativePreviewBufferRef.current, instrument.id, renderState().audioDataUrl!) ?? source;
-    }
-    const shouldLoop = isSustained || loopPreview();
-    source.loop = shouldLoop;
-    const gain = ctx.createGain();
-    gain.gain.value = 0.24;
-    source.connect(gain);
-    gain.connect(ctx.destination);
-    source.onended = () => {
-      if (previewRef.current?.source === source) {
-        previewRef.current = null;
-        gain.disconnect();
-        setPlayingId(null);
-        stopProgress();
+    try {
+      const ctx = getPreviewContext(previewContextRef);
+      if (ctx.state === "suspended") await ctx.resume();
+      if (playbackRequestRef.current !== requestId) return;
+
+      const sampleUrls = instrumentSampleUrls(instrument);
+      const isSustained = isSustainedPreview(instrument);
+      let source: AudioBufferSourceNode | null = null;
+      if (!isSustained && sampleUrls.length > 0) {
+        const index = sampleCursorRef.current.get(instrument.id) ?? (samplePreviewIndex()[instrument.id] ?? 0);
+        const sampleUrl = sampleUrls[index % sampleUrls.length];
+        setSamplePreviewIndex((current) => ({ ...current, [instrument.id]: index % sampleUrls.length }));
+        sampleCursorRef.current.set(instrument.id, (index + 1) % sampleUrls.length);
+        await preloadInstrumentSampleUrl(ctx, sampleUrl);
+        if (playbackRequestRef.current !== requestId) return;
+        source = createInstrumentSampleBufferSource(ctx, instrument, sampleUrl, previewFrequency(instrument), 112);
+        if (!source) throw new Error(`Could not load sampler audio: ${sampleUrl}`);
       }
-    };
-    previewRef.current = { source, gain };
-    setPlayingId(instrument.id);
-    const duration = source.buffer?.duration ?? PREVIEW_SECONDS;
-    const offset = clamp01(initialProgress) * duration;
-    source.start(0, Math.min(Math.max(0, offset), Math.max(0, duration - 0.001)));
-    startProgress(ctx, duration, shouldLoop, initialProgress);
+      source ??= createInstrumentBufferSource(ctx, instrument, PREVIEW_SECONDS, previewFrequency(instrument), undefined, 112, projectBpm());
+      if (isSustained && activeInstrument()?.id === instrument.id && renderState().audioDataUrl) {
+        source = await nativePreviewSource(ctx, nativePreviewBufferRef.current, instrument.id, renderState().audioDataUrl!) ?? source;
+      }
+      if (playbackRequestRef.current !== requestId) {
+        source.disconnect();
+        return;
+      }
+      const shouldLoop = isSustained || loopPreview();
+      source.loop = shouldLoop;
+      const gain = ctx.createGain();
+      gain.gain.value = 0.24;
+      source.connect(gain);
+      gain.connect(ctx.destination);
+      source.onended = () => {
+        if (previewRef.current?.source === source) {
+          previewRef.current = null;
+          gain.disconnect();
+          setPlayingId(null);
+          stopProgress();
+        }
+      };
+      previewRef.current = { source, gain };
+      setPlayingId(instrument.id);
+      const duration = source.buffer?.duration ?? PREVIEW_SECONDS;
+      const offset = clamp01(initialProgress) * duration;
+      source.start(0, Math.min(Math.max(0, offset), Math.max(0, duration - 0.001)));
+      startProgress(ctx, duration, shouldLoop, initialProgress);
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error("[Beat instrument preview] Failed to prepare preview", { instrumentId: instrument.id, error });
+    } finally {
+      if (playbackRequestRef.current === requestId) setPreviewLoadingId(null);
+    }
   }
 
   function deleteActiveInstrument() {
@@ -348,35 +417,64 @@ export function InstrumentsPage() {
       browserLabel="Instrument browser"
       previewLabel="Instrument preview"
       previewClassName={styles.preview}
+      browserClassName={styles.instrumentBrowser}
       browser={
         <>
-        <div class={styles.actions}>
-          <Button
-            iconOnly
-            size="sm"
-            selected={searchOpen() || searchQuery().length > 0}
-            onClick={() => setSearchOpen((value) => !value)}
-            aria-label="Search instruments by name"
-          >
-            <Icon name="ph:magnifying-glass" size={18} decorative />
-          </Button>
-          {(searchOpen() || searchQuery().length > 0) && (
-            <TextInput
+        <div class={styles.browserControls}>
+          <div class={styles.actionsPrimary}>
+            <span class={styles.searchWrap}>
+              <Icon name="ph:magnifying-glass" size={18} decorative />
+              <LibrarySearch
+                className={styles.searchInput}
+                value={searchQuery()}
+                onInput={(event) => setSearchQuery(event.currentTarget.value)}
+                placeholder="Search name, engine, set…"
+                aria-label="Search instruments"
+              />
+            </span>
+            <FloatingSelect
+              className={styles.toolbarSelect}
               layout="bare"
-              inputClassName={styles.searchInput}
-              value={searchQuery()}
-              onInput={(event) => setSearchQuery(event.currentTarget.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Escape") {
-                  setSearchQuery("");
-                  setSearchOpen(false);
-                }
-              }}
-              placeholder="Name"
-              autofocus
+              value={filterMode()}
+              options={INSTRUMENT_FILTER_OPTIONS}
+              ariaLabel="Filter instruments"
+              onChange={(value) => setFilterMode(value as InstrumentFilterMode)}
             />
-          )}
-          <span class={styles.count}>{visibleInstruments().length}</span>
+            <span class={styles.count}>{visibleInstruments().length}/{instruments().length}</span>
+          </div>
+          <div class={styles.actionsSecondary}>
+            <FloatingSelect
+              className={styles.navigationSelect}
+              layout="bare"
+              value={groupMode()}
+              options={INSTRUMENT_GROUP_OPTIONS}
+              ariaLabel="Group instruments"
+              onChange={(value) => {
+                setGroupMode(value as InstrumentGroupMode);
+                setCollapsedGroups({});
+              }}
+            />
+            <FloatingSelect
+              className={styles.navigationSelect}
+              layout="bare"
+              value={sortMode()}
+              options={INSTRUMENT_SORT_OPTIONS}
+              ariaLabel="Sort instruments"
+              onChange={(value) => setSortMode(value as InstrumentSortMode)}
+            />
+            <span class={styles.groupActions}>
+              <HoverInfo content="Collapse all groups">
+                <Button iconOnly size="sm" variant="ghost" onClick={collapseAllGroups} aria-label="Collapse all instrument groups">
+                  <Icon name="ph:minus" size={18} decorative />
+                </Button>
+              </HoverInfo>
+              <HoverInfo content="Expand all groups">
+                <Button iconOnly size="sm" variant="ghost" onClick={expandAllGroups} aria-label="Expand all instrument groups">
+                  <Icon name="ph:plus" size={18} decorative />
+                </Button>
+              </HoverInfo>
+            </span>
+          </div>
         </div>
         <div class={styles.rows}>
           {loading() && instruments().length === 0 ? (
@@ -398,11 +496,19 @@ export function InstrumentsPage() {
             </div>
           ) : grouped().map((group) => (
             <div class={styles.group}>
-              <div class={styles.groupHeader}>
-                <span>{instrumentSetDisplayName(group.set)}</span>
+              <Button
+                variant="ghost"
+                class={styles.groupHeader}
+                aria-expanded={Boolean(searchQuery()) || !collapsedGroups()[group.key]}
+                onClick={() => setCollapsedGroups((current) => ({ ...current, [group.key]: !current[group.key] }))}
+              >
+                <span class={styles.groupTitle}>
+                  <Icon name={(Boolean(searchQuery()) || !collapsedGroups()[group.key]) ? "ph:caret-down" : "ph:caret-right"} size={18} decorative />
+                  <span>{group.title}</span>
+                </span>
                 <strong>{group.instruments.length}</strong>
-              </div>
-              {group.instruments.map((instrument) => (
+              </Button>
+              {(Boolean(searchQuery()) || !collapsedGroups()[group.key]) && group.instruments.map((instrument) => (
                 <div
                   class={`${styles.row} ${activeInstrument()?.id === instrument.id ? styles.rowActive : ""}`}
                   role="button"
@@ -423,13 +529,16 @@ export function InstrumentsPage() {
                       variant="ghost"
                       selected={playingId() === instrument.id}
                       class={styles.rowPlay}
-                      aria-label={`Preview ${instrument.name}`}
+                      aria-label={`${previewLoadingId() === instrument.id ? "Cancel loading" : playingId() === instrument.id ? "Pause" : "Preview"} ${instrument.name}`}
+                      aria-busy={previewLoadingId() === instrument.id}
                       onClick={(event) => {
                         event.stopPropagation();
                         void playPreview(instrument);
                       }}
                     >
-                      <Icon name={playingId() === instrument.id ? "ph:pause-fill" : "ph:play-fill"} size={18} decorative />
+                      {previewLoadingId() === instrument.id
+                        ? <span class={styles.previewSpinner} aria-hidden="true" />
+                        : <Icon name={playingId() === instrument.id ? "ph:pause-fill" : "ph:play-fill"} size={18} decorative />}
                     </Button>
                   </span>
                 </div>
@@ -498,9 +607,12 @@ export function InstrumentsPage() {
                   iconOnly
                   selected={playingId() === activeInstrument()!.id}
                   onClick={() => void playPreview(activeInstrument()!)}
-                  aria-label="Play or pause instrument preview"
+                  aria-label={previewLoadingId() === activeInstrument()!.id ? "Cancel loading instrument preview" : "Play or pause instrument preview"}
+                  aria-busy={previewLoadingId() === activeInstrument()!.id}
                 >
-                  <Icon name={playingId() === activeInstrument()!.id ? "ph:pause-fill" : "ph:play-fill"} size={18} decorative />
+                  {previewLoadingId() === activeInstrument()!.id
+                    ? <span class={styles.previewSpinner} aria-hidden="true" />
+                    : <Icon name={playingId() === activeInstrument()!.id ? "ph:pause-fill" : "ph:play-fill"} size={18} decorative />}
                 </Button>
               </HoverInfo>
               <HoverInfo content="Loop sample preview">
@@ -586,16 +698,108 @@ export function InstrumentsPage() {
   );
 }
 
-function instrumentSetDisplayName(set: InstrumentSet): string {
+function instrumentSetDisplayName(set?: InstrumentSet): string {
+  if (!set) return "User Instruments";
   if (!set.factory || set.id === TEMPORARY_DS_INSTRUMENT_SET_ID || set.name === "Aurum Test") return set.name;
   return `Factory ${set.name}`;
 }
 
+function instrumentCategoryLabel(instrument: Instrument): string {
+  const categoryId = instrument.taxonomy?.categoryId ?? "";
+  return CATEGORY_OPTIONS.find((option) => option.value === categoryId)?.label ?? "Unassigned";
+}
+
+function instrumentMatchesFilter(instrument: Instrument, filter: InstrumentFilterMode): boolean {
+  if (filter === "all") return true;
+  if (filter === "user") return Boolean(instrument.userCreated);
+  const type = formatInstrumentType(instrument).toLowerCase();
+  const category = instrumentCategoryLabel(instrument).toLowerCase();
+  if (filter === "sample") return type.includes("sampler") || (instrument.sampleMap?.length ?? 0) > 0;
+  if (filter === "drum") return category.includes("drum") || category.includes("percussion");
+  return ["aether", "aurum", "lumen", "nodemap", "basic"].some((label) => type.includes(label));
+}
+
+function compareInstruments(
+  a: Instrument,
+  b: Instrument,
+  mode: InstrumentSortMode,
+  usage: Record<string, InstrumentUsageSummary>,
+): number {
+  if (mode === "name-desc") return b.name.localeCompare(a.name, undefined, { sensitivity: "base" });
+  if (mode === "edited-desc") {
+    const editedOrder = (b.updatedAt ?? b.createdAt ?? 0) - (a.updatedAt ?? a.createdAt ?? 0);
+    if (editedOrder !== 0) return editedOrder;
+  }
+  if (mode === "usage-desc") {
+    const aUsage = usage[a.id];
+    const bUsage = usage[b.id];
+    const segmentOrder = (bUsage?.segmentCount ?? 0) - (aUsage?.segmentCount ?? 0);
+    if (segmentOrder !== 0) return segmentOrder;
+    const trackOrder = (bUsage?.trackCount ?? 0) - (aUsage?.trackCount ?? 0);
+    if (trackOrder !== 0) return trackOrder;
+    const projectOrder = (bUsage?.projectCount ?? 0) - (aUsage?.projectCount ?? 0);
+    if (projectOrder !== 0) return projectOrder;
+  }
+  if (mode === "type") {
+    const typeOrder = formatInstrumentType(a).localeCompare(formatInstrumentType(b), undefined, { sensitivity: "base" });
+    if (typeOrder !== 0) return typeOrder;
+  }
+  return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+}
+
+function groupInstruments(
+  instruments: Instrument[],
+  sets: InstrumentSet[],
+  mode: InstrumentGroupMode,
+): Array<{ key: string; title: string; instruments: Instrument[] }> {
+  const setById = new Map(sets.map((set) => [set.id, set]));
+  const groups = new Map<string, { key: string; title: string; instruments: Instrument[] }>();
+  for (const instrument of instruments) {
+    const key = mode === "set"
+      ? `set:${instrument.setId ?? "user-instruments"}`
+      : mode === "alphabetical"
+        ? `alphabetical:${instrumentInitial(instrument.name)}`
+      : mode === "type"
+        ? `type:${formatInstrumentType(instrument)}`
+        : mode === "category"
+          ? `category:${instrument.taxonomy?.categoryId ?? "unassigned"}`
+          : `source:${instrument.userCreated ? "user" : "factory"}`;
+    const title = mode === "set"
+      ? instrumentSetDisplayName(setById.get(instrument.setId ?? "user-instruments"))
+      : mode === "alphabetical"
+        ? instrumentInitial(instrument.name)
+      : mode === "type"
+        ? formatInstrumentType(instrument)
+        : mode === "category"
+          ? instrumentCategoryLabel(instrument)
+          : instrument.userCreated ? "User" : "Factory";
+    const group = groups.get(key) ?? { key, title, instruments: [] };
+    group.instruments.push(instrument);
+    groups.set(key, group);
+  }
+  return [...groups.values()].sort((a, b) => a.title.localeCompare(b.title, undefined, { sensitivity: "base" }));
+}
+
+function instrumentInitial(name: string): string {
+  const initial = name.trim().slice(0, 1).toUpperCase();
+  return /^[A-Z]$/.test(initial) ? initial : "#";
+}
+
 function InstrumentWaveform(props: { waveform: AudioWaveformSummary | null }) {
-  const left = createMemo(() => props.waveform ? waveformPath(channelEnvelope(props.waveform.left), 50, -42) : null);
-  const right = createMemo(() => props.waveform ? waveformPath(channelEnvelope(props.waveform.right), 50, 42) : null);
+  const leftChannel = createMemo(() => {
+    const waveform = props.waveform;
+    if (!waveform) return null;
+    return waveform.left.upper.length > 0 ? waveform.left : waveform.right;
+  });
+  const rightChannel = createMemo(() => {
+    const waveform = props.waveform;
+    if (!waveform) return null;
+    return waveform.right.upper.length > 0 ? waveform.right : waveform.left;
+  });
+  const left = createMemo(() => leftChannel() ? waveformPath(channelEnvelope(leftChannel()!), 50, -42) : null);
+  const right = createMemo(() => rightChannel() ? waveformPath(channelEnvelope(rightChannel()!), 50, 42) : null);
   return (
-    props.waveform && props.waveform.left.upper.length > 0 ? (
+    left() && right() ? (
       <svg class={styles.waveformSvg} viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
         <polygon class={styles.waveformFill} points={left()!.fill} />
         <polyline class={styles.waveformTrace} points={left()!.trace} />
@@ -1260,6 +1464,26 @@ function clamp01(value: number) {
   return Math.max(0, Math.min(1, value));
 }
 
+function nextUiTurn(): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, 0));
+}
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timeout = window.setTimeout(() => reject(new Error(message)), timeoutMs);
+    promise.then(
+      (value) => {
+        window.clearTimeout(timeout);
+        resolve(value);
+      },
+      (error) => {
+        window.clearTimeout(timeout);
+        reject(error);
+      },
+    );
+  });
+}
+
 function toggleLoopPreviewForSource(preview: { source: AudioBufferSourceNode; gain: GainNode } | null, instrument: Instrument, loop: boolean) {
   if (!preview || isSustainedPreview(instrument)) return;
   preview.source.loop = loop;
@@ -1314,20 +1538,52 @@ async function loadSampleWaveform(
   zone?: NonNullable<Instrument["sampleMap"]>[number],
 ): Promise<AudioWaveformSummary> {
   const hasZoneSlice = Boolean(zone && (zone.startSample || zone.endSample));
-  if (!hasZoneSlice && isNative() && sampleUrl.startsWith("/")) {
-    const response = await send({ kind: "audio.waveform", path: sampleUrl, bucketCount: 128 });
-    if (isUsableWaveform(response.waveform)) return response.waveform;
-  }
+  const cachedBuffer = cachedInstrumentSampleBuffer(sampleUrl);
+  if (cachedBuffer) return audioBufferWaveform(sliceAudioBuffer(cachedBuffer, zone?.startSample, zone?.endSample), 128);
   const fileWaveform = await sampleFileWaveform(sampleUrl, zone, 128).catch(() => null);
   if (fileWaveform) return fileWaveform;
-  await preloadInstrumentSampleUrl(ctx, sampleUrl);
+  await preloadInstrumentSampleUrl(ctx, sampleUrl).catch(() => undefined);
   const buffer = cachedInstrumentSampleBuffer(sampleUrl);
-  if (!buffer) throw new Error("Sample waveform unavailable.");
-  return audioBufferWaveform(sliceAudioBuffer(buffer, zone?.startSample, zone?.endSample), 128);
+  if (buffer) return audioBufferWaveform(sliceAudioBuffer(buffer, zone?.startSample, zone?.endSample), 128);
+  const nativePath = nativeSamplePath(sampleUrl);
+  if (!hasZoneSlice && isNative() && nativePath) {
+    const response = await send({ kind: "audio.waveform", path: nativePath, bucketCount: 128 });
+    if (isUsableWaveform(response.waveform)) return normalizeWaveformSummary(response.waveform);
+  }
+  throw new Error("Sample waveform unavailable.");
 }
 
 function isUsableWaveform(waveform: AudioWaveformSummary | null | undefined): waveform is AudioWaveformSummary {
-  return Boolean(waveform && waveform.left.upper.length > 0 && waveform.right.upper.length > 0);
+  return Boolean(waveform && (waveform.left.upper.length > 0 || waveform.right.upper.length > 0));
+}
+
+function nativeSamplePath(url: string): string | null {
+  // Bundled Vite assets are root-relative WebView resources, not absolute
+  // filesystem paths in the native app.
+  if (url.startsWith("/samples/")) return null;
+  if (url.startsWith("/")) return url;
+  if (!url.startsWith("file:")) return null;
+  try {
+    return decodeURIComponent(new URL(url).pathname);
+  } catch {
+    return null;
+  }
+}
+
+function normalizeWaveformSummary(waveform: AudioWaveformSummary): AudioWaveformSummary {
+  const values = [
+    ...waveform.left.upper,
+    ...waveform.left.lower,
+    ...waveform.right.upper,
+    ...waveform.right.lower,
+  ];
+  const peak = values.reduce((maximum, value) => Math.max(maximum, Math.abs(value)), 0);
+  if (peak <= 0) return waveform;
+  const normalize = (channel: { upper: number[]; lower: number[] }) => ({
+    upper: channel.upper.map((value) => Math.min(1, Math.abs(value) / peak)),
+    lower: channel.lower.map((value) => Math.min(1, Math.abs(value) / peak)),
+  });
+  return { ...waveform, left: normalize(waveform.left), right: normalize(waveform.right) };
 }
 
 function sampleZoneForUrl(instrument: Instrument, sampleUrl: string, velocity = 127) {
@@ -1520,9 +1776,15 @@ function isSustainedPreview(instrument: Instrument) {
   return instrument.kind === "synth" || instrument.kind === "wavetable" || Boolean(instrument.aether || instrument.aurum || instrument.synthPatch);
 }
 
+function isLumenInstrument(instrument: Instrument) {
+  return instrument.synthPatch?.instrumentType === "lumen-hybrid-synth"
+    || instrument.synthPatch?.namespace === "lumen";
+}
+
 function formatEngine(instrument: Instrument) {
   if (instrument.nodeGraph) return "Nodemap";
   if (instrument.aurum) return "Aurum";
+  if (isLumenInstrument(instrument)) return "Lumen";
   if (instrument.aether || instrument.kind === "wavetable") return "Aether";
   if (instrument.kind === "sampler") return "Sampler";
   if (instrument.kind === "synth") return "Basic";
@@ -1533,6 +1795,7 @@ function formatInstrumentType(instrument: Instrument) {
   if (instrument.nodeGraph) return "Nodemap";
   if (instrument.aurum) return "Aurum";
   if (instrument.kind === "sampler" || instrument.waveform === "sample") return "Sampler";
+  if (isLumenInstrument(instrument)) return "Lumen";
   if (instrument.aether || instrument.kind === "wavetable") return "Aether";
   if (instrument.kind === "synth") return "Basic";
   return titleCase(instrument.kind);

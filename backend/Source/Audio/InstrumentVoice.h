@@ -146,6 +146,12 @@ namespace beat
                 std::shared_ptr<const SfzDecodedInstrument> sfzSource;
                 int routing { 0 };
                 std::array<float, 2> fxSends {};
+                bool reverse { false };
+                float playbackRate { 1.0f };
+                bool pingPongLoop { false };
+                float releaseTailMs { 4.0f };
+                float sfzTrimStartRatio { 0.0f };
+                float sfzTrimEndRatio { 1.0f };
             };
 
             struct AurumOperator
@@ -189,6 +195,7 @@ namespace beat
 
             struct DynamicModTarget
             {
+                static constexpr size_t modulationSourceCount = 27;
                 float lfo { 0.0f };
                 bool lfoBipolar { true };
                 float lfo2 { 0.0f };
@@ -221,6 +228,7 @@ namespace beat
                 float macro6 { 0.0f };
                 float macro7 { 0.0f };
                 float macro8 { 0.0f };
+                std::array<uint8_t, modulationSourceCount> curves {};
             };
 
             struct DynamicModulation
@@ -251,6 +259,11 @@ namespace beat
                 DynamicModTarget ampPan;
                 DynamicModTarget unisonDetune;
                 DynamicModTarget unisonSpread;
+                std::array<DynamicModTarget, 6> aurumOperatorLevel;
+                std::array<DynamicModTarget, 6> aurumOperatorPan;
+                std::array<DynamicModTarget, 2> aurumFilterCutoff;
+                std::array<DynamicModTarget, 2> aurumFilterResonance;
+                std::array<DynamicModTarget, 2> aurumFilterDrive;
             };
 
             float cutoff01    { 0.6f };
@@ -307,6 +320,7 @@ namespace beat
             float lfoPhaseOffset { 0.0f };
             bool lfoRetrigger { true };
             bool lfoOneShot { false };
+            float lfoKeytrackRate { 0.0f };
             bool lfo2Enabled { false };
             int lfo2Waveform { 1 };
             float lfo2RateHz { 0.5f };
@@ -315,10 +329,12 @@ namespace beat
             float lfo2PhaseOffset { 0.0f };
             bool lfo2Retrigger { true };
             bool lfo2OneShot { false };
+            float lfo2KeytrackRate { 0.0f };
             struct ExtraLfo
             {
                 bool enabled { false }; int waveform { 0 }; float rateHz { 1.0f }; float smoothing { 0.0f };
                 float randomPhase { 0.0f }; float phaseOffset { 0.0f }; bool retrigger { true }; bool oneShot { false };
+                float keytrackRate { 0.0f };
             };
             std::array<ExtraLfo, 8> extraLfos {};
             bool lfoPositionBipolar { true };
@@ -335,15 +351,15 @@ namespace beat
             bool mono { false };
             bool legato { false };
             bool hasAether { false };
-            bool hasLumus { false };
+            bool hasLumen { false };
             bool hasAetherSourceSends { false };
             AetherOscillator aetherOscA;
             AetherOscillator aetherOscB;
-            AetherOscillator lumusOscC;
+            AetherOscillator lumenOscC;
             AetherSub aetherSub;
             AetherNoise aetherNoise;
             AetherSampleSlot aetherSampleSlot1;
-            std::array<AetherSampleSlot, 3> lumusSampleSlots;
+            std::array<AetherSampleSlot, 3> lumenSampleSlots;
             struct AetherGranularSlot
             {
                 bool enabled { false };
@@ -352,7 +368,7 @@ namespace beat
                 int routing { 0 };
                 std::array<float, 2> fxSends {};
             } aetherGranularSlot2;
-            std::array<AetherGranularSlot, 3> lumusGranularSlots;
+            std::array<AetherGranularSlot, 3> lumenGranularSlots;
             float aetherRuntimeWarp { 0.0f };
             int aetherRuntimeWarpMode { 0 };
             float aetherRuntimeWarp2 { 0.0f };
@@ -407,6 +423,10 @@ namespace beat
         float memberPitchWheelSemitonesForTest() const noexcept { return pitchWheelSemitones; }
         float masterPitchWheelSemitonesForTest() const noexcept { return masterPitchWheelSemitones; }
         float memberPitchBendRangeForTest() const noexcept { return memberPitchBendRangeSemitones; }
+        int preparedRenderKernelForTest() const noexcept { return (int) preparedTopology.kernel; }
+        int preparedRouteLaneMaskForTest() const noexcept { return (int) preparedTopology.routeLaneMask; }
+        int preparedLumenSampleCountForTest() const noexcept { return preparedTopology.lumenSampleCount; }
+        int preparedLumenGranularCountForTest() const noexcept { return preparedTopology.lumenGranularCount; }
 #endif
 
         struct AllocationState
@@ -423,6 +443,29 @@ namespace beat
 
     private:
         using StereoSample = DriveStage::StereoFrame;
+
+        enum class RenderKernel : uint8_t
+        {
+            Legacy,
+            Aether,
+            Lumen,
+            Aurum,
+        };
+
+        struct PreparedRenderTopology
+        {
+            RenderKernel kernel { RenderKernel::Legacy };
+            uint8_t routeLaneMask { 1 };
+            std::array<uint8_t, 3> lumenSampleIndices {};
+            std::array<uint8_t, 3> lumenGranularIndices {};
+            int lumenSampleCount { 0 };
+            int lumenGranularCount { 0 };
+            bool lumenOscC { false };
+            bool aetherSample { false };
+            bool aetherSampleUsesSfz { false };
+            bool aetherGranular { false };
+            bool sourceSends { false };
+        };
 
         using WavetableUnisonPlan = WavetableUnison::Plan;
 
@@ -441,6 +484,11 @@ namespace beat
         void refreshCachedPanGains() noexcept;
         void refreshCachedPitchRates() noexcept;
         void refreshCachedDynamicModulationFlags() noexcept;
+        void refreshPreparedRenderTopology() noexcept;
+        template <RenderKernel kernel>
+        void renderPreparedBlock(juce::AudioBuffer<float>& outputBuffer,
+                                 int startSample,
+                                 int numSamples);
         float shapedEnvelope(float rawEnvelope) noexcept;
         float env1LoopValue() noexcept;
         float env2LoopValue() noexcept;
@@ -461,7 +509,7 @@ namespace beat
         std::array<double, 8> extraLfoPhases {};
         double  aetherOscAPhaseOffset { 0.0 };
         double  aetherOscBPhaseOffset { 0.0 };
-        double  lumusOscCPhaseOffset { 0.0 };
+        double  lumenOscCPhaseOffset { 0.0 };
         std::array<double, 48> aurumPhases {};
         std::array<float, 48> aurumOutputs {};
         std::array<float, 6> aurumReleaseLevels {};
@@ -469,6 +517,7 @@ namespace beat
         std::array<float, 6> aurumPhaseReleaseLevels {};
         int64_t aurumAgeSamples { 0 };
         int64_t aurumReleaseAgeSamples { -1 };
+        bool aurumNoteActive { false };
         float   level { 0.0f };
         float   noteKeytrack { 0.0f };
         float   modWheel { 0.0f };
@@ -481,34 +530,36 @@ namespace beat
         std::shared_ptr<const Wavetable> wavetableTable;
         std::shared_ptr<const Wavetable> aetherTableA;
         std::shared_ptr<const Wavetable> aetherTableB;
-        std::shared_ptr<const Wavetable> lumusTableC;
+        std::shared_ptr<const Wavetable> lumenTableC;
         std::shared_ptr<const Wavetable> retiredWavetableTable;
         std::shared_ptr<const Wavetable> retiredAetherTableA;
         std::shared_ptr<const Wavetable> retiredAetherTableB;
-        std::shared_ptr<const Wavetable> retiredLumusTableC;
+        std::shared_ptr<const Wavetable> retiredLumenTableC;
         WavetableOscillatorBank::Bank wavetableOscillators;
         WavetableOscillatorBank::Bank aetherOscillatorsA;
         WavetableOscillatorBank::Bank aetherOscillatorsB;
-        WavetableOscillatorBank::Bank lumusOscillatorsC;
+        WavetableOscillatorBank::Bank lumenOscillatorsC;
         WavetableUnisonPlan wavetableUnisonPlan;
         WavetableUnisonPlan aetherUnisonPlanA;
         WavetableUnisonPlan aetherUnisonPlanB;
-        WavetableUnisonPlan lumusUnisonPlanC;
+        WavetableUnisonPlan lumenUnisonPlanC;
         AetherTableStackRenderer::InteractionState aetherInteractionState;
         MappedSampleSourceSlot aetherSampleSlot1;
         SfzSourceSlot aetherSfzSlot1;
-        std::array<MappedSampleSourceSlot, 3> lumusSampleSlots;
-        std::array<SfzSourceSlot, 3> lumusSfzSlots;
-        std::array<GranularSourceSlot, 3> lumusGranularSlots;
+        std::array<MappedSampleSourceSlot, 3> lumenSampleSlots;
+        std::array<SfzSourceSlot, 3> lumenSfzSlots;
+        std::array<GranularSourceSlot, 3> lumenGranularSlots;
         GranularSourceSlot aetherGranularSlot2;
         VoiceAetherCache::PanGains cachedPanGains;
         VoiceAetherCache::PitchRates cachedPitchRates;
         DynamicModulation::TargetActivityFlags cachedDynamicTargets;
+        DynamicModulation::PreparedState cachedPreparedDynamicModulation;
         VoiceRealtimeRampState realtimeRampState;
         VoiceNoteAutomationState noteAutomationState;
         RealtimeRamp pitchFrequencyRamp;
         int activeWavetableUnison { 1 };
         int aurumOutputBusMask { 0 };
+        PreparedRenderTopology preparedTopology;
         VoiceStats::RenderWorkBlock currentBlockWork;
         DriveStage::State aetherRuntimeWarpState;
         DriveStage::State aetherDirectRuntimeWarpState;

@@ -1,10 +1,25 @@
-.actions {
+.instrumentBrowser.instrumentBrowser {
+  grid-template-rows: 66px minmax(0, 1fr);
+}
+
+.browserControls {
+  display: grid;
+  grid-template-rows: 33px 33px;
+  min-width: 0;
+}
+
+.actionsPrimary,
+.actionsSecondary {
   display: flex;
   align-items: center;
   justify-content: flex-start;
-  gap: 6px;
+  gap: 3px;
   padding: 0 6px;
   border-bottom: var(--border-fg);
+}
+
+.actionsSecondary {
+  padding-left: 33px;
 }
 
 .count {
@@ -13,28 +28,42 @@
   font-size: var(--font-size-ui);
 }
 
-.searchInput {
-  width: min(180px, 44%);
-  min-width: 96px;
+.searchWrap {
+  display: flex;
+  align-items: center;
+  flex: 1 1 150px;
+  min-width: 108px;
   height: var(--button-square-sm);
-  padding: 0 6px;
   border: var(--border-fg);
+  padding-left: 3px;
+  overflow: hidden;
+}
+
+.searchInput {
+  min-width: 0;
+  height: 100%;
+  min-height: 0;
+  border: 0;
+  padding: 0 3px;
   background: transparent;
-  color: var(--color-fg);
-  font: inherit;
-  font-size: var(--font-size-ui);
-  outline: none;
 }
 
-.searchInput::placeholder {
-  color: var(--color-fg-hover);
-  text-transform: uppercase;
+.toolbarSelect {
+  flex: 0 0 111px;
+  min-width: 90px;
 }
 
-.searchInput:focus,
-.searchInput:focus-visible {
-  outline: none;
-  background: var(--surface-subtle);
+.navigationSelect {
+  flex: 1 1 150px;
+  min-width: 108px;
+  max-width: 210px;
+}
+
+.groupActions {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: auto;
 }
 
 .rows {
@@ -48,10 +77,27 @@
   align-items: center;
   min-height: 27px;
   padding: 0 6px;
+  border: 0;
   border-bottom: 1px solid color-mix(in srgb, var(--color-fg) 48%, transparent);
   background: var(--surface-subtle);
+  color: var(--color-fg);
+  font: inherit;
   font-size: var(--font-size-ui);
+  text-align: left;
   text-transform: uppercase;
+  cursor: pointer;
+  transition: var(--interaction-transition);
+}
+
+.groupHeader:hover {
+  background: var(--interaction-hover-bg);
+}
+
+.groupTitle {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
 }
 
 .groupHeader span,
@@ -273,6 +319,23 @@
   display: flex;
   justify-content: center;
   gap: 6px;
+}
+
+.previewSpinner {
+  display: inline-block;
+  width: 15px;
+  height: 15px;
+  border: 2px solid color-mix(in srgb, currentColor 30%, transparent);
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: instrument-preview-spin var(--duration-fade) var(--ease-linear) infinite;
+  pointer-events: none;
+}
+
+@keyframes instrument-preview-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .taxonomyRow {

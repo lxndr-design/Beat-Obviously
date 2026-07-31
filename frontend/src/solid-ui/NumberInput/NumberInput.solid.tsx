@@ -86,8 +86,12 @@ export function NumberInput(props: NumberInputProps) {
           onInput={(event) => updateText(event.currentTarget.value)}
           onFocus={() => setEditing(true)}
           onBlur={(event) => {
+            // Commit while the editing guard is still active. Dropping the
+            // guard first lets the props-sync effect restore the previous
+            // value before the input's current text is read.
+            const raw = event.currentTarget.value;
+            commit(raw);
             setEditing(false);
-            commit(event.currentTarget.value);
           }}
           onKeyDown={onKeyDown}
         />

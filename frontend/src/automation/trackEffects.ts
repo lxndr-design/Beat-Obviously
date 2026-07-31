@@ -170,6 +170,18 @@ export function defaultEffectPointBeat(bpm: number, lengthBeats: number): number
   return Math.max(0, Math.min(lengthBeats, oneSecondBeat));
 }
 
+export function effectAutomationBeatFromDrag(
+  startBeat: number,
+  startClientX: number,
+  currentClientX: number,
+  beatsToPx: number,
+  lengthBeats: number,
+): number {
+  const safeScale = Math.max(0.000001, beatsToPx);
+  const beat = startBeat + (currentClientX - startClientX) / safeScale;
+  return Math.max(0, Math.min(Math.max(0, lengthBeats), beat));
+}
+
 export function effectValueToLaneY(value: number, param: EffectParamMeta): number {
   const normalized = normalizeEffectParamValue(value, param);
   return 18 - normalized * 14;

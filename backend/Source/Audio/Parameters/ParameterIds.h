@@ -6,20 +6,29 @@
 namespace beat::params
 {
     inline constexpr int patchSchemaVersion = 1;
-    inline constexpr int lumusPatchSchemaVersion = 10;
-    inline constexpr int lumusLegacyPatchSchemaVersion = 1;
-    inline constexpr int lumusPreviousPatchSchemaVersion = 2;
-    inline constexpr int lumusSampleModePatchSchemaVersion = 3;
-    inline constexpr int lumusSampleOwnershipPatchSchemaVersion = 4;
-    inline constexpr int lumusGranularPatchSchemaVersion = 5;
-    inline constexpr int lumusMultisamplePatchSchemaVersion = 6;
-    inline constexpr int lumusArpeggiatorPatchSchemaVersion = 7;
-    inline constexpr int lumusArpeggiatorSwingPatchSchemaVersion = 8;
-    inline constexpr int lumusArpeggiatorScalePatchSchemaVersion = 9;
-    inline constexpr int lumusClipPatchSchemaVersion = 10;
+    inline constexpr int lumenPatchSchemaVersion = 16;
+    inline constexpr int lumenLegacyPatchSchemaVersion = 1;
+    inline constexpr int lumenPreviousPatchSchemaVersion = 2;
+    inline constexpr int lumenSampleModePatchSchemaVersion = 3;
+    inline constexpr int lumenSampleOwnershipPatchSchemaVersion = 4;
+    inline constexpr int lumenGranularPatchSchemaVersion = 5;
+    inline constexpr int lumenMultisamplePatchSchemaVersion = 6;
+    inline constexpr int lumenArpeggiatorPatchSchemaVersion = 7;
+    inline constexpr int lumenArpeggiatorSwingPatchSchemaVersion = 8;
+    inline constexpr int lumenArpeggiatorScalePatchSchemaVersion = 9;
+    inline constexpr int lumenClipPatchSchemaVersion = 10;
+    inline constexpr int lumenPolyphonicClipPatchSchemaVersion = 11;
+    inline constexpr int lumenSamplePlaybackPatchSchemaVersion = 12;
+    inline constexpr int lumenSampleLoopTailPatchSchemaVersion = 13;
+    inline constexpr int lumenSampleSlicePatchSchemaVersion = 14;
+    inline constexpr int lumenSpectralWarpPatchSchemaVersion = 15;
+    inline constexpr int lumenKeytrackedLfoPatchSchemaVersion = 16;
     inline constexpr std::string_view instrumentTypeWavetableSynth { "wavetable-synth" };
-    inline constexpr std::string_view instrumentTypeLumusHybridSynth { "lumus-hybrid-synth" };
+    inline constexpr std::string_view instrumentTypeLumenHybridSynth { "lumen-hybrid-synth" };
+    inline constexpr std::string_view legacyInstrumentTypeLumusHybridSynth { "lumus-hybrid-synth" };
     inline constexpr std::string_view synthNamespace { "synth" };
+    inline constexpr std::string_view lumenNamespace { "lumen" };
+    inline constexpr std::string_view legacyLumusNamespace { "lumus" };
 
     namespace oscillator
     {

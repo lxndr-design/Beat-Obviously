@@ -9,4 +9,6 @@ namespace beat
     int synthWavetableBankForId(const juce::String& id);
 
     bool applySynthPatchContract(const juce::var& patch, InstrumentDefinition& instrument);
+    juce::var normalizeAurumModulationContract(const juce::var& modulation, int aurumVersion);
+    bool applyAurumModulationContract(const juce::var& aurum, InstrumentDefinition& instrument);
 }

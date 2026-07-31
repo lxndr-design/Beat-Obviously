@@ -15,8 +15,8 @@
 #include "BeatSynthesiser.h"
 #include "AudioQuality.h"
 #include "Realtime/VoiceNoteAutomation.h"
-#include "Midi/LumusArpeggiator.h"
-#include "Midi/LumusClipSequencer.h"
+#include "Midi/LumenArpeggiator.h"
+#include "Midi/LumenClipSequencer.h"
 #include <array>
 #include <atomic>
 #include <functional>
@@ -116,7 +116,8 @@ namespace beat
                                        juce::String* error = nullptr,
                                        RenderProgressCallback progress = {},
                                        int bitDepth = 16,
-                                       AudioQuality quality = AudioQuality::standardLive);
+                                       AudioQuality quality = AudioQuality::standardLive,
+                                       bool includeTail = true);
         static bool renderProjectRangeToWav(Project project,
                                             Beats startBeat,
                                             Beats endBeat,
@@ -138,7 +139,8 @@ namespace beat
                                      juce::String* error = nullptr,
                                      RenderProgressCallback progress = {},
                                      int bitDepth = 16,
-                                     AudioQuality quality = AudioQuality::standardLive);
+                                     AudioQuality quality = AudioQuality::standardLive,
+                                     bool includeTail = true);
         static int estimateProjectLatencySamples(const Project& project) noexcept;
         int getProjectLatencySamples() const noexcept { return projectLatencySamples; }
         void shutdown();
@@ -151,6 +153,10 @@ namespace beat
         void stopAllNotes(bool allowTailOff);
 #if defined(BEAT_BACKEND_STRESS_TEST)
         void holdRuntimeLockForTest(std::atomic<bool>& acquired, const std::atomic<bool>& release);
+        void setRealtimeDeadlineOverrunStateForTest(int consecutiveOverruns, bool safetySilenced) noexcept;
+        int getConsecutiveRealtimeDeadlineOverrunsForTest() const noexcept;
+        bool isTransportSafetySilencedForTest() const noexcept;
+        bool isMidiPreviewActiveForTest() const noexcept;
 #endif
         void requestPlay();
         void requestPause();
@@ -160,6 +166,26 @@ namespace beat
         void requestSpeed(double speed);
         void requestLoop(Beats start, Beats end);
         void requestClearLoop();
+        bool requestMidiPreviewNote(Id trackId,
+                                    Id instrumentId,
+                                    int pitch,
+                                    int velocity,
+                                    double delaySeconds,
+                                    double durationSeconds,
+                                    float segmentGainDb = 0.0f,
+                                    const MidiNote* sourceNote = nullptr,
+                                    int glideTargetPitch = -1,
+                                    float glideMs = 0.0f);
+        void requestStopMidiPreview(const Id& trackId);
+        bool requestAudioSegmentPreview(Id trackId,
+                                        Id audioFileId,
+                                        Beats sourceStartBeat,
+                                        Beats positionBeat,
+                                        Beats lengthBeats,
+                                        Beats fadeInBeats,
+                                        Beats fadeOutBeats,
+                                        float segmentGainDb);
+        void requestStopAudioPreview(const Id& trackId);
         bool queueRealtimeParameterChange(Id instrumentId,
                                           juce::String parameterId,
                                           float value,
@@ -217,6 +243,17 @@ namespace beat
             double copyMs { 0.0 };
             double totalMs { 0.0 };
             double loadPercent { 0.0 };
+            int hottestRouteIndex { -1 };
+            double hottestRouteMs { 0.0 };
+            int hottestVoiceRouteIndex { -1 };
+            double hottestVoiceRouteMs { 0.0 };
+            int64_t hottestVoiceRouteBlocks { 0 };
+            int64_t hottestVoiceRouteSamples { 0 };
+            int64_t hottestVoiceRouteOscillatorSamples { 0 };
+            int64_t hottestVoiceRouteWavetableSamples { 0 };
+            int hottestVoiceRouteMidiEvents { 0 };
+            int hottestVoiceRouteVoicesBefore { 0 };
+            int hottestVoiceRouteVoicesAfter { 0 };
             int activeSynthVoices { 0 };
             int activeSampleVoices { 0 };
             int activeAudioClipVoices { 0 };
@@ -372,6 +409,7 @@ namespace beat
             bool oneShot { false };
             int chokeGroup { 0 };
             int sampleEnd { 0 };
+            bool preview { false };
         };
 
         struct ActiveAudioClipVoice
@@ -387,6 +425,7 @@ namespace beat
             int totalSamples { 0 };
             int fadeInSamples { 0 };
             int fadeOutSamples { 0 };
+            bool preview { false };
         };
 
         struct ScheduledNoteOff
@@ -395,6 +434,21 @@ namespace beat
             Id instrumentId;
             int pitch { 60 };
             int samplesUntilOff { 0 };
+        };
+
+        struct ScheduledPreviewNote
+        {
+            Id trackId;
+            Id instrumentId;
+            int pitch { 60 };
+            int velocity { 100 };
+            int samplesUntilOn { 0 };
+            int lengthSamples { 1 };
+            float segmentGainDb { 0.0f };
+            MidiNote sourceNote;
+            bool hasSourceNote { false };
+            int glideTargetPitch { -1 };
+            float glideMs { 0.0f };
         };
 
         struct PendingParameterAutomation
@@ -416,6 +470,7 @@ namespace beat
         {
             Id trackId;
             Id instrumentId;
+            float pitchBendRangeSemitones { 2.0f };
         };
 
         struct ActiveMidiExpressionNote
@@ -425,6 +480,9 @@ namespace beat
             float velocity { 0.0f };
             float keytrack { 0.0f };
         };
+
+        using NoteAutomationContextBank =
+            std::array<VoiceNoteAutomation::Context, VoiceNoteAutomation::maxPendingContexts>;
 
         struct InstrumentRenderState
         {
@@ -475,17 +533,18 @@ namespace beat
             float inputTrimDb { 0.0f };
             bool mute { false };
             bool audible { true };
+            bool midiPreviewTailActive { false };
             std::unique_ptr<juce::Synthesiser> synth;
             static constexpr size_t maxRetiringSynths = 2;
             std::array<std::unique_ptr<juce::Synthesiser>, maxRetiringSynths> retiringSynths;
             juce::MidiBuffer midi;
             juce::MidiBuffer retiringMidi;
-            LumusArpeggiator lumusArpeggiator;
-            LumusArpeggiator::Config lumusArpeggiatorConfig;
-            int lumusArpeggiatorRateDivision { 16 };
-            LumusClipSequencer lumusClipSequencer;
-            LumusClipSequencer::Config lumusClipConfig;
-            int lumusClipRateDivision { 16 };
+            LumenArpeggiator lumenArpeggiator;
+            LumenArpeggiator::Config lumenArpeggiatorConfig;
+            int lumenArpeggiatorRateDivision { 16 };
+            LumenClipSequencer lumenClipSequencer;
+            LumenClipSequencer::Config lumenClipConfig;
+            int lumenClipRateDivision { 16 };
             float gainDb { 0.0f };
             float pan { 0.0f };
             std::vector<TrackEffect> effects;
@@ -508,7 +567,9 @@ namespace beat
             std::vector<std::unique_ptr<PhaserEffectState>> phaserStates;
             std::unique_ptr<DelayEffectState> compensationDelayState;
             std::vector<CompressorEffectState> compressorStates;
-            std::array<VoiceNoteAutomation::Context, VoiceNoteAutomation::maxPendingContexts> noteAutomationContexts {};
+            std::unique_ptr<NoteAutomationContextBank> noteAutomationContexts {
+                std::make_unique<NoteAutomationContextBank>()
+            };
             int noteAutomationContextCount { 0 };
             int routeLatencySamples { 0 };
             int routeCompensationSamples { 0 };
@@ -522,6 +583,9 @@ namespace beat
             VoiceTransition effectGraphTransition;
             VoiceTransition::Stereo lastEffectGraphOutput {};
         };
+
+        static_assert(sizeof(InstrumentRenderState) < 128 * 1024,
+                      "InstrumentRenderState must remain safe to construct in bounded-stack code.");
 
         struct RouteEffectWorkStats
         {
@@ -624,7 +688,9 @@ namespace beat
         std::vector<PendingParameterAutomation> pendingParameterAutomation;
         std::vector<RealtimeParameterChange> blockRealtimeParameterEvents;
         std::vector<RouteParameterAutomationEvent> blockRouteParameterEvents;
-        std::array<VoiceNoteAutomation::Context, VoiceNoteAutomation::maxPendingContexts> defaultNoteAutomationContexts {};
+        std::unique_ptr<NoteAutomationContextBank> defaultNoteAutomationContexts {
+            std::make_unique<NoteAutomationContextBank>()
+        };
         int defaultNoteAutomationContextCount { 0 };
         std::vector<ActiveSampleVoice> activeSampleVoices;
         std::vector<ActiveAudioClipVoice> activeAudioClipVoices;
@@ -651,23 +717,27 @@ namespace beat
         std::atomic<bool> inputMonitoringEnabled { false };
         std::atomic<float> inputMonitoringGain { 1.0f };
         std::atomic<bool> transportSafetySilence { false };
+        std::atomic<bool> midiPreviewActive { false };
+        std::atomic<bool> audioPreviewActive { false };
         std::atomic<bool> runtimeResetPending { false };
-        int consecutiveRealtimeDeadlineOverruns { 0 };
+        std::atomic<int> consecutiveRealtimeDeadlineOverruns { 0 };
         int projectLatencySamples { 0 };
         Id activeProjectId;
         juce::CriticalSection sampleLock;
         std::atomic<bool> realtimeDeviceMode { false };
         SpscRingBuffer<TransportCommand, 512> transportCommands;
         RealtimeParameterQueue<RenderBudgets::realtimeQueueEvents> realtimeParameterChanges;
+        std::vector<ScheduledPreviewNote> scheduledPreviewNotes;
+        std::vector<ScheduledNoteOff> previewNoteOffs;
 
         std::unique_ptr<juce::Synthesiser> createInstrumentSynth(
             const InstrumentDefinition& instrument,
             std::shared_ptr<const ImmutableMappedSampleSource> aetherSampleSlot1 = nullptr,
             std::shared_ptr<const SfzDecodedInstrument> aetherSfzSlot1 = nullptr,
             std::shared_ptr<const ImmutableGranularSource> aetherGranularSlot2 = nullptr,
-            std::array<std::shared_ptr<const ImmutableMappedSampleSource>, 3> lumusSampleSlots = {},
-            std::array<std::shared_ptr<const SfzDecodedInstrument>, 3> lumusSfzSlots = {},
-            std::array<std::shared_ptr<const ImmutableGranularSource>, 3> lumusGranularSlots = {});
+            std::array<std::shared_ptr<const ImmutableMappedSampleSource>, 3> lumenSampleSlots = {},
+            std::array<std::shared_ptr<const SfzDecodedInstrument>, 3> lumenSfzSlots = {},
+            std::array<std::shared_ptr<const ImmutableGranularSource>, 3> lumenGranularSlots = {});
         void rebuildSampleInstruments(const Project& project);
         InstrumentRenderState* findInstrumentRenderState(const Id& instrumentId);
         InstrumentRenderState* findTrackRenderState(const Id& trackId, const Id& instrumentId);
@@ -675,8 +745,8 @@ namespace beat
         InstrumentRenderState* findGroupRenderState(const Id& trackId);
         InstrumentRenderState* findReturnBusRenderState(const Id& busId);
         TrackMeterState* findTrackMeterState(const Id& trackId) noexcept;
-        bool startSampleVoiceLocked(const Sequencer::TriggerEvent& ev);
-        bool startAudioClipVoiceLocked(const Sequencer::AudioClipEvent& ev);
+        bool startSampleVoiceLocked(const Sequencer::TriggerEvent& ev, bool preview = false);
+        bool startAudioClipVoiceLocked(const Sequencer::AudioClipEvent& ev, bool preview = false);
         void renderSampleVoicesForRouteLocked(const Id& trackId,
                                                juce::AudioBuffer<float>& route,
                                                int numSamples);
@@ -790,6 +860,15 @@ namespace beat
                                  int activeAudioClipVoiceCount,
                                  int routeCount,
                                  int automationEventCount,
+                                 int hottestRouteIndex,
+                                 int64_t hottestRouteTicks,
+                                 int hottestVoiceRouteIndex,
+                                 int64_t hottestVoiceRouteTicks,
+                                 int hottestVoiceRouteMidiEvents,
+                                 int hottestVoiceRouteVoicesBefore,
+                                 int hottestVoiceRouteVoicesAfter,
+                                 VoiceStats::RenderWork hottestVoiceRouteWork,
+                                 VoiceStats::RenderWork voiceWork,
                                  RouteEffectWorkStats routeEffectWork) noexcept;
 
         // Used to throttle position-change notifications to ~60Hz so we
@@ -813,6 +892,17 @@ namespace beat
         std::atomic<int> renderTimingActiveAudioClipVoices { 0 };
         std::atomic<int> renderTimingRouteCount { 0 };
         std::atomic<int> renderTimingAutomationEventCount { 0 };
+        std::atomic<int> renderTimingHottestRouteIndex { -1 };
+        std::atomic<int64_t> renderTimingHottestRouteTicks { 0 };
+        std::atomic<int> renderTimingHottestVoiceRouteIndex { -1 };
+        std::atomic<int64_t> renderTimingHottestVoiceRouteTicks { 0 };
+        std::atomic<int64_t> renderTimingHottestVoiceRouteBlocks { 0 };
+        std::atomic<int64_t> renderTimingHottestVoiceRouteSamples { 0 };
+        std::atomic<int64_t> renderTimingHottestVoiceRouteOscillatorSamples { 0 };
+        std::atomic<int64_t> renderTimingHottestVoiceRouteWavetableSamples { 0 };
+        std::atomic<int> renderTimingHottestVoiceRouteMidiEvents { 0 };
+        std::atomic<int> renderTimingHottestVoiceRouteVoicesBefore { 0 };
+        std::atomic<int> renderTimingHottestVoiceRouteVoicesAfter { 0 };
         std::atomic<int64_t> renderTimingVoiceRenderBlocks { 0 };
         std::atomic<int64_t> renderTimingVoiceRenderSamples { 0 };
         std::atomic<int64_t> renderTimingOscillatorSamples { 0 };

@@ -30,6 +30,7 @@ export function Knob(allProps: KnobProps) {
   const props = allProps;
   const [dragging, setDragging] = createSignal(false);
   const [editing, setEditing] = createSignal<string | null>(null);
+  let activePointerId: number | null = null;
   let startY = 0;
   let startValue = props.value;
 
@@ -58,18 +59,23 @@ export function Knob(allProps: KnobProps) {
   }
 
   function handlePointerDown(event: PointerEvent) {
-    if (props.disabled || editing() !== null) return;
+    if (props.disabled || editing() !== null || event.button !== 0) return;
     if (isNonDragTarget(event.target)) return;
     event.preventDefault();
-    (event.currentTarget as Element).setPointerCapture(event.pointerId);
+    activePointerId = event.pointerId;
     startY = event.clientY;
     startValue = props.value;
     setDragging(true);
     props.onDragStart?.();
+    removePointerListeners();
+    window.addEventListener("pointermove", handlePointerMove, true);
+    window.addEventListener("pointerup", handlePointerEnd, true);
+    window.addEventListener("pointercancel", handlePointerEnd, true);
   }
 
   function handlePointerMove(event: PointerEvent) {
-    if (!dragging()) return;
+    if (!dragging() || activePointerId !== event.pointerId) return;
+    event.preventDefault();
     const dy = startY - event.clientY;
     const fine = event.shiftKey ? 0.2 : 1;
     const delta = (dy / (props.sensitivity ?? 200)) * (props.max - props.min) * fine;
@@ -78,17 +84,24 @@ export function Knob(allProps: KnobProps) {
     props.onChange(next);
   }
 
-  function handlePointerUp() {
+  function handlePointerEnd(event: PointerEvent) {
+    if (activePointerId !== event.pointerId) return;
+    activePointerId = null;
+    removePointerListeners();
     if (!dragging()) return;
     setDragging(false);
     props.onDragEnd?.();
   }
 
-  window.addEventListener("pointermove", handlePointerMove);
-  window.addEventListener("pointerup", handlePointerUp);
+  function removePointerListeners() {
+    window.removeEventListener("pointermove", handlePointerMove, true);
+    window.removeEventListener("pointerup", handlePointerEnd, true);
+    window.removeEventListener("pointercancel", handlePointerEnd, true);
+  }
+
   onCleanup(() => {
-    window.removeEventListener("pointermove", handlePointerMove);
-    window.removeEventListener("pointerup", handlePointerUp);
+    activePointerId = null;
+    removePointerListeners();
   });
 
   function onValueKeyDown(event: KeyboardEvent) {
@@ -143,6 +156,8 @@ export function Knob(allProps: KnobProps) {
       data-synth-target-id={props.pickTargetId}
       data-synth-source-id={props.pickSourceId}
       data-disabled={props.disabled ? "true" : "false"}
+      data-dragging={dragging() ? "true" : "false"}
+      data-editing={editing() !== null ? "true" : "false"}
       onPointerDown={handlePointerDown}
     >
       <Show when={isPickable()}>

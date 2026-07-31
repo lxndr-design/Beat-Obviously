@@ -5,6 +5,7 @@
 #include "../Oscillator/VoiceMath.h"
 
 #include <juce_core/juce_core.h>
+#include <juce_dsp/juce_dsp.h>
 
 #include <array>
 #include <cmath>
@@ -20,6 +21,7 @@ namespace beat::WavetableOscillatorBank
         int64_t voiceSamples { 0 };
         int64_t frequencyUpdates { 0 };
         int64_t positionUpdates { 0 };
+        int64_t simdVoiceSamples { 0 };
     };
 
     struct StereoRenderResult
@@ -29,6 +31,7 @@ namespace beat::WavetableOscillatorBank
         int64_t voiceSamples { 0 };
         int64_t frequencyUpdates { 0 };
         int64_t positionUpdates { 0 };
+        int64_t simdVoiceSamples { 0 };
     };
 
     template <typename Config>
@@ -66,7 +69,7 @@ namespace beat::WavetableOscillatorBank
         WavetableUnison::invalidate(plan);
     }
 
-    template <typename Config>
+    template <bool useSimdUnison = false, typename Config>
     inline RenderResult render(
         Bank& oscillators,
         WavetableUnison::Plan& plan,
@@ -83,36 +86,80 @@ namespace beat::WavetableOscillatorBank
 
         auto& renderPlan = WavetableUnison::update(plan, config.unison, config.detuneCents, config.blend, detuneCentsMod, spreadMod);
         const float modulatedPosition = VoiceMath::quantizeWavetablePosition(config.position + positionMod);
+        const bool updateFrequency = std::abs(renderPlan.requestedFrequencyHz - frequencyHz) > 0.000001
+            || std::abs(renderPlan.requestedSampleRate - sampleRate) > 0.000001;
+        const bool updatePosition = std::abs(renderPlan.requestedPosition - modulatedPosition) > 0.000001f;
         RenderResult result;
         result.voiceSamples = renderPlan.unison;
 
-        for (int voice = 0; voice < renderPlan.unison; ++voice)
+        if (updateFrequency)
         {
-            auto& osc = oscillators[(size_t) voice];
-            const auto index = (size_t) voice;
-            const double phaseDriftHz = (double) renderPlan.phaseSpread[index] * sampleRate;
-            const double nextFrequencyHz = VoiceMath::quantizeWavetableFrequency(frequencyHz * renderPlan.rates[index] + phaseDriftHz);
-            if (std::abs(nextFrequencyHz - renderPlan.appliedFrequencyHz[index]) > 0.000001)
+            for (int voice = 0; voice < renderPlan.unison; ++voice)
             {
-                osc.setFrequency(nextFrequencyHz);
-                renderPlan.appliedFrequencyHz[index] = nextFrequencyHz;
-                ++result.frequencyUpdates;
+                auto& osc = oscillators[(size_t) voice];
+                const auto index = (size_t) voice;
+                const double phaseDriftHz = (double) renderPlan.phaseSpread[index] * sampleRate;
+                const double nextFrequencyHz = VoiceMath::quantizeWavetableFrequency(frequencyHz * renderPlan.rates[index] + phaseDriftHz);
+                if (std::abs(nextFrequencyHz - renderPlan.appliedFrequencyHz[index]) > 0.000001)
+                {
+                    osc.setFrequency(nextFrequencyHz);
+                    renderPlan.appliedFrequencyHz[index] = nextFrequencyHz;
+                    ++result.frequencyUpdates;
+                }
             }
-
-            if (std::abs(modulatedPosition - renderPlan.appliedPosition[index]) > 0.000001f)
+        }
+        if (updatePosition)
+        {
+            for (int voice = 0; voice < renderPlan.unison; ++voice)
             {
+                auto& osc = oscillators[(size_t) voice];
+                const auto index = (size_t) voice;
                 osc.setPosition(modulatedPosition);
                 renderPlan.appliedPosition[index] = modulatedPosition;
                 ++result.positionUpdates;
             }
-            result.sample += osc.renderSample() * renderPlan.weights[(size_t) voice];
         }
+
+        if constexpr (useSimdUnison)
+        {
+            if (renderPlan.unison == WavetableUnison::maxVoices && WavetableUnison::simdWidth > 1)
+            {
+                using Simd = WavetableUnison::SimdFloat;
+                constexpr int width = WavetableUnison::simdWidth;
+                alignas(64) std::array<float, WavetableUnison::capacity> samples;
+               #if defined(__clang__)
+                #pragma clang loop unroll(full)
+               #endif
+                for (int voice = 0; voice < WavetableUnison::maxVoices; ++voice)
+                    samples[(size_t) voice] = oscillators[(size_t) voice].renderSample();
+                Simd sum { 0.0f };
+                for (int voice = 0; voice < WavetableUnison::maxVoices; voice += width)
+                    sum += Simd::fromRawArray(samples.data() + voice)
+                        * renderPlan.simdWeights[(size_t) (voice / width)];
+                result.sample = sum.sum();
+                result.simdVoiceSamples = WavetableUnison::maxVoices;
+            }
+            else
+            {
+                for (int voice = 0; voice < renderPlan.unison; ++voice)
+                    result.sample += oscillators[(size_t) voice].renderSample() * renderPlan.weights[(size_t) voice];
+            }
+        }
+        else
+        {
+            for (int voice = 0; voice < renderPlan.unison; ++voice)
+                result.sample += oscillators[(size_t) voice].renderSample() * renderPlan.weights[(size_t) voice];
+        }
+
+        renderPlan.requestedFrequencyHz = frequencyHz;
+        renderPlan.requestedSampleRate = sampleRate;
+        renderPlan.requestedPosition = modulatedPosition;
 
         result.sample = juce::jlimit(-1.0f, 1.0f, result.sample / juce::jmax(1.0f, renderPlan.weightSum));
         return result;
     }
 
-    template <typename Config>
+    template <bool useSimdUnison = false, typename Config>
     inline StereoRenderResult renderStereo(
         Bank& oscillators,
         WavetableUnison::Plan& plan,
@@ -130,6 +177,9 @@ namespace beat::WavetableOscillatorBank
 
         auto& renderPlan = WavetableUnison::update(plan, config.unison, config.detuneCents, config.blend, detuneCentsMod, spreadMod);
         const float modulatedPosition = VoiceMath::quantizeWavetablePosition(config.position + positionMod);
+        const bool updateFrequency = std::abs(renderPlan.requestedFrequencyHz - frequencyHz) > 0.000001
+            || std::abs(renderPlan.requestedSampleRate - sampleRate) > 0.000001;
+        const bool updatePosition = std::abs(renderPlan.requestedPosition - modulatedPosition) > 0.000001f;
         const float quantizedBasePan = std::round(juce::jlimit(-1.0f, 1.0f, basePan) * 512.0f) / 512.0f;
         if (std::abs(renderPlan.appliedBasePan - quantizedBasePan) > 0.0001f)
         {
@@ -142,34 +192,89 @@ namespace beat::WavetableOscillatorBank
                 renderPlan.rightGains[index] = rightGain;
             }
             renderPlan.appliedBasePan = quantizedBasePan;
+            WavetableUnison::refreshSimdStereoGains(renderPlan);
         }
         StereoRenderResult result;
         result.voiceSamples = renderPlan.unison;
 
-        for (int voice = 0; voice < renderPlan.unison; ++voice)
+        if (updateFrequency)
         {
-            auto& osc = oscillators[(size_t) voice];
-            const auto index = (size_t) voice;
-            const double phaseDriftHz = (double) renderPlan.phaseSpread[index] * sampleRate;
-            const double nextFrequencyHz = VoiceMath::quantizeWavetableFrequency(frequencyHz * renderPlan.rates[index] + phaseDriftHz);
-            if (std::abs(nextFrequencyHz - renderPlan.appliedFrequencyHz[index]) > 0.000001)
+            for (int voice = 0; voice < renderPlan.unison; ++voice)
             {
-                osc.setFrequency(nextFrequencyHz);
-                renderPlan.appliedFrequencyHz[index] = nextFrequencyHz;
-                ++result.frequencyUpdates;
+                auto& osc = oscillators[(size_t) voice];
+                const auto index = (size_t) voice;
+                const double phaseDriftHz = (double) renderPlan.phaseSpread[index] * sampleRate;
+                const double nextFrequencyHz = VoiceMath::quantizeWavetableFrequency(frequencyHz * renderPlan.rates[index] + phaseDriftHz);
+                if (std::abs(nextFrequencyHz - renderPlan.appliedFrequencyHz[index]) > 0.000001)
+                {
+                    osc.setFrequency(nextFrequencyHz);
+                    renderPlan.appliedFrequencyHz[index] = nextFrequencyHz;
+                    ++result.frequencyUpdates;
+                }
             }
-
-            if (std::abs(modulatedPosition - renderPlan.appliedPosition[index]) > 0.000001f)
+        }
+        if (updatePosition)
+        {
+            for (int voice = 0; voice < renderPlan.unison; ++voice)
             {
+                auto& osc = oscillators[(size_t) voice];
+                const auto index = (size_t) voice;
                 osc.setPosition(modulatedPosition);
                 renderPlan.appliedPosition[index] = modulatedPosition;
                 ++result.positionUpdates;
             }
-
-            const float sample = osc.renderSample() * renderPlan.weights[index];
-            result.left += sample * renderPlan.leftGains[index];
-            result.right += sample * renderPlan.rightGains[index];
         }
+
+        if constexpr (useSimdUnison)
+        {
+            if (renderPlan.unison == WavetableUnison::maxVoices && WavetableUnison::simdWidth > 1)
+            {
+                using Simd = WavetableUnison::SimdFloat;
+                constexpr int width = WavetableUnison::simdWidth;
+                alignas(64) std::array<float, WavetableUnison::capacity> samples;
+               #if defined(__clang__)
+                #pragma clang loop unroll(full)
+               #endif
+                for (int voice = 0; voice < WavetableUnison::maxVoices; ++voice)
+                    samples[(size_t) voice] = oscillators[(size_t) voice].renderSample();
+                Simd leftSum { 0.0f };
+                Simd rightSum { 0.0f };
+                for (int voice = 0; voice < WavetableUnison::maxVoices; voice += width)
+                {
+                    const auto samplesVector = Simd::fromRawArray(samples.data() + voice);
+                    const auto group = (size_t) (voice / width);
+                    leftSum += samplesVector * renderPlan.simdWeightedLeftGains[group];
+                    rightSum += samplesVector * renderPlan.simdWeightedRightGains[group];
+                }
+                result.left = leftSum.sum();
+                result.right = rightSum.sum();
+                result.simdVoiceSamples = WavetableUnison::maxVoices;
+            }
+            else
+            {
+                for (int voice = 0; voice < renderPlan.unison; ++voice)
+                {
+                    const auto index = (size_t) voice;
+                    const float sample = oscillators[index].renderSample() * renderPlan.weights[index];
+                    result.left += sample * renderPlan.leftGains[index];
+                    result.right += sample * renderPlan.rightGains[index];
+                }
+            }
+        }
+        else
+        {
+            for (int voice = 0; voice < renderPlan.unison; ++voice)
+            {
+                const auto index = (size_t) voice;
+                const float sample = oscillators[index].renderSample() * renderPlan.weights[index];
+                result.left += sample * renderPlan.leftGains[index];
+                result.right += sample * renderPlan.rightGains[index];
+            }
+        }
+
+        renderPlan.requestedFrequencyHz = frequencyHz;
+        renderPlan.requestedSampleRate = sampleRate;
+        renderPlan.requestedPosition = modulatedPosition;
 
         const float normalizer = juce::jmax(1.0f, renderPlan.weightSum);
         result.left = juce::jlimit(-1.0f, 1.0f, result.left / normalizer);

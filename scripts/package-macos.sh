@@ -21,6 +21,18 @@ ROOT_APP_PATH="${ROOT_DIR}/Beat.app"
 rm -rf "${ROOT_APP_PATH}"
 ditto "${APP_PATH}" "${ROOT_APP_PATH}"
 
+# The frontend build runs on every package, while CMake's POST_BUILD resource
+# copy only runs when the native Beat target relinks. Refresh the packaged copy
+# explicitly so a frontend-only change can never leave a stale UI in Beat.app.
+FRONTEND_DIST_PATH="${ROOT_DIR}/frontend/dist"
+ROOT_FRONTEND_PATH="${ROOT_APP_PATH}/Contents/Resources/frontend"
+if [[ ! -f "${FRONTEND_DIST_PATH}/index.html" ]]; then
+  echo "Built frontend was not found: ${FRONTEND_DIST_PATH}" >&2
+  exit 1
+fi
+cmake -E remove_directory "${ROOT_FRONTEND_PATH}"
+cmake -E copy_directory "${FRONTEND_DIST_PATH}" "${ROOT_FRONTEND_PATH}"
+
 # Keep a single user-facing launcher in the repo root. CMake/Xcode creates an
 # intermediate app bundle under build-native; after packaging, the root copy is
 # the one users should launch/register.

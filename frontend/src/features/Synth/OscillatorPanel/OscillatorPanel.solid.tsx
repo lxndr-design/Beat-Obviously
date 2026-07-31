@@ -1,8 +1,10 @@
 import { createMemo, createSignal, For, Show } from "solid-js";
 import { renderAetherOutputPreviewSamples } from "../../../audio/synthPreview";
 import { AETHER_MAX_UNISON_VOICES } from "../../../audio/aetherLimits";
-import { Button, FloatingSelect, HoverInfo, Icon, Knob, NumberInput, TextInput } from "../../../solid-ui";
+import { resynthesizeAudioFileToWavemap } from "../../../audio/wavemapResynthesis";
+import { appAlert, Button, FloatingSelect, HoverInfo, Icon, Knob, NumberInput, TextInput } from "../../../solid-ui";
 import { createStoreSelector } from "../../../solid-utils/store";
+import { useAudioFileStore } from "../../../state/store";
 import type { CustomWavetableFrame, WavemapDefinition, WavetableWarpMode } from "../../../state/types";
 import {
   CUSTOM_WAVETABLE_FRAME_LABELS,
@@ -18,6 +20,7 @@ import {
   getNumberParam,
   getStringParam,
   modulationSummaryForTarget,
+  normalizeWavemapManualRange,
   normalizeWavemapFrames,
   summarizeWavemapAnalysis,
   synthDraftToPreviewInstrument,
@@ -84,6 +87,15 @@ const WARP_MODE_OPTIONS: Array<{ value: WavetableWarpMode; label: string; icon: 
   { value: "mirror", label: "Mirror", icon: "ph:diamonds-four" },
 ];
 
+const LUMEN_WARP_MODE_OPTIONS: Array<{ value: WavetableWarpMode; label: string }> = [
+  ...WARP_MODE_OPTIONS.map(({ value, label }) => ({ value, label })),
+  { value: "harmonic-shift", label: "Harmonic Shift" },
+  { value: "harmonic-stretch", label: "Harmonic Stretch" },
+  { value: "spectral-smear", label: "Spectral Smear" },
+  { value: "spectral-skew", label: "Spectral Skew" },
+  { value: "spectral-filter", label: "Spectral Filter" },
+];
+
 const RESYNTHESIS_MODE_OPTIONS: Array<{ value: WavemapAudioSelectionMode; label: string }> = [
   { value: "full", label: "Full" },
   { value: "transient", label: "Transient" },
@@ -125,7 +137,7 @@ export function OscillatorPanel() {
     <section class={`${styles.panel} ${styles.majorSection}`} aria-label="Oscillator">
       <div class={styles.majorSectionTitleRow}>
         <div class={styles.majorSectionTitle}>Oscillators</div>
-        <Show when={draft().instrumentType !== "lumus-hybrid-synth"}>
+        <Show when={draft().instrumentType !== "lumen-hybrid-synth"}>
           <Button size="xs" onClick={addOscillator} aria-label="Add oscillator">
             <Icon name="ph:plus" size={18} decorative /> Add Oscillator
           </Button>
@@ -228,6 +240,7 @@ function OscillatorRow(props: {
   previewInstrument: ReturnType<typeof synthDraftToPreviewInstrument>;
 }) {
   const draft = createStoreSelector(useSynthStore, (state) => state.draft);
+  const audioFiles = createStoreSelector(useAudioFileStore, (state) => state.files);
   const setParameter = useSynthStore.getState().setParameter;
   const setNumericParameter = useSynthStore.getState().setNumericParameter;
   const setBooleanParameter = useSynthStore.getState().setBooleanParameter;
@@ -238,30 +251,34 @@ function OscillatorRow(props: {
   const removeOscillator = useSynthStore.getState().removeOscillator;
   const renameOscillator = useSynthStore.getState().renameOscillator;
   const [resynthesisMode, setResynthesisMode] = createSignal<WavemapAudioSelectionMode>("full");
+  const [resynthesisAudioFileId, setResynthesisAudioFileId] = createSignal("");
+  const [manualRangeStart, setManualRangeStart] = createSignal(0);
+  const [manualRangeEnd, setManualRangeEnd] = createSignal(100);
+  const [resynthesizing, setResynthesizing] = createSignal(false);
   const [analysisView, setAnalysisView] = createSignal<WavemapAnalysisView>("details");
   const [customEditorOpen, setCustomEditorOpen] = createSignal(true);
   const editMode = () => "additive" as WavemapEditMode;
-  const lumusSlotIndex = createMemo(() => draft().instrumentType === "lumus-hybrid-synth"
+  const lumenSlotIndex = createMemo(() => draft().instrumentType === "lumen-hybrid-synth"
     ? ({ a: 0, b: 1, c: 2 } as const)[props.oscillator as "a" | "b" | "c"] ?? -1
     : -1);
-  const lumusSlot = createMemo(() => lumusSlotIndex() >= 0);
+  const lumenSlot = createMemo(() => lumenSlotIndex() >= 0);
   const sourceMode = createMemo(() => {
-    const index = lumusSlotIndex();
+    const index = lumenSlotIndex();
     return index >= 0
-      ? draft().metadata.lumusSourceRack?.slots[index as 0 | 1 | 2]?.mode ?? "wavetable"
+      ? draft().metadata.lumenSourceRack?.slots[index as 0 | 1 | 2]?.mode ?? "wavetable"
       : "wavetable";
   });
   const sampleMode = createMemo(() => sourceMode() === "sample" || sourceMode() === "multisample");
   const granularMode = createMemo(() => sourceMode() === "granular");
-  const samplePrefix = createMemo(() => `lumus.source.${props.oscillator}.sample`);
+  const samplePrefix = createMemo(() => `lumen.source.${props.oscillator}.sample`);
   const sampleAvailable = createMemo(() => Boolean(
     getStringParam(draft(), `${samplePrefix()}.audioFileId` as SynthParameterId)
-      || draft().metadata.lumusSampleSlots?.[props.oscillator as "a" | "b" | "c"]?.managedSfz,
+      || draft().metadata.lumenSampleSlots?.[props.oscillator as "a" | "b" | "c"]?.managedSfz,
   ));
-  const granularPrefix = createMemo(() => `lumus.source.${props.oscillator}.granular`);
+  const granularPrefix = createMemo(() => `lumen.source.${props.oscillator}.granular`);
   const granularAvailable = createMemo(() => Boolean(
     getStringParam(draft(), `${granularPrefix()}.builtinSource` as SynthParameterId) === "benchmark"
-      || draft().metadata.lumusGranularSlots?.[props.oscillator as "a" | "b" | "c"]?.managedAsset,
+      || draft().metadata.lumenGranularSlots?.[props.oscillator as "a" | "b" | "c"]?.managedAsset,
   ));
   const sourceAvailable = createMemo(() => sampleMode() ? sampleAvailable() : granularMode() ? granularAvailable() : true);
   const enabledId = createMemo(() => sampleMode()
@@ -275,7 +292,9 @@ function OscillatorRow(props: {
   const selectedWavetable = createMemo(() => getStringParam(draft(), wavetableId()) as WavetableId);
   const selectedWarpMode = createMemo(() => {
     const mode = getStringParam(draft(), warpModeId());
-    return mode === "fold" || mode === "pinch" || mode === "mirror" ? mode : "shape";
+    return LUMEN_WARP_MODE_OPTIONS.some((option) => option.value === mode)
+      ? mode as WavetableWarpMode
+      : "shape";
   });
   const customTableId = createMemo(() => selectedWavetable().startsWith("user.") ? selectedWavetable() : DEFAULT_CUSTOM_WAVETABLE_ID);
   const customTable = createMemo(() => draft().metadata.wavemaps?.[customTableId()] ?? draft().metadata.customWavetables?.[customTableId()] ?? createDefaultCustomWavetable(customTableId()));
@@ -287,11 +306,37 @@ function OscillatorRow(props: {
     setParameter(wavetableId(), next.id as WavetableId);
   }
 
+  async function importAudioWavemap() {
+    if (resynthesizing()) return;
+    const audioFile = audioFiles().find((candidate) => candidate.id === resynthesisAudioFileId());
+    if (!audioFile) {
+      await appAlert("Choose an audio-library file to resynthesize.", "Import Audio Wavemap");
+      return;
+    }
+    const range = normalizeWavemapManualRange(manualRangeStart(), manualRangeEnd());
+    const selection = resynthesisMode() === "manual"
+      ? { mode: "manual" as const, startRatio: range.startPercent / 100, endRatio: range.endPercent / 100 }
+      : { mode: resynthesisMode() };
+    const baseName = audioFile.name.replace(/\.[^.]+$/, "") || "Audio";
+    const safeName = baseName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "audio";
+    const wavemapId = `user.${safeName}.${Date.now().toString(36)}`;
+    setResynthesizing(true);
+    try {
+      replaceCurrentWavemap(await resynthesizeAudioFileToWavemap(audioFile, wavemapId, `${baseName} Wavemap`, selection));
+      setCustomEditorOpen(true);
+      setAnalysisView("details");
+    } catch (error) {
+      await appAlert(error instanceof Error ? error.message : "Audio could not be resynthesized.", "Import Audio Wavemap");
+    } finally {
+      setResynthesizing(false);
+    }
+  }
+
   function setSourceMode(mode: "wavetable" | "sample" | "multisample" | "granular") {
-    if (!lumusSlot()) return;
+    if (!lumenSlot()) return;
     const current = draft();
-    const slots = current.metadata.lumusSourceRack?.slots.map((slot, index) =>
-      index === lumusSlotIndex() ? { ...slot, mode } : slot,
+    const slots = current.metadata.lumenSourceRack?.slots.map((slot, index) =>
+      index === lumenSlotIndex() ? { ...slot, mode } : slot,
     ) ?? [];
     setDraft({
       ...current,
@@ -306,7 +351,7 @@ function OscillatorRow(props: {
       },
       metadata: {
         ...current.metadata,
-        lumusSourceRack: {
+        lumenSourceRack: {
           schemaVersion: 2,
           slots: slots as [{ id: "a"; mode: "wavetable" | "sample" | "multisample" | "granular" }, { id: "b"; mode: "wavetable" | "sample" | "multisample" | "granular" }, { id: "c"; mode: "wavetable" | "sample" | "multisample" | "granular" }],
         },
@@ -335,7 +380,7 @@ function OscillatorRow(props: {
           value={props.name}
           onChange={(event) => renameOscillator(props.oscillator, event.currentTarget.value)}
         />
-        <Show when={lumusSlot()}>
+        <Show when={lumenSlot()}>
           <FloatingSelect
             layout="inline"
             label="Source"
@@ -355,7 +400,7 @@ function OscillatorRow(props: {
             <span>{selectedWavetableLabel(selectedWavetable())}</span>
           </div>
         </Show>
-        <Show when={draft().instrumentType !== "lumus-hybrid-synth" && props.oscillator !== "a"}>
+        <Show when={draft().instrumentType !== "lumen-hybrid-synth" && props.oscillator !== "a"}>
           <Button iconOnly size="xs" className={styles.removeOscillatorButton} aria-label={`Remove ${label()}`} onClick={() => removeOscillator(props.oscillator)}>
             <Icon name="ph:trash" size={18} decorative />
           </Button>
@@ -375,6 +420,7 @@ function OscillatorRow(props: {
                       oscillator={props.oscillator}
                       draft={draft()}
                       warpModeValue={group.label === "Warp Mode" ? selectedWarpMode() : undefined}
+                      lumenWarpModes={group.label === "Warp Mode" && lumenSlot()}
                       onWarpModeChange={group.label === "Warp Mode" ? (value) => setParameter(warpModeId(), value) : undefined}
                       onChange={setNumericParameter}
                     />
@@ -389,6 +435,57 @@ function OscillatorRow(props: {
               />
             </div>
           </div>
+          <Show when={lumenSlot()}>
+            <div class={styles.resynthesisBar} aria-label={`${label()} audio wavemap import`}>
+              <FloatingSelect
+                layout="inline"
+                label="Audio"
+                ariaLabel={`${label()} audio wavemap source`}
+                value={resynthesisAudioFileId()}
+                options={audioFiles().map((file) => ({ value: file.id, label: file.name || file.id }))}
+                disabled={audioFiles().length === 0 || resynthesizing()}
+                onChange={setResynthesisAudioFileId}
+              />
+              <div class={styles.resynthesisModes} role="radiogroup" aria-label="Audio resynthesis window">
+                <For each={RESYNTHESIS_MODE_OPTIONS}>
+                  {(option) => (
+                    <Button
+                      size="xs"
+                      selected={resynthesisMode() === option.value}
+                      aria-label={`${option.label} audio resynthesis window`}
+                      onClick={() => setResynthesisMode(option.value)}
+                    >
+                      {option.label}
+                    </Button>
+                  )}
+                </For>
+              </div>
+              <Show when={resynthesisMode() === "manual"}>
+                <div class={styles.manualRangeControl}>
+                  <div class={styles.manualRangeStrip} aria-hidden="true">
+                    <span style={{
+                      left: `${normalizeWavemapManualRange(manualRangeStart(), manualRangeEnd()).startPercent}%`,
+                      width: `${normalizeWavemapManualRange(manualRangeStart(), manualRangeEnd()).endPercent - normalizeWavemapManualRange(manualRangeStart(), manualRangeEnd()).startPercent}%`,
+                    }} />
+                  </div>
+                  <NumberInput layout="inline" label="Start" min={0} max={99} step={1} unit="%" value={manualRangeStart()} onChange={setManualRangeStart} />
+                  <NumberInput layout="inline" label="End" min={1} max={100} step={1} unit="%" value={manualRangeEnd()} onChange={setManualRangeEnd} />
+                  <span class={styles.manualRangeReadout}>
+                    {normalizeWavemapManualRange(manualRangeStart(), manualRangeEnd()).startPercent}–{normalizeWavemapManualRange(manualRangeStart(), manualRangeEnd()).endPercent}%
+                  </span>
+                </div>
+              </Show>
+              <Button
+                size="xs"
+                disabled={!resynthesisAudioFileId() || resynthesizing()}
+                aria-busy={resynthesizing()}
+                onClick={() => void importAudioWavemap()}
+              >
+                <Icon name={resynthesizing() ? "ph:spinner" : "ph:waveform"} size={18} decorative />
+                {resynthesizing() ? "Resynthesizing" : "Import Audio"}
+              </Button>
+            </div>
+          </Show>
           <Show when={selectedWavetable().startsWith("user.")}>
             <div class={styles.customEditor} aria-label={`${label()} wavemap frames`}>
               <div class={`ds-section-header ${styles.customEditorHeader}`}>
@@ -404,20 +501,6 @@ function OscillatorRow(props: {
               </div>
               <Show when={customEditorOpen()}>
                 <div class={styles.wavemapToolbar}>
-                  <div class={styles.resynthesisModes} role="radiogroup" aria-label="Audio resynthesis window">
-                    <For each={RESYNTHESIS_MODE_OPTIONS}>
-                      {(option) => (
-                        <Button
-                          size="xs"
-                          selected={resynthesisMode() === option.value}
-                          aria-label={`${option.label} audio resynthesis window`}
-                          onClick={() => setResynthesisMode(option.value)}
-                        >
-                          {option.label}
-                        </Button>
-                      )}
-                    </For>
-                  </div>
                   <div class={styles.interpolationModes} role="radiogroup" aria-label="Wavemap interpolation">
                     <Button
                       size="xs"
@@ -726,6 +809,7 @@ function OscillatorParamGroup(props: {
   oscillator: OscillatorKey;
   draft: SynthDraftPatch;
   warpModeValue?: WavetableWarpMode;
+  lumenWarpModes?: boolean;
   onWarpModeChange?: (value: WavetableWarpMode) => void;
   onChange: (id: SynthParameterId, value: number) => void;
 }) {
@@ -739,6 +823,7 @@ function OscillatorParamGroup(props: {
           <div class={styles.oscillatorControlGroupTitle}>{props.label}</div>
           <WarpModeButtons
             value={props.warpModeValue ?? "shape"}
+            lumenModes={props.lumenWarpModes}
             onChange={props.onWarpModeChange ?? (() => undefined)}
           />
         </div>
@@ -1025,7 +1110,18 @@ function wavetableButtonSelected(buttonId: WavetableId, value: WavetableId): boo
   return buttonId === value || (buttonId === DEFAULT_CUSTOM_WAVETABLE_ID && isCustomWavetableId(value));
 }
 
-function WarpModeButtons(props: { value: WavetableWarpMode; onChange: (value: WavetableWarpMode) => void }) {
+function WarpModeButtons(props: { value: WavetableWarpMode; lumenModes?: boolean; onChange: (value: WavetableWarpMode) => void }) {
+  if (props.lumenModes) {
+    return (
+      <FloatingSelect
+        layout="bare"
+        ariaLabel="Lumen prepared warp mode"
+        value={props.value}
+        options={LUMEN_WARP_MODE_OPTIONS}
+        onChange={(value) => props.onChange(value as WavetableWarpMode)}
+      />
+    );
+  }
   return (
     <div class={styles.wavetableControl} data-compact="true">
       <div class={styles.wavetableButtons} role="radiogroup" aria-label="Warp mode">

@@ -325,7 +325,7 @@ export function playComponentPreview(
       }
     }
   } else {
-    const instrument = instruments.find((i) => i.id === component.instrumentId) ?? instruments[0] ?? fallbackInstrument;
+    const instrument = fallbackInstrument;
     if (instrument.sampleUrl) {
       void preloadInstrumentSample(ctx, instrument).catch(() => undefined);
     }

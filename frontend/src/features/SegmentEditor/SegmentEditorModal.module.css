@@ -439,12 +439,25 @@
 }
 
 .audioPanel {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
+  display: grid;
+  gap: 6px;
   padding: var(--space-1);
   border: var(--border-fg);
   margin-top: var(--space-1);
+}
+
+.audioFields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(219px, 0.45fr);
+  gap: 6px;
+}
+
+.audioSourceRow {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 9px;
+  min-height: 27px;
 }
 
 .audioLabel {
@@ -455,7 +468,12 @@
 }
 
 .audioHint {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
   font-family: var(--font-family-mono);
   font-size: var(--font-size-ui);
   opacity: 0.7;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }

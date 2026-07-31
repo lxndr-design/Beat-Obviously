@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cstdint>
 #include <cmath>
 
 namespace beat::DynamicModulation
@@ -35,6 +36,11 @@ namespace beat::DynamicModulation
         bool ampLevel { false };
         bool unisonDetune { false };
         bool unisonSpread { false };
+        std::array<bool, 6> aurumOperatorLevel {};
+        std::array<bool, 6> aurumOperatorPan {};
+        std::array<bool, 2> aurumFilterCutoff {};
+        std::array<bool, 2> aurumFilterResonance {};
+        std::array<bool, 2> aurumFilterDrive {};
         bool lfo { false };
         bool lfo2 { false };
         std::array<bool, 8> extraLfo {};
@@ -65,6 +71,293 @@ namespace beat::DynamicModulation
         bool needsEnv4Value { false };
         bool hasAmpPanMod { false };
     };
+
+    enum class PreparedSource : uint8_t
+    {
+        lfo,
+        lfo2,
+        extraLfo1,
+        extraLfo2,
+        extraLfo3,
+        extraLfo4,
+        extraLfo5,
+        extraLfo6,
+        extraLfo7,
+        extraLfo8,
+        env,
+        env2,
+        env3,
+        env4,
+        velocity,
+        keytrack,
+        modWheel,
+        pressure,
+        timbre,
+        macro1,
+        macro2,
+        macro3,
+        macro4,
+        macro5,
+        macro6,
+        macro7,
+        macro8,
+        count,
+    };
+
+    struct InputFrame
+    {
+        static constexpr size_t sourceCount = static_cast<size_t>(PreparedSource::count);
+        std::array<float, sourceCount> values;
+
+        float operator[](PreparedSource source) const noexcept
+        {
+            return values[static_cast<size_t>(source)];
+        }
+    };
+
+    inline InputFrame makeInputFrame(
+        float rawLfo,
+        float rawLfo2,
+        const std::array<float, 8>& rawExtraLfos,
+        float env,
+        float env2,
+        float env3,
+        float env4,
+        float velocity,
+        float keytrack,
+        float modWheel,
+        float pressure,
+        float timbre,
+        const std::array<float, 8>& macroValues) noexcept
+    {
+        InputFrame frame;
+        frame.values = {
+            rawLfo,
+            rawLfo2,
+            rawExtraLfos[0],
+            rawExtraLfos[1],
+            rawExtraLfos[2],
+            rawExtraLfos[3],
+            rawExtraLfos[4],
+            rawExtraLfos[5],
+            rawExtraLfos[6],
+            rawExtraLfos[7],
+            env,
+            env2,
+            env3,
+            env4,
+            velocity,
+            keytrack,
+            modWheel,
+            pressure,
+            timbre,
+            macroValues[0],
+            macroValues[1],
+            macroValues[2],
+            macroValues[3],
+            macroValues[4],
+            macroValues[5],
+            macroValues[6],
+            macroValues[7],
+        };
+        return frame;
+    }
+
+    struct PreparedRoute
+    {
+        PreparedSource source { PreparedSource::lfo };
+        float amount { 0.0f };
+        bool bipolar { false };
+        uint8_t curve { 0 };
+    };
+
+    inline float applyRemapCurve(float value, uint8_t curve) noexcept
+    {
+        if (curve == 0) return value;
+        const float sign = value < 0.0f ? -1.0f : 1.0f;
+        const float x = std::clamp(std::abs(value), 0.0f, 1.0f);
+        float shaped = x;
+        if (curve == 1) shaped = x * x;
+        else if (curve == 2) shaped = 1.0f - (1.0f - x) * (1.0f - x);
+        else if (curve == 3) shaped = x * x * (3.0f - 2.0f * x);
+        return sign * shaped;
+    }
+
+    inline float routeEnvValue(float env, bool bipolar) noexcept;
+
+    struct PreparedTarget
+    {
+        std::array<PreparedRoute, 2> lfoRoutes {};
+        std::array<PreparedRoute, 8> extraLfoRoutes {};
+        std::array<PreparedRoute, 17> expressionRoutes {};
+        uint8_t lfoRouteCount { 0 };
+        uint8_t extraLfoRouteCount { 0 };
+        uint8_t expressionRouteCount { 0 };
+
+        bool active() const noexcept
+        {
+            return lfoRouteCount != 0 || extraLfoRouteCount != 0 || expressionRouteCount != 0;
+        }
+
+        int routeCount() const noexcept
+        {
+            return (int) lfoRouteCount + (int) extraLfoRouteCount + (int) expressionRouteCount;
+        }
+
+        float evaluate(const InputFrame& frame, float scale) const noexcept
+        {
+            const auto routeValue = [&frame](const PreparedRoute& route) noexcept
+            {
+                const float raw = frame[route.source];
+                const auto sourceIndex = static_cast<size_t>(route.source);
+                const auto firstEnvelope = static_cast<size_t>(PreparedSource::env);
+                const auto firstMacro = static_cast<size_t>(PreparedSource::macro1);
+                const float shaped = sourceIndex < firstEnvelope
+                    ? Lfo::routeValue(raw, route.bipolar)
+                    : sourceIndex < firstMacro
+                        ? routeEnvValue(raw, route.bipolar)
+                        : raw;
+                return applyRemapCurve(shaped, route.curve) * route.amount;
+            };
+
+            float value = 0.0f;
+            for (uint8_t index = 0; index < lfoRouteCount; ++index)
+                value += routeValue(lfoRoutes[index]);
+
+            // Preserve the legacy evaluator's separately accumulated extra-LFO
+            // term so existing patches retain their floating-point order.
+            float extraLfoValue = 0.0f;
+            for (uint8_t index = 0; index < extraLfoRouteCount; ++index)
+                extraLfoValue += routeValue(extraLfoRoutes[index]);
+            value += extraLfoValue;
+
+            for (uint8_t index = 0; index < expressionRouteCount; ++index)
+                value += routeValue(expressionRoutes[index]);
+            return value * scale;
+        }
+    };
+
+    template <typename Target>
+    PreparedTarget prepareTarget(const Target& target) noexcept
+    {
+        PreparedTarget prepared;
+        const auto add = [&target](auto& routes, uint8_t& count, PreparedSource source, float amount, bool bipolar) noexcept
+        {
+            if (amount != 0.0f)
+                routes[count++] = { source, amount, bipolar, target.curves[static_cast<size_t>(source)] };
+        };
+
+        add(prepared.lfoRoutes, prepared.lfoRouteCount, PreparedSource::lfo, target.lfo, target.lfoBipolar);
+        add(prepared.lfoRoutes, prepared.lfoRouteCount, PreparedSource::lfo2, target.lfo2, target.lfo2Bipolar);
+        for (size_t index = 0; index < target.extraLfo.size(); ++index)
+            add(prepared.extraLfoRoutes, prepared.extraLfoRouteCount,
+                static_cast<PreparedSource>(static_cast<size_t>(PreparedSource::extraLfo1) + index),
+                target.extraLfo[index], target.extraLfoBipolar[index]);
+
+        add(prepared.expressionRoutes, prepared.expressionRouteCount, PreparedSource::env, target.env, target.envBipolar);
+        add(prepared.expressionRoutes, prepared.expressionRouteCount, PreparedSource::env2, target.env2, target.env2Bipolar);
+        add(prepared.expressionRoutes, prepared.expressionRouteCount, PreparedSource::env3, target.env3, target.env3Bipolar);
+        add(prepared.expressionRoutes, prepared.expressionRouteCount, PreparedSource::env4, target.env4, target.env4Bipolar);
+        add(prepared.expressionRoutes, prepared.expressionRouteCount, PreparedSource::velocity, target.velocity, target.velocityBipolar);
+        add(prepared.expressionRoutes, prepared.expressionRouteCount, PreparedSource::keytrack, target.keytrack, target.keytrackBipolar);
+        add(prepared.expressionRoutes, prepared.expressionRouteCount, PreparedSource::modWheel, target.modWheel, target.modWheelBipolar);
+        add(prepared.expressionRoutes, prepared.expressionRouteCount, PreparedSource::pressure, target.pressure, target.pressureBipolar);
+        add(prepared.expressionRoutes, prepared.expressionRouteCount, PreparedSource::timbre, target.timbre, target.timbreBipolar);
+        add(prepared.expressionRoutes, prepared.expressionRouteCount, PreparedSource::macro1, target.macro1, false);
+        add(prepared.expressionRoutes, prepared.expressionRouteCount, PreparedSource::macro2, target.macro2, false);
+        add(prepared.expressionRoutes, prepared.expressionRouteCount, PreparedSource::macro3, target.macro3, false);
+        add(prepared.expressionRoutes, prepared.expressionRouteCount, PreparedSource::macro4, target.macro4, false);
+        add(prepared.expressionRoutes, prepared.expressionRouteCount, PreparedSource::macro5, target.macro5, false);
+        add(prepared.expressionRoutes, prepared.expressionRouteCount, PreparedSource::macro6, target.macro6, false);
+        add(prepared.expressionRoutes, prepared.expressionRouteCount, PreparedSource::macro7, target.macro7, false);
+        add(prepared.expressionRoutes, prepared.expressionRouteCount, PreparedSource::macro8, target.macro8, false);
+        return prepared;
+    }
+
+    struct PreparedState
+    {
+        PreparedTarget oscAPosition;
+        PreparedTarget oscAFine;
+        PreparedTarget oscALevel;
+        PreparedTarget oscAPan;
+        PreparedTarget oscBPosition;
+        PreparedTarget oscBFine;
+        PreparedTarget oscBLevel;
+        PreparedTarget oscBPan;
+        PreparedTarget oscCPosition;
+        PreparedTarget oscCFine;
+        PreparedTarget oscCLevel;
+        PreparedTarget oscCPan;
+        PreparedTarget oscAUnisonDetune;
+        PreparedTarget oscAUnisonSpread;
+        PreparedTarget oscBUnisonDetune;
+        PreparedTarget oscBUnisonSpread;
+        PreparedTarget oscCUnisonDetune;
+        PreparedTarget oscCUnisonSpread;
+        PreparedTarget filterCutoff;
+        PreparedTarget filterResonance;
+        PreparedTarget filterDrive;
+        PreparedTarget ampLevel;
+        PreparedTarget ampPan;
+        PreparedTarget unisonDetune;
+        PreparedTarget unisonSpread;
+        std::array<PreparedTarget, 6> aurumOperatorLevel;
+        std::array<PreparedTarget, 6> aurumOperatorPan;
+        std::array<PreparedTarget, 2> aurumFilterCutoff;
+        std::array<PreparedTarget, 2> aurumFilterResonance;
+        std::array<PreparedTarget, 2> aurumFilterDrive;
+        int activeRouteCount { 0 };
+    };
+
+    template <typename Modulation>
+    PreparedState prepare(const Modulation& modulation) noexcept
+    {
+        PreparedState state;
+        if (!modulation.active)
+            return state;
+        const auto assign = [&state](PreparedTarget& destination, const auto& source) noexcept
+        {
+            destination = prepareTarget(source);
+            state.activeRouteCount += destination.routeCount();
+        };
+        assign(state.oscAPosition, modulation.oscAPosition);
+        assign(state.oscAFine, modulation.oscAFine);
+        assign(state.oscALevel, modulation.oscALevel);
+        assign(state.oscAPan, modulation.oscAPan);
+        assign(state.oscBPosition, modulation.oscBPosition);
+        assign(state.oscBFine, modulation.oscBFine);
+        assign(state.oscBLevel, modulation.oscBLevel);
+        assign(state.oscBPan, modulation.oscBPan);
+        assign(state.oscCPosition, modulation.oscCPosition);
+        assign(state.oscCFine, modulation.oscCFine);
+        assign(state.oscCLevel, modulation.oscCLevel);
+        assign(state.oscCPan, modulation.oscCPan);
+        assign(state.oscAUnisonDetune, modulation.oscAUnisonDetune);
+        assign(state.oscAUnisonSpread, modulation.oscAUnisonSpread);
+        assign(state.oscBUnisonDetune, modulation.oscBUnisonDetune);
+        assign(state.oscBUnisonSpread, modulation.oscBUnisonSpread);
+        assign(state.oscCUnisonDetune, modulation.oscCUnisonDetune);
+        assign(state.oscCUnisonSpread, modulation.oscCUnisonSpread);
+        assign(state.filterCutoff, modulation.filterCutoff);
+        assign(state.filterResonance, modulation.filterResonance);
+        assign(state.filterDrive, modulation.filterDrive);
+        assign(state.ampLevel, modulation.ampLevel);
+        assign(state.ampPan, modulation.ampPan);
+        assign(state.unisonDetune, modulation.unisonDetune);
+        assign(state.unisonSpread, modulation.unisonSpread);
+        for (size_t index = 0; index < state.aurumOperatorLevel.size(); ++index)
+        {
+            assign(state.aurumOperatorLevel[index], modulation.aurumOperatorLevel[index]);
+            assign(state.aurumOperatorPan[index], modulation.aurumOperatorPan[index]);
+        }
+        for (size_t index = 0; index < state.aurumFilterCutoff.size(); ++index)
+        {
+            assign(state.aurumFilterCutoff[index], modulation.aurumFilterCutoff[index]);
+            assign(state.aurumFilterResonance[index], modulation.aurumFilterResonance[index]);
+            assign(state.aurumFilterDrive[index], modulation.aurumFilterDrive[index]);
+        }
+        return state;
+    }
 
     inline float routeEnvValue(float env, bool bipolar) noexcept
     {
@@ -224,6 +517,17 @@ namespace beat::DynamicModulation
         flags.ampLevel = targetActive(modulation.ampLevel);
         flags.unisonDetune = targetActive(modulation.unisonDetune);
         flags.unisonSpread = targetActive(modulation.unisonSpread);
+        for (size_t index = 0; index < flags.aurumOperatorLevel.size(); ++index)
+        {
+            flags.aurumOperatorLevel[index] = targetActive(modulation.aurumOperatorLevel[index]);
+            flags.aurumOperatorPan[index] = targetActive(modulation.aurumOperatorPan[index]);
+        }
+        for (size_t index = 0; index < flags.aurumFilterCutoff.size(); ++index)
+        {
+            flags.aurumFilterCutoff[index] = targetActive(modulation.aurumFilterCutoff[index]);
+            flags.aurumFilterResonance[index] = targetActive(modulation.aurumFilterResonance[index]);
+            flags.aurumFilterDrive[index] = targetActive(modulation.aurumFilterDrive[index]);
+        }
         addSourceActivity(flags, modulation.ampPan);
         addSourceActivity(flags, modulation.oscAPan);
         addSourceActivity(flags, modulation.oscBPan);
@@ -249,6 +553,17 @@ namespace beat::DynamicModulation
         addSourceActivity(flags, modulation.ampLevel);
         addSourceActivity(flags, modulation.unisonDetune);
         addSourceActivity(flags, modulation.unisonSpread);
+        for (size_t index = 0; index < flags.aurumOperatorLevel.size(); ++index)
+        {
+            addSourceActivity(flags, modulation.aurumOperatorLevel[index]);
+            addSourceActivity(flags, modulation.aurumOperatorPan[index]);
+        }
+        for (size_t index = 0; index < flags.aurumFilterCutoff.size(); ++index)
+        {
+            addSourceActivity(flags, modulation.aurumFilterCutoff[index]);
+            addSourceActivity(flags, modulation.aurumFilterResonance[index]);
+            addSourceActivity(flags, modulation.aurumFilterDrive[index]);
+        }
         flags.any =
             flags.ampPan
             || flags.oscAPan
@@ -274,13 +589,21 @@ namespace beat::DynamicModulation
             || flags.filterDrive
             || flags.ampLevel
             || flags.unisonDetune
-            || flags.unisonSpread;
+            || flags.unisonSpread
+            || std::any_of(flags.aurumOperatorLevel.begin(), flags.aurumOperatorLevel.end(), [](bool active) { return active; })
+            || std::any_of(flags.aurumOperatorPan.begin(), flags.aurumOperatorPan.end(), [](bool active) { return active; })
+            || std::any_of(flags.aurumFilterCutoff.begin(), flags.aurumFilterCutoff.end(), [](bool active) { return active; })
+            || std::any_of(flags.aurumFilterResonance.begin(), flags.aurumFilterResonance.end(), [](bool active) { return active; })
+            || std::any_of(flags.aurumFilterDrive.begin(), flags.aurumFilterDrive.end(), [](bool active) { return active; });
         return flags;
     }
 
     inline bool hasFilterCoefficientMod(const TargetActivityFlags& flags) noexcept
     {
-        return flags.filterCutoff || flags.filterResonance;
+        return flags.filterCutoff
+            || flags.filterResonance
+            || std::any_of(flags.aurumFilterCutoff.begin(), flags.aurumFilterCutoff.end(), [](bool active) { return active; })
+            || std::any_of(flags.aurumFilterResonance.begin(), flags.aurumFilterResonance.end(), [](bool active) { return active; });
     }
 
     inline RenderPlan makeRenderPlan(

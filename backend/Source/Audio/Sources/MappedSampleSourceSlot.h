@@ -52,6 +52,17 @@ namespace beat
             return true;
         }
 
+        bool configurePlayback(bool reverse, float rate, bool pingPong = false,
+                               float releaseTailMs = 4.0f) noexcept
+        {
+            if (activeVoiceCount() != 0)
+                return false;
+            bool accepted = true;
+            for (auto& zone : zoneSlots)
+                accepted = zone.configurePlayback(reverse, rate, pingPong, releaseTailMs) && accepted;
+            return accepted;
+        }
+
         void reset() noexcept override
         {
             for (auto& zone : zoneSlots)

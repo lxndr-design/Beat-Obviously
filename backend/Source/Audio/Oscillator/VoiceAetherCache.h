@@ -31,7 +31,7 @@ namespace beat::VoiceAetherCache
             VoiceMath::equalPowerPanGains(params.ampPan),
             VoiceMath::equalPowerPanGains(params.aetherOscA.pan),
             VoiceMath::equalPowerPanGains(params.aetherOscB.pan),
-            VoiceMath::equalPowerPanGains(params.lumusOscC.pan),
+            VoiceMath::equalPowerPanGains(params.lumenOscC.pan),
         };
     }
 
@@ -61,7 +61,7 @@ namespace beat::VoiceAetherCache
         return {
             oscillatorRate(params.aetherOscA),
             oscillatorRate(params.aetherOscB),
-            oscillatorRate(params.lumusOscC),
+            oscillatorRate(params.lumenOscC),
             std::exp2((double) params.aetherSub.octave),
         };
     }

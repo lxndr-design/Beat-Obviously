@@ -200,6 +200,18 @@
   width: 100%;
 }
 
+.nodeFamilyPicker {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 27px;
+  align-items: stretch;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.nodeFamilyPicker button {
+  width: 27px;
+}
+
 .nodePaletteButton,
 .nodeActionButton {
   display: inline-flex;

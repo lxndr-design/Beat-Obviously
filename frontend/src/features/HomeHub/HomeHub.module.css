@@ -98,8 +98,7 @@
 
 .actionRow,
 .emptyRow,
-.assetRow,
-.trainingRow {
+.assetRow {
   min-height: 36px;
   border: 0;
   border-bottom: var(--border-fg);
@@ -110,8 +109,7 @@
 }
 
 .actionRow,
-.assetRow,
-.trainingRow {
+.assetRow {
   display: flex;
   align-items: center;
   text-align: left;
@@ -132,8 +130,7 @@
 }
 
 .actionRow:hover,
-.assetRow:hover,
-.trainingRow:hover {
+.assetRow:hover {
   background: var(--interaction-hover-bg);
   color: var(--color-fg);
 }
@@ -141,6 +138,8 @@
 .recentGrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-auto-rows: minmax(54px, max-content);
+  align-content: start;
   gap: 6px;
   min-height: 0;
   padding: 6px;
@@ -149,70 +148,90 @@
 
 .recentCard {
   --recent-card-hover-bg: var(--interaction-mesh-current);
+  position: relative;
   display: flex;
-  flex-direction: column;
-  justify-content: flex-start;
-  gap: 0;
+  align-items: center;
   min-width: 0;
+  min-height: 54px;
   padding: 0;
   border: var(--border-fg);
   background: transparent;
   color: var(--color-fg);
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
   transition: var(--interaction-transition);
-  white-space: normal;
 }
 
-.recentCard:hover {
+.recentCard:hover,
+.recentCard:focus-within {
   background: var(--recent-card-hover-bg);
 }
 
-.recentArt {
-  position: relative;
+.recentOpen {
+  flex: 1 1 auto;
   display: flex;
   align-items: center;
+  justify-content: flex-start;
+  gap: 9px;
+  align-self: stretch;
+  min-width: 0;
+  min-height: 51px;
+  width: 100%;
+  padding: 6px 45px 6px 6px;
+  color: var(--color-fg);
+  text-align: left;
+  white-space: normal;
+}
+
+.recentOpen:hover,
+.recentOpen:active {
+  background: transparent;
+}
+
+.recentLogoFrame {
+  flex: 0 0 36px;
+  display: inline-flex;
+  align-items: center;
   justify-content: center;
-  aspect-ratio: 16 / 9;
-  min-height: 111px;
-  border-bottom: var(--border-fg);
-  color: color-mix(in srgb, var(--color-fg) 26%, var(--color-bg));
-  overflow: hidden;
+  width: 36px;
+  height: 36px;
+  color: color-mix(in srgb, var(--color-fg) 32%, var(--color-bg));
 }
 
 .recentLogo {
-  width: 39px;
-  height: 39px;
+  width: 21px;
+  height: 21px;
+}
+
+.recentActions {
+  position: absolute;
+  z-index: 4;
+  top: 6px;
+  right: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .recentRemove {
-  position: absolute;
-  top: 6px;
-  right: 6px;
-  display: none;
-  align-items: center;
-  justify-content: center;
-  width: var(--button-square-sm);
-  height: var(--button-square-sm);
-  border: var(--border-fg);
-  background: var(--color-bg);
-  color: var(--color-fg);
-  cursor: pointer;
-  transition: var(--interaction-transition);
+  opacity: 0;
+  pointer-events: none;
+  background: transparent;
+  color: var(--color-fg-hover);
+  transition: opacity var(--duration-hover) var(--ease-out), var(--interaction-transition);
 }
 
 .recentCard:hover .recentRemove,
+.recentCard:focus-within .recentRemove,
 .recentRemove:focus-visible {
-  display: inline-flex;
+  opacity: 1;
+  pointer-events: auto;
 }
 
-.recentRemove:hover {
+.recentRemove:hover:not(:disabled) {
   background: var(--interaction-hover-bg);
   color: var(--color-fg);
 }
 
-.recentRemove:active {
+.recentRemove:active:not(:disabled) {
   background: var(--interaction-pressed-bg);
 }
 
@@ -221,21 +240,23 @@
   flex-direction: column;
   gap: 3px;
   min-width: 0;
-  padding: 6px;
 }
 
 .recentName {
-  font-size: var(--font-size-ui-lg);
-  line-height: 1.1;
+  display: block;
+  font-size: var(--font-size-ui);
+  font-weight: var(--font-weight-medium);
+  line-height: 1.15;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .recentDate {
+  display: block;
   color: var(--color-fg-hover);
   font-size: var(--font-size-ui);
-  line-height: 1.1;
+  line-height: 1.15;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -260,15 +281,13 @@
   color: var(--color-fg-hover);
 }
 
-.assetRow,
-.trainingRow {
+.assetRow {
   justify-content: space-between;
   gap: 6px;
   padding: 0 12px;
 }
 
-.assetRow > span,
-.trainingRow > span {
+.assetRow > span {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -285,15 +304,22 @@
   color: var(--color-fg);
 }
 
-.blankContent {
-  flex: 1 1 auto;
-  min-height: 0;
-  border: var(--border-fg);
-}
-
 @media (max-width: 860px) {
   .grid {
     grid-template-columns: 1fr;
     overflow: auto;
+  }
+}
+
+@media (max-width: 540px) {
+  .recentGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (hover: none) {
+  .recentRemove {
+    opacity: 1;
+    pointer-events: auto;
   }
 }

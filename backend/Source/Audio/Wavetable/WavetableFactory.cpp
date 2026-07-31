@@ -78,9 +78,87 @@ namespace beat
                 case WavetableWarpMode::Fold: return clamped * 1.35f;
                 case WavetableWarpMode::Pinch: return std::pow(clamped, 0.72f);
                 case WavetableWarpMode::Mirror: return std::pow(clamped, 1.12f) * 1.48f;
+                case WavetableWarpMode::HarmonicShift:
+                case WavetableWarpMode::HarmonicStretch:
+                case WavetableWarpMode::SpectralSmear:
+                case WavetableWarpMode::SpectralSkew:
+                case WavetableWarpMode::SpectralFilter:
                 case WavetableWarpMode::Shape:
                 default: return clamped;
             }
+        }
+
+        bool isSpectralWarpMode(WavetableWarpMode mode) noexcept
+        {
+            return mode == WavetableWarpMode::HarmonicShift
+                || mode == WavetableWarpMode::HarmonicStretch
+                || mode == WavetableWarpMode::SpectralSmear
+                || mode == WavetableWarpMode::SpectralSkew
+                || mode == WavetableWarpMode::SpectralFilter;
+        }
+
+        template <typename BaseAmplitude>
+        float spectralWarpedAmplitude(
+            WavetableWarpMode mode,
+            int harmonic,
+            int harmonicLimit,
+            float frame,
+            float warp,
+            BaseAmplitude&& baseAmplitude)
+        {
+            const float mix = juce::jlimit(0.0f, 1.0f, warp);
+            const int safeLimit = juce::jmax(1, harmonicLimit);
+            const auto sampleAt = [&](float sourceHarmonic)
+            {
+                if (sourceHarmonic < 1.0f || sourceHarmonic > (float) safeLimit)
+                    return 0.0f;
+                const int lower = juce::jlimit(1, safeLimit, (int) std::floor(sourceHarmonic));
+                const int upper = juce::jlimit(1, safeLimit, lower + 1);
+                const float fraction = sourceHarmonic - (float) lower;
+                const float lowerAmplitude = baseAmplitude(lower);
+                return lowerAmplitude + (baseAmplitude(upper) - lowerAmplitude) * fraction;
+            };
+            const float original = baseAmplitude(harmonic);
+            float transformed = original;
+            const float normalized = safeLimit <= 1
+                ? 0.0f
+                : (float) (harmonic - 1) / (float) (safeLimit - 1);
+
+            if (mode == WavetableWarpMode::HarmonicShift)
+            {
+                const float shiftBins = 1.0f + juce::jmin(7.0f, (float) safeLimit - 1.0f) * mix;
+                transformed = sampleAt((float) harmonic - shiftBins);
+            }
+            else if (mode == WavetableWarpMode::HarmonicStretch)
+            {
+                transformed = sampleAt(1.0f + ((float) harmonic - 1.0f) / 2.5f);
+            }
+            else if (mode == WavetableWarpMode::SpectralSmear)
+            {
+                float total = 0.0f;
+                float weight = 0.0f;
+                for (int offset = -4; offset <= 4; ++offset)
+                {
+                    const int source = harmonic + offset;
+                    if (source < 1 || source > safeLimit) continue;
+                    const float tap = (float) (5 - std::abs(offset));
+                    total += baseAmplitude(source) * tap;
+                    weight += tap;
+                }
+                transformed = weight > 0.0f ? total / weight : original;
+            }
+            else if (mode == WavetableWarpMode::SpectralSkew)
+            {
+                const float pivot = 0.2f + juce::jlimit(0.0f, 1.0f, frame) * 0.6f;
+                transformed = original * std::exp((normalized - pivot) * 2.2f);
+            }
+            else if (mode == WavetableWarpMode::SpectralFilter)
+            {
+                const float cutoff = 0.15f + juce::jlimit(0.0f, 1.0f, frame) * 0.7f;
+                transformed = original / (1.0f + std::exp((normalized - cutoff) * 18.0f));
+            }
+
+            return original + (transformed - original) * mix;
         }
 
         float warpAmplitudeOffset(WavetableWarpMode mode, int harmonic, float frame, float warp)
@@ -111,6 +189,14 @@ namespace beat
                 return std::cos((float) harmonic * 0.33f + frame) * shapedWarp * 0.3f;
             if (mode == WavetableWarpMode::Mirror)
                 return std::sin((float) harmonic * 0.24f + frame * juce::MathConstants<float>::pi) * ((harmonic % 2) == 0 ? 1.0f : -1.0f) * shapedWarp * 0.42f;
+            if (mode == WavetableWarpMode::HarmonicShift)
+                return std::sin((float) harmonic * 0.21f + frame * juce::MathConstants<float>::pi) * shapedWarp * 0.28f;
+            if (mode == WavetableWarpMode::HarmonicStretch)
+                return std::cos((float) harmonic * 0.17f + frame) * shapedWarp * 0.22f;
+            if (mode == WavetableWarpMode::SpectralSmear)
+                return std::sin((float) harmonic * 0.31f + frame * juce::MathConstants<float>::pi) * shapedWarp * 0.35f;
+            if (mode == WavetableWarpMode::SpectralSkew)
+                return std::log2((float) harmonic + 1.0f) * shapedWarp * 0.06f;
             return 0.0f;
         }
 
@@ -149,8 +235,21 @@ namespace beat
                 sample = (sample - (float) mean) * gain;
         }
 
-        float customAmplitude(const WavetableFactory::CustomFrame& frame, int harmonic, float warp, WavetableWarpMode warpMode)
+        float customAmplitude(const WavetableFactory::CustomFrame& frame, int harmonic, int harmonicLimit, float warp, WavetableWarpMode warpMode)
         {
+            if (isSpectralWarpMode(warpMode))
+            {
+                return spectralWarpedAmplitude(
+                    warpMode,
+                    harmonic,
+                    harmonicLimit,
+                    frame.brightness,
+                    warp,
+                    [&](int sourceHarmonic)
+                    {
+                        return customAmplitude(frame, sourceHarmonic, harmonicLimit, 0.0f, WavetableWarpMode::Shape);
+                    });
+            }
             const float brightness = juce::jlimit(0.0f, 1.0f, frame.brightness);
             const float even = juce::jlimit(0.0f, 1.0f, frame.even);
             const float skew = juce::jlimit(-1.0f, 1.0f, frame.skew);
@@ -190,6 +289,9 @@ namespace beat
 
         float customPhase(const WavetableFactory::CustomFrame& frame, int harmonic, float warp, WavetableWarpMode warpMode)
         {
+            if (isSpectralWarpMode(warpMode))
+                return customPhase(frame, harmonic, 0.0f, WavetableWarpMode::Shape)
+                    + warpPhaseOffset(warpMode, harmonic, frame.brightness, warp);
             const float shapedWarp = warpModeIntensity(warp, warpMode);
             const float fold = juce::jlimit(0.0f, 1.0f, frame.fold + shapedWarp * 0.25f);
             const float formant = juce::jlimit(0.0f, 1.0f, frame.formant);
@@ -303,10 +405,20 @@ namespace beat
                     double value = 0.0;
                     for (int harmonic = 1; harmonic <= levelHarmonicLimit; ++harmonic)
                     {
-                        const float amp = harmonicAmplitude(shape, harmonic);
+                        const float amp = isSpectralWarpMode(warpMode)
+                            ? spectralWarpedAmplitude(
+                                warpMode,
+                                harmonic,
+                                levelHarmonicLimit,
+                                frameNorm,
+                                warp,
+                                [&](int sourceHarmonic) { return harmonicAmplitude(shape, sourceHarmonic); })
+                            : harmonicAmplitude(shape, harmonic);
                         if (amp != 0.0f)
                         {
-                            const float harmonicWarp = warpAmplitudeOffset(warpMode, harmonic, frameNorm, warp);
+                            const float harmonicWarp = isSpectralWarpMode(warpMode)
+                                ? 0.0f
+                                : warpAmplitudeOffset(warpMode, harmonic, frameNorm, warp);
                             const float shapedAmp = amp + harmonicWarp;
                             value += std::sin(twoPi * phase * (double) harmonic + (double) warpPhaseOffset(warpMode, harmonic, frameNorm, warp)) * (double) shapedAmp;
                         }
@@ -367,7 +479,7 @@ namespace beat
                     double value = 0.0;
                     for (int harmonic = 1; harmonic <= mipLimit; ++harmonic)
                     {
-                        const float amp = customAmplitude(customFrame, harmonic, warp, warpMode);
+                        const float amp = customAmplitude(customFrame, harmonic, mipLimit, warp, warpMode);
                         if (amp <= 0.0001f) continue;
                         value += std::sin(twoPi * phase * (double) harmonic + (double) customPhase(customFrame, harmonic, warp, warpMode)) * (double) amp;
                     }

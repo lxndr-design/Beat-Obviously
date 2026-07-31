@@ -44,8 +44,17 @@ export const PH_ICON_SUBSET = {
     "brackets-square": {
       "body": "<path fill=\"currentColor\" d=\"M48 48v160h32a8 8 0 0 1 0 16H40a8 8 0 0 1-8-8V40a8 8 0 0 1 8-8h40a8 8 0 0 1 0 16Zm168-16h-40a8 8 0 0 0 0 16h32v160h-32a8 8 0 0 0 0 16h40a8 8 0 0 0 8-8V40a8 8 0 0 0-8-8\"/>"
     },
+    "caret-double-left": {
+      "body": "<path fill=\"currentColor\" d=\"M205.66 202.34a8 8 0 0 1-11.32 11.32l-80-80a8 8 0 0 1 0-11.32l80-80a8 8 0 0 1 11.32 11.32L131.31 128ZM51.31 128l74.35-74.34a8 8 0 0 0-11.32-11.32l-80 80a8 8 0 0 0 0 11.32l80 80a8 8 0 0 0 11.32-11.32Z\"/>"
+    },
+    "caret-double-right": {
+      "body": "<path fill=\"currentColor\" d=\"m141.66 133.66l-80 80a8 8 0 0 1-11.32-11.32L124.69 128L50.34 53.66a8 8 0 0 1 11.32-11.32l80 80a8 8 0 0 1 0 11.32m80-11.32l-80-80a8 8 0 0 0-11.32 11.32L204.69 128l-74.35 74.34a8 8 0 0 0 11.32 11.32l80-80a8 8 0 0 0 0-11.32\"/>"
+    },
     "caret-down": {
       "body": "<path fill=\"currentColor\" d=\"m213.66 101.66l-80 80a8 8 0 0 1-11.32 0l-80-80a8 8 0 0 1 11.32-11.32L128 164.69l74.34-74.35a8 8 0 0 1 11.32 11.32\"/>"
+    },
+    "caret-left": {
+      "body": "<path fill=\"currentColor\" d=\"M165.66 202.34a8 8 0 0 1-11.32 11.32l-80-80a8 8 0 0 1 0-11.32l80-80a8 8 0 0 1 11.32 11.32L91.31 128Z\"/>"
     },
     "caret-right": {
       "body": "<path fill=\"currentColor\" d=\"m181.66 133.66l-80 80a8 8 0 0 1-11.32-11.32L164.69 128L90.34 53.66a8 8 0 0 1 11.32-11.32l80 80a8 8 0 0 1 0 11.32\"/>"
@@ -452,7 +461,16 @@ export const PH_ICON_USAGE_SIZES = {
   "ph:brackets-square": [
     18
   ],
+  "ph:caret-double-left": [
+    18
+  ],
+  "ph:caret-double-right": [
+    18
+  ],
   "ph:caret-down": [
+    18
+  ],
+  "ph:caret-left": [
     18
   ],
   "ph:caret-right": [

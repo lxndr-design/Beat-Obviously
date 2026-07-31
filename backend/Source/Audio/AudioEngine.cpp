@@ -191,7 +191,7 @@ namespace beat
 
             void setGraph(Nodemap::Graph graphToUse)
             {
-                graph = std::move(graphToUse);
+                renderer.prepare(graphToUse, sampleRate);
             }
 
             void prepare(double sr)
@@ -211,9 +211,7 @@ namespace beat
                 options.velocity = juce::jlimit(0.0f, 1.0f, velocity);
                 options.keytrack = juce::jlimit(0.0f, 1.0f, (float) midiNoteNumber / 127.0f);
                 options.randomSeed = (juce::uint32) (0x2a17b4c3u ^ (juce::uint32) midiNoteNumber);
-                rendered = Nodemap::renderOneNote(graph, options);
-                cursor = 0;
-                active = !rendered.silent && !rendered.left.empty() && !rendered.right.empty();
+                active = renderer.startNote(options);
                 if (!active)
                     clearCurrentNote();
             }
@@ -223,6 +221,7 @@ namespace beat
                 if (!allowTailOff)
                 {
                     active = false;
+                    renderer.stop(false);
                     clearCurrentNote();
                 }
             }
@@ -240,30 +239,28 @@ namespace beat
                 const int channelCount = outputBuffer.getNumChannels();
                 for (int i = 0; i < numSamples; ++i)
                 {
-                    if (cursor >= rendered.left.size())
+                    if (!renderer.isActive())
                     {
                         active = false;
                         clearCurrentNote();
                         return;
                     }
 
-                    const auto left = rendered.left[cursor];
-                    const auto right = cursor < rendered.right.size() ? rendered.right[cursor] : left;
+                    const auto frame = renderer.renderFrame();
+                    const auto left = frame.left;
+                    const auto right = frame.right;
                     if (channelCount > 0)
                         outputBuffer.addSample(0, startSample + i, left);
                     if (channelCount > 1)
                         outputBuffer.addSample(1, startSample + i, right);
                     for (int channel = 2; channel < channelCount; ++channel)
                         outputBuffer.addSample(channel, startSample + i, 0.5f * (left + right));
-                    ++cursor;
                 }
             }
 
         private:
-            Nodemap::Graph graph { Nodemap::makeOutputOnlyGraph() };
-            Nodemap::AuditionResult rendered;
+            Nodemap::RealtimeRenderer renderer;
             double sampleRate { 44100.0 };
-            size_t cursor { 0 };
             bool active { false };
         };
 
@@ -744,6 +741,8 @@ namespace beat
     {
         formatManager.registerBasicFormats();
         pendingNoteOffs.reserve(RenderBudgets::pendingNoteOffs);
+        scheduledPreviewNotes.reserve(RenderBudgets::pendingNoteOffs);
+        previewNoteOffs.reserve(RenderBudgets::pendingNoteOffs);
         pendingParameterAutomation.reserve(RenderBudgets::blockParameterEvents);
         blockRealtimeParameterEvents.reserve(RenderBudgets::blockParameterEvents);
         blockRouteParameterEvents.reserve(RenderBudgets::blockRouteEvents);
@@ -1033,14 +1032,15 @@ namespace beat
                                          juce::String* error,
                                          RenderProgressCallback progress,
                                          int bitDepth,
-                                         AudioQuality quality)
+                                         AudioQuality quality,
+                                         bool includeTail)
     {
         const auto endBeat = project.lengthBeats;
         return renderProjectRangeToWav(std::move(project),
                                        0.0,
                                        endBeat,
                                        outputFile,
-                                       true,
+                                       includeTail,
                                        sr,
                                        blockSize,
                                        channels,
@@ -1077,10 +1077,19 @@ namespace beat
         applyPluginEffectCapabilities(project);
         normalizeProjectTrackEffects(project);
 
-        sr = sr > 0.0 ? sr : 44100.0;
-        blockSize = juce::jmax(1, blockSize);
+        if (!std::isfinite(sr) || sr < 8000.0 || sr > 384000.0)
+            return setError("Export sample rate is invalid.");
+        if (blockSize < 1 || blockSize > 8192)
+            return setError("Export block size is invalid.");
+        if (!std::isfinite(startBeat) || !std::isfinite(endBeat))
+            return setError("Export range is invalid.");
+
         channels = juce::jlimit(1, 2, channels);
         bitDepth = (bitDepth <= 16) ? 16 : (bitDepth <= 24 ? 24 : 32);
+
+        if (!std::isfinite(project.bpm) || project.bpm <= 0.0
+            || !std::isfinite(project.lengthBeats) || project.lengthBeats < 0.0)
+            return setError("Project timing is invalid.");
 
         const double bpm = juce::jmax(1.0, project.bpm);
         const double projectLengthBeats = juce::jmax(0.0, project.lengthBeats);
@@ -1090,9 +1099,14 @@ namespace beat
         if (lengthBeats <= 0.0)
             return setError("Export range is empty.");
 
-        const juce::int64 totalSamples = juce::jmax<juce::int64>(
-            1,
-            (juce::int64) std::ceil((lengthBeats * 60.0 / bpm + (includeTail ? estimateProjectTailSeconds(project) : 0.0)) * sr));
+        const double durationSeconds = lengthBeats * 60.0 / bpm
+            + (includeTail ? estimateProjectTailSeconds(project) : 0.0);
+        const double totalSamplesDouble = std::ceil(durationSeconds * sr);
+        if (!std::isfinite(totalSamplesDouble)
+            || totalSamplesDouble < 1.0
+            || totalSamplesDouble > (double) std::numeric_limits<juce::int64>::max())
+            return setError("Export duration is invalid or too long.");
+        const auto totalSamples = (juce::int64) totalSamplesDouble;
 
         auto parent = outputFile.getParentDirectory();
         if (!parent.exists() && !parent.createDirectory())
@@ -1101,6 +1115,15 @@ namespace beat
         auto tempFile = parent.getChildFile(outputFile.getFileName() + ".tmp");
         if (tempFile.existsAsFile() && !tempFile.deleteFile())
             return setError("Could not clear previous temporary export file.");
+        struct TemporaryExportCleanup
+        {
+            juce::File file;
+            ~TemporaryExportCleanup()
+            {
+                if (file.existsAsFile())
+                    file.deleteFile();
+            }
+        } temporaryExportCleanup { tempFile };
 
         std::unique_ptr<juce::FileOutputStream> stream(tempFile.createOutputStream());
         if (stream == nullptr || stream->failedToOpen())
@@ -1108,9 +1131,11 @@ namespace beat
 
         const int bitsPerSample = bitDepth;
         const int bytesPerSample = bitsPerSample / 8;
-        const juce::int64 dataBytes64 = totalSamples * channels * bytesPerSample;
-        if (dataBytes64 > (juce::int64) std::numeric_limits<uint32_t>::max() - 36)
+        const juce::int64 bytesPerFrame = channels * bytesPerSample;
+        const juce::int64 maximumWavDataBytes = (juce::int64) std::numeric_limits<uint32_t>::max() - 36;
+        if (totalSamples > maximumWavDataBytes / bytesPerFrame)
             return setError("Export is too long for this WAV writer.");
+        const juce::int64 dataBytes64 = totalSamples * channels * bytesPerSample;
 
         const auto dataBytes = (uint32_t) dataBytes64;
         const auto byteRate = (uint32_t) std::round(sr) * (uint32_t) channels * (uint32_t) bytesPerSample;
@@ -1142,35 +1167,44 @@ namespace beat
             };
             return stream->write(bytes, sizeof(bytes));
         };
-        stream->write("RIFF", 4);
-        writeU32(36 + dataBytes);
-        stream->write("WAVE", 4);
-        stream->write("fmt ", 4);
-        writeU32(16);
-        writeU16(1);
-        writeU16((uint16_t) channels);
-        writeU32((uint32_t) std::round(sr));
-        writeU32(byteRate);
-        writeU16(blockAlign);
-        writeU16(bitsPerSample);
-        stream->write("data", 4);
-        writeU32(dataBytes);
+        const bool headerWritten = stream->write("RIFF", 4)
+            && writeU32(36 + dataBytes)
+            && stream->write("WAVE", 4)
+            && stream->write("fmt ", 4)
+            && writeU32(16)
+            && writeU16(1)
+            && writeU16((uint16_t) channels)
+            && writeU32((uint32_t) std::round(sr))
+            && writeU32(byteRate)
+            && writeU16(blockAlign)
+            && writeU16(bitsPerSample)
+            && stream->write("data", 4)
+            && writeU32(dataBytes);
+        if (!headerWritten || stream->getStatus().failed())
+            return setError("Could not write the export WAV header.");
 
-        AudioEngine offlineEngine;
-        offlineEngine.prepareForOffline(sr, blockSize, channels);
-        offlineEngine.setProcessingQuality(quality);
-        offlineEngine.applyProject(std::move(project));
-        offlineEngine.requestSeek(startBeat);
-        offlineEngine.requestPlay();
+        // Mono reference exports are a fold-down of the completed stereo mix,
+        // not a separate one-channel DSP topology. Rendering the graph in mono
+        // changes panning and stereo effects before the fold-down point.
+        const int renderChannels = channels == 1 ? 2 : channels;
+        // AudioEngine owns large fixed-capacity realtime buffers. Keeping an
+        // instance in this frame overflows macOS's 512 KB std::thread stack
+        // before export can render its first block.
+        auto offlineEngine = std::make_unique<AudioEngine>();
+        offlineEngine->prepareForOffline(sr, blockSize, renderChannels);
+        offlineEngine->setProcessingQuality(quality);
+        offlineEngine->applyProject(std::move(project));
+        offlineEngine->requestSeek(startBeat);
+        offlineEngine->requestPlay();
 
-        juce::AudioBuffer<float> block(channels, blockSize);
-        std::vector<float*> outputPointers((size_t) channels, nullptr);
+        juce::AudioBuffer<float> block(renderChannels, blockSize);
+        std::vector<float*> outputPointers((size_t) renderChannels, nullptr);
         juce::AudioIODeviceCallbackContext context;
 
         juce::int64 samplesWritten = 0;
         if (progress && !progress(0.0, 0, totalSamples))
         {
-            offlineEngine.requestStop();
+            offlineEngine->requestStop();
             stream.reset();
             tempFile.deleteFile();
             return setError("Export cancelled.");
@@ -1179,24 +1213,27 @@ namespace beat
         while (samplesWritten < totalSamples)
         {
             const int samplesThisBlock = (int) juce::jmin<juce::int64>(blockSize, totalSamples - samplesWritten);
-            block.setSize(channels, samplesThisBlock, false, false, true);
+            block.setSize(renderChannels, samplesThisBlock, false, false, true);
             block.clear();
 
-            for (int ch = 0; ch < channels; ++ch)
+            for (int ch = 0; ch < renderChannels; ++ch)
                 outputPointers[(size_t) ch] = block.getWritePointer(ch);
 
-            offlineEngine.audioDeviceIOCallbackWithContext(nullptr,
-                                                           0,
-                                                           outputPointers.data(),
-                                                           channels,
-                                                           samplesThisBlock,
-                                                           context);
+            offlineEngine->audioDeviceIOCallbackWithContext(nullptr,
+                                                            0,
+                                                            outputPointers.data(),
+                                                            renderChannels,
+                                                            samplesThisBlock,
+                                                            context);
 
             for (int i = 0; i < samplesThisBlock; ++i)
             {
                 for (int ch = 0; ch < channels; ++ch)
                 {
-                    const auto sample = juce::jlimit(-1.0f, 1.0f, block.getSample(ch, i));
+                    const auto renderedSample = channels == 1
+                        ? 0.5f * (block.getSample(0, i) + block.getSample(1, i))
+                        : block.getSample(ch, i);
+                    const auto sample = juce::jlimit(-1.0f, 1.0f, renderedSample);
                     if (bitsPerSample == 16)
                     {
                         writeU16((uint16_t) (int16_t) std::lrint(sample * 32767.0f));
@@ -1218,15 +1255,20 @@ namespace beat
                              samplesWritten,
                              totalSamples))
             {
-                offlineEngine.requestStop();
+                offlineEngine->requestStop();
                 stream.reset();
                 tempFile.deleteFile();
                 return setError("Export cancelled.");
             }
         }
 
-        offlineEngine.requestStop();
+        offlineEngine->requestStop();
         stream->flush();
+        if (stream->getStatus().failed())
+        {
+            stream.reset();
+            return setError("Could not finish writing the export WAV file.");
+        }
         stream.reset();
 
         if (!tempFile.existsAsFile() || tempFile.getSize() <= 44)
@@ -1279,7 +1321,8 @@ namespace beat
                                        juce::String* error,
                                        RenderProgressCallback progress,
                                        int bitDepth,
-                                       AudioQuality quality)
+                                       AudioQuality quality,
+                                       bool includeTail)
     {
         const auto setError = [error](const juce::String& message)
         {
@@ -1291,21 +1334,35 @@ namespace beat
         if (trackId.isEmpty())
             return setError("No track selected for render.");
 
-        bool found = false;
-        for (auto& track : project.tracks)
+        const auto target = std::find_if(project.tracks.begin(), project.tracks.end(),
+                                         [&](const Track& track) { return track.id == trackId; });
+        if (target == project.tracks.end())
+            return setError("Selected track was not found in the project.");
+        if (target->kind == TrackKind::Group)
+            return setError("Group tracks cannot be exported as individual stems yet.");
+
+        juce::StringArray ancestorGroupIds;
+        auto parentId = target->parentTrackId;
+        while (parentId.isNotEmpty() && !ancestorGroupIds.contains(parentId))
         {
-            const bool isTarget = track.id == trackId;
-            found = found || isTarget;
-            track.solo = isTarget;
-            track.mute = !isTarget;
+            ancestorGroupIds.add(parentId);
+            const auto parent = std::find_if(project.tracks.begin(), project.tracks.end(),
+                                             [&](const Track& track) { return track.id == parentId; });
+            parentId = parent != project.tracks.end() && parent->kind == TrackKind::Group
+                ? parent->parentTrackId
+                : Id();
         }
 
-        if (!found)
-            return setError("Selected track was not found in the project.");
+        for (auto& track : project.tracks)
+        {
+            const bool isStemPath = track.id == trackId || ancestorGroupIds.contains(track.id);
+            track.solo = isStemPath;
+            track.mute = !isStemPath;
+        }
 
         return renderProjectToWav(
             std::move(project), outputFile, sr, blockSize, channels, error,
-            std::move(progress), bitDepth, quality);
+            std::move(progress), bitDepth, quality, includeTail);
     }
 
     int AudioEngine::estimateProjectLatencySamples(const Project& project) noexcept
@@ -1368,6 +1425,7 @@ namespace beat
 
     void AudioEngine::requestPlay()
     {
+        consecutiveRealtimeDeadlineOverruns.store(0, std::memory_order_release);
         const TransportCommand command { TransportCommand::Type::Play, 0.0, 0.0 };
         if (!tryApplyUrgentTransportCommand(command))
             queueTransportCommand(command);
@@ -1395,6 +1453,7 @@ namespace beat
 
     void AudioEngine::requestRestart()
     {
+        consecutiveRealtimeDeadlineOverruns.store(0, std::memory_order_release);
         TransportCommand command { TransportCommand::Type::Restart, 0.0, 0.0 };
         if (!tryApplyUrgentTransportCommand(command))
             queueTransportCommand(command);
@@ -1424,6 +1483,132 @@ namespace beat
     {
         seq.clearLoop();
         queueTransportCommand({ TransportCommand::Type::ClearLoop, 0.0, 0.0 });
+    }
+
+    bool AudioEngine::requestMidiPreviewNote(Id trackId,
+                                             Id instrumentId,
+                                             int pitch,
+                                             int velocity,
+                                             double delaySeconds,
+                                             double durationSeconds,
+                                             float segmentGainDb,
+                                             const MidiNote* sourceNote,
+                                             int glideTargetPitch,
+                                             float glideMs)
+    {
+        const juce::ScopedLock lock(sampleLock);
+        if (findTrackRenderState(trackId, instrumentId) == nullptr
+            || scheduledPreviewNotes.size() >= scheduledPreviewNotes.capacity())
+            return false;
+
+        const auto renderSampleRate = sampleRate > 0.0 ? sampleRate : 48000.0;
+        ScheduledPreviewNote preview;
+        preview.trackId = std::move(trackId);
+        preview.instrumentId = std::move(instrumentId);
+        preview.pitch = juce::jlimit(0, 127, pitch);
+        preview.velocity = juce::jlimit(1, 127, velocity);
+        preview.samplesUntilOn = juce::jmax(0, (int) std::round(delaySeconds * renderSampleRate));
+        preview.lengthSamples = juce::jmax(1, (int) std::round(durationSeconds * renderSampleRate));
+        preview.segmentGainDb = juce::jlimit(-96.0f, 24.0f, segmentGainDb);
+        preview.glideTargetPitch = juce::jlimit(-1, 127, glideTargetPitch);
+        preview.glideMs = juce::jlimit(0.0f, 5000.0f, glideMs);
+        if (sourceNote != nullptr)
+        {
+            preview.sourceNote = *sourceNote;
+            preview.sourceNote.instrumentId = preview.instrumentId;
+            preview.sourceNote.pitch = preview.pitch;
+            preview.sourceNote.velocity = preview.velocity;
+            preview.hasSourceNote = true;
+        }
+        scheduledPreviewNotes.push_back(std::move(preview));
+        midiPreviewActive.store(true, std::memory_order_release);
+        return true;
+    }
+
+    void AudioEngine::requestStopMidiPreview(const Id& trackId)
+    {
+        const juce::ScopedLock lock(sampleLock);
+        scheduledPreviewNotes.erase(
+            std::remove_if(scheduledPreviewNotes.begin(), scheduledPreviewNotes.end(),
+                           [&](const auto& note) { return trackId.isEmpty() || note.trackId == trackId; }),
+            scheduledPreviewNotes.end());
+        previewNoteOffs.erase(
+            std::remove_if(previewNoteOffs.begin(), previewNoteOffs.end(),
+                           [&](const auto& note) { return trackId.isEmpty() || note.trackId == trackId; }),
+            previewNoteOffs.end());
+        for (auto& route : instrumentRenderStates)
+            if ((trackId.isEmpty() || route.trackId == trackId) && route.synth != nullptr)
+                route.synth->allNotesOff(0, false);
+        activeSampleVoices.erase(
+            std::remove_if(activeSampleVoices.begin(), activeSampleVoices.end(),
+                           [&](const auto& voice) {
+                               return voice.preview && (trackId.isEmpty() || voice.trackId == trackId);
+                           }),
+            activeSampleVoices.end());
+        midiPreviewActive.store(!scheduledPreviewNotes.empty() || !previewNoteOffs.empty(), std::memory_order_release);
+    }
+
+    bool AudioEngine::requestAudioSegmentPreview(Id trackId,
+                                                 Id audioFileId,
+                                                 Beats sourceStartBeat,
+                                                 Beats positionBeat,
+                                                 Beats lengthBeats,
+                                                 Beats fadeInBeats,
+                                                 Beats fadeOutBeats,
+                                                 float segmentGainDb)
+    {
+        const juce::ScopedLock lock(sampleLock);
+        const auto clampedLength = juce::jmax(0.0, lengthBeats);
+        const auto clampedPosition = juce::jlimit(0.0, clampedLength, positionBeat);
+        if (clampedLength <= 0.0 || clampedPosition >= clampedLength
+            || findTrackRouteState(trackId) == nullptr
+            || audioFileBuffers.find(audioFileId) == audioFileBuffers.end())
+            return false;
+
+        activeAudioClipVoices.erase(
+            std::remove_if(activeAudioClipVoices.begin(), activeAudioClipVoices.end(),
+                           [&](const auto& voice) { return voice.preview && voice.trackId == trackId; }),
+            activeAudioClipVoices.end());
+
+        const auto renderSampleRate = sampleRate > 0.0 ? sampleRate : 48000.0;
+        const auto tempo = juce::jmax(1.0, seq.getTempo());
+        const auto speed = juce::jmax(0.1, seq.getSpeed());
+        const auto outputSamplesPerBeat = (renderSampleRate * 60.0 / tempo) / speed;
+        const auto remainingBeats = clampedLength - clampedPosition;
+        const Sequencer::AudioClipEvent event {
+            trackId,
+            "__audio-preview__",
+            audioFileId,
+            0,
+            juce::jmax(1, (int) std::round(remainingBeats * outputSamplesPerBeat)),
+            juce::jmax(0.0, sourceStartBeat + clampedPosition),
+            clampedPosition,
+            clampedLength,
+            juce::jlimit(0.0, clampedLength, fadeInBeats),
+            juce::jlimit(0.0, clampedLength, fadeOutBeats),
+            0,
+            0.0,
+            0.0f,
+            0.0f,
+            juce::jlimit(-96.0f, 24.0f, segmentGainDb),
+        };
+        const bool started = startAudioClipVoiceLocked(event, true);
+        audioPreviewActive.store(started, std::memory_order_release);
+        return started;
+    }
+
+    void AudioEngine::requestStopAudioPreview(const Id& trackId)
+    {
+        const juce::ScopedLock lock(sampleLock);
+        activeAudioClipVoices.erase(
+            std::remove_if(activeAudioClipVoices.begin(), activeAudioClipVoices.end(),
+                           [&](const auto& voice) {
+                               return voice.preview && (trackId.isEmpty() || voice.trackId == trackId);
+                           }),
+            activeAudioClipVoices.end());
+        const bool active = std::any_of(activeAudioClipVoices.begin(), activeAudioClipVoices.end(),
+                                        [](const auto& voice) { return voice.preview; });
+        audioPreviewActive.store(active, std::memory_order_release);
     }
 
     bool AudioEngine::queueRealtimeParameterChange(Id instrumentId,
@@ -1505,6 +1690,17 @@ namespace beat
             ? (double) out.blockSamples * 1000.0 / sampleRate
             : 0.0;
         out.loadPercent = blockMs > 0.0 ? juce::jlimit(0.0, 999.0, (out.totalMs / blockMs) * 100.0) : 0.0;
+        out.hottestRouteIndex = renderTimingHottestRouteIndex.load(std::memory_order_relaxed);
+        out.hottestRouteMs = ticksToMs(renderTimingHottestRouteTicks.load(std::memory_order_relaxed));
+        out.hottestVoiceRouteIndex = renderTimingHottestVoiceRouteIndex.load(std::memory_order_relaxed);
+        out.hottestVoiceRouteMs = ticksToMs(renderTimingHottestVoiceRouteTicks.load(std::memory_order_relaxed));
+        out.hottestVoiceRouteBlocks = renderTimingHottestVoiceRouteBlocks.load(std::memory_order_relaxed);
+        out.hottestVoiceRouteSamples = renderTimingHottestVoiceRouteSamples.load(std::memory_order_relaxed);
+        out.hottestVoiceRouteOscillatorSamples = renderTimingHottestVoiceRouteOscillatorSamples.load(std::memory_order_relaxed);
+        out.hottestVoiceRouteWavetableSamples = renderTimingHottestVoiceRouteWavetableSamples.load(std::memory_order_relaxed);
+        out.hottestVoiceRouteMidiEvents = renderTimingHottestVoiceRouteMidiEvents.load(std::memory_order_relaxed);
+        out.hottestVoiceRouteVoicesBefore = renderTimingHottestVoiceRouteVoicesBefore.load(std::memory_order_relaxed);
+        out.hottestVoiceRouteVoicesAfter = renderTimingHottestVoiceRouteVoicesAfter.load(std::memory_order_relaxed);
         out.activeSynthVoices = renderTimingActiveSynthVoices.load(std::memory_order_relaxed);
         out.activeSampleVoices = renderTimingActiveSampleVoices.load(std::memory_order_relaxed);
         out.activeAudioClipVoices = renderTimingActiveAudioClipVoices.load(std::memory_order_relaxed);
@@ -1685,7 +1881,8 @@ namespace beat
                         -1.0f,
                         1.0f,
                         ((float) message.getPitchWheelValue() - 8192.0f) / 8192.0f);
-                    midiExpressionPitchBend[target.instrumentId] = normalized * 2.0f;
+                    midiExpressionPitchBend[target.instrumentId] = normalized
+                        * juce::jlimit(0.0f, 24.0f, target.pitchBendRangeSemitones);
                 }
                 else if (message.isController() && message.getControllerNumber() == 1)
                 {
@@ -1826,10 +2023,32 @@ namespace beat
         while (!release.load(std::memory_order_acquire))
             juce::Thread::yield();
     }
+
+    void AudioEngine::setRealtimeDeadlineOverrunStateForTest(int consecutiveOverruns, bool safetySilenced) noexcept
+    {
+        consecutiveRealtimeDeadlineOverruns.store(consecutiveOverruns, std::memory_order_release);
+        transportSafetySilence.store(safetySilenced, std::memory_order_release);
+    }
+
+    int AudioEngine::getConsecutiveRealtimeDeadlineOverrunsForTest() const noexcept
+    {
+        return consecutiveRealtimeDeadlineOverruns.load(std::memory_order_acquire);
+    }
+
+    bool AudioEngine::isTransportSafetySilencedForTest() const noexcept
+    {
+        return transportSafetySilence.load(std::memory_order_acquire);
+    }
+
+    bool AudioEngine::isMidiPreviewActiveForTest() const noexcept
+    {
+        return midiPreviewActive.load(std::memory_order_acquire);
+    }
 #endif
 
     void AudioEngine::resetRouteRuntimeLocked(InstrumentRenderState& route, bool allowTailOff) noexcept
     {
+        route.midiPreviewTailActive = false;
         if (route.synth != nullptr)
             route.synth->allNotesOff(0, allowTailOff);
         for (auto& retiringSynth : route.retiringSynths)
@@ -1838,8 +2057,8 @@ namespace beat
 
         route.midi.clear();
         route.retiringMidi.clear();
-        route.lumusArpeggiator.reset();
-        route.lumusClipSequencer.reset();
+        route.lumenArpeggiator.reset();
+        route.lumenClipSequencer.reset();
         route.noteAutomationContextCount = 0;
         route.gainDb = route.baseGainDb;
         route.pan = route.basePan;
@@ -1948,6 +2167,8 @@ namespace beat
         defaultNoteAutomationContextCount = 0;
         activeSampleVoices.clear();
         activeAudioClipVoices.clear();
+        midiPreviewActive.store(false, std::memory_order_release);
+        audioPreviewActive.store(false, std::memory_order_release);
         if (!allowTailOff)
             masterDcBlocker.reset();
         resetMasterLoudnessMeter();
@@ -2106,9 +2327,9 @@ namespace beat
         std::shared_ptr<const ImmutableMappedSampleSource> aetherSampleSlot1,
         std::shared_ptr<const SfzDecodedInstrument> aetherSfzSlot1,
         std::shared_ptr<const ImmutableGranularSource> aetherGranularSlot2,
-        std::array<std::shared_ptr<const ImmutableMappedSampleSource>, 3> lumusSampleSlots,
-        std::array<std::shared_ptr<const SfzDecodedInstrument>, 3> lumusSfzSlots,
-        std::array<std::shared_ptr<const ImmutableGranularSource>, 3> lumusGranularSlots)
+        std::array<std::shared_ptr<const ImmutableMappedSampleSource>, 3> lumenSampleSlots,
+        std::array<std::shared_ptr<const SfzDecodedInstrument>, 3> lumenSfzSlots,
+        std::array<std::shared_ptr<const ImmutableGranularSource>, 3> lumenGranularSlots)
     {
         auto instrumentSynth = std::make_unique<BeatSynthesiser>();
         instrumentSynth->configureMemberExpressionZone({
@@ -2204,6 +2425,7 @@ namespace beat
         params.env4ReleaseCurve = instrument.env4ReleaseCurve; params.env4Loop = instrument.env4Loop;
         params.ampLevel = instrument.ampLevel;
         params.ampPan = instrument.ampPan;
+        params.pitchBendRangeSemitones = juce::jlimit(0.0f, 24.0f, instrument.pitchBendRangeSemitones);
         params.glideMs = juce::jlimit(0.0f, 5000.0f, instrument.glideMs);
         const auto allocation = VoiceAllocation::policyFor(instrument.maxVoices, instrument.mono, instrument.legato);
         params.mono = allocation.mono;
@@ -2225,6 +2447,7 @@ namespace beat
         params.lfoPhaseOffset = juce::jlimit(0.0f, 1.0f, instrument.lfoPhaseOffset);
         params.lfoRetrigger = instrument.lfoRetrigger;
         params.lfoOneShot = instrument.lfoOneShot;
+        params.lfoKeytrackRate = juce::jlimit(-1.0f, 1.0f, instrument.lfoKeytrackRate);
         params.lfo2Enabled = instrument.lfo2Enabled;
         params.lfo2Waveform = instrument.lfo2Waveform;
         params.lfo2RateHz = Lfo::effectiveRateHz(instrument.lfo2RateHz, instrument.lfo2Sync, instrument.lfo2SyncedRate, seq.getTempo());
@@ -2233,12 +2456,14 @@ namespace beat
         params.lfo2PhaseOffset = juce::jlimit(0.0f, 1.0f, instrument.lfo2PhaseOffset);
         params.lfo2Retrigger = instrument.lfo2Retrigger;
         params.lfo2OneShot = instrument.lfo2OneShot;
+        params.lfo2KeytrackRate = juce::jlimit(-1.0f, 1.0f, instrument.lfo2KeytrackRate);
         for (size_t index = 0; index < params.extraLfos.size(); ++index)
         {
             const auto& source = instrument.extraLfos[index];
             params.extraLfos[index] = { source.enabled, source.waveform,
                 Lfo::effectiveRateHz(source.rateHz, source.sync, source.syncedRate, seq.getTempo()), source.smoothing,
-                source.randomPhase, source.phaseOffset, source.retrigger, source.oneShot };
+                source.randomPhase, source.phaseOffset, source.retrigger, source.oneShot,
+                juce::jlimit(-1.0f, 1.0f, source.keytrackRate) };
         }
         params.lfoPositionBipolar = instrument.lfoPositionBipolar;
         params.lfoPitchBipolar = instrument.lfoPitchBipolar;
@@ -2282,6 +2507,7 @@ namespace beat
             target.macro6 = source.macro6;
             target.macro7 = source.macro7;
             target.macro8 = source.macro8;
+            target.curves = source.curves;
             return target;
         };
         params.dynamicModulation.active = instrument.dynamicModulation.active;
@@ -2310,6 +2536,17 @@ namespace beat
         params.dynamicModulation.ampPan = copyDynamicTarget(instrument.dynamicModulation.ampPan);
         params.dynamicModulation.unisonDetune = copyDynamicTarget(instrument.dynamicModulation.unisonDetune);
         params.dynamicModulation.unisonSpread = copyDynamicTarget(instrument.dynamicModulation.unisonSpread);
+        for (size_t index = 0; index < params.dynamicModulation.aurumOperatorLevel.size(); ++index)
+        {
+            params.dynamicModulation.aurumOperatorLevel[index] = copyDynamicTarget(instrument.dynamicModulation.aurumOperatorLevel[index]);
+            params.dynamicModulation.aurumOperatorPan[index] = copyDynamicTarget(instrument.dynamicModulation.aurumOperatorPan[index]);
+        }
+        for (size_t index = 0; index < params.dynamicModulation.aurumFilterCutoff.size(); ++index)
+        {
+            params.dynamicModulation.aurumFilterCutoff[index] = copyDynamicTarget(instrument.dynamicModulation.aurumFilterCutoff[index]);
+            params.dynamicModulation.aurumFilterResonance[index] = copyDynamicTarget(instrument.dynamicModulation.aurumFilterResonance[index]);
+            params.dynamicModulation.aurumFilterDrive[index] = copyDynamicTarget(instrument.dynamicModulation.aurumFilterDrive[index]);
+        }
         params.wavetable = copyWavetable({
             instrument.wavetableBank,
             instrument.wavetableBank == 5,
@@ -2323,7 +2560,7 @@ namespace beat
             instrument.wavetableBlend,
         });
         params.hasAether = instrument.hasAether;
-        params.hasLumus = instrument.synthEngine == InstrumentDefinition::SynthEngine::Lumus;
+        params.hasLumen = instrument.synthEngine == InstrumentDefinition::SynthEngine::Lumen;
         params.aetherOscA = {
             instrument.aether.oscA.enabled,
             instrument.aether.oscA.level,
@@ -2366,26 +2603,26 @@ namespace beat
             instrument.aether.oscB.fxSends,
             copyWavetable(instrument.aether.oscB.wavetable),
         };
-        params.lumusOscC = {
-            instrument.lumus.oscC.enabled,
-            instrument.lumus.oscC.level,
-            instrument.lumus.oscC.pan,
-            instrument.lumus.oscC.waveform,
-            instrument.lumus.oscC.octave,
-            instrument.lumus.oscC.semitone,
-            instrument.lumus.oscC.fineCents,
-            instrument.lumus.oscC.tuningMode,
-            instrument.lumus.oscC.harmonic,
-            instrument.lumus.oscC.ratioNumerator,
-            instrument.lumus.oscC.ratioDenominator,
-            instrument.lumus.oscC.tuningStep,
-            instrument.lumus.oscC.tuningDivisions,
-            instrument.lumus.oscC.phaseMode,
-            instrument.lumus.oscC.routing,
-            instrument.lumus.oscC.phase,
-            instrument.lumus.oscC.randomPhase,
-            instrument.lumus.oscC.fxSends,
-            copyWavetable(instrument.lumus.oscC.wavetable),
+        params.lumenOscC = {
+            instrument.lumen.oscC.enabled,
+            instrument.lumen.oscC.level,
+            instrument.lumen.oscC.pan,
+            instrument.lumen.oscC.waveform,
+            instrument.lumen.oscC.octave,
+            instrument.lumen.oscC.semitone,
+            instrument.lumen.oscC.fineCents,
+            instrument.lumen.oscC.tuningMode,
+            instrument.lumen.oscC.harmonic,
+            instrument.lumen.oscC.ratioNumerator,
+            instrument.lumen.oscC.ratioDenominator,
+            instrument.lumen.oscC.tuningStep,
+            instrument.lumen.oscC.tuningDivisions,
+            instrument.lumen.oscC.phaseMode,
+            instrument.lumen.oscC.routing,
+            instrument.lumen.oscC.phase,
+            instrument.lumen.oscC.randomPhase,
+            instrument.lumen.oscC.fxSends,
+            copyWavetable(instrument.lumen.oscC.wavetable),
         };
         params.aetherSub = {
             instrument.aether.sub.enabled,
@@ -2403,23 +2640,45 @@ namespace beat
             instrument.aether.noise.fxSends,
         };
         params.aetherSampleSlot1 = {
-            !params.hasLumus && instrument.aether.sampleSlot1.enabled
+            !params.hasLumen && instrument.aether.sampleSlot1.enabled
                 && (aetherSampleSlot1 != nullptr || aetherSfzSlot1 != nullptr),
             std::move(aetherSampleSlot1),
             std::move(aetherSfzSlot1),
             juce::jlimit(0, 3, instrument.aether.sampleSlot1.routing),
             instrument.aether.sampleSlot1.fxSends,
+            false,
+            1.0f,
+            false,
+            4.0f,
+            0.0f,
+            1.0f,
         };
-        for (size_t index = 0; index < params.lumusSampleSlots.size(); ++index)
+        for (size_t index = 0; index < params.lumenSampleSlots.size(); ++index)
         {
-            const auto& source = instrument.lumus.sampleSlots[index];
-            params.lumusSampleSlots[index] = {
-                params.hasLumus && source.enabled
-                    && (lumusSampleSlots[index] != nullptr || lumusSfzSlots[index] != nullptr),
-                std::move(lumusSampleSlots[index]),
-                std::move(lumusSfzSlots[index]),
+            const auto& source = instrument.lumen.sampleSlots[index];
+            float selectedSliceStart = 0.0f;
+            float selectedSliceEnd = 1.0f;
+            if (source.selectedSliceId.isNotEmpty())
+                if (const auto selected = std::find_if(source.slices.begin(), source.slices.end(),
+                        [&](const auto& slice) { return slice.id == source.selectedSliceId; });
+                    selected != source.slices.end())
+                {
+                    selectedSliceStart = selected->startRatio;
+                    selectedSliceEnd = selected->endRatio;
+                }
+            params.lumenSampleSlots[index] = {
+                params.hasLumen && source.enabled
+                    && (lumenSampleSlots[index] != nullptr || lumenSfzSlots[index] != nullptr),
+                std::move(lumenSampleSlots[index]),
+                std::move(lumenSfzSlots[index]),
                 juce::jlimit(0, 4, source.routing),
                 source.fxSends,
+                source.reverse,
+                source.playbackRate,
+                source.pingPongLoop,
+                source.releaseTailMs,
+                selectedSliceStart,
+                selectedSliceEnd,
             };
         }
         params.aetherGranularSlot2 = {
@@ -2429,12 +2688,12 @@ namespace beat
             juce::jlimit(0, 3, instrument.aether.granularSlot2.routing),
             instrument.aether.granularSlot2.fxSends,
         };
-        for (size_t index = 0; index < params.lumusGranularSlots.size(); ++index)
+        for (size_t index = 0; index < params.lumenGranularSlots.size(); ++index)
         {
-            const auto& source = instrument.lumus.granularSlots[index];
-            params.lumusGranularSlots[index] = {
-                params.hasLumus && source.enabled && lumusGranularSlots[index] != nullptr,
-                std::move(lumusGranularSlots[index]), source.level,
+            const auto& source = instrument.lumen.granularSlots[index];
+            params.lumenGranularSlots[index] = {
+                params.hasLumen && source.enabled && lumenGranularSlots[index] != nullptr,
+                std::move(lumenGranularSlots[index]), source.level,
                 juce::jlimit(0, 4, source.routing), source.fxSends,
             };
         }
@@ -2445,16 +2704,16 @@ namespace beat
                 if (instrument.aether.fxBusIds[bus].isNotEmpty()
                     && (instrument.aether.oscA.fxSends[bus] > 0.0001f
                         || instrument.aether.oscB.fxSends[bus] > 0.0001f
-                        || instrument.lumus.oscC.fxSends[bus] > 0.0001f
+                        || instrument.lumen.oscC.fxSends[bus] > 0.0001f
                         || instrument.aether.sub.fxSends[bus] > 0.0001f
                         || instrument.aether.noise.fxSends[bus] > 0.0001f
                         || (instrument.aether.sampleSlot1.enabled
                             && instrument.aether.sampleSlot1.fxSends[bus] > 0.0001f)
-                        || std::any_of(instrument.lumus.sampleSlots.begin(), instrument.lumus.sampleSlots.end(),
+                        || std::any_of(instrument.lumen.sampleSlots.begin(), instrument.lumen.sampleSlots.end(),
                             [bus](const auto& slot) { return slot.enabled && slot.fxSends[bus] > 0.0001f; })
                         || (instrument.aether.granularSlot2.enabled
                             && instrument.aether.granularSlot2.fxSends[bus] > 0.0001f)
-                        || std::any_of(instrument.lumus.granularSlots.begin(), instrument.lumus.granularSlots.end(),
+                        || std::any_of(instrument.lumen.granularSlots.begin(), instrument.lumen.granularSlots.end(),
                             [bus](const auto& slot) { return slot.enabled && slot.fxSends[bus] > 0.0001f; })))
                     return true;
             }
@@ -2560,8 +2819,8 @@ namespace beat
                         if (zone.audioFileId.isNotEmpty()) aetherAudioFileIds.insert(zone.audioFileId);
             };
             if (instrument.hasAether) collectSampleIds(instrument.aether.sampleSlot1);
-            if (instrument.synthEngine == InstrumentDefinition::SynthEngine::Lumus)
-                for (const auto& slot : instrument.lumus.sampleSlots) collectSampleIds(slot);
+            if (instrument.synthEngine == InstrumentDefinition::SynthEngine::Lumen)
+                for (const auto& slot : instrument.lumen.sampleSlots) collectSampleIds(slot);
         }
 
         const auto loadBuffer = [&](const juce::String& path) -> std::shared_ptr<SampleBuffer>
@@ -2725,7 +2984,8 @@ namespace beat
 
             if (track.kind == TrackKind::Group)
             {
-                InstrumentRenderState route;
+                auto routeStorage = std::make_unique<InstrumentRenderState>();
+                auto& route = *routeStorage;
                 route.trackId = track.id;
                 route.parentTrackId = track.parentTrackId;
                 route.outputBusId = track.outputBusId;
@@ -2757,7 +3017,8 @@ namespace beat
                 continue;
             }
 
-            InstrumentRenderState route;
+            auto routeStorage = std::make_unique<InstrumentRenderState>();
+            auto& route = *routeStorage;
             route.trackId = track.id;
             route.instrumentId = track.instrumentId;
             route.parentTrackId = track.parentTrackId;
@@ -2788,7 +3049,11 @@ namespace beat
                     });
                 if (!duplicate)
                 {
-                    nextMidiExpressionTargets.push_back({ track.id, track.instrumentId });
+                    nextMidiExpressionTargets.push_back({
+                        track.id,
+                        track.instrumentId,
+                        juce::jlimit(0.0f, 24.0f, routeInstrument->pitchBendRangeSemitones),
+                    });
                     retainedMidiExpressionInstrumentIds.push_back(track.instrumentId);
                 }
             }
@@ -2813,44 +3078,45 @@ namespace beat
 
             if (routeInstrument != nullptr)
             {
-                if (routeInstrument->synthEngine == InstrumentDefinition::SynthEngine::Lumus)
+                if (routeInstrument->synthEngine == InstrumentDefinition::SynthEngine::Lumen)
                 {
-                    const auto& arp = routeInstrument->lumus.arpeggiator;
-                    route.lumusArpeggiatorConfig.enabled = arp.enabled;
-                    route.lumusArpeggiatorConfig.mode = arp.mode == 1 ? LumusArpeggiator::Mode::down
-                        : arp.mode == 2 ? LumusArpeggiator::Mode::upDown
-                        : arp.mode == 3 ? LumusArpeggiator::Mode::random
-                        : LumusArpeggiator::Mode::up;
-                    route.lumusArpeggiatorConfig.gate = arp.gate;
-                    route.lumusArpeggiatorConfig.swing = arp.swing;
-                    route.lumusArpeggiatorConfig.octaves = arp.octaves;
-                    route.lumusArpeggiatorConfig.rootPitchClass = arp.rootPitchClass;
-                    route.lumusArpeggiatorConfig.scale = arp.scale == 1 ? LumusArpeggiator::Scale::major
-                        : arp.scale == 2 ? LumusArpeggiator::Scale::naturalMinor
-                        : arp.scale == 3 ? LumusArpeggiator::Scale::majorPentatonic
-                        : arp.scale == 4 ? LumusArpeggiator::Scale::blues
-                        : LumusArpeggiator::Scale::chromatic;
-                    route.lumusArpeggiatorRateDivision = arp.rateDivision;
-                    route.lumusArpeggiator.prepare(routeBuf.getNumSamples() > 0 ? routeBuf.getNumSamples() : 512);
-                    const auto& clip = routeInstrument->lumus.clip;
-                    route.lumusClipConfig.enabled = clip.enabled;
-                    route.lumusClipConfig.swing = clip.swing;
-                    route.lumusClipConfig.lengthSteps = clip.lengthSteps;
-                    for (int index = 0; index < LumusClipSequencer::maxSteps; ++index)
+                    const auto& arp = routeInstrument->lumen.arpeggiator;
+                    route.lumenArpeggiatorConfig.enabled = arp.enabled;
+                    route.lumenArpeggiatorConfig.mode = arp.mode == 1 ? LumenArpeggiator::Mode::down
+                        : arp.mode == 2 ? LumenArpeggiator::Mode::upDown
+                        : arp.mode == 3 ? LumenArpeggiator::Mode::random
+                        : LumenArpeggiator::Mode::up;
+                    route.lumenArpeggiatorConfig.gate = arp.gate;
+                    route.lumenArpeggiatorConfig.swing = arp.swing;
+                    route.lumenArpeggiatorConfig.octaves = arp.octaves;
+                    route.lumenArpeggiatorConfig.rootPitchClass = arp.rootPitchClass;
+                    route.lumenArpeggiatorConfig.scale = arp.scale == 1 ? LumenArpeggiator::Scale::major
+                        : arp.scale == 2 ? LumenArpeggiator::Scale::naturalMinor
+                        : arp.scale == 3 ? LumenArpeggiator::Scale::majorPentatonic
+                        : arp.scale == 4 ? LumenArpeggiator::Scale::blues
+                        : LumenArpeggiator::Scale::chromatic;
+                    route.lumenArpeggiatorRateDivision = arp.rateDivision;
+                    route.lumenArpeggiator.prepare(routeBuf.getNumSamples() > 0 ? routeBuf.getNumSamples() : 512);
+                    const auto& clip = routeInstrument->lumen.clip;
+                    route.lumenClipConfig.enabled = clip.enabled;
+                    route.lumenClipConfig.swing = clip.swing;
+                    route.lumenClipConfig.lengthSteps = clip.lengthSteps;
+                    route.lumenClipConfig.noteCount = clip.noteCount;
+                    for (int index = 0; index < LumenClipSequencer::maxNotes; ++index)
                     {
-                        route.lumusClipConfig.steps[(size_t) index].enabled = clip.steps[(size_t) index].enabled;
-                        route.lumusClipConfig.steps[(size_t) index].pitchOffset = clip.steps[(size_t) index].pitchOffset;
-                        route.lumusClipConfig.steps[(size_t) index].lengthSteps = clip.steps[(size_t) index].lengthSteps;
-                        route.lumusClipConfig.steps[(size_t) index].velocity = clip.steps[(size_t) index].velocity;
+                        route.lumenClipConfig.notes[(size_t) index].startStep = clip.notes[(size_t) index].startStep;
+                        route.lumenClipConfig.notes[(size_t) index].pitchOffset = clip.notes[(size_t) index].pitchOffset;
+                        route.lumenClipConfig.notes[(size_t) index].lengthSteps = clip.notes[(size_t) index].lengthSteps;
+                        route.lumenClipConfig.notes[(size_t) index].velocity = clip.notes[(size_t) index].velocity;
                     }
-                    route.lumusClipRateDivision = clip.rateDivision;
-                    route.lumusClipSequencer.prepare(routeBuf.getNumSamples() > 0 ? routeBuf.getNumSamples() : 512);
+                    route.lumenClipRateDivision = clip.rateDivision;
+                    route.lumenClipSequencer.prepare(routeBuf.getNumSamples() > 0 ? routeBuf.getNumSamples() : 512);
                 }
                 std::shared_ptr<const ImmutableMappedSampleSource> aetherSampleSlot1;
                 std::shared_ptr<const SfzDecodedInstrument> aetherSfzSlot1;
-                std::array<std::shared_ptr<const ImmutableMappedSampleSource>, 3> lumusSampleSlots;
-                std::array<std::shared_ptr<const SfzDecodedInstrument>, 3> lumusSfzSlots;
-                std::array<std::shared_ptr<const ImmutableGranularSource>, 3> lumusGranularSlots;
+                std::array<std::shared_ptr<const ImmutableMappedSampleSource>, 3> lumenSampleSlots;
+                std::array<std::shared_ptr<const SfzDecodedInstrument>, 3> lumenSfzSlots;
+                std::array<std::shared_ptr<const ImmutableGranularSource>, 3> lumenGranularSlots;
                 std::shared_ptr<const ImmutableGranularSource> aetherGranularSlot2;
                 const auto loadSampleSlot = [&](const InstrumentDefinition::AetherSampleSlot& slot,
                                                 std::shared_ptr<const ImmutableMappedSampleSource>& mappedOutput,
@@ -2864,6 +3130,18 @@ namespace beat
                         if (loaded.isAccepted())
                             sfzOutput = loaded.instrument;
                     }
+                    float selectedSliceStart = 0.0f;
+                    float selectedSliceEnd = 1.0f;
+                    bool hasSelectedSlice = false;
+                    if (slot.selectedSliceId.isNotEmpty())
+                        if (const auto selected = std::find_if(slot.slices.begin(), slot.slices.end(),
+                                [&](const auto& slice) { return slice.id == slot.selectedSliceId; });
+                            selected != slot.slices.end())
+                        {
+                            selectedSliceStart = selected->startRatio;
+                            selectedSliceEnd = selected->endRatio;
+                            hasSelectedSlice = true;
+                        }
                     auto map = std::make_shared<ImmutableMappedSampleSource>();
                     const auto addZone = [&](const Id& audioFileId, int rootNote, int loNote, int hiNote,
                                              int loVelocity, int hiVelocity, float level, float pan,
@@ -2872,6 +3150,18 @@ namespace beat
                     {
                         if (map->zoneCount >= ImmutableMappedSampleSource::maximumZones || audioFileId.isEmpty())
                             return;
+                        if (hasSelectedSlice)
+                        {
+                            startRatio = selectedSliceStart;
+                            endRatio = selectedSliceEnd;
+                            loopStartRatio = juce::jlimit(startRatio, endRatio, loopStartRatio);
+                            loopEndRatio = juce::jlimit(startRatio, endRatio, loopEndRatio);
+                            if (loopEndRatio <= loopStartRatio)
+                            {
+                                loopStartRatio = startRatio;
+                                loopEndRatio = endRatio;
+                            }
+                        }
                         auto source = std::make_shared<ImmutableSampleSource>();
                         const auto foundSample = nextAudioFiles.find(audioFileId);
                         if (foundSample != nextAudioFiles.end() && foundSample->second)
@@ -2911,10 +3201,15 @@ namespace beat
                                     (int64_t) std::llround((double) ratio * (double) frames));
                             };
                             const int64_t startFrame = ratioFrame(source->startRatio);
-                            (void) nextStreamingSession->preloadFrame(source->streamingAssetIndex, startFrame);
+                            const int64_t endFrame = ratioFrame(source->endRatio);
+                            const int64_t initialFrame = slot.reverse
+                                ? juce::jmax<int64_t>(0, endFrame - 1) : startFrame;
+                            (void) nextStreamingSession->preloadFrame(source->streamingAssetIndex, initialFrame);
                             (void) nextStreamingSession->preloadFrame(source->streamingAssetIndex,
-                                juce::jmin<int64_t>(frames - 1,
-                                    startFrame + BoundedSamplePageCache::pageFrames));
+                                slot.reverse
+                                    ? juce::jmax<int64_t>(0, initialFrame - BoundedSamplePageCache::pageFrames)
+                                    : juce::jmin<int64_t>(frames - 1,
+                                        initialFrame + BoundedSamplePageCache::pageFrames));
                             if (source->loopEnabled)
                             {
                                 (void) nextStreamingSession->preloadFrame(
@@ -2948,14 +3243,14 @@ namespace beat
                 };
                 const auto& slot = routeInstrument->aether.sampleSlot1;
                 auto sampleIdentity = routeInstrument->hasAether
-                        && routeInstrument->synthEngine != InstrumentDefinition::SynthEngine::Lumus
+                        && routeInstrument->synthEngine != InstrumentDefinition::SynthEngine::Lumen
                     ? loadSampleSlot(slot, aetherSampleSlot1, aetherSfzSlot1)
                     : juce::String();
-                std::array<juce::String, 3> lumusSampleIdentities;
-                if (routeInstrument->synthEngine == InstrumentDefinition::SynthEngine::Lumus)
-                    for (size_t index = 0; index < lumusSampleSlots.size(); ++index)
-                        lumusSampleIdentities[index] = loadSampleSlot(routeInstrument->lumus.sampleSlots[index],
-                            lumusSampleSlots[index], lumusSfzSlots[index]);
+                std::array<juce::String, 3> lumenSampleIdentities;
+                if (routeInstrument->synthEngine == InstrumentDefinition::SynthEngine::Lumen)
+                    for (size_t index = 0; index < lumenSampleSlots.size(); ++index)
+                        lumenSampleIdentities[index] = loadSampleSlot(routeInstrument->lumen.sampleSlots[index],
+                            lumenSampleSlots[index], lumenSfzSlots[index]);
                 const auto loadGranularSlot = [&](const InstrumentDefinition::AetherGranularSlot& granular)
                 {
                     std::shared_ptr<const ImmutableGranularSource> result;
@@ -2989,12 +3284,12 @@ namespace beat
                 };
                 const auto& granular = routeInstrument->aether.granularSlot2;
                 if (routeInstrument->hasAether) aetherGranularSlot2 = loadGranularSlot(granular);
-                if (routeInstrument->synthEngine == InstrumentDefinition::SynthEngine::Lumus)
-                    for (size_t index = 0; index < lumusGranularSlots.size(); ++index)
-                        lumusGranularSlots[index] = loadGranularSlot(routeInstrument->lumus.granularSlots[index]);
+                if (routeInstrument->synthEngine == InstrumentDefinition::SynthEngine::Lumen)
+                    for (size_t index = 0; index < lumenGranularSlots.size(); ++index)
+                        lumenGranularSlots[index] = loadGranularSlot(routeInstrument->lumen.granularSlots[index]);
                 route.synth = createInstrumentSynth(*routeInstrument,
                     std::move(aetherSampleSlot1), std::move(aetherSfzSlot1), std::move(aetherGranularSlot2),
-                    std::move(lumusSampleSlots), std::move(lumusSfzSlots), std::move(lumusGranularSlots));
+                    std::move(lumenSampleSlots), std::move(lumenSfzSlots), std::move(lumenGranularSlots));
                 route.sourceFxBusIds = routeInstrument->aether.fxBusIds;
                 route.aetherSampleSlot1Identity = slot.enabled
                     ? juce::String(slot.routing) + ":" + juce::String(slot.fxSends[0], 6) + ":"
@@ -3002,16 +3297,16 @@ namespace beat
                         + (slot.managedSfz.assetId.isNotEmpty()
                             ? "sfz:" + slot.managedSfz.assetId : sampleIdentity)
                     : juce::String();
-                if (routeInstrument->synthEngine == InstrumentDefinition::SynthEngine::Lumus)
-                    for (size_t index = 0; index < routeInstrument->lumus.sampleSlots.size(); ++index)
+                if (routeInstrument->synthEngine == InstrumentDefinition::SynthEngine::Lumen)
+                    for (size_t index = 0; index < routeInstrument->lumen.sampleSlots.size(); ++index)
                     {
-                        const auto& lumusSlot = routeInstrument->lumus.sampleSlots[index];
-                        if (!lumusSlot.enabled) continue;
-                        route.aetherSampleSlot1Identity += "|lumus-sample-" + juce::String((int) index) + ":"
-                            + juce::String(lumusSlot.routing) + ":" + juce::String(lumusSlot.fxSends[0], 6) + ":"
-                            + juce::String(lumusSlot.fxSends[1], 6) + ":"
-                            + (lumusSlot.managedSfz.assetId.isNotEmpty()
-                                ? "sfz:" + lumusSlot.managedSfz.assetId : lumusSampleIdentities[index]);
+                        const auto& lumenSlot = routeInstrument->lumen.sampleSlots[index];
+                        if (!lumenSlot.enabled) continue;
+                        route.aetherSampleSlot1Identity += "|lumen-sample-" + juce::String((int) index) + ":"
+                            + juce::String(lumenSlot.routing) + ":" + juce::String(lumenSlot.fxSends[0], 6) + ":"
+                            + juce::String(lumenSlot.fxSends[1], 6) + ":"
+                            + (lumenSlot.managedSfz.assetId.isNotEmpty()
+                                ? "sfz:" + lumenSlot.managedSfz.assetId : lumenSampleIdentities[index]);
                     }
                 if (granular.enabled)
                     route.aetherSampleSlot1Identity += "|granular:" + granular.builtinSource + ":"
@@ -3022,12 +3317,12 @@ namespace beat
                         + juce::String((int64_t) granular.randomSeed) + ":" + juce::String(granular.level, 6) + ":"
                         + juce::String(granular.routing) + ":" + juce::String(granular.fxSends[0], 6) + ":"
                         + juce::String(granular.fxSends[1], 6);
-                if (routeInstrument->synthEngine == InstrumentDefinition::SynthEngine::Lumus)
-                    for (size_t index = 0; index < routeInstrument->lumus.granularSlots.size(); ++index)
+                if (routeInstrument->synthEngine == InstrumentDefinition::SynthEngine::Lumen)
+                    for (size_t index = 0; index < routeInstrument->lumen.granularSlots.size(); ++index)
                     {
-                        const auto& source = routeInstrument->lumus.granularSlots[index];
+                        const auto& source = routeInstrument->lumen.granularSlots[index];
                         if (!source.enabled) continue;
-                        route.aetherSampleSlot1Identity += "|lumus-granular-" + juce::String((int) index) + ":"
+                        route.aetherSampleSlot1Identity += "|lumen-granular-" + juce::String((int) index) + ":"
                             + source.builtinSource + ":" + source.managedAsset.assetId + ":"
                             + juce::String(source.rootNote) + ":" + juce::String(source.position, 6) + ":"
                             + juce::String(source.positionSpread, 6) + ":" + juce::String(source.grainMilliseconds, 3) + ":"
@@ -3053,7 +3348,8 @@ namespace beat
         {
             const auto& bus = *busPtr;
 
-            InstrumentRenderState route;
+            auto routeStorage = std::make_unique<InstrumentRenderState>();
+            auto& route = *routeStorage;
             route.trackId = bus.id;
             route.outputBusId = bus.outputBusId;
             route.outputEnabled = bus.outputEnabled;
@@ -3243,6 +3539,10 @@ namespace beat
             activeSampleVoices.clear();
             activeAudioClipVoices.clear();
             pendingNoteOffs.clear();
+            scheduledPreviewNotes.clear();
+            previewNoteOffs.clear();
+            midiPreviewActive.store(false, std::memory_order_release);
+            audioPreviewActive.store(false, std::memory_order_release);
             pendingParameterAutomation.clear();
             blockRealtimeParameterEvents.clear();
             blockRouteParameterEvents.clear();
@@ -3623,7 +3923,7 @@ namespace beat
         const double samplesPerBeat = sr * 60.0 / tempo / speed;
         auto* route = findTrackRenderState(ev.trackId, ev.instrumentId);
         auto& contextCount = route != nullptr ? route->noteAutomationContextCount : defaultNoteAutomationContextCount;
-        auto& contexts = route != nullptr ? route->noteAutomationContexts : defaultNoteAutomationContexts;
+        auto& contexts = route != nullptr ? *route->noteAutomationContexts : *defaultNoteAutomationContexts;
 
         if (contextCount >= (int) contexts.size()) return;
 
@@ -4459,6 +4759,8 @@ namespace beat
                     auto& state = route.compressorStates[effectIndex];
                     const float thresholdDb = juce::jlimit(-60.0f, 0.0f, trackEffectParam(effect, "thresholdDb", -18.0f));
                     const float ratio = juce::jlimit(1.0f, 40.0f, trackEffectParam(effect, "ratio", 4.0f));
+                    const float thresholdGain = juce::Decibels::decibelsToGain(thresholdDb);
+                    const float compressionExponent = 1.0f / ratio - 1.0f;
                     const float attackMs = juce::jlimit(0.1f, 200.0f, trackEffectParam(effect, "attackMs", 10.0f));
                     const float releaseMs = juce::jlimit(1.0f, 2000.0f, trackEffectParam(effect, "releaseMs", 120.0f));
                     const float makeupGain = juce::Decibels::decibelsToGain(juce::jlimit(-24.0f, 24.0f, trackEffectParam(effect, "makeupDb", 0.0f)));
@@ -4475,14 +4777,9 @@ namespace beat
                         const float coeff = detector > state.envelope ? attackCoeff : releaseCoeff;
                         state.envelope = detector + coeff * (state.envelope - detector);
 
-                        const float inputDb = juce::Decibels::gainToDecibels(juce::jmax(state.envelope, 0.000001f), -120.0f);
-                        float gainReductionDb = 0.0f;
-                        if (inputDb > thresholdDb)
-                        {
-                            const float compressedDb = thresholdDb + (inputDb - thresholdDb) / ratio;
-                            gainReductionDb = compressedDb - inputDb;
-                        }
-                        const float compressorGain = juce::Decibels::decibelsToGain(gainReductionDb) * makeupGain;
+                        const float compressorGain = (state.envelope > thresholdGain
+                            ? std::pow(state.envelope / thresholdGain, compressionExponent)
+                            : 1.0f) * makeupGain;
 
                         for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
                         {
@@ -4654,6 +4951,8 @@ namespace beat
         {
             const float thresholdDb = juce::jlimit(-60.0f, 0.0f, masterChainSettings.compressorThresholdDb);
             const float ratio = juce::jlimit(1.0f, 40.0f, masterChainSettings.compressorRatio);
+            const float thresholdGain = juce::Decibels::decibelsToGain(thresholdDb);
+            const float compressionExponent = 1.0f / ratio - 1.0f;
             const float attackMs = juce::jlimit(0.1f, 200.0f, masterChainSettings.compressorAttackMs);
             const float releaseMs = juce::jlimit(1.0f, 3000.0f, masterChainSettings.compressorReleaseMs);
             const float makeupGain = juce::Decibels::decibelsToGain(juce::jlimit(-24.0f, 24.0f, masterChainSettings.compressorMakeupDb));
@@ -4670,15 +4969,9 @@ namespace beat
                 const float coeff = detector > masterCompressorEnvelope ? attackCoeff : releaseCoeff;
                 masterCompressorEnvelope = detector + coeff * (masterCompressorEnvelope - detector);
 
-                const float inputDb = juce::Decibels::gainToDecibels(juce::jmax(masterCompressorEnvelope, 0.000001f), -120.0f);
-                float gainReductionDb = 0.0f;
-                if (inputDb > thresholdDb)
-                {
-                    const float compressedDb = thresholdDb + (inputDb - thresholdDb) / ratio;
-                    gainReductionDb = compressedDb - inputDb;
-                }
-
-                const float compressorGain = juce::Decibels::decibelsToGain(gainReductionDb) * makeupGain;
+                const float compressorGain = (masterCompressorEnvelope > thresholdGain
+                    ? std::pow(masterCompressorEnvelope / thresholdGain, compressionExponent)
+                    : 1.0f) * makeupGain;
                 for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
                 {
                     auto* samples = buffer.getWritePointer(ch);
@@ -4860,7 +5153,7 @@ namespace beat
         }
     }
 
-    bool AudioEngine::startSampleVoiceLocked(const Sequencer::TriggerEvent& ev)
+    bool AudioEngine::startSampleVoiceLocked(const Sequencer::TriggerEvent& ev, bool preview)
     {
         if (findTrackRouteState(ev.trackId) == nullptr)
             return false;
@@ -5024,11 +5317,12 @@ namespace beat
             zone.oneShot,
             zone.chokeGroup,
             zoneEnd,
+            preview,
         });
         return true;
     }
 
-    bool AudioEngine::startAudioClipVoiceLocked(const Sequencer::AudioClipEvent& ev)
+    bool AudioEngine::startAudioClipVoiceLocked(const Sequencer::AudioClipEvent& ev, bool preview)
     {
         if (findTrackRouteState(ev.trackId) == nullptr)
             return false;
@@ -5071,6 +5365,7 @@ namespace beat
             clipTotalSamples,
             fades.in,
             fades.out,
+            preview,
         });
         return true;
     }
@@ -5261,6 +5556,15 @@ namespace beat
                                           int activeAudioClipVoiceCount,
                                           int routeCount,
                                           int automationEventCount,
+                                          int hottestRouteIndex,
+                                          int64_t hottestRouteTicks,
+                                          int hottestVoiceRouteIndex,
+                                          int64_t hottestVoiceRouteTicks,
+                                          int hottestVoiceRouteMidiEvents,
+                                          int hottestVoiceRouteVoicesBefore,
+                                          int hottestVoiceRouteVoicesAfter,
+                                          VoiceStats::RenderWork hottestVoiceRouteWork,
+                                          VoiceStats::RenderWork voiceWork,
                                           RouteEffectWorkStats routeEffectWork) noexcept
     {
         renderTimingBlockSamples.store(numSamples, std::memory_order_relaxed);
@@ -5279,7 +5583,17 @@ namespace beat
         renderTimingActiveAudioClipVoices.store(activeAudioClipVoiceCount, std::memory_order_relaxed);
         renderTimingRouteCount.store(routeCount, std::memory_order_relaxed);
         renderTimingAutomationEventCount.store(automationEventCount, std::memory_order_relaxed);
-        const auto voiceWork = InstrumentVoice::consumeRenderWorkStats();
+        renderTimingHottestRouteIndex.store(hottestRouteIndex, std::memory_order_relaxed);
+        renderTimingHottestRouteTicks.store(hottestRouteTicks, std::memory_order_relaxed);
+        renderTimingHottestVoiceRouteIndex.store(hottestVoiceRouteIndex, std::memory_order_relaxed);
+        renderTimingHottestVoiceRouteTicks.store(hottestVoiceRouteTicks, std::memory_order_relaxed);
+        renderTimingHottestVoiceRouteBlocks.store(hottestVoiceRouteWork.voiceBlocks, std::memory_order_relaxed);
+        renderTimingHottestVoiceRouteSamples.store(hottestVoiceRouteWork.voiceSamples, std::memory_order_relaxed);
+        renderTimingHottestVoiceRouteOscillatorSamples.store(hottestVoiceRouteWork.oscillatorSamples, std::memory_order_relaxed);
+        renderTimingHottestVoiceRouteWavetableSamples.store(hottestVoiceRouteWork.wavetableVoiceSamples, std::memory_order_relaxed);
+        renderTimingHottestVoiceRouteMidiEvents.store(hottestVoiceRouteMidiEvents, std::memory_order_relaxed);
+        renderTimingHottestVoiceRouteVoicesBefore.store(hottestVoiceRouteVoicesBefore, std::memory_order_relaxed);
+        renderTimingHottestVoiceRouteVoicesAfter.store(hottestVoiceRouteVoicesAfter, std::memory_order_relaxed);
         renderTimingVoiceRenderBlocks.store(voiceWork.voiceBlocks, std::memory_order_relaxed);
         renderTimingVoiceRenderSamples.store(voiceWork.voiceSamples, std::memory_order_relaxed);
         renderTimingOscillatorSamples.store(voiceWork.oscillatorSamples, std::memory_order_relaxed);
@@ -5316,10 +5630,12 @@ namespace beat
             deadlineOverruns.fetch_add(1, std::memory_order_relaxed);
         if (realtimeDeviceMode.load(std::memory_order_relaxed))
         {
-            consecutiveRealtimeDeadlineOverruns = missedDeadline
-                ? consecutiveRealtimeDeadlineOverruns + 1
+            const int consecutiveOverruns = missedDeadline
+                ? consecutiveRealtimeDeadlineOverruns.fetch_add(1, std::memory_order_relaxed) + 1
                 : 0;
-            if (consecutiveRealtimeDeadlineOverruns >= 8
+            if (!missedDeadline)
+                consecutiveRealtimeDeadlineOverruns.store(0, std::memory_order_relaxed);
+            if (consecutiveOverruns >= 8
                 && !transportSafetySilence.exchange(true, std::memory_order_acq_rel))
             {
                 seq.pause();
@@ -5340,7 +5656,7 @@ namespace beat
     void AudioEngine::audioDeviceStopped()
     {
         realtimeDeviceMode.store(false, std::memory_order_release);
-        consecutiveRealtimeDeadlineOverruns = 0;
+        consecutiveRealtimeDeadlineOverruns.store(0, std::memory_order_release);
     }
 
     void AudioEngine::handleIncomingMidiMessage(juce::MidiInput*, const juce::MidiMessage& message)
@@ -5366,7 +5682,9 @@ namespace beat
         // rebuild may own sampleLock while the realtime callback is already
         // overloaded; never wait for that lock before replacing device output
         // with silence.
-        if (transportSafetySilence.load(std::memory_order_acquire))
+        if (transportSafetySilence.load(std::memory_order_acquire)
+            && !midiPreviewActive.load(std::memory_order_acquire)
+            && !audioPreviewActive.load(std::memory_order_acquire))
         {
             clearDeviceOutput();
             const juce::ScopedTryLock lock(sampleLock);
@@ -5418,6 +5736,87 @@ namespace beat
                     state.midi.clear();
                     state.noteAutomationContextCount = 0;
                 }
+
+                size_t previewWrite = 0;
+                for (size_t previewRead = 0; previewRead < scheduledPreviewNotes.size(); ++previewRead)
+                {
+                    auto note = std::move(scheduledPreviewNotes[previewRead]);
+                    if (note.samplesUntilOn < numSamples)
+                    {
+                        if (auto* route = findTrackRenderState(note.trackId, note.instrumentId))
+                        {
+                            const int onSample = juce::jmax(0, note.samplesUntilOn);
+                            const auto previewLengthBeats = note.hasSourceNote
+                                ? juce::jmax(0.0, note.sourceNote.lengthBeats)
+                                : (double) note.lengthSamples / juce::jmax(1.0, sampleRate)
+                                    * juce::jmax(1.0, seq.getTempo()) / 60.0;
+                            const Sequencer::TriggerEvent previewEvent {
+                                note.trackId,
+                                "__midi-preview__",
+                                note.instrumentId,
+                                note.pitch,
+                                note.velocity,
+                                previewLengthBeats,
+                                note.lengthSamples,
+                                onSample,
+                                0,
+                                0.0,
+                                route->gainDb,
+                                route->pan,
+                                note.segmentGainDb,
+                                note.hasSourceNote ? &note.sourceNote : nullptr,
+                                -1,
+                                note.glideTargetPitch,
+                                note.glideMs,
+                            };
+                            if (!startSampleVoiceLocked(previewEvent, true))
+                            {
+                                route->midiPreviewTailActive = true;
+                                scheduleNoteAutomationLocked(previewEvent);
+                                route->midi.addEvent(
+                                    juce::MidiMessage::noteOn(1, note.pitch, (juce::uint8) note.velocity),
+                                    onSample);
+                                const int offSample = onSample + note.lengthSamples;
+                                if (offSample < numSamples)
+                                {
+                                    route->midi.addEvent(juce::MidiMessage::noteOff(1, note.pitch), offSample);
+                                }
+                                else if (previewNoteOffs.size() < previewNoteOffs.capacity())
+                                {
+                                    previewNoteOffs.push_back({
+                                        note.trackId,
+                                        note.instrumentId,
+                                        note.pitch,
+                                        offSample,
+                                    });
+                                }
+                            }
+                        }
+                        continue;
+                    }
+
+                    note.samplesUntilOn -= numSamples;
+                    scheduledPreviewNotes[previewWrite++] = std::move(note);
+                }
+                scheduledPreviewNotes.resize(previewWrite);
+
+                size_t previewOffWrite = 0;
+                for (size_t previewOffRead = 0; previewOffRead < previewNoteOffs.size(); ++previewOffRead)
+                {
+                    auto noteOff = std::move(previewNoteOffs[previewOffRead]);
+                    if (noteOff.samplesUntilOff < numSamples)
+                    {
+                        if (auto* route = findTrackRenderState(noteOff.trackId, noteOff.instrumentId))
+                            route->midi.addEvent(
+                                juce::MidiMessage::noteOff(1, noteOff.pitch),
+                                juce::jmax(0, noteOff.samplesUntilOff));
+                        continue;
+                    }
+
+                    noteOff.samplesUntilOff -= numSamples;
+                    previewNoteOffs[previewOffWrite++] = std::move(noteOff);
+                }
+                previewNoteOffs.resize(previewOffWrite);
 
                 size_t noteOffWrite = 0;
                 for (size_t noteOffRead = 0; noteOffRead < pendingNoteOffs.size(); ++noteOffRead)
@@ -5552,29 +5951,58 @@ namespace beat
         int activeAudioClipVoiceCount = 0;
         int routeCount = 0;
         int automationEventCount = 0;
+        int hottestRouteIndex = -1;
+        int64_t hottestRouteTicks = 0;
+        int hottestVoiceRouteIndex = -1;
+        int64_t hottestVoiceRouteTicks = 0;
+        int hottestVoiceRouteMidiEvents = 0;
+        int hottestVoiceRouteVoicesBefore = 0;
+        int hottestVoiceRouteVoicesAfter = 0;
+        VoiceStats::RenderWork hottestVoiceRouteWork;
+        VoiceStats::RenderWork voiceWork;
+        VoiceStats::add(voiceWork, InstrumentVoice::consumeRenderWorkStats());
         {
             const juce::ScopedTryLock lock(sampleLock);
             if (lock.isLocked())
             {
-                VoiceAutomationInbox::setPending(defaultNoteAutomationContexts.data(),
+                VoiceAutomationInbox::setPending(defaultNoteAutomationContexts->data(),
                                                  defaultNoteAutomationContextCount);
                 auto voiceStartTicks = markTicks();
+                const auto legacyVoicesBefore = countActiveSynthVoices(synth);
                 renderSynthWithRealtimeParametersLocked(synth, mixBuf, midi, {}, numSamples);
-                voiceTicks += ticksBetween(voiceStartTicks, markTicks());
+                const auto legacyVoiceTicks = ticksBetween(voiceStartTicks, markTicks());
+                voiceTicks += legacyVoiceTicks;
+                const auto legacyVoiceWork = InstrumentVoice::consumeRenderWorkStats();
+                VoiceStats::add(voiceWork, legacyVoiceWork);
+                if (legacyVoiceTicks > hottestVoiceRouteTicks)
+                {
+                    hottestVoiceRouteTicks = legacyVoiceTicks;
+                    hottestVoiceRouteIndex = -1;
+                    hottestVoiceRouteMidiEvents = midi.getNumEvents();
+                    hottestVoiceRouteVoicesBefore = legacyVoicesBefore;
+                    hottestVoiceRouteVoicesAfter = countActiveSynthVoices(synth);
+                    hottestVoiceRouteWork = legacyVoiceWork;
+                }
                 activeSynthVoiceCount += countActiveSynthVoices(synth);
                 VoiceAutomationInbox::clearPending();
                 for (auto& bus : returnRenderStates)
                     bus.returnBuffer.clear();
                 for (auto& group : groupRenderStates)
                     group.groupBuffer.clear();
+                int routeIndex = 0;
                 for (auto& route : instrumentRenderStates)
                 {
+                    const auto routeStartTicks = markTicks();
+                    int64_t routeVoiceTicks = 0;
+                    int routeMidiEventCount = 0;
+                    int routeVoicesBefore = 0;
+                    int routeVoicesAfter = 0;
                     routeBuf.clear();
                     for (auto& sourceFxBuffer : route.sourceFxBuffers)
                         sourceFxBuffer.clear();
                     if (route.synth != nullptr)
                     {
-                        VoiceAutomationInbox::setPending(route.noteAutomationContexts.data(),
+                        VoiceAutomationInbox::setPending(route.noteAutomationContexts->data(),
                                                          route.noteAutomationContextCount);
                         voiceStartTicks = markTicks();
                         const AetherSourceBusContext::ScopedTargets sourceBusTargets({
@@ -5584,28 +6012,33 @@ namespace beat
                         const auto realtimeRouteId = makeRealtimeParameterChangeFromJuce(
                             &route.instrumentId, nullptr, 0.0f);
                         juce::MidiBuffer* routeMidi = &route.midi;
-                        if (route.lumusClipConfig.enabled)
+                        if (route.lumenClipConfig.enabled)
                         {
                             const auto tempo = juce::jmax(1.0, seq.getTempo());
                             const auto speed = juce::jmax(0.1, seq.getSpeed());
-                            route.lumusClipConfig.stepSamples = sampleRate * 60.0 / tempo / speed
-                                * (4.0 / (double) route.lumusClipRateDivision);
-                            route.lumusClipSequencer.setConfig(route.lumusClipConfig);
-                            routeMidi = &route.lumusClipSequencer.process(route.midi, numSamples);
+                            route.lumenClipConfig.stepSamples = sampleRate * 60.0 / tempo / speed
+                                * (4.0 / (double) route.lumenClipRateDivision);
+                            route.lumenClipSequencer.setConfig(route.lumenClipConfig);
+                            routeMidi = &route.lumenClipSequencer.process(route.midi, numSamples);
                         }
-                        else if (route.lumusArpeggiatorConfig.enabled)
+                        else if (route.lumenArpeggiatorConfig.enabled)
                         {
                             const auto tempo = juce::jmax(1.0, seq.getTempo());
                             const auto speed = juce::jmax(0.1, seq.getSpeed());
-                            route.lumusArpeggiatorConfig.stepSamples = sampleRate * 60.0 / tempo / speed
-                                * (4.0 / (double) route.lumusArpeggiatorRateDivision);
-                            route.lumusArpeggiator.setConfig(route.lumusArpeggiatorConfig);
-                            routeMidi = &route.lumusArpeggiator.process(route.midi, numSamples);
+                            route.lumenArpeggiatorConfig.stepSamples = sampleRate * 60.0 / tempo / speed
+                                * (4.0 / (double) route.lumenArpeggiatorRateDivision);
+                            route.lumenArpeggiator.setConfig(route.lumenArpeggiatorConfig);
+                            routeMidi = &route.lumenArpeggiator.process(route.midi, numSamples);
                         }
+                        routeMidiEventCount = routeMidi->getNumEvents();
+                        routeVoicesBefore = countActiveSynthVoices(*route.synth);
                         renderSynthWithRealtimeParametersLocked(*route.synth, routeBuf, *routeMidi,
                             realtimeRouteId.instrumentIdView(), numSamples);
-                        voiceTicks += ticksBetween(voiceStartTicks, markTicks());
-                        activeSynthVoiceCount += countActiveSynthVoices(*route.synth);
+                        const auto renderedTicks = ticksBetween(voiceStartTicks, markTicks());
+                        voiceTicks += renderedTicks;
+                        routeVoiceTicks += renderedTicks;
+                        routeVoicesAfter = countActiveSynthVoices(*route.synth);
+                        activeSynthVoiceCount += routeVoicesAfter;
                         VoiceAutomationInbox::clearPending();
                     }
 
@@ -5614,14 +6047,32 @@ namespace beat
                     {
                         if (retiringSynth == nullptr || countActiveSynthVoices(*retiringSynth) == 0)
                             continue;
+                        routeVoicesBefore += countActiveSynthVoices(*retiringSynth);
                         voiceStartTicks = markTicks();
                         const AetherSourceBusContext::ScopedTargets sourceBusTargets({
                             &route.sourceFxBuffers[0],
                             &route.sourceFxBuffers[1],
                         });
                         retiringSynth->renderNextBlock(routeBuf, route.retiringMidi, 0, numSamples);
-                        voiceTicks += ticksBetween(voiceStartTicks, markTicks());
-                        activeSynthVoiceCount += countActiveSynthVoices(*retiringSynth);
+                        const auto renderedTicks = ticksBetween(voiceStartTicks, markTicks());
+                        voiceTicks += renderedTicks;
+                        routeVoiceTicks += renderedTicks;
+                        const auto retiringVoicesAfter = countActiveSynthVoices(*retiringSynth);
+                        routeVoicesAfter += retiringVoicesAfter;
+                        activeSynthVoiceCount += retiringVoicesAfter;
+                    }
+                    if (route.midiPreviewTailActive && routeVoicesAfter == 0)
+                        route.midiPreviewTailActive = false;
+                    const auto routeVoiceWork = InstrumentVoice::consumeRenderWorkStats();
+                    VoiceStats::add(voiceWork, routeVoiceWork);
+                    if (routeVoiceTicks > hottestVoiceRouteTicks)
+                    {
+                        hottestVoiceRouteTicks = routeVoiceTicks;
+                        hottestVoiceRouteIndex = routeIndex;
+                        hottestVoiceRouteMidiEvents = routeMidiEventCount;
+                        hottestVoiceRouteVoicesBefore = routeVoicesBefore;
+                        hottestVoiceRouteVoicesAfter = routeVoicesAfter;
+                        hottestVoiceRouteWork = routeVoiceWork;
                     }
 
                     addAetherSourceSendsLocked(route, 0, numSamples);
@@ -5635,11 +6086,34 @@ namespace beat
                     processRouteAutomationLocked(route, routeBuf, numSamples, &routeEffectTicks, &routeEffectWork);
                     const auto routeAutomationTicks = ticksBetween(routeModulationStartTicks, markTicks());
                     modulationTicks += juce::jmax<int64_t>(0, routeAutomationTicks - (routeEffectTicks - routeEffectTicksBefore));
+                    const auto routeTicks = ticksBetween(routeStartTicks, markTicks());
+                    if (routeTicks > hottestRouteTicks)
+                    {
+                        hottestRouteTicks = routeTicks;
+                        hottestRouteIndex = routeIndex;
+                    }
+                    ++routeIndex;
                 }
                 processGroupBusesLocked(numSamples, &routeEffectTicks, &routeEffectWork);
                 processReturnBusesLocked(numSamples, &routeEffectTicks, &routeEffectWork);
                 activeSampleVoiceCount = (int) activeSampleVoices.size();
                 activeAudioClipVoiceCount = (int) activeAudioClipVoices.size();
+                const bool previewSampleActive = std::any_of(
+                    activeSampleVoices.begin(), activeSampleVoices.end(),
+                    [](const auto& voice) { return voice.preview; });
+                const bool previewSynthActive = std::any_of(
+                    instrumentRenderStates.begin(), instrumentRenderStates.end(),
+                    [](const auto& route) { return route.midiPreviewTailActive; });
+                midiPreviewActive.store(
+                    !scheduledPreviewNotes.empty()
+                        || !previewNoteOffs.empty()
+                        || previewSampleActive
+                        || previewSynthActive,
+                    std::memory_order_release);
+                audioPreviewActive.store(
+                    std::any_of(activeAudioClipVoices.begin(), activeAudioClipVoices.end(),
+                                [](const auto& voice) { return voice.preview; }),
+                    std::memory_order_release);
                 routeCount = (int) instrumentRenderStates.size() + (int) groupRenderStates.size() + (int) returnRenderStates.size();
                 automationEventCount = (int) blockRealtimeParameterEvents.size()
                     + (int) blockRouteParameterEvents.size()
@@ -5710,6 +6184,15 @@ namespace beat
                             activeAudioClipVoiceCount,
                             routeCount,
                             automationEventCount,
+                            hottestRouteIndex,
+                            hottestRouteTicks,
+                            hottestVoiceRouteIndex,
+                            hottestVoiceRouteTicks,
+                            hottestVoiceRouteMidiEvents,
+                            hottestVoiceRouteVoicesBefore,
+                            hottestVoiceRouteVoicesAfter,
+                            hottestVoiceRouteWork,
+                            voiceWork,
                             routeEffectWork);
 
         // 5. Notify UI of position changes ~60Hz.

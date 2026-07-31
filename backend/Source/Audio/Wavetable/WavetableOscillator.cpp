@@ -183,12 +183,22 @@ namespace beat
             }
             return data[(size_t) index0] + (data[(size_t) index1] - data[(size_t) index0]) * sampleFrac;
         };
+        // Most live patches sit exactly on a frame and mip level for long
+        // stretches. Avoid reading and interpolating the three unused table
+        // corners in that common case; the full four-corner path remains for
+        // actual frame and mip morphing.
         const float mip0Frame0 = interpolate(cache.frame0Mip0Data);
-        const float mip0Frame1 = interpolate(cache.frame1Mip0Data);
+        const bool blendFrames = cache.frameFrac != 0.0f;
+        const float mip0Sample = blendFrames
+            ? mip0Frame0 + (interpolate(cache.frame1Mip0Data) - mip0Frame0) * cache.frameFrac
+            : mip0Frame0;
+        if (cache.mipFrac == 0.0f)
+            return mip0Sample;
+
         const float mip1Frame0 = interpolate(cache.frame0Mip1Data);
-        const float mip1Frame1 = interpolate(cache.frame1Mip1Data);
-        const float mip0Sample = mip0Frame0 + (mip0Frame1 - mip0Frame0) * cache.frameFrac;
-        const float mip1Sample = mip1Frame0 + (mip1Frame1 - mip1Frame0) * cache.frameFrac;
+        const float mip1Sample = blendFrames
+            ? mip1Frame0 + (interpolate(cache.frame1Mip1Data) - mip1Frame0) * cache.frameFrac
+            : mip1Frame0;
         return mip0Sample + (mip1Sample - mip0Sample) * cache.mipFrac;
     }
 }

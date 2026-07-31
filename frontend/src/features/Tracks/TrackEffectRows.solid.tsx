@@ -5,18 +5,29 @@ import {
   EFFECT_KIND_ORDER,
   EFFECT_META,
   clampEffectParamValue,
+  effectAutomationBeatFromDrag,
   effectAutomationSelectionKey,
   effectValueToLaneY,
   formatEffectParamValue,
   visibleEffectAutomationPoints,
+  type EffectMeta,
   type EffectParamMeta,
 } from "../../automation/trackEffects";
 import { AUTOMATION_CURVES, automationCurveLabel, evaluateAutomationCurve } from "../../automation/curves";
 import { useProjectStore, useUiStore, useViewStore } from "../../state/store";
 import styles from "./TrackEffectRows.module.css";
+import { TimepointHandle, TimepointValuePopover } from "./TimepointLane.solid";
 import type { Id, TrackEffect, TrackEffectAutomationPoint } from "../../state/types";
 
 const TIMEPOINT_HANDLE_Y = 11;
+
+function effectMeta(effect: TrackEffect): EffectMeta {
+  const kind = String(effect.kind);
+  return (EFFECT_META as Partial<Record<string, EffectMeta>>)[kind] ?? {
+    label: `Unsupported effect (${kind || "unknown"})`,
+    params: [],
+  };
+}
 
 interface EffectRowsProps {
   trackId: Id;
@@ -73,7 +84,7 @@ function EffectRowGroupHeader(props: {
   expanded: boolean;
   onToggle: () => void;
 }) {
-  const meta = createMemo(() => EFFECT_META[props.effect.kind]);
+  const meta = createMemo(() => effectMeta(props.effect));
   const menu = createContextMenu((): ContextMenuItem[] => [
     {
       label: "Change Effect...",
@@ -157,7 +168,7 @@ function EffectRowGroupLane(props: {
   bpm: number;
   beatsToPx: number;
 }) {
-  const meta = createMemo(() => EFFECT_META[props.effect.kind]);
+  const meta = createMemo(() => effectMeta(props.effect));
   const ghostPoints = createMemo(() => meta().params.flatMap((param) =>
     visibleEffectAutomationPoints(props.effect, param, props.lengthBeats, props.bpm).map((point) => ({ point, param })),
   ));
@@ -224,10 +235,11 @@ function EffectSummaryLane(props: {
       </For>
       <For each={props.ghostPoints}>
         {({ point, param }) => (
-          <span
-            class={`${styles.valueDiamond} ${styles.ghostDiamond}`}
+          <TimepointHandle
             title={`${param.label} ${formatEffectParamValue(point.value, param)}`}
-            style={{ left: `${point.beat * props.beatsToPx}px`, top: `${TIMEPOINT_HANDLE_Y}px` }}
+            left={point.beat * props.beatsToPx}
+            top={TIMEPOINT_HANDLE_Y}
+            ghost
           />
         )}
       </For>
@@ -243,8 +255,8 @@ function TrackEffectValueLaneRow(props: {
   bpm: number;
   beatsToPx: number;
 }) {
-  let laneElement: HTMLDivElement | undefined;
   const [editor, setEditor] = createSignal<{ pointId?: Id; beat: number; value: string; left: number; top: number } | null>(null, { equals: false });
+  const [draggingPointId, setDraggingPointId] = createSignal<Id | null>(null);
   const [pendingContextBeat, setPendingContextBeat] = createSignal(0);
   const selectedPointKeys = createStoreSelector(useUiStore, (state) => state.selectedTrackEffectAutomationPointKeys);
   const points = createMemo(() => visibleEffectAutomationPoints(props.effect, props.param, props.lengthBeats, props.bpm));
@@ -272,11 +284,7 @@ function TrackEffectValueLaneRow(props: {
       label: "+ Timepoint",
       icon: "ph:diamond",
       onSelect: () => {
-        useProjectStore.getState().upsertTrackEffectAutomationPoint(props.trackId, props.effect.id, props.param.key, {
-          beat: pendingContextBeat(),
-          value: props.effect.params[props.param.key] ?? props.param.min,
-          curve: "linear",
-        });
+        createPointAtBeat(pendingContextBeat(), props.effect.params[props.param.key] ?? props.param.min);
       },
     },
   ]);
@@ -284,11 +292,6 @@ function TrackEffectValueLaneRow(props: {
   function beatAtClientX(clientX: number, target: HTMLElement): number {
     const rect = target.getBoundingClientRect();
     return Math.max(0, Math.min(props.lengthBeats, (clientX - rect.left) / props.beatsToPx));
-  }
-
-  function beatAtLaneClientX(clientX: number): number {
-    if (!laneElement) return 0;
-    return beatAtClientX(clientX, laneElement);
   }
 
   function openEditor(beat: number, fallbackValue: number, pointId?: Id) {
@@ -306,45 +309,93 @@ function TrackEffectValueLaneRow(props: {
     if (!current) return;
     const parsed = Number(current.value);
     if (!Number.isFinite(parsed)) return;
+    const value = clampEffectParamValue(parsed, props.param);
+    if (!current.pointId) {
+      createPointAtBeat(current.beat, value);
+      setEditor(null);
+      return;
+    }
     const existingPoint = points().find((point) => point.id === current.pointId);
     useProjectStore.getState().upsertTrackEffectAutomationPoint(props.trackId, props.effect.id, props.param.key, {
       id: current.pointId,
       beat: current.beat,
-      value: clampEffectParamValue(parsed, props.param),
+      value,
       curve: existingPoint?.curve ?? "linear",
     });
     setEditor(null);
   }
 
-  function movePointToClientX(pointId: Id, value: number, clientX: number) {
+  function createPointAtBeat(beat: number, value: number): Id {
+    const persistedLane = props.effect.automation?.find((candidate) => candidate.param === props.param.key);
+    const fallbackPoint = persistedLane?.points.length ? undefined : points()[0];
+    let createdPointId: Id;
+    if (fallbackPoint && Math.abs(fallbackPoint.beat - beat) < 0.0001) {
+      createdPointId = useProjectStore.getState().upsertTrackEffectAutomationPoint(props.trackId, props.effect.id, props.param.key, {
+        id: fallbackPoint.id,
+        beat,
+        value,
+        curve: fallbackPoint.curve ?? "linear",
+      });
+    } else {
+      if (fallbackPoint) {
+        useProjectStore.getState().upsertTrackEffectAutomationPoint(props.trackId, props.effect.id, props.param.key, {
+          id: fallbackPoint.id,
+          beat: fallbackPoint.beat,
+          value: fallbackPoint.value,
+          curve: fallbackPoint.curve ?? "linear",
+        });
+      }
+      createdPointId = useProjectStore.getState().upsertTrackEffectAutomationPoint(props.trackId, props.effect.id, props.param.key, {
+        beat,
+        value,
+        curve: "linear",
+      });
+    }
+    useUiStore.getState().selectTrackEffectAutomationPoint(
+      effectAutomationSelectionKey(props.trackId, props.effect.id, props.param.key, createdPointId),
+      false,
+    );
+    return createdPointId;
+  }
+
+  function movePointToBeat(pointId: Id, value: number, beat: number) {
     const existingPoint = points().find((point) => point.id === pointId);
     useProjectStore.getState().upsertTrackEffectAutomationPoint(props.trackId, props.effect.id, props.param.key, {
       id: pointId,
-      beat: beatAtLaneClientX(clientX),
+      beat,
       value,
       curve: existingPoint?.curve ?? "linear",
     });
   }
 
-  function startPointDrag(point: TrackEffectAutomationPoint, clientX: number) {
+  function startPointDrag(point: TrackEffectAutomationPoint, pointerId: number, clientX: number) {
     let moved = false;
     const startClientX = clientX;
-    const handleMouseMove = (event: MouseEvent) => {
+    setDraggingPointId(point.id);
+    const handlePointerMove = (event: PointerEvent) => {
+      if (event.pointerId !== pointerId) return;
       if (!moved && Math.abs(event.clientX - startClientX) < 2) return;
       moved = true;
-      movePointToClientX(point.id, point.value, event.clientX);
+      movePointToBeat(
+        point.id,
+        point.value,
+        effectAutomationBeatFromDrag(point.beat, startClientX, event.clientX, props.beatsToPx, props.lengthBeats),
+      );
     };
-    const stopDrag = () => {
-      window.removeEventListener("mousemove", handleMouseMove);
-      window.removeEventListener("mouseup", stopDrag);
+    const stopDrag = (event: PointerEvent) => {
+      if (event.pointerId !== pointerId) return;
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", stopDrag);
+      window.removeEventListener("pointercancel", stopDrag);
+      setDraggingPointId(null);
     };
-    window.addEventListener("mousemove", handleMouseMove);
-    window.addEventListener("mouseup", stopDrag);
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", stopDrag);
+    window.addEventListener("pointercancel", stopDrag);
   }
 
   return (
     <div
-      ref={laneElement}
       class={`${styles.effectLane} ${styles.valueLane}`}
       style={{ width: `${props.lengthBeats * props.beatsToPx}px` }}
       onContextMenu={(event) => {
@@ -405,11 +456,12 @@ function TrackEffectValueLaneRow(props: {
               point={point}
               pointKey={pointKey()}
               selected={selectedPointKeys().includes(pointKey())}
+              dragging={draggingPointId() === point.id}
               beatsToPx={props.beatsToPx}
               onSelect={(additive) => useUiStore.getState().selectTrackEffectAutomationPoint(pointKey(), additive)}
-              onStartDrag={(clientX) => {
+              onStartDrag={(pointerId, clientX) => {
                 setEditor(null);
-                startPointDrag(point, clientX);
+                startPointDrag(point, pointerId, clientX);
               }}
               onOpenEditor={() => openEditor(point.beat, point.value, point.id)}
             />
@@ -418,25 +470,16 @@ function TrackEffectValueLaneRow(props: {
       </For>
       <Show when={editor()}>
         {(current) => (
-          <div
-            class={styles.pointPopover}
-            style={{ left: `${current().left}px`, top: `${current().top}px` }}
-            onDblClick={(event) => event.stopPropagation()}
-            onPointerDown={(event) => event.stopPropagation()}
-          >
-            <input
-              class={styles.pointInput}
-              value={current().value}
-              autofocus
-              onInput={(event) => setEditor({ ...current(), value: event.currentTarget.value })}
-              onBlur={commitEditor}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") commitEditor();
-                if (event.key === "Escape") setEditor(null);
-              }}
-            />
-            <span class={styles.pointUnit}>{props.param.unit}</span>
-          </div>
+          <TimepointValuePopover
+            left={current().left}
+            top={current().top}
+            label={`${props.param.label} automation`}
+            value={current().value}
+            unit={props.param.unit}
+            onInput={(value) => setEditor({ ...current(), value })}
+            onCommit={commitEditor}
+            onCancel={() => setEditor(null)}
+          />
         )}
       </Show>
       {menu.menu()}
@@ -451,9 +494,10 @@ function AutomationPointDiamond(props: {
   point: TrackEffectAutomationPoint;
   pointKey: string;
   selected: boolean;
+  dragging: boolean;
   beatsToPx: number;
   onSelect: (additive: boolean) => void;
-  onStartDrag: (clientX: number) => void;
+  onStartDrag: (pointerId: number, clientX: number) => void;
   onOpenEditor: () => void;
 }) {
   const menu = createContextMenu((): ContextMenuItem[] => [
@@ -483,31 +527,22 @@ function AutomationPointDiamond(props: {
 
   return (
     <>
-      <span
-        class={`${styles.valueDiamond} ${props.selected ? styles.valueDiamondSelected : ""}`}
+      <TimepointHandle
         title={`${props.param.label} ${formatEffectParamValue(props.point.value, props.param)} · ${automationCurveLabel(props.point.curve ?? "linear")}`}
-        style={{ left: `${props.point.beat * props.beatsToPx}px`, top: `${TIMEPOINT_HANDLE_Y}px` }}
-        data-track-effect-automation-point-key={props.pointKey}
+        displayValue={formatEffectParamValue(props.point.value, props.param)}
+        left={props.point.beat * props.beatsToPx}
+        top={TIMEPOINT_HANDLE_Y}
+        selectionKey={props.pointKey}
+        selected={props.selected}
+        dragging={props.dragging}
         onContextMenu={(event) => {
           useUiStore.getState().selectTrackEffectAutomationPoint(props.pointKey, false);
           menu.onContextMenu(event);
         }}
-        onClick={(event) => {
-          event.stopPropagation();
-          props.onSelect(event.shiftKey);
-        }}
-        onMouseDown={(event) => {
-          if (event.button !== 0 || event.ctrlKey) return;
-          event.stopPropagation();
-          props.onStartDrag(event.clientX);
-        }}
-        onDblClick={(event) => {
-          event.stopPropagation();
-          props.onOpenEditor();
-        }}
-      >
-        <span class={styles.valueTooltip}>{formatEffectParamValue(props.point.value, props.param)}</span>
-      </span>
+        onSelect={props.onSelect}
+        onStartDrag={props.onStartDrag}
+        onOpenEditor={props.onOpenEditor}
+      />
       {menu.menu()}
     </>
   );

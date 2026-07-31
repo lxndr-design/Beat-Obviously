@@ -44,3 +44,6 @@ __pycache__/
 # Beat-specific
 *.beat.tmp
 samples-cache/
+
+# Misrouted local benchmark output
+--help/

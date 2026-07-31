@@ -10,7 +10,6 @@ import { Timeline } from "./Timeline.solid";
 import { Playhead } from "./Playhead.solid";
 import { TrackHeader } from "./TrackHeader.solid";
 import {
-  clampClientYToTimeline,
   marqueeStyleFromClientPoints,
   normalizedTimelineRect,
   rectsOverlap,
@@ -39,14 +38,16 @@ export function TrackList() {
   const tracks = createStoreSelector(useProjectStore, (state) => state.project.tracks);
   const lengthBeats = createStoreSelector(useProjectStore, (state) => state.project.lengthBeats);
   const bpm = createStoreSelector(useProjectStore, (state) => state.project.bpm);
+  const audioFiles = createStoreSelector(useAudioFileStore, (state) => state.files);
   const selectedTrackIds = createStoreSelector(useUiStore, (state) => state.selectedTrackIds);
   const selectedSegmentIds = createStoreSelector(useUiStore, (state) => state.selectedSegmentIds);
   const loopEnabled = createStoreSelector(useTransportStore, (state) => state.loopEnabled);
   const loopRange = createStoreSelector(useTransportStore, (state) => state.loopRange);
   const beatsToPx = createStoreSelector(useViewStore, (state) => state.beatsToPx);
   const [marquee, setMarquee] = createSignal<MarqueeState | null>(null, { equals: false });
+  const [horizontalScrollLeft, setHorizontalScrollLeft] = createSignal(0);
   const [expandedEffectIds, setExpandedEffectIds] = createSignal<Set<Id>>(new Set(), { equals: false });
-  const [audioRecordingRequest, setAudioRecordingRequest] = createSignal<{ trackId: Id; startBeat: number } | null>(null);
+  const [audioRecordingRequest, setAudioRecordingRequest] = createSignal<{ trackId: Id; startBeat: number; recordingGroupId: Id } | null>(null);
   const selectedSegments = createMemo(() => {
     const ids = new Set(selectedSegmentIds());
     return tracks().flatMap((track) => track.segments).filter((segment) => ids.has(segment.id));
@@ -57,7 +58,13 @@ export function TrackList() {
   const audioRecordingContext = createMemo(() => {
     const request = audioRecordingRequest();
     const track = request ? tracks().find((candidate) => candidate.id === request.trackId) : undefined;
-    return request && track ? { request, track } : null;
+    if (!request || !track) return null;
+    const filesById = new Map(audioFiles().map((file) => [file.id, file]));
+    const takes = track.segments
+      .filter((segment) => segment.recordingGroupId === request.recordingGroupId && segment.payload.kind === "audio")
+      .sort((a, b) => (a.recordingTakeNumber ?? 0) - (b.recordingTakeNumber ?? 0) || (a.recordedAt ?? 0) - (b.recordedAt ?? 0))
+      .map((segment) => ({ segment, file: filesById.get(segment.payload.kind === "audio" ? segment.payload.audioFileId : "") }));
+    return { request, track, takes };
   });
 
   function clearSelection() {
@@ -94,11 +101,12 @@ export function TrackList() {
   function updateMarqueeSelection(next: MarqueeState) {
     const rect = normalizedTimelineRect(
       next.startClientX,
-      clampMarqueeClientY(next.startClientY, laneScrollElement),
+      next.startClientY,
       next.currentClientX,
-      clampMarqueeClientY(next.currentClientY, laneScrollElement),
+      next.currentClientY,
     );
     const ids = new Set<Id>();
+    const effectPointKeys = new Set<string>();
     laneScrollElement
       ?.querySelectorAll<HTMLElement>("[data-segment-id]")
       .forEach((node) => {
@@ -106,6 +114,17 @@ export function TrackList() {
         if (!segmentId) return;
         if (rectsOverlap(rect, rectFromDom(node.getBoundingClientRect()))) ids.add(segmentId);
       });
+    laneScrollElement
+      ?.querySelectorAll<HTMLElement>("[data-track-timepoint-selection-key]")
+      .forEach((node) => {
+        const pointKey = node.dataset.trackTimepointSelectionKey;
+        if (!pointKey) return;
+        if (rectsOverlap(rect, rectFromDom(node.getBoundingClientRect()))) effectPointKeys.add(pointKey);
+      });
+    if (effectPointKeys.size > 0) {
+      useUiStore.getState().setSelectedTrackEffectAutomationPoints(Array.from(effectPointKeys));
+      return;
+    }
     useUiStore.getState().setSelectedSegments(Array.from(ids));
     useUiStore.getState().setSelectedTracks([]);
   }
@@ -113,14 +132,14 @@ export function TrackList() {
   function onLanePointerDown(event: PointerEvent) {
     if (event.button !== 0 || event.ctrlKey) return;
     const target = event.target as Element;
-    if (target.closest("[data-timeline-ruler], [data-segment-body], [data-segment-handle], [data-segment-fade-handle], input, button, [data-floating-layer]")) return;
+    if (target.closest("[data-timeline-ruler], [data-segment-body], [data-segment-handle], [data-segment-fade-handle], [data-track-timepoint-selection-key], input, button, [data-floating-layer]")) return;
     const inner = laneScrollElement?.querySelector<HTMLElement>(`.${styles.lanesInner}`);
     if (!inner?.contains(target)) return;
     const next = {
       startClientX: event.clientX,
-      startClientY: clampMarqueeClientY(event.clientY, laneScrollElement),
+      startClientY: event.clientY,
       currentClientX: event.clientX,
-      currentClientY: clampMarqueeClientY(event.clientY, laneScrollElement),
+      currentClientY: event.clientY,
       active: false,
     };
     marqueeRef = next;
@@ -132,11 +151,10 @@ export function TrackList() {
     const current = marqueeRef;
     if (!current) return;
     const active = current.active || Math.hypot(event.clientX - current.startClientX, event.clientY - current.startClientY) >= 4;
-    const currentClientY = clampMarqueeClientY(event.clientY, laneScrollElement);
     const next = {
       ...current,
       currentClientX: event.clientX,
-      currentClientY,
+      currentClientY: event.clientY,
       active,
     };
     marqueeRef = next;
@@ -234,26 +252,57 @@ export function TrackList() {
     file: AudioFile;
     lengthBeats: number;
     sourceStartBeat: number;
+    segmentId?: Id;
+    recordedAt?: number;
   }) {
     const request = audioRecordingRequest();
     if (!request) return;
     const lengthBeats = Math.max(0.03125, take.lengthBeats);
+    const track = tracks().find((candidate) => candidate.id === request.trackId);
+    const existingTakes = track?.segments.filter((segment) => segment.recordingGroupId === request.recordingGroupId) ?? [];
+    const takeNumber = existingTakes.reduce((maximum, segment) => Math.max(maximum, segment.recordingTakeNumber ?? 0), 0) + 1;
     useAudioFileStore.getState().addFile(take.file);
     useProjectStore.getState().addSegment(request.trackId, {
-      name: take.file.name || "Recorded audio",
+      ...(take.segmentId ? { id: take.segmentId } : {}),
+      name: `Live Record · Take ${takeNumber}`,
       startBeat: request.startBeat,
       lengthBeats,
       sourceStartBeat: take.sourceStartBeat,
       payload: { kind: "audio", audioFileId: take.file.id, gainDb: 0 },
+      recordingGroupId: request.recordingGroupId,
+      recordingTakeNumber: takeNumber,
+      recordedAt: take.recordedAt ?? Date.now(),
+      recordingInputDeviceId: track?.inputDeviceId ?? "",
+      recordingInputDeviceName: useProjectStore.getState().project.recordingInput.inputDeviceName ?? "",
+      muted: false,
     });
     useViewStore.getState().setLastSegmentLength(lengthBeats);
-    setAudioRecordingRequest(null);
+  }
+
+  function toggleRecordedTake(segmentId: Id, enabled: boolean) {
+    useProjectStore.getState().updateSegment(segmentId, { muted: !enabled });
+  }
+
+  function updateRecordingInput(input: { id: string; name: string; channelCount: number }) {
+    const request = audioRecordingRequest();
+    if (!request) return;
+    const projectStore = useProjectStore.getState();
+    projectStore.updateTrack(request.trackId, {
+      inputDeviceId: input.id,
+      inputChannelCount: input.channelCount,
+    });
+    projectStore.updateRecordingInput({
+      inputDeviceId: input.id,
+      inputDeviceName: input.name,
+      inputChannelCount: input.channelCount,
+    });
   }
 
   return (
     <div class={styles.panel}>
       <div class={styles.area}>
         <div class={styles.headerCol}>
+          <div class={styles.timelineSpacer} aria-hidden="true" />
           <For each={tracks()}>
             {(track, index) => (
               <div>
@@ -280,10 +329,13 @@ export function TrackList() {
             <Icon name="ph:plus" size={18} decorative />
             <span>Add track</span>
           </Button>
-          <div class={styles.timelineSpacer} aria-hidden="true" />
         </div>
 
         <div class={styles.laneWrap}>
+          <div class={styles.timelineDock}>
+            <Timeline scrollLeft={horizontalScrollLeft()} />
+            <Playhead offsetPx={-horizontalScrollLeft()} />
+          </div>
           <Show when={selectedSegments().length > 1}>
             <div class={styles.selectionBar} data-floating-layer>
               <span class={styles.selectionCount}>{selectedSegments().length}</span>
@@ -319,6 +371,7 @@ export function TrackList() {
             ref={laneScrollElement}
             class={styles.laneScroll}
             onWheel={onWheel}
+            onScroll={(event) => setHorizontalScrollLeft(event.currentTarget.scrollLeft)}
           >
             <div
               class={styles.lanesInner}
@@ -358,36 +411,36 @@ export function TrackList() {
               </Show>
               <div class={styles.addRowLaneSpacer} />
               <Playhead />
-              <Timeline />
               <Show when={marquee()}>
                 {(current) => <div class={styles.marquee} style={marqueeStyle(current(), laneScrollElement)} />}
               </Show>
             </div>
           </div>
 
-          <div class={styles.zoomFloat}>
-            <HoverInfo content="Zoom out">
-              <Button
-                iconOnly
-                size="xs"
-                onClick={() => setZoom(Math.max(MIN_ZOOM, beatsToPx() - ZOOM_STEP))}
-                aria-label="Zoom out"
-              >
-                <Icon name="ph:magnifying-glass-minus" size={18} decorative />
-              </Button>
-            </HoverInfo>
-            <HoverInfo content="Zoom in">
-              <Button
-                iconOnly
-                size="xs"
-                onClick={() => setZoom(Math.min(MAX_ZOOM, beatsToPx() + ZOOM_STEP))}
-                aria-label="Zoom in"
-              >
-                <Icon name="ph:magnifying-glass-plus" size={18} decorative />
-              </Button>
-            </HoverInfo>
-          </div>
         </div>
+      </div>
+
+      <div class={styles.zoomFloat}>
+        <HoverInfo content="Zoom out">
+          <Button
+            iconOnly
+            size="xs"
+            onClick={() => setZoom(Math.max(MIN_ZOOM, beatsToPx() - ZOOM_STEP))}
+            aria-label="Zoom out"
+          >
+            <Icon name="ph:magnifying-glass-minus" size={18} decorative />
+          </Button>
+        </HoverInfo>
+        <HoverInfo content="Zoom in">
+          <Button
+            iconOnly
+            size="xs"
+            onClick={() => setZoom(Math.min(MAX_ZOOM, beatsToPx() + ZOOM_STEP))}
+            aria-label="Zoom in"
+          >
+            <Icon name="ph:magnifying-glass-plus" size={18} decorative />
+          </Button>
+        </HoverInfo>
       </div>
 
       <Show when={audioRecordingContext()}>
@@ -396,9 +449,16 @@ export function TrackList() {
             trackId={context().request.trackId}
             trackName={context().track.name}
             startBeat={context().request.startBeat}
+            recordingGroupId={context().request.recordingGroupId}
             bpm={bpm()}
+            inputDeviceId={context().track.inputDeviceId ?? ""}
+            inputDeviceName={useProjectStore.getState().project.recordingInput.inputDeviceName ?? ""}
+            inputChannelCount={context().track.inputChannelCount}
+            takes={context().takes}
             onClose={() => setAudioRecordingRequest(null)}
             onCommit={commitRecordedTake}
+            onToggleTake={toggleRecordedTake}
+            onInputDeviceChange={updateRecordingInput}
           />
         )}
       </Show>
@@ -416,7 +476,7 @@ function marqueeStyle(state: MarqueeState, laneScroll: HTMLDivElement | undefine
     state.currentClientY,
     rect?.left ?? 0,
     rect?.top ?? 0,
-    getTimelineTop(laneScroll),
+    undefined,
   );
   return {
     left: `${next.left}px`,
@@ -424,15 +484,6 @@ function marqueeStyle(state: MarqueeState, laneScroll: HTMLDivElement | undefine
     width: `${next.width}px`,
     height: `${next.height}px`,
   };
-}
-
-function clampMarqueeClientY(clientY: number, laneScroll: HTMLDivElement | undefined): number {
-  return clampClientYToTimeline(clientY, getTimelineTop(laneScroll));
-}
-
-function getTimelineTop(laneScroll: HTMLDivElement | undefined): number | undefined {
-  const timeline = laneScroll?.querySelector<HTMLElement>("[data-timeline-ruler]");
-  return timeline?.getBoundingClientRect().top;
 }
 
 function rectFromDom(rect: DOMRect): TimelineRect {

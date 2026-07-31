@@ -1,0 +1,151 @@
+{
+  "schema": "beat.lumen-vital-capability-matrix.v1",
+  "reviewedAt": "2026-07-29",
+  "reference": {
+    "product": "Vital",
+    "vendor": "Vital Audio",
+    "binaryVersion": null,
+    "sourceSnapshot": "636ca0ef517a4db087a6a08a6a8a5e704e21f836",
+    "sourceSnapshotCaveat": "The official repository states that source publication is delayed after binary releases; this commit is provenance context, not a claim about the current downloadable binary.",
+    "sourcePolicy": "Official Vital product, press-kit, and repository pages define this feature contract. The pinned GPLv3 source snapshot was separately inspected for an architecture audit, but no Vital source, preset, wavetable, sample, artwork, branding, service, or binary is imported into Beat.",
+    "urls": [
+      "https://vital.audio/",
+      "https://vital.audio/presskit/",
+      "https://github.com/mtytel/vital"
+    ]
+  },
+  "sourceArchitectureAudit": {
+    "status": "reviewed-no-import",
+    "document": "docs/audio/lumen-vital-source-audit.md",
+    "scope": "Sparse processing, modulation rate selection, spectral buffer reuse, active filter/effect selection, and SIMD unison architecture.",
+    "implementationBoundary": "Independent Beat implementation is recommended. Any copied, translated, or closely adapted Vital implementation must use the documented GPLv3 private-build provenance path."
+  },
+  "comparisonMode": "feature-contract",
+  "directAudioComparison": {
+    "status": "blocked-no-local-reference-renderer",
+    "reason": "No locally installed Vital AU, VST3, VST, or standalone application was found. No Vital sound-quality, CPU, aliasing, null, latency, or preset result is inferred."
+  },
+  "lumenInternalBaseline": {
+    "scope": "Aether-to-Lumen equivalent patches only; Vital does not participate.",
+    "rows": 8,
+    "outputEquivalentRows": 8,
+    "lumenToAetherMedianWallRatio": 1.086237,
+    "maxObservedRowMedianWallRatio": 1.094587
+  },
+  "rows": [
+    {
+      "id": "identity.scope",
+      "vital": "A dedicated spectral-warping wavetable synthesizer distributed as VST, VST3, AU, LV2, and standalone products.",
+      "lumen": "A Beat-owned internal hybrid instrument engine with its own lumen-hybrid-synth identity and native project contract.",
+      "status": "different-product-boundary"
+    },
+    {
+      "id": "oscillator.architecture",
+      "vital": "High-quality wavetable oscillators, efficient unison, and a custom sample source.",
+      "lumen": "Three fixed A/B/C source slots each select Wavetable, Sample, Multisample, or Granular, plus inherited sub and noise sources.",
+      "status": "different-strengths"
+    },
+    {
+      "id": "wavetable.spectral-warping",
+      "vital": "Frequency and wave warping act on harmonic content, including stretch, shift, smear, and skew behavior.",
+      "lumen": "Schema v15 adds five Lumen-only prepared harmonic-domain wavetable modes: Harmonic Shift, Harmonic Stretch, Spectral Smear, Spectral Skew, and Spectral Filter. Tables are generated and cached outside playback. This is a bounded warp foundation, not Vital's full spectral engine or a direct sound/CPU parity result.",
+      "status": "partial"
+    },
+    {
+      "id": "wavetable.authoring",
+      "vital": "Built-in wavetable editing plus pitch-splice and vocode conversion from user samples; text-to-wavetable is an external web service.",
+      "lumen": "Beat-owned drawn, generated, imported-audio, resynthesized wavemaps, editable partial overlays, and frame analysis exist. Any A/B/C wavetable slot can resynthesize an existing audio-library asset through Full, Transient, Sustain, or bounded Manual windows. Native worker isolation remains incomplete. No external text-generation service is a parity target.",
+      "status": "partial"
+    },
+    {
+      "id": "oscillator.quality",
+      "vital": "The official product describes a low noise floor, sharp Nyquist cutoff, and almost no aliasing.",
+      "lumen": "Pitch, finite output, cross-rate behavior, deterministic live/export rendering, immutable mip/frame selection, and interaction alias thresholds have automated coverage. A direct Vital comparison is blocked.",
+      "status": "independently-measured"
+    },
+    {
+      "id": "unison.performance",
+      "vital": "The official product describes SSE-optimized efficient unison.",
+      "lumen": "Up to 16 unison voices per wavetable source use precomputed plans and cached stereo gains; equivalent disabled-extension Lumen patches remain within Beat's Aether wall-time budgets.",
+      "status": "foundation-complete-direct-comparison-blocked"
+    },
+    {
+      "id": "filters.dual",
+      "vital": "Two routable voice filters provide analog and digital models with continuous blending modes.",
+      "lumen": "A/B/C route independently to a shared filter, Filter 1, Filter 2, Direct, or None, but model breadth and continuous morphing do not match Vital's documented surface.",
+      "status": "partial"
+    },
+    {
+      "id": "modulation.audio-rate",
+      "vital": "Many controls accept audio-rate modulation, including filter cutoff use cases.",
+      "lumen": "The current parameter policy distinguishes control/sample/audio-rate classes, but Lumen does not claim a general user-routable audio-rate modulation system.",
+      "status": "major-gap"
+    },
+    {
+      "id": "modulation.stereo-remap",
+      "vital": "Stereo-split modulation and per-connection modulation remapping are first-class workflows.",
+      "lumen": "Ordered routes, bipolar policy, source lanes, macros, MPE sources, conflict summaries, and per-route Linear/Ease In/Ease Out/S-Curve remapping exist. Stereo-split routing and arbitrary editable remap curves remain absent.",
+      "status": "partial"
+    },
+    {
+      "id": "modulation.sources",
+      "vital": "Custom editable LFOs, keytracked LFOs, modulatable custom-curve envelopes, and stereo random sources including Perlin and Lorenz attractors.",
+      "lumen": "Four envelopes, ten LFO slots, eight macros, velocity, keytrack, mod wheel, pressure, timbre, and pitch sources exist. Schema v16 adds bounded per-LFO octave-rate keytracking evaluated once per voice block. Audio-rate routing, deep editable shapes, and advanced random generators remain incomplete.",
+      "status": "partial"
+    },
+    {
+      "id": "sample.hybrid-depth",
+      "vital": "A custom sample source complements its wavetable oscillators.",
+      "lumen": "Every main slot supports Sample, mapped Multisample/SFZ, and deterministic Granular playback with routing, sends, slices, direction, rate, loops, and release-tail controls.",
+      "status": "lumen-advantage"
+    },
+    {
+      "id": "effects.routing",
+      "vital": "Eight routable effects include multiband compression, multi-mode phaser, and 16-voice chorus.",
+      "lumen": "Ordered instrument inserts, track inserts, return buses, nested routing, latency compensation, and live/export parity exist; effect algorithm breadth and synth-local workflow are not yet Vital-equivalent.",
+      "status": "partial"
+    },
+    {
+      "id": "expression.mpe",
+      "vital": "The official product claims full MPE support.",
+      "lumen": "Per-member pressure, timbre, pitch, mod wheel, saved zones, and legacy MPE configuration messages are implemented, but MIDI-CI negotiation and simultaneous lower/upper zones remain open.",
+      "status": "partial"
+    },
+    {
+      "id": "tuning.microtonal-files",
+      "vital": "Loads .tun, .scl, and .kbd microtonal files.",
+      "lumen": "Per-source harmonic, ratio, equal-division, and step tuning exist, but there is no .tun/.scl/.kbd import contract.",
+      "status": "gap"
+    },
+    {
+      "id": "visualization.workflow",
+      "vital": "Animated controls, filter responses, waveforms, LFOs, oscilloscopes, and spectrograms are GPU-optimized and run at 60 fps.",
+      "lumen": "Beat exposes waveform, analyzer, modulation, and render-timing surfaces, but not Vital's unified animated modulation and spectral-feedback workflow.",
+      "status": "major-gap"
+    },
+    {
+      "id": "preset.workflow",
+      "vital": "Preset browsing includes sorting, search, tags, and folder organization.",
+      "lumen": "Searchable grouped instruments, factory archetypes, tags, recency/use sorting, and source-preserving Aether cloning exist; content scale and synth-specialized audition remain shallower.",
+      "status": "partial"
+    },
+    {
+      "id": "sequencing.beat-integration",
+      "vital": "The official feature pages used for this matrix do not establish a comparable internal clip contract.",
+      "lumen": "A bounded arpeggiator and 1-32-step, 64-note polyphonic clip integrate with Beat tempo, piano roll, reusable MIDI patterns, and sample-accurate route MIDI.",
+      "status": "lumen-product-advantage"
+    },
+    {
+      "id": "performance.direct-reference",
+      "vital": "Requires a locally installed official binary, exact version, neutral user-authored patches, and controlled host settings.",
+      "lumen": "Native and browser timing/work telemetry exists, but no cross-product performance result is valid until both renderers run under one recorded protocol.",
+      "status": "blocked"
+    },
+    {
+      "id": "licensing.provenance",
+      "vital": "The published source is GPLv3; the official repository points proprietary users to separate licensing and prohibits reuse of branding, services, and bundled presets outside their licenses.",
+      "lumen": "Current Lumen production code is independently implemented Beat-owned work. The quarantined Vital source snapshot remains external and unused.",
+      "status": "boundary-enforced"
+    }
+  ]
+}
