@@ -3478,7 +3478,7 @@ namespace beat
         {
             const auto recentStartedMs = juce::Time::getMillisecondCounterHiRes();
             juce::Array<juce::var> items;
-            for (const auto& recent : projectRepo.listRecentProjects(16))
+            for (const auto& recent : projectRepo.listRecentProjects())
             {
                 juce::DynamicObject::Ptr item = new juce::DynamicObject();
                 item->setProperty("path", recent.path);

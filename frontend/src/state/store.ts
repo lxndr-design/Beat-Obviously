@@ -220,7 +220,6 @@ interface SettingsSnapshot {
   defaultInputChannelCount: 1 | 2;
   fileAssetPolicy: FileAssetPolicy;
   autosaveBackups: boolean;
-  maxRecentProjects: number;
   memoryCachePreset: MemoryCachePreset;
   restoreLastProject: boolean;
   startupProjectBehavior: StartupProjectBehavior;
@@ -246,7 +245,6 @@ const DEFAULT_SETTINGS: SettingsSnapshot = {
   defaultInputChannelCount: 2,
   fileAssetPolicy: "copy",
   autosaveBackups: true,
-  maxRecentProjects: 8,
   memoryCachePreset: "balanced",
   restoreLastProject: false,
   startupProjectBehavior: "home",
@@ -289,7 +287,6 @@ function normalizeSettingsSnapshot(value: unknown): SettingsSnapshot {
     defaultInputChannelCount: source.defaultInputChannelCount === 1 ? 1 : 2,
     fileAssetPolicy: normalizeFileAssetPolicy(source.fileAssetPolicy),
     autosaveBackups: source.autosaveBackups ?? DEFAULT_SETTINGS.autosaveBackups,
-    maxRecentProjects: Math.max(4, Math.min(24, Math.round(source.maxRecentProjects ?? DEFAULT_SETTINGS.maxRecentProjects))),
     memoryCachePreset: normalizeMemoryCachePreset(source.memoryCachePreset),
     restoreLastProject: source.restoreLastProject ?? DEFAULT_SETTINGS.restoreLastProject,
     startupProjectBehavior: normalizeStartupProjectBehavior(source.startupProjectBehavior),
@@ -1403,7 +1400,6 @@ interface SettingsSlice {
   defaultInputChannelCount: 1 | 2;
   fileAssetPolicy: FileAssetPolicy;
   autosaveBackups: boolean;
-  maxRecentProjects: number;
   memoryCachePreset: MemoryCachePreset;
   restoreLastProject: boolean;
   startupProjectBehavior: StartupProjectBehavior;
@@ -1425,7 +1421,6 @@ interface SettingsSlice {
   setDefaultInputChannelCount: (count: 1 | 2) => void;
   setFileAssetPolicy: (policy: FileAssetPolicy) => void;
   setAutosaveBackups: (enabled: boolean) => void;
-  setMaxRecentProjects: (count: number) => void;
   setMemoryCachePreset: (preset: MemoryCachePreset) => void;
   setRestoreLastProject: (enabled: boolean) => void;
   setStartupProjectBehavior: (behavior: StartupProjectBehavior) => void;
@@ -1513,11 +1508,6 @@ export const useSettingsStore = create<SettingsSlice>()((set) => ({
   setAutosaveBackups: (autosaveBackups) => {
     writeSettingsPatch({ autosaveBackups });
     set({ autosaveBackups });
-  },
-  setMaxRecentProjects: (maxRecentProjects) => {
-    const normalized = Math.max(4, Math.min(24, Math.round(maxRecentProjects)));
-    writeSettingsPatch({ maxRecentProjects: normalized });
-    set({ maxRecentProjects: normalized });
   },
   setMemoryCachePreset: (memoryCachePreset) => {
     writeSettingsPatch({ memoryCachePreset });
@@ -1680,26 +1670,22 @@ function normalizeTimestampMs(value: unknown): number {
 
 function normalizeRecentProjects(projects: unknown[]): RecentProjectEntry[] {
   const unique: RecentProjectEntry[] = [];
-  const maxRecentProjects = readSettingsSnapshot().maxRecentProjects;
   for (const project of projects) {
     if (!project || typeof project !== "object") continue;
     const candidate = project as Partial<RecentProjectEntry>;
     if (typeof candidate.path !== "string" || !candidate.path.trim()) continue;
     const normalized = createRecentProject(candidate as Partial<RecentProjectEntry> & { path: string });
     if (!unique.some((existing) => existing.path === normalized.path)) unique.push(normalized);
-    if (unique.length >= maxRecentProjects) break;
   }
   return unique;
 }
 
 function normalizeRecentFilePaths(paths: unknown[]): string[] {
   const unique: string[] = [];
-  const maxRecentProjects = readSettingsSnapshot().maxRecentProjects;
   for (const path of paths) {
     if (typeof path !== "string" || !path.trim()) continue;
     const trimmed = path.trim();
     if (!unique.includes(trimmed)) unique.push(trimmed);
-    if (unique.length >= maxRecentProjects) break;
   }
   return unique;
 }

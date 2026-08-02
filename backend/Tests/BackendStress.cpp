@@ -9598,15 +9598,21 @@ namespace
             && afterRecord.front().sizeBytes == (double) firstFile.getSize()
             && afterRecord.front().openedAt > 1000000000000LL;
 
+        for (int index = 0; index < 32; ++index)
+            repo.recordRecentProject(root.getChildFile("Bulk " + juce::String(index + 1) + ".beat"));
+        const auto afterBulkRecord = repo.listRecentProjects();
+        const bool unlimitedOk = afterBulkRecord.size() == 34;
+
         root.deleteRecursively();
-        const bool ok = orderOk && existenceProbeWaiverOk && legacyTimestampOk && removeOk && recordOk;
+        const bool ok = orderOk && existenceProbeWaiverOk && legacyTimestampOk && removeOk && recordOk && unlimitedOk;
         if (!ok)
         {
             std::cerr << "Recent project repository stress failed order=" << orderOk
                       << " existenceProbeWaiver=" << existenceProbeWaiverOk
                       << " legacyTimestamp=" << legacyTimestampOk
                       << " remove=" << removeOk
-                      << " record=" << recordOk << "\n";
+                      << " record=" << recordOk
+                      << " unlimited=" << unlimitedOk << "\n";
         }
         return ok;
     }
@@ -23209,6 +23215,17 @@ namespace
 
 int main(int argc, char** argv)
 {
+    if (argc == 2 && juce::String(argv[1]) == "--recent-projects")
+    {
+        if (!stressRecentProjectRepository())
+        {
+            std::cerr << "Recent projects focused stress failed\n";
+            return 1;
+        }
+        std::cout << "Recent projects focused stress passed\n";
+        return 0;
+    }
+
     if (argc == 2 && juce::String(argv[1]) == "--timeline-jumping")
     {
         if (!stressAudioEngineSampleZoneStartEndSlicing()

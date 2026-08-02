@@ -47,7 +47,7 @@ namespace beat
         std::vector<Summary> list();
         void remove(const Id& id);
         void recordRecentProject(const juce::File& file, const juce::var& document = {});
-        std::vector<RecentProject> listRecentProjects(int limit = 16);
+        std::vector<RecentProject> listRecentProjects();
         void removeRecentProject(const juce::String& path);
 
     private:

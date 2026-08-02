@@ -2504,26 +2504,16 @@ namespace beat
         stmt.bind(4, static_cast<double>(file.existsAsFile() ? file.getSize() : 0));
         stmt.step();
 
-        db.exec(R"sql(
-            DELETE FROM recent_projects
-            WHERE path NOT IN (
-                SELECT path FROM recent_projects
-                ORDER BY opened_at DESC
-                LIMIT 16
-            )
-        )sql");
     }
 
-    std::vector<ProjectRepository::RecentProject> ProjectRepository::listRecentProjects(int limit)
+    std::vector<ProjectRepository::RecentProject> ProjectRepository::listRecentProjects()
     {
         std::vector<RecentProject> out;
         Statement stmt(db, R"sql(
             SELECT path, name, opened_at, size_bytes
             FROM recent_projects
             ORDER BY opened_at DESC
-            LIMIT ?
         )sql");
-        stmt.bind(1, juce::jlimit(1, 128, limit));
         while (stmt.step())
         {
             const auto path = stmt.columnText(0);

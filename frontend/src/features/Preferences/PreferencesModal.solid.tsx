@@ -23,7 +23,6 @@ export function PreferencesModal() {
   const [outputOpen, setOutputOpen] = createSignal(false);
   const [sampleRateOpen, setSampleRateOpen] = createSignal(false);
   const [bufferOpen, setBufferOpen] = createSignal(false);
-  const [recentOpen, setRecentOpen] = createSignal(false);
   const [assetPolicyOpen, setAssetPolicyOpen] = createSignal(false);
   const [memoryOpen, setMemoryOpen] = createSignal(false);
   const [startupOpen, setStartupOpen] = createSignal(false);
@@ -63,7 +62,6 @@ export function PreferencesModal() {
     setOutputOpen(false);
     setSampleRateOpen(false);
     setBufferOpen(false);
-    setRecentOpen(false);
     setAssetPolicyOpen(false);
     setMemoryOpen(false);
     setStartupOpen(false);
@@ -197,11 +195,9 @@ export function PreferencesModal() {
             <FilesPreferences
               settings={settings()}
               assetPolicyOpen={assetPolicyOpen()}
-              recentOpen={recentOpen()}
               memoryOpen={memoryOpen()}
               startupOpen={startupOpen()}
               setAssetPolicyOpen={setAssetPolicyOpen}
-              setRecentOpen={setRecentOpen}
               setMemoryOpen={setMemoryOpen}
               setStartupOpen={setStartupOpen}
             />
@@ -360,11 +356,9 @@ function AudioPreferences(props: AudioPreferencesProps) {
 interface FilesPreferencesProps {
   settings: SettingsState;
   assetPolicyOpen: boolean;
-  recentOpen: boolean;
   memoryOpen: boolean;
   startupOpen: boolean;
   setAssetPolicyOpen: (open: boolean) => void;
-  setRecentOpen: (open: boolean) => void;
   setMemoryOpen: (open: boolean) => void;
   setStartupOpen: (open: boolean) => void;
 }
@@ -385,17 +379,6 @@ function FilesPreferences(props: FilesPreferencesProps) {
             open={props.assetPolicyOpen}
             onOpenChange={props.setAssetPolicyOpen}
             onChange={(value) => props.settings.setFileAssetPolicy(value as FileAssetPolicy)}
-          />
-          <FloatingSelect
-            className={styles.fieldSelect}
-            label="Recents"
-            layout="inline"
-            value={String(props.settings.maxRecentProjects)}
-            ariaLabel="Recent project limit"
-            options={RECENT_PROJECT_OPTIONS}
-            open={props.recentOpen}
-            onOpenChange={props.setRecentOpen}
-            onChange={(value) => props.settings.setMaxRecentProjects(Number(value))}
           />
           <Toggle
             className={styles.inlineToggle}
@@ -605,7 +588,6 @@ const CONTRAST_LEVEL_OPTIONS: Array<{ value: ThemeContrastLevel; label: string }
   { value: "normal", label: "Normal" },
   { value: "high", label: "High" },
 ];
-const RECENT_PROJECT_OPTIONS = ["4", "8", "12", "16", "24"].map((value) => ({ value, label: value }));
 const SAMPLE_RATE_OPTIONS = [8000, 11025, 16000, 22050, 32000, 44100, 48000, 88200, 96000, 192000].map((value) => ({
   value: String(value),
   label: formatSampleRate(value),
