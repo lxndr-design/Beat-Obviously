@@ -2,6 +2,15 @@
 
 All notable Beat changes are tracked here. Dates use local project dates.
 
+## Unreleased
+
+### Changed
+
+- Redesigned native and in-app startup feedback around Beat's timeline visual
+  language and added shared loading indicators and skeletons for Recent
+  Projects, asset libraries, waveform decoding, preset browsing, and plugin
+  refreshes, including reduced-motion behavior.
+
 ## 0.3.0 - 2026-08-01
 
 ### Added

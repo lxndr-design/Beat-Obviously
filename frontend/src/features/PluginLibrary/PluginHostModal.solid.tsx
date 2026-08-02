@@ -1,5 +1,5 @@
 import { createEffect, createMemo, createSignal, For, onCleanup, Show, type JSX } from "solid-js";
-import { Button, FloatingSelect, Icon, Modal, Slider } from "../../solid-ui";
+import { Button, FloatingSelect, Icon, LoadingIndicator, Modal, Slider } from "../../solid-ui";
 import {
   decentSamplerControlBindingState,
   decentSamplerControlInstrumentPatch,
@@ -315,7 +315,7 @@ function DecentSamplerHost(props: { plugin: PluginAdapter }) {
       </div>
       <Show when={loading() || loadError()}>
         <div class={styles.decentSkinNotice} role={loadError() ? "alert" : "status"}>
-          {loading() ? "Refreshing package UI" : loadError()}
+          {loading() ? <LoadingIndicator size="sm" label="Refreshing package UI" /> : loadError()}
         </div>
       </Show>
 

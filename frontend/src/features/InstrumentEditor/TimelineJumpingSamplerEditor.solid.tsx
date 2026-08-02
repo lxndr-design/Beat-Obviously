@@ -1,5 +1,5 @@
 import { createEffect, createMemo, createSignal, For, onCleanup, Show } from "solid-js";
-import { appAlert, Button, FloatingSelect, Icon, Modal, NumberInput, TextInput } from "../../solid-ui";
+import { appAlert, Button, FloatingSelect, Icon, LoadingIndicator, Modal, NumberInput, TextInput } from "../../solid-ui";
 import {
   cachedInstrumentSampleBuffer,
   getBrowserPreviewAudioContext,
@@ -231,7 +231,7 @@ export function TimelineJumpingSamplerEditor(props: Props) {
         <div class={styles.waveformPanel}>
           <button class={styles.waveform} type="button" onPointerDown={movePlayhead} aria-label="Set Timeline Jumping playhead">
             <span class={styles.centerLine} />
-            <Show when={waveformPoints()} fallback={<span class={styles.waveformStatus}>{waveformLoading() ? "Decoding waveform" : "Waveform unavailable"}</span>}>
+            <Show when={waveformPoints()} fallback={<span class={styles.waveformStatus}>{waveformLoading() ? <LoadingIndicator size="sm" label="Decoding waveform" /> : "Waveform unavailable"}</span>}>
               {(points) => (
                 <svg viewBox="0 0 100 40" preserveAspectRatio="none" aria-hidden="true">
                   <polygon points={points()} />

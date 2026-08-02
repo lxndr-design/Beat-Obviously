@@ -1,6 +1,6 @@
 import { createEffect, createMemo, createSignal, For, onCleanup, Show } from "solid-js";
 import { appAlert, appConfirm, appPrompt } from "../../solid-ui";
-import { ActionFooter, Button, FloatingSelect, HoverInfo, Icon, LibrarySearch, MarqueeText } from "../../solid-ui";
+import { ActionFooter, Button, FloatingSelect, HoverInfo, Icon, LibrarySearch, LoadingIndicator, MarqueeText } from "../../solid-ui";
 import { importAudioFiles } from "../../audio/audioImport";
 import { registerGlobalAudioStop } from "../../audio/globalAudioSafety";
 import { isNative, send } from "../../ipc/bridge";
@@ -782,7 +782,7 @@ function ScopeOverlay({ analysis }: { analysis: WaveformAnalysis | null }) {
 }
 
 function WaveformPreview({ analysis, loading }: { analysis: WaveformAnalysis | null; loading: boolean }) {
-  if (loading) return <div class={styles.waveformLoading} />;
+  if (loading) return <LoadingIndicator size="lg" className={styles.waveformLoading} label="Loading waveform" />;
   if (!analysis) return null;
   if (analysis.left.upper.length === 0 && analysis.right.upper.length === 0) return null;
 

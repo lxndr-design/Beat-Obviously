@@ -3,7 +3,7 @@ import { registerGlobalAudioStop, stopAllBrowserAudio } from "../../audio/global
 import { pauseTransport } from "../../audio/transportActions";
 import { isNative, send } from "../../ipc/bridge";
 import type { AudioWaveformSummary } from "../../ipc/schema";
-import { Button, HoverInfo, Icon } from "../../solid-ui";
+import { Button, HoverInfo, Icon, LoadingIndicator } from "../../solid-ui";
 import { useTransportStore } from "../../state/store";
 import type { AudioFile, Segment } from "../../state/types";
 import styles from "./AudioSegmentTransport.module.css";
@@ -256,7 +256,7 @@ export function AudioSegmentTransport(props: Props) {
         aria-label={`Audio preview position ${formatBeat(positionBeat())} of ${formatBeat(lengthBeats())} beats`}
       >
         <span class={styles.centerLine} aria-hidden />
-        <Show when={displayWaveform()} fallback={<span class={styles.waveformState}>{loadingWaveform() ? "Loading waveform…" : "Waveform unavailable"}</span>}>
+        <Show when={displayWaveform()} fallback={<span class={styles.waveformState}>{loadingWaveform() ? <LoadingIndicator size="sm" label="Loading waveform" /> : "Waveform unavailable"}</span>}>
           {(channels) => (
             <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
               <path d={waveformPath(channels().left, 25, 21)} />

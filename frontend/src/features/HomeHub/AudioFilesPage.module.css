@@ -396,13 +396,7 @@
 .waveformLoading {
   position: relative;
   z-index: 1;
-  width: 36px;
-  height: 36px;
-  border: 6px solid transparent;
-  border-top-color: var(--color-fg);
-  border-left-color: color-mix(in srgb, var(--color-fg) 45%, transparent);
-  border-radius: 50%;
-  animation: audioPreviewSpin 1s linear infinite;
+  flex-direction: column;
 }
 
 .waveformStatus {

@@ -1,0 +1,136 @@
+.indicator {
+  --loading-unit: 3px;
+  --loading-gap: 3px;
+  --loading-height: 15px;
+
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: var(--color-fg);
+}
+
+.small {
+  --loading-unit: 2px;
+  --loading-gap: 3px;
+  --loading-height: 12px;
+}
+
+.large {
+  --loading-unit: 6px;
+  --loading-gap: 3px;
+  --loading-height: 42px;
+  gap: 12px;
+}
+
+.signal {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--loading-gap);
+  height: var(--loading-height);
+}
+
+.signal i {
+  display: block;
+  width: var(--loading-unit);
+  height: 28%;
+  background: currentColor;
+  transform-origin: center;
+  animation: beatLoadingSignal 980ms steps(5, end) infinite;
+  animation-delay: calc(var(--loading-index) * -90ms);
+}
+
+.label {
+  overflow: hidden;
+  color: var(--color-fg-hover);
+  font-size: var(--font-size-ui);
+  line-height: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.skeleton {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  min-height: 36px;
+  overflow: hidden;
+}
+
+.skeletonMedia {
+  min-height: 54px;
+  padding: 6px;
+  border: var(--border-fg);
+}
+
+.skeletonShape {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--color-fg) 12%, var(--color-bg));
+}
+
+.skeletonShape::after {
+  position: absolute;
+  inset: 0;
+  content: "";
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in srgb, var(--color-fg) 18%, transparent) 45%,
+    color-mix(in srgb, var(--color-fg) 32%, transparent) 50%,
+    color-mix(in srgb, var(--color-fg) 18%, transparent) 55%,
+    transparent 100%
+  );
+  transform: translateX(-115%);
+  animation: beatLoadingSweep 1.4s steps(18, end) infinite;
+}
+
+.skeletonSquare {
+  flex: 0 0 36px;
+  width: 36px;
+  height: 36px;
+}
+
+.skeletonCopy {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.skeletonPrimary {
+  width: min(42%, 210px);
+  height: 9px;
+}
+
+.skeletonSecondary {
+  width: min(29%, 150px);
+  height: 6px;
+  opacity: 0.65;
+}
+
+@keyframes beatLoadingSignal {
+  0%, 100% { height: 22%; opacity: 0.45; }
+  20% { height: 92%; opacity: 1; }
+  45% { height: 48%; opacity: 0.72; }
+  70% { height: 74%; opacity: 0.9; }
+}
+
+@keyframes beatLoadingSweep {
+  to { transform: translateX(115%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .signal i,
+  .skeletonShape::after {
+    animation: none;
+  }
+
+  .signal i:nth-child(2n) { height: 72%; opacity: 0.8; }
+  .signal i:nth-child(3n) { height: 44%; opacity: 0.65; }
+}

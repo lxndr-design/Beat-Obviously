@@ -1,5 +1,5 @@
 import { createEffect, createSignal, For, onCleanup, Show } from "solid-js";
-import { Button, Checkbox, HoverInfo, Icon, LibraryFolder, LibrarySearch, RowActionButton, RowItem, SectionRibbon, SectionRibbonActionButton, createContextMenu, type ContextMenuItem } from "../../solid-ui";
+import { Button, Checkbox, HoverInfo, Icon, LibraryFolder, LibrarySearch, LoadingIndicator, RowActionButton, RowItem, SectionRibbon, SectionRibbonActionButton, createContextMenu, type ContextMenuItem } from "../../solid-ui";
 import { createInstrumentBufferSource, preloadInstrumentSamplesForPlayback, previewFrequency } from "../../audio/synthPreview";
 import { registerGlobalAudioStop } from "../../audio/globalAudioSafety";
 import { LUMEN_TEST_INSTRUMENT_SET_ID, TEMPORARY_DS_INSTRUMENT_SET_ID, snapshotInstrument, useInstrumentStore, usePluginStore, useProjectStore, useUiStore } from "../../state/store";
@@ -405,8 +405,7 @@ export function InstrumentLibraryPanel(props: InstrumentLibraryPanelProps) {
       <div class={`${styles.list} ${props.expanded ? styles.listOpen : ""}`} aria-hidden={!props.expanded}>
         <Show when={loading()}>
           <div class={styles.loadingState} role="status" aria-live="polite">
-            <span class={styles.loadingRing} />
-            <span>Loading Instruments...</span>
+            <LoadingIndicator size="md" label="Loading Instruments" announce={false} />
           </div>
         </Show>
         <Show when={!loading() && instruments().length === 0}>

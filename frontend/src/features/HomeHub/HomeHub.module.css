@@ -266,12 +266,19 @@
   flex: 0 0 36px;
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  gap: 9px;
   padding: 0 12px;
   border-bottom: var(--border-fg);
   color: var(--color-fg);
   font-size: var(--font-size-ui-lg);
   font-weight: var(--font-weight-bold);
   text-transform: uppercase;
+}
+
+.subRibbon :global([role="status"]) {
+  font-weight: var(--font-weight-medium);
+  text-transform: none;
 }
 
 .emptyRow {

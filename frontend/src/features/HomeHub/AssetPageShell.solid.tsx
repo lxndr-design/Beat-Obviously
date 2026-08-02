@@ -1,5 +1,5 @@
 import { Show, type JSX } from "solid-js";
-import { Icon } from "../../solid-ui";
+import { Icon, LoadingIndicator } from "../../solid-ui";
 import styles from "./AssetPageShell.module.css";
 
 type AssetPageVariant = "balanced" | "wide-browser" | "instrument";
@@ -65,7 +65,9 @@ export function AssetStateMessage(props: {
   return (
     <div class={className()}>
       <span class={styles.stateIcon} aria-hidden>
-        <Icon name={props.icon} size={18} decorative />
+        <Show when={props.tone === "loading"} fallback={<Icon name={props.icon} size={18} decorative />}>
+          <LoadingIndicator size="sm" announce={false} />
+        </Show>
       </span>
       <div class={styles.stateCopy}>
         <strong>{props.title}</strong>

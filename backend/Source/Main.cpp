@@ -2,6 +2,9 @@
 #include "MainComponent.h"
 #include "DiagnosticLog.h"
 
+#include <array>
+#include <cmath>
+
 namespace
 {
     namespace menuCommand
@@ -216,15 +219,27 @@ namespace
 
         void paint(juce::Graphics& g) override
         {
-            g.fillAll(juce::Colours::black.withAlpha(0.72f));
+            g.fillAll(juce::Colours::black);
 
-            auto panel = juce::Rectangle<int>(250, 250).withCentre(getLocalBounds().getCentre());
+            const auto bounds = getLocalBounds();
+            g.setColour(juce::Colours::white.withAlpha(0.055f));
+            for (int x = bounds.getX(); x < bounds.getRight(); x += 48)
+                g.drawVerticalLine(x, (float) bounds.getY(), (float) bounds.getBottom());
+            for (int y = bounds.getY(); y < bounds.getBottom(); y += 48)
+                g.drawHorizontalLine(y, (float) bounds.getX(), (float) bounds.getRight());
+
+            const int panelWidth = juce::jmin(420, juce::jmax(280, bounds.getWidth() - 36));
+            const int panelHeight = juce::jmin(286, juce::jmax(230, bounds.getHeight() - 36));
+            auto panel = juce::Rectangle<int>(panelWidth, panelHeight).withCentre(bounds.getCentre());
+            g.setColour(juce::Colours::white.withAlpha(0.08f));
+            g.fillRect(panel.translated(10, 10));
             g.setColour(juce::Colours::black);
             g.fillRect(panel);
             g.setColour(juce::Colours::white);
             g.drawRect(panel.toFloat().reduced(0.5f), 1.0f);
 
-            const auto logoBounds = panel.withSizeKeepingCentre(76, 76).translated(0, -34);
+            auto header = panel.reduced(12).withHeight(58);
+            const auto logoBounds = header.removeFromLeft(58).reduced(4);
             if (icon.isValid())
                 g.drawImageWithin(icon, logoBounds.getX(), logoBounds.getY(), logoBounds.getWidth(), logoBounds.getHeight(),
                                   juce::RectanglePlacement::centred | juce::RectanglePlacement::onlyReduceInSize);
@@ -234,21 +249,70 @@ namespace
                 g.drawRect(logoBounds.toFloat(), 1.0f);
             }
 
-            auto bar = juce::Rectangle<int>(150, 6).withCentre(panel.getCentre()).translated(0, 54);
-            g.setColour(juce::Colours::white.withAlpha(0.45f));
-            g.drawRect(bar.toFloat().reduced(0.5f), 1.0f);
-
             const auto phase = (float) ((juce::Time::getMillisecondCounter() % 1200) / 1200.0);
-            const auto fillWidth = juce::jmax(12, (int) std::round((double) bar.getWidth() * (0.18 + 0.42 * phase)));
+            g.setColour(juce::Colours::white);
+            g.setFont(juce::FontOptions(10.0f).withStyle("Bold"));
+            g.drawText("NATIVE AUDIO WORKSPACE", header.withTrimmedLeft(12).withHeight(15), juce::Justification::topLeft);
+            g.setFont(juce::FontOptions(24.0f).withStyle("Bold"));
+            g.drawText("Beat", header.withTrimmedLeft(12).withTrimmedTop(14).withHeight(27), juce::Justification::centredLeft);
+            g.setColour(juce::Colours::white.withAlpha(0.62f));
+            g.setFont(juce::FontOptions(12.0f));
+            g.drawText("Preparing audio engine and interface", header.withTrimmedLeft(12).withTrimmedTop(41), juce::Justification::topLeft);
+
+            auto motion = panel.reduced(12).withTrimmedTop(68).withHeight(88);
+            g.setColour(juce::Colours::white.withAlpha(0.24f));
+            g.drawRect(motion.toFloat().reduced(0.5f), 1.0f);
+            for (int index = 0; index <= 16; ++index)
+            {
+                const int x = motion.getX() + index * motion.getWidth() / 16;
+                g.setColour(juce::Colours::white.withAlpha(index % 4 == 0 ? 0.23f : 0.09f));
+                g.drawVerticalLine(x, (float) motion.getY(), (float) motion.getBottom());
+            }
+            g.setColour(juce::Colours::white.withAlpha(0.12f));
+            g.drawHorizontalLine(motion.getCentreY(), (float) motion.getX(), (float) motion.getRight());
+
+            constexpr int signalBars = 9;
+            constexpr int signalWidth = 6;
+            constexpr int signalGap = 4;
+            const int signalSpan = signalBars * signalWidth + (signalBars - 1) * signalGap;
+            const int signalStart = motion.getCentreX() - signalSpan / 2;
+            for (int index = 0; index < signalBars; ++index)
+            {
+                const float wave = 0.5f + 0.5f * std::sin((phase * juce::MathConstants<float>::twoPi)
+                    + (float) index * 0.92f);
+                const int height = 14 + (int) std::round(wave * 44.0f);
+                g.setColour(juce::Colours::white.withAlpha(0.55f + wave * 0.45f));
+                g.fillRect(signalStart + index * (signalWidth + signalGap), motion.getCentreY() - height / 2,
+                           signalWidth, height);
+            }
+            const int playheadX = motion.getX() + (int) std::round(phase * (float) motion.getWidth());
+            g.setColour(juce::Colours::white);
+            g.drawVerticalLine(playheadX, (float) motion.getY(), (float) motion.getBottom());
+
+            auto status = panel.reduced(12).withTrimmedTop(164);
+            g.setColour(juce::Colours::white.withAlpha(0.62f));
+            g.setFont(juce::FontOptions(10.0f).withStyle("Bold"));
+            g.drawText("PREPARING SESSION", status.removeFromTop(18), juce::Justification::centredLeft);
+            auto bar = status.removeFromTop(8);
+            g.setColour(juce::Colours::white.withAlpha(0.18f));
+            g.fillRect(bar);
+            const auto fillWidth = juce::jmax(18, (int) std::round((double) bar.getWidth() * 0.28));
             const auto fillStart = bar.getX() + (int) std::round((double) (bar.getWidth() - fillWidth) * phase);
             g.setColour(juce::Colours::white);
-            g.fillRect(juce::Rectangle<int>(fillStart, bar.getY(), fillWidth, bar.getHeight()));
+            g.fillRect(fillStart, bar.getY(), fillWidth, bar.getHeight());
 
-            g.setFont(juce::FontOptions(17.0f).withStyle("Bold"));
-            g.drawText("Starting Beat", panel.withTrimmedTop(128).withHeight(24), juce::Justification::centred);
-            g.setColour(juce::Colours::white.withAlpha(0.62f));
-            g.setFont(juce::FontOptions(13.0f));
-            g.drawText("Preparing audio engine and interface", panel.withTrimmedTop(151).withHeight(20), juce::Justification::centred);
+            status.removeFromTop(12);
+            const std::array<juce::String, 3> stageLabels {{ "AUDIO ENGINE", "INSTRUMENTS", "INTERFACE" }};
+            const int stageWidth = juce::jmax(1, (status.getWidth() - 12) / 3);
+            for (int index = 0; index < 3; ++index)
+            {
+                auto stage = juce::Rectangle<int>(status.getX() + index * (stageWidth + 6), status.getY(), stageWidth, 34);
+                g.setColour(juce::Colours::white.withAlpha(0.4f));
+                g.drawRect(stage.toFloat().reduced(0.5f), 1.0f);
+                g.setColour(juce::Colours::white.withAlpha(0.72f));
+                g.setFont(juce::FontOptions(9.0f).withStyle("Bold"));
+                g.drawText(stageLabels[(size_t) index], stage.reduced(6), juce::Justification::centredLeft);
+            }
         }
 
     private:

@@ -352,7 +352,11 @@ export function App() {
   });
 
   onMount(() => {
-    if (!isNative()) return;
+    if (!isNative()) {
+      useDocumentStore.getState().setRecentProjectsLoading(false);
+      return;
+    }
+    useDocumentStore.getState().setRecentProjectsLoading(true);
     const timer = window.setTimeout(() => {
       void send({ kind: "project.recentList" })
         .then((result) => {
@@ -371,7 +375,8 @@ export function App() {
         .catch((error) => {
           // eslint-disable-next-line no-console
           console.warn("[Beat] Could not load recent projects", error);
-        });
+        })
+        .finally(() => useDocumentStore.getState().setRecentProjectsLoading(false));
     }, 1_500);
     onCleanup(() => window.clearTimeout(timer));
   });

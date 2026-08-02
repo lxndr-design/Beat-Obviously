@@ -1542,6 +1542,7 @@ interface DocumentSlice {
   savedFingerprint: string | null;
   recentFilePaths: string[];
   recentProjects: RecentProjectEntry[];
+  recentProjectsLoading: boolean;
   missingAssets: BeatProjectAsset[];
   integrityReport: BeatProjectIntegrityReport | null;
   cleanupReport: ProjectSidecarCleanupReport | null;
@@ -1553,6 +1554,7 @@ interface DocumentSlice {
   setCurrentFilePath: (path: string | null) => void;
   addRecentFilePath: (path: string) => void;
   addRecentProject: (project: Partial<RecentProjectEntry> & { path: string }) => void;
+  setRecentProjectsLoading: (loading: boolean) => void;
   removeRecentFilePath: (path: string) => void;
   setMissingAssets: (assets: BeatProjectAsset[]) => void;
   setIntegrityReport: (report: BeatProjectIntegrityReport | null) => void;
@@ -1569,6 +1571,7 @@ export const useDocumentStore = create<DocumentSlice>()((set) => ({
   savedFingerprint: null,
   recentProjects: initialRecentProjects,
   recentFilePaths: initialRecentProjects.map((project) => project.path),
+  recentProjectsLoading: true,
   missingAssets: [],
   integrityReport: null,
   cleanupReport: null,
@@ -1610,6 +1613,7 @@ export const useDocumentStore = create<DocumentSlice>()((set) => ({
   setCurrentFilePath: (path) => set((state) => ({ currentFilePath: path, documentOpen: path ? true : state.documentOpen })),
   addRecentFilePath: (path) => set((state) => storeRecentProjectState(upsertRecentProject(state.recentProjects, { path, openedAt: Date.now() }))),
   addRecentProject: (project) => set((state) => storeRecentProjectState(upsertRecentProject(state.recentProjects, project))),
+  setRecentProjectsLoading: (loading) => set({ recentProjectsLoading: loading }),
   removeRecentFilePath: (path) => set((state) => storeRecentProjectState(state.recentProjects.filter((project) => project.path !== path))),
   setMissingAssets: (assets) => set({ missingAssets: assets }),
   setIntegrityReport: (report) => set({ integrityReport: report }),

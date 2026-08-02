@@ -1,5 +1,5 @@
 import { createMemo, createSignal, For, onCleanup, onMount, Show, type Accessor } from "solid-js";
-import { AppLogo } from "../../solid-ui";
+import { AppLogo, LoadingIndicator } from "../../solid-ui";
 import styles from "./StartupSplash.module.css";
 
 export interface StartupStage {
@@ -31,13 +31,29 @@ export function StartupSplash(props: { props: Accessor<StartupSplashProps> }) {
   return (
     <Show when={!(ready() && minimumElapsed())}>
       <div class={styles.scrim} role="status" aria-live="polite" aria-label={`Starting Beat. ${activeStage()}.`}>
+        <div class={styles.backgroundGrid} aria-hidden="true" />
         <section class={styles.panel} style={{ "--startup-progress": `${progress()}%` }}>
-          <div class={styles.mark} aria-hidden="true">
-            <AppLogo class={styles.markGlyph} />
+          <header class={styles.header}>
+            <div class={styles.mark} aria-hidden="true">
+              <AppLogo class={styles.markGlyph} />
+            </div>
+            <div class={styles.copy}>
+              <span class={styles.eyebrow}>Native audio workspace</span>
+              <h1>Beat</h1>
+              <p>{activeStage()}</p>
+            </div>
+            <strong class={styles.percent}>{progress()}%</strong>
+          </header>
+          <div class={styles.motionField} aria-hidden="true">
+            <LoadingIndicator size="lg" announce={false} className={styles.signal} />
+            <div class={styles.timeline}>
+              <For each={Array.from({ length: 16 })}>{(_, index) => <i class={index() % 4 === 0 ? styles.majorTick : ""} />}</For>
+              <span class={styles.playhead} />
+            </div>
           </div>
-          <div class={styles.copy}>
-            <h1>Beat</h1>
-            <p>{activeStage()}</p>
+          <div class={styles.progressHeader}>
+            <span>Preparing session</span>
+            <span>{readyCount()} / {stages().length}</span>
           </div>
           <div class={styles.progress} aria-hidden="true">
             <span />
@@ -46,8 +62,13 @@ export function StartupSplash(props: { props: Accessor<StartupSplashProps> }) {
             <For each={stages()}>
               {(stage) => (
                 <li class={stage.ready ? styles.stageReady : ""}>
-                  <span class={styles.stageDot} aria-hidden="true" />
+                  <span class={styles.stageIndex} aria-hidden="true">{stages().indexOf(stage) + 1}</span>
                   <span>{stage.label}</span>
+                  <span class={styles.stageState} aria-hidden="true">
+                    <Show when={stage.ready} fallback={<LoadingIndicator size="sm" announce={false} />}>
+                      Ready
+                    </Show>
+                  </span>
                 </li>
               )}
             </For>

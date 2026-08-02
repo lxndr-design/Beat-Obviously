@@ -1,7 +1,7 @@
 import { createSignal, For, Show } from "solid-js";
 import type { RecentProjectEntry } from "../../ipc/schema";
 import { appConfirm } from "../../solid-ui";
-import { AppLogo, Button, createContextMenu, HoverInfo, Icon, type ContextMenuItem } from "../../solid-ui";
+import { AppLogo, Button, createContextMenu, HoverInfo, Icon, LoadingIndicator, LoadingSkeleton, type ContextMenuItem } from "../../solid-ui";
 import { useComponentStore } from "../../state/components";
 import { useAudioFileStore, useDocumentStore, useInstrumentStore } from "../../state/store";
 import { createStoreSelector } from "../../solid-utils/store";
@@ -36,6 +36,7 @@ export function HomeHub(props: HomeHubProps) {
   const [page, setPage] = createSignal<HomePage>("home");
   const [startModalOpen, setStartModalOpen] = createSignal(false);
   const recentProjects = createStoreSelector(useDocumentStore, (s) => s.recentProjects);
+  const recentProjectsLoading = createStoreSelector(useDocumentStore, (s) => s.recentProjectsLoading);
   const audioFileCount = createStoreSelector(useAudioFileStore, (s) => s.files.length);
   const instrumentCount = createStoreSelector(useInstrumentStore, (s) => s.instruments.length);
   const patternCount = createStoreSelector(useComponentStore, (s) => s.components.length);
@@ -96,10 +97,24 @@ export function HomeHub(props: HomeHubProps) {
                 <span>Open Project</span>
               </Button>
             </div>
-            <div class={styles.subRibbon}>Recent</div>
+            <div class={styles.subRibbon}>
+              <span>Recent</span>
+              <Show when={recentProjectsLoading()}>
+                <LoadingIndicator size="sm" label="Refreshing" />
+              </Show>
+            </div>
             <Show
               when={recentProjects().length > 0}
-              fallback={<div class={styles.emptyRow}>No recent projects yet.</div>}
+              fallback={(
+                <Show
+                  when={recentProjectsLoading()}
+                  fallback={<div class={styles.emptyRow}>No recent projects yet.</div>}
+                >
+                  <div class={styles.recentGrid} aria-label="Loading recent projects">
+                    <For each={[0, 1, 2, 3]}>{() => <LoadingSkeleton variant="media" label="Loading recent project" />}</For>
+                  </div>
+                </Show>
+              )}
             >
               <div class={styles.recentGrid}>
                 <For each={recentProjects()}>

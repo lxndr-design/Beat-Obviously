@@ -10,6 +10,7 @@ import { IconDemo } from "../solid-ui/Icon/Icon.demo.solid";
 import { KnobDemo } from "../solid-ui/Knob/Knob.demo.solid";
 import { LibraryFolderDemo } from "../solid-ui/LibraryFolder/LibraryFolder.demo.solid";
 import { LibrarySearchDemo } from "../solid-ui/LibrarySearch/LibrarySearch.demo.solid";
+import { LoadingStateDemo } from "../solid-ui/LoadingState/LoadingState.demo.solid";
 import { ActionFooterDemo } from "../solid-ui/ActionFooter/ActionFooter.demo.solid";
 import { AppDialogDemo } from "../solid-ui/AppDialog/AppDialog.demo.solid";
 import { AppLogoDemo } from "../solid-ui/AppLogo/AppLogo.demo.solid";
@@ -48,6 +49,7 @@ export function SolidUiKitCatalog() {
       <RowActionButtonDemo />
       <LibraryFolderDemo />
       <LibrarySearchDemo />
+      <LoadingStateDemo />
       <RowItemDemo />
       <SectionRibbonDemo />
       <TextInputDemo />

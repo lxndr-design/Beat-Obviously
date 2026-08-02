@@ -1,6 +1,6 @@
 import { createEffect, createMemo, createSignal, For, onCleanup, Show } from "solid-js";
 import { filterInstrumentPresetEntries, type InstrumentPresetSearchEntry } from "../../state/instrumentPresetLibrary";
-import { Button, Checkbox, Icon, LibrarySearch, RowActionButton, RowItem } from "../../solid-ui";
+import { Button, Checkbox, Icon, LibrarySearch, LoadingIndicator, RowActionButton, RowItem } from "../../solid-ui";
 import styles from "./InstrumentPresetBrowser.module.css";
 
 export interface InstrumentPresetBrowserEntry extends InstrumentPresetSearchEntry {
@@ -81,7 +81,7 @@ export function InstrumentPresetBrowser(props: InstrumentPresetBrowserProps) {
           </div>
 
           <ul class={styles.list} role="listbox" aria-label="Saved instrument presets">
-            <Show when={!props.loading} fallback={<li class={styles.empty} role="status">Loading presets...</li>}>
+            <Show when={!props.loading} fallback={<li class={styles.empty} role="status"><LoadingIndicator label="Loading presets" announce={false} /></li>}>
               <Show when={filtered().length > 0} fallback={<li class={styles.empty}>No matching presets.</li>}>
                 <For each={filtered()}>{(entry) => (
                   <RowItem
