@@ -9,12 +9,15 @@ import { AudioFilesPage } from "./AudioFilesPage.solid";
 import { InstrumentsPage } from "./InstrumentsPage.solid";
 import { PatternsPage } from "./PatternsPage.solid";
 import styles from "./HomeHub.module.css";
+import type { GenerateSongOptions } from "../../ai/songGenerator";
+import { StartFromSomethingModal } from "./StartFromSomethingModal.solid";
 
 type HomePage = "home" | "audio" | "instruments" | "patterns";
 
 export interface HomeHubProps {
   onHome: () => void;
   onNew: () => void;
+  onStartFromSomething: (options: GenerateSongOptions) => void;
   onOpen: () => void;
   onRecent: (path: string) => void;
   onRevealRecent: (path: string) => void;
@@ -31,6 +34,7 @@ export interface HomeHubProps {
 
 export function HomeHub(props: HomeHubProps) {
   const [page, setPage] = createSignal<HomePage>("home");
+  const [startModalOpen, setStartModalOpen] = createSignal(false);
   const recentProjects = createStoreSelector(useDocumentStore, (s) => s.recentProjects);
   const audioFileCount = createStoreSelector(useAudioFileStore, (s) => s.files.length);
   const instrumentCount = createStoreSelector(useInstrumentStore, (s) => s.instruments.length);
@@ -43,6 +47,7 @@ export function HomeHub(props: HomeHubProps) {
   }
 
   return (
+    <>
     <Show
       when={page() === "home"}
       fallback={
@@ -81,6 +86,10 @@ export function HomeHub(props: HomeHubProps) {
               <Button variant="ghost" class={styles.actionRow} onClick={props.onNew}>
                 <Icon name="ph:plus" size={18} decorative />
                 <span>New Project</span>
+              </Button>
+              <Button variant="ghost" class={styles.actionRow} onClick={() => setStartModalOpen(true)}>
+                <Icon name="ph:sparkle" size={18} decorative />
+                <span>Start from Something</span>
               </Button>
               <Button variant="ghost" class={styles.actionRow} onClick={props.onOpen}>
                 <Icon name="ph:folder-open" size={18} decorative />
@@ -138,6 +147,12 @@ export function HomeHub(props: HomeHubProps) {
         </div>
       </section>
     </Show>
+    <StartFromSomethingModal
+      open={startModalOpen()}
+      onClose={() => setStartModalOpen(false)}
+      onStart={props.onStartFromSomething}
+    />
+    </>
   );
 }
 

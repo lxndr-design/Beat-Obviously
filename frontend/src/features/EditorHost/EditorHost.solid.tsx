@@ -17,6 +17,7 @@ import { ProjectHealthModal } from "../ProjectHealth/ProjectHealthModal.solid";
 import { SegmentEditorModal } from "../SegmentEditor/SegmentEditorModal.solid";
 import { SynthEditor } from "../Synth/SynthEditor/SynthEditor.solid";
 import { TrackDetailsModal } from "../TrackDetails/TrackDetailsModal.solid";
+import { TrackAutomationEditor } from "../TrackAutomation/TrackAutomationEditor.solid";
 import { TrackEffectsPanel } from "../TrackEffects/TrackEffectsPanel.solid";
 import { AurumEditor } from "../Aurum/AurumEditor.solid";
 
@@ -113,6 +114,8 @@ export function EditorHost() {
               );
             case "track":
               return <TrackDetailsModal trackId={editor.trackId} />;
+            case "trackAutomation":
+              return <TrackAutomationEditor trackId={editor.trackId} target={editor.target} />;
             case "segment":
               return <SegmentEditorSwitch segmentId={editor.segmentId} discardIfUntouched={editor.discardIfUntouched} />;
             case "component":

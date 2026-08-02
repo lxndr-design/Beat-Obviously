@@ -1107,33 +1107,35 @@ function InstrumentFxRack() {
         </div>
         <Show when={effects().length > 0} fallback={<div class={styles.fxEmpty}>No instrument FX. Output goes directly to the track chain.</div>}>
           <div class={styles.fxChain}>
-            <For each={effects()}>
-              {(effect) => (
+            <For each={effects().map((effect) => effect.id)}>
+              {(effectId) => {
+                const effect = () => effects().find((candidate) => candidate.id === effectId)!;
+                return (
                 <article
-                  class={`${styles.fxBlock} ${effect.bypassed ? styles.fxBlockBypassed : ""}`}
-                  data-effect-id={effect.id}
-                  data-dragging={draggedEffectId() === effect.id ? "true" : "false"}
-                  data-drag-over={dragOverEffectId() === effect.id ? "true" : "false"}
+                  class={`${styles.fxBlock} ${effect().bypassed ? styles.fxBlockBypassed : ""}`}
+                  data-effect-id={effectId}
+                  data-dragging={draggedEffectId() === effectId ? "true" : "false"}
+                  data-drag-over={dragOverEffectId() === effectId ? "true" : "false"}
                   onDragOver={(event) => {
-                    if (!draggedEffectId() || draggedEffectId() === effect.id) return;
+                    if (!draggedEffectId() || draggedEffectId() === effectId) return;
                     event.preventDefault();
-                    setDragOverEffectId(effect.id);
+                    setDragOverEffectId(effectId);
                     if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
                   }}
                   onDragLeave={() => {
-                    if (dragOverEffectId() === effect.id) setDragOverEffectId(null);
+                    if (dragOverEffectId() === effectId) setDragOverEffectId(null);
                   }}
-                  onDrop={(event) => dropEffectOn(effect.id, event)}
+                  onDrop={(event) => dropEffectOn(effectId, event)}
                 >
                   <div class={styles.fxHeader}>
                     <button
                       type="button"
                       class={styles.fxDragHandle}
                       draggable
-                      aria-label={`Drag ${EFFECT_LABELS[effect.kind]} to reorder`}
+                      aria-label={`Drag ${EFFECT_LABELS[effect().kind]} to reorder`}
                       title="Drag to reorder"
-                      onPointerDown={(event) => startEffectPointerDrag(effect.id, event)}
-                      onDragStart={(event) => startEffectDrag(effect.id, event)}
+                      onPointerDown={(event) => startEffectPointerDrag(effectId, event)}
+                      onDragStart={(event) => startEffectDrag(effectId, event)}
                       onDragEnd={() => {
                         setDraggedEffectId(null);
                         setDragOverEffectId(null);
@@ -1143,16 +1145,16 @@ function InstrumentFxRack() {
                     </button>
                     <Toggle
                       className={styles.fxToggle}
-                      checked={!effect.bypassed}
-                      aria-label={`${effect.bypassed ? "Enable" : "Bypass"} ${EFFECT_LABELS[effect.kind]}`}
-                      onChange={(enabled) => patchEffect(effect.id, { bypassed: !enabled })}
+                      checked={!effect().bypassed}
+                      aria-label={`${effect().bypassed ? "Enable" : "Bypass"} ${EFFECT_LABELS[effect().kind]}`}
+                      onChange={(enabled) => patchEffect(effectId, { bypassed: !enabled })}
                     />
                     <div class={styles.fxTitleBlock}>
                       <div class={styles.fxTitleLine}>
-                        <span class={styles.fxTitle}>{EFFECT_LABELS[effect.kind]}</span>
+                        <span class={styles.fxTitle}>{EFFECT_LABELS[effect().kind]}</span>
                         <span class={styles.fxBadges}>
-                          <span>{formatEffectLatency(effect)}</span>
-                          <span>{formatEffectTail(effect)}</span>
+                          <span>{formatEffectLatency(effect())}</span>
+                          <span>{formatEffectTail(effect())}</span>
                         </span>
                       </div>
                     </div>
@@ -1160,8 +1162,8 @@ function InstrumentFxRack() {
                       <HoverInfo content="Remove effect">
                         <FieldActionButton
                           className={styles.fxRemoveButton}
-                          aria-label={`Remove ${EFFECT_LABELS[effect.kind]}`}
-                          onClick={() => removeEffect(effect.id)}
+                          aria-label={`Remove ${EFFECT_LABELS[effect().kind]}`}
+                          onClick={() => removeEffect(effectId)}
                         >
                           <Icon name="ph:trash" size={18} decorative />
                         </FieldActionButton>
@@ -1169,18 +1171,19 @@ function InstrumentFxRack() {
                     </div>
                   </div>
                   <div class={styles.fxParams}>
-                    <For each={EFFECT_PARAM_SPECS[effect.kind]}>
+                    <For each={EFFECT_PARAM_SPECS[effect().kind]}>
                       {(param) => (
                         <EffectParamControl
                           param={param}
-                          value={effect.params[param.key] ?? EFFECT_DEFAULT_PARAMS[effect.kind][param.key] ?? param.min}
-                          onChange={(value) => patchParam(effect, param.key, value)}
+                          value={effect().params[param.key] ?? EFFECT_DEFAULT_PARAMS[effect().kind][param.key] ?? param.min}
+                          onChange={(value) => patchParam(effect(), param.key, value)}
                         />
                       )}
                     </For>
                   </div>
                 </article>
-              )}
+                );
+              }}
             </For>
           </div>
         </Show>

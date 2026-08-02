@@ -1,6 +1,6 @@
 import { createEffect, createSignal, For, onCleanup, Show } from "solid-js";
 import { Button, Checkbox, HoverInfo, Icon, LibraryFolder, LibrarySearch, RowActionButton, RowItem, SectionRibbon, SectionRibbonActionButton, createContextMenu, type ContextMenuItem } from "../../solid-ui";
-import { createInstrumentBufferSource, preloadInstrumentSample, previewFrequency } from "../../audio/synthPreview";
+import { createInstrumentBufferSource, preloadInstrumentSamplesForPlayback, previewFrequency } from "../../audio/synthPreview";
 import { registerGlobalAudioStop } from "../../audio/globalAudioSafety";
 import { LUMEN_TEST_INSTRUMENT_SET_ID, TEMPORARY_DS_INSTRUMENT_SET_ID, snapshotInstrument, useInstrumentStore, usePluginStore, useProjectStore, useUiStore } from "../../state/store";
 import { createAurumInstrument } from "../../state/aurum";
@@ -124,6 +124,11 @@ export function InstrumentLibraryPanel(props: InstrumentLibraryPanelProps) {
       onSelect: createSampler,
     },
     {
+      label: "Create Timeline Jumper",
+      icon: "ph:scissors",
+      onSelect: createTimelineJumper,
+    },
+    {
       label: "Add DS instrument",
       icon: "ph:piano-keys",
       separatorBefore: true,
@@ -200,7 +205,29 @@ export function InstrumentLibraryPanel(props: InstrumentLibraryPanelProps) {
       kind: "sampler",
       waveform: "sample",
       sampleIds: [],
+      samplerComplexity: "mapped",
       source: { kind: "created", label: "Made in Beat" },
+      userCreated: true,
+    });
+    useUiStore.getState().openEditor({
+      kind: "samplerInstrument",
+      instrumentId: draftInstrument.id,
+      draftInstrument,
+    });
+  }
+
+  function createTimelineJumper() {
+    const instrumentName = nextInstrumentName(instruments(), "Timeline Jumper");
+    const draftInstrument = createDraftInstrument({
+      name: instrumentName,
+      icon: "ph:scissors",
+      kind: "sampler",
+      waveform: "sample",
+      sampleIds: [],
+      samplerComplexity: "timeline-jumping",
+      envelope: { attackMs: 1, decayMs: 100, sustain: 1, releaseMs: 35 },
+      source: { kind: "created", label: "Made in Beat / Timeline Jumping" },
+      descriptors: ["sampler", "timeline jumping", "slices", "pads", "keyboard"],
       userCreated: true,
     });
     useUiStore.getState().openEditor({
@@ -678,7 +705,7 @@ registerGlobalAudioStop(stopInstrumentPreview);
 async function playInstrumentPreview(instrument: Instrument, onDone: () => void, shouldContinue: () => boolean) {
   const ctx = getPreviewCtx();
   if (ctx.state === "suspended") await ctx.resume();
-  await preloadInstrumentSample(ctx, instrument);
+  await preloadInstrumentSamplesForPlayback(ctx, instrument, previewFrequency(instrument), 127);
   if (!shouldContinue()) return;
 
   stopInstrumentPreview();

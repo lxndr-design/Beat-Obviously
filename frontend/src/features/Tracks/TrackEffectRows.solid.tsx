@@ -39,14 +39,18 @@ export function TrackEffectHeaderRows(props: EffectRowsProps) {
   const track = createStoreSelector(useProjectStore, (state) => state.project.tracks.find((candidate) => candidate.id === props.trackId));
   return (
     <Show when={track()?.effects.filters.length}>
-      <For each={track()?.effects.filters ?? []}>
-        {(effect) => (
-          <EffectRowGroupHeader
-            trackId={props.trackId}
-            effect={effect}
-            expanded={props.expandedEffectIds.has(effect.id)}
-            onToggle={() => props.onToggleEffect(effect.id)}
-          />
+      <For each={(track()?.effects.filters ?? []).map((effect) => effect.id)}>
+        {(effectId) => (
+          <Show when={track()?.effects.filters.find((effect) => effect.id === effectId)}>
+            {(effect) => (
+              <EffectRowGroupHeader
+                trackId={props.trackId}
+                effect={effect()}
+                expanded={props.expandedEffectIds.has(effectId)}
+                onToggle={() => props.onToggleEffect(effectId)}
+              />
+            )}
+          </Show>
         )}
       </For>
     </Show>
@@ -61,17 +65,21 @@ export function TrackEffectLaneRows(props: EffectRowsProps) {
 
   return (
     <Show when={track()?.effects.filters.length}>
-      <For each={track()?.effects.filters ?? []}>
-        {(effect) => (
-          <EffectRowGroupLane
-            trackId={props.trackId}
-            effect={effect}
-            expanded={props.expandedEffectIds.has(effect.id)}
-            onToggle={() => props.onToggleEffect(effect.id)}
-            lengthBeats={lengthBeats()}
-            bpm={bpm()}
-            beatsToPx={beatsToPx()}
-          />
+      <For each={(track()?.effects.filters ?? []).map((effect) => effect.id)}>
+        {(effectId) => (
+          <Show when={track()?.effects.filters.find((effect) => effect.id === effectId)}>
+            {(effect) => (
+              <EffectRowGroupLane
+                trackId={props.trackId}
+                effect={effect()}
+                expanded={props.expandedEffectIds.has(effectId)}
+                onToggle={() => props.onToggleEffect(effectId)}
+                lengthBeats={lengthBeats()}
+                bpm={bpm()}
+                beatsToPx={beatsToPx()}
+              />
+            )}
+          </Show>
         )}
       </For>
     </Show>
@@ -445,25 +453,26 @@ function TrackEffectValueLaneRow(props: {
           );
         }}
       </For>
-      <For each={points()}>
-        {(point) => {
-          const pointKey = () => effectAutomationSelectionKey(props.trackId, props.effect.id, props.param.key, point.id);
+      <For each={points().map((point) => point.id)}>
+        {(pointId) => {
+          const point = () => points().find((candidate) => candidate.id === pointId)!;
+          const pointKey = () => effectAutomationSelectionKey(props.trackId, props.effect.id, props.param.key, pointId);
           return (
             <AutomationPointDiamond
               trackId={props.trackId}
               effect={props.effect}
               param={props.param}
-              point={point}
+              point={point()}
               pointKey={pointKey()}
               selected={selectedPointKeys().includes(pointKey())}
-              dragging={draggingPointId() === point.id}
+              dragging={draggingPointId() === pointId}
               beatsToPx={props.beatsToPx}
               onSelect={(additive) => useUiStore.getState().selectTrackEffectAutomationPoint(pointKey(), additive)}
               onStartDrag={(pointerId, clientX) => {
                 setEditor(null);
-                startPointDrag(point, pointerId, clientX);
+                startPointDrag(point(), pointerId, clientX);
               }}
-              onOpenEditor={() => openEditor(point.beat, point.value, point.id)}
+              onOpenEditor={() => openEditor(point().beat, point().value, pointId)}
             />
           );
         }}

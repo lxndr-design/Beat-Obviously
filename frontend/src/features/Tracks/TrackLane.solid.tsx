@@ -1,7 +1,7 @@
-import { createMemo, createSignal, For, onCleanup, Show } from "solid-js";
+import { createMemo, createSignal, For, Show } from "solid-js";
 import { nanoid as nano } from "nanoid";
 import { createStoreSelector } from "../../solid-utils/store";
-import { appAlert, Button } from "../../solid-ui";
+import { appAlert } from "../../solid-ui";
 import { isSupportedAudioFileName, SUPPORTED_AUDIO_IMPORT_LABEL } from "../../audio/audioFormats";
 import { importAudioFile } from "../../audio/audioImport";
 import { createAurumInstrument } from "../../state/aurum";
@@ -11,7 +11,6 @@ import {
   useInstrumentStore,
   usePluginStore,
   useProjectStore,
-  useSettingsStore,
   useTransportStore,
   useUiStore,
   useViewStore,
@@ -21,26 +20,13 @@ import { useComponentStore } from "../../state/components";
 import { clipboardStore } from "../../state/clipboard";
 import { expandTrackSegments } from "../../state/selectors";
 import {
-  insertTrackAutomationPoint,
-  removeTrackAutomationPoint,
-  trackAutomationValueRange,
-  updateTrackAutomationPoint,
-  type AetherArrangementAutomationTarget,
-} from "../../automation/aetherArrangementAutomation";
-import {
   decentSamplerEditorKind,
   decentSamplerInstrumentInstancePatch,
   decentSamplerPluginForInstrument,
 } from "../PluginLibrary/decentSamplerPluginAdapter";
 import { createContextMenu, type ContextMenuItem } from "../../solid-ui";
 import { Segment } from "./Segment.solid";
-import {
-  arrangementAutomationAddPointBeat,
-  arrangementAutomationDragValue,
-  arrangementAutomationPreview,
-  arrangementAutomationRemovePointIndex,
-  type ArrangementAutomationPreviewPoint,
-} from "./arrangementAutomationLane";
+import { segmentLandingGhosts } from "./segmentDragPreview";
 import styles from "./TrackLane.module.css";
 import type { DrumRow, Id, Instrument, Segment as SegmentModel, Track } from "../../state/types";
 
@@ -52,19 +38,13 @@ interface Props {
 
 export function TrackLane(props: Props) {
   let laneElement: HTMLDivElement | undefined;
-  let automationPreviewElement: HTMLDivElement | undefined;
-  let releaseAutomationDrag: (() => void) | undefined;
   let lastClickBeat = 0;
   const [dragOver, setDragOver] = createSignal(false);
-  const [activeAutomationPoint, setActiveAutomationPoint] = createSignal<number | null>(null);
-  const [draggingAutomationPoint, setDraggingAutomationPoint] = createSignal<number | null>(null);
   const track = createStoreSelector(useProjectStore, (state) => state.project.tracks.find((candidate) => candidate.id === props.trackId));
   const tracks = createStoreSelector(useProjectStore, (state) => state.project.tracks);
   const lengthBeats = createStoreSelector(useProjectStore, (state) => state.project.lengthBeats);
   const bpm = createStoreSelector(useProjectStore, (state) => state.project.bpm);
   const beatsToPx = createStoreSelector(useViewStore, (state) => state.beatsToPx);
-  const timelineSmartGrid = createStoreSelector(useSettingsStore, (state) => state.timelineSmartGrid);
-  const timelineSubdivision = createStoreSelector(useSettingsStore, (state) => state.timelineSubdivision);
   const lastLen = createStoreSelector(useViewStore, (state) => state.lastSegmentLength);
   const instruments = createStoreSelector(useInstrumentStore, (state) => state.instruments);
   const plugins = createStoreSelector(usePluginStore, (state) => state.plugins);
@@ -74,8 +54,6 @@ export function TrackLane(props: Props) {
     const currentTrack = track();
     return currentTrack ? expandTrackSegments(currentTrack, lengthBeats()) : [];
   });
-  const visibleAutomation = createMemo(() => arrangementAutomationPreview(track(), lengthBeats(), beatsToPx()));
-  onCleanup(() => releaseAutomationDrag?.());
 
   const menu = createContextMenu((): ContextMenuItem[] => {
     if (!track()) return [];
@@ -364,84 +342,6 @@ export function TrackLane(props: Props) {
     }
   }
 
-  function handleAutomationPointPointerDown(
-    event: PointerEvent,
-    target: AetherArrangementAutomationTarget,
-    point: ArrangementAutomationPreviewPoint,
-  ) {
-    event.preventDefault();
-    event.stopPropagation();
-    releaseAutomationDrag?.();
-    let dragBeat = point.beat;
-    let dragValue = point.value;
-    setActiveAutomationPoint(point.index);
-    const move = (moveEvent: PointerEvent) => {
-      const laneRect = laneElement?.getBoundingClientRect();
-      const previewRect = automationPreviewElement?.getBoundingClientRect();
-      const currentTrack = track();
-      if (!laneRect || !previewRect || !currentTrack) return;
-      const pointIndex = findDraggingAutomationPointIndex(currentTrack, target, dragBeat, dragValue);
-      if (pointIndex < 0) return;
-      const next = arrangementAutomationDragValue({
-        clientX: moveEvent.clientX,
-        clientY: moveEvent.clientY,
-        laneLeft: laneRect.left,
-        previewTop: previewRect.top,
-        projectLengthBeats: lengthBeats(),
-        beatsToPx: beatsToPx(),
-        height: previewRect.height,
-        target,
-        shiftKey: moveEvent.shiftKey,
-        timelineSmartGrid: timelineSmartGrid(),
-        timelineSubdivision: timelineSubdivision(),
-      });
-      dragBeat = next.beat;
-      dragValue = next.value;
-      const updated = updateTrackAutomationPoint(currentTrack, target, lengthBeats(), pointIndex, next.beat, next.value);
-      useProjectStore.getState().updateTrack(props.trackId, { automation: updated.automation });
-    };
-    const up = () => {
-      setDraggingAutomationPoint(null);
-      releaseAutomationDrag?.();
-    };
-    releaseAutomationDrag = () => {
-      window.removeEventListener("pointermove", move);
-      window.removeEventListener("pointerup", up);
-      window.removeEventListener("pointercancel", up);
-      releaseAutomationDrag = undefined;
-    };
-    setDraggingAutomationPoint(point.index);
-    window.addEventListener("pointermove", move);
-    window.addEventListener("pointerup", up);
-    window.addEventListener("pointercancel", up);
-  }
-
-  function addArrangementAutomationPoint(event: MouseEvent, target: AetherArrangementAutomationTarget) {
-    event.preventDefault();
-    event.stopPropagation();
-    const currentTrack = track();
-    if (!currentTrack) return;
-    const range = trackAutomationValueRange(currentTrack, target);
-    const beat = arrangementAutomationAddPointBeat(lengthBeats());
-    const nextTrack = insertTrackAutomationPoint(currentTrack, target, lengthBeats(), beat, range.midValue);
-    useProjectStore.getState().updateTrack(props.trackId, { automation: nextTrack.automation });
-    const nextPreview = arrangementAutomationPreview(nextTrack, lengthBeats(), beatsToPx());
-    setActiveAutomationPoint(nextPreview?.points.find((point) => Math.abs(point.beat - beat) < 0.000001)?.index ?? null);
-  }
-
-  function removeArrangementAutomationPoint(event: MouseEvent, target: AetherArrangementAutomationTarget) {
-    event.preventDefault();
-    event.stopPropagation();
-    const currentTrack = track();
-    const preview = visibleAutomation();
-    if (!currentTrack || !preview || preview.points.length === 0) return;
-    const pointIndex = arrangementAutomationRemovePointIndex(preview.points, activeAutomationPoint());
-    if (pointIndex == null) return;
-    const nextTrack = removeTrackAutomationPoint(currentTrack, target, pointIndex);
-    useProjectStore.getState().updateTrack(props.trackId, { automation: nextTrack.automation });
-    setActiveAutomationPoint(null);
-  }
-
   const segById = createMemo(() => new Map((track()?.segments ?? []).map((segment) => [segment.id, segment])));
 
   return (
@@ -469,67 +369,23 @@ export function TrackLane(props: Props) {
           )}
         </For>
 
-        <Show when={visibleAutomation()}>
-          {(preview) => (
+        <For each={segmentLandingGhosts().filter((ghost) => ghost.targetTrackId === props.trackId)}>
+          {(ghost) => (
             <div
-              ref={automationPreviewElement}
-              class={styles.automationPreview}
-              data-aether-arrangement-automation={preview().target}
-              aria-label={`${track()?.name ?? "Track"} Aether arrangement automation lane`}
+              class={styles.segmentLandingGhost}
+              classList={{ [styles.segmentLandingGhostColored]: Boolean(ghost.color) }}
+              style={{
+                left: `${ghost.startBeat * beatsToPx()}px`,
+                width: `${Math.max(beatsToPx() / 2, ghost.lengthBeats * beatsToPx())}px`,
+                "--segment-color": ghost.color,
+              }}
+              data-segment-landing-ghost={ghost.segmentId}
+              aria-hidden="true"
             >
-              <div class={styles.automationLabel}>
-                <span>{preview().label}</span>
-                <Show when={preview().count > 1}>
-                  <span class={styles.automationCount}>{preview().count}</span>
-                </Show>
-                <Button
-                  iconOnly
-                  size="xs"
-                  variant="ghost"
-                  class={styles.automationAction}
-                  aria-label={`Add ${preview().label} arrangement automation point`}
-                  onClick={(event) => addArrangementAutomationPoint(event, preview().target)}
-                >
-                  +
-                </Button>
-                <Button
-                  iconOnly
-                  size="xs"
-                  variant="ghost"
-                  class={styles.automationAction}
-                  aria-label={`Remove ${preview().label} arrangement automation point`}
-                  disabled={preview().points.length === 0}
-                  onClick={(event) => removeArrangementAutomationPoint(event, preview().target)}
-                >
-                  -
-                </Button>
-              </div>
-              <svg
-                class={styles.automationCurve}
-                viewBox={`0 0 ${preview().width} ${preview().height}`}
-                preserveAspectRatio="none"
-                aria-hidden="true"
-              >
-                <polyline class={styles.automationCurveLine} points={preview().polyline} />
-              </svg>
-              <For each={preview().points}>
-                {(point) => (
-                  <div
-                    class={[
-                      styles.automationPoint,
-                      activeAutomationPoint() === point.index && styles.automationPointActive,
-                      draggingAutomationPoint() === point.index && styles.automationPointDragging,
-                    ].filter(Boolean).join(" ")}
-                    data-aether-arrangement-automation-point={point.index}
-                    title={point.title}
-                    style={{ left: `${point.x}px`, top: `${point.y}px` }}
-                    onPointerDown={(event) => handleAutomationPointPointerDown(event, preview().target, point)}
-                  />
-                )}
-              </For>
+              <span>{ghost.name}</span>
             </div>
           )}
-        </Show>
+        </For>
 
         <For each={expanded()}>
           {(occurrence) => {
@@ -562,26 +418,6 @@ export function TrackLane(props: Props) {
       </div>
     </Show>
   );
-}
-
-function findDraggingAutomationPointIndex(
-  track: Track,
-  target: AetherArrangementAutomationTarget,
-  beat: number,
-  value: number,
-): number {
-  const lane = track.automation?.find((candidate) => candidate.target === target);
-  if (!lane) return -1;
-  let bestIndex = -1;
-  let bestDistance = Number.POSITIVE_INFINITY;
-  lane.points.forEach((point, index) => {
-    const distance = Math.abs(point.beat - beat) + Math.abs(point.value - value);
-    if (distance < bestDistance) {
-      bestDistance = distance;
-      bestIndex = index;
-    }
-  });
-  return bestIndex;
 }
 
 function nextSegmentName(tracks: Track[], kind: "midi" | "audio" | "drum" | "drumpad"): string {

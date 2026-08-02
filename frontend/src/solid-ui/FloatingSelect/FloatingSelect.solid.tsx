@@ -135,7 +135,7 @@ export function FloatingSelect(props: FloatingSelectProps) {
     width: `${rect.width}px`,
     "max-height": `${rect.maxHeight}px`,
     position: "fixed",
-    "z-index": 4000,
+    "z-index": "calc(var(--z-toast) + 1)",
   });
 
   return (

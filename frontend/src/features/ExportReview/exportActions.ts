@@ -2,6 +2,7 @@ import { isNative, send } from "../../ipc/bridge";
 import { buildCurrentBeatDocument } from "../../persistence/beatDocument";
 import { useAudioFileStore, useDocumentStore, useInstrumentStore, useProjectStore, useTransportStore, useUiStore } from "../../state/store";
 import type { Id, Track } from "../../state/types";
+import { projectWithRenderedMidiArpeggiations } from "../../state/midiNoteGroups";
 import {
   exportPresetById,
   exportValidationBlocksExport,
@@ -25,7 +26,7 @@ export async function runProjectExport(mode: ExportPresetTarget = "project") {
   const validation = await validateCurrentProjectBeforeExport();
   if (exportValidationBlocksExport(validation)) throw new Error(validation.message);
   const request = {
-    project: useProjectStore.getState().project,
+    project: projectWithRenderedMidiArpeggiations(useProjectStore.getState().project),
     instruments: useInstrumentStore.getState().instruments,
     audioFiles: useAudioFileStore.getState().files,
     pathHint,
@@ -131,8 +132,9 @@ export async function runProjectExport(mode: ExportPresetTarget = "project") {
 
 export async function exportTrackAsWav(trackId: Id) {
   const exportState = useExportStore.getState();
-  const project = useProjectStore.getState().project;
-  const track = project.tracks.find((candidate) => candidate.id === trackId);
+  const sourceProject = useProjectStore.getState().project;
+  const project = projectWithRenderedMidiArpeggiations(sourceProject);
+  const track = sourceProject.tracks.find((candidate) => candidate.id === trackId);
   if (!track) throw new Error("Track was not found.");
   if (!isRenderableStemTrack(track)) throw new Error("Group tracks cannot be exported as individual WAV files yet.");
 
@@ -171,8 +173,9 @@ export async function bounceTrackInPlace(trackId?: Id) {
   if (selectedTrackIds.length !== 1) throw new Error("Select exactly one track before bouncing in place.");
 
   const projectState = useProjectStore.getState();
-  const project = projectState.project;
-  const sourceTrack = project.tracks.find((track) => track.id === selectedTrackIds[0]);
+  const sourceProject = projectState.project;
+  const project = projectWithRenderedMidiArpeggiations(sourceProject);
+  const sourceTrack = sourceProject.tracks.find((track) => track.id === selectedTrackIds[0]);
   if (!sourceTrack) throw new Error("Selected track was not found.");
   if (sourceTrack.kind === "group") throw new Error("Group track bounce is not supported yet.");
 
@@ -193,7 +196,7 @@ export async function bounceTrackInPlace(trackId?: Id) {
   if (result.error) throw new Error(result.error);
   if (!result.track || !result.audioFile) throw new Error("Bounce did not return a bounced track.");
 
-  const nextProject = structuredClone(project);
+  const nextProject = structuredClone(sourceProject);
   const nextSource = nextProject.tracks.find((track) => track.id === sourceTrack.id);
   if (nextSource) {
     nextSource.mute = true;

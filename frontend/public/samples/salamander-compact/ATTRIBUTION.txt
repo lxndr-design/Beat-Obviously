@@ -1,0 +1,15 @@
+Salamander Grand Piano V3
+
+Original recording: Alexander Holm
+SFZ reconstruction: kinwie / sfzinstruments
+Source: https://github.com/sfzinstruments/SalamanderGrandPiano
+Pinned source revision: 3382bf9496bba2486f5ab0de55a264d1dfc38404
+License: Creative Commons Attribution 3.0 Unported (CC BY 3.0)
+License URI: https://creativecommons.org/licenses/by/3.0/
+
+Beat compact adaptation
+
+Beat retains unmodified FLAC recordings for selected pitch roots and velocity
+layers. It replaces the upstream ARIA-specific SFZ mapping with a Beat-native
+multisample map containing nine pitch roots and four velocity layers. This is a
+derived mapping of Salamander Grand Piano V3, not the complete upstream library.

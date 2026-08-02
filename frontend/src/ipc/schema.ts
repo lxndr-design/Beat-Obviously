@@ -117,13 +117,16 @@ export interface StemSeparationJobStatus {
   stems: StemSeparationResult[];
 }
 
-export type AudioTranscriptionProfile = "bass" | "vocals" | "other";
+export type AudioTranscriptionProfile = "bass" | "vocals" | "other" | "piano" | "piano-recovery" | "multi-instrument";
 
 export interface AudioTranscriptionNote {
   startSeconds: number;
   endSeconds: number;
   pitch: number;
   velocity: number;
+  /** MuScriptor instrument group. Missing for single-instrument providers. */
+  instrument?: string;
+  isDrum?: boolean;
   /** Basic Pitch contour offsets in thirds of a semitone. */
   pitchBends: number[];
 }

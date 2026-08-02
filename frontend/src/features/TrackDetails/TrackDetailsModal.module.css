@@ -38,8 +38,41 @@
   padding: var(--space-1);
 }
 
+.trackKnob {
+  justify-self: center;
+  margin: 3px auto;
+}
+
+.automationSummary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 9px;
+}
+
+.automationSummary > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.automationSummary strong {
+  font-size: var(--font-size-ui);
+  font-weight: var(--font-weight-medium);
+}
+
+.automationSummary span {
+  min-width: 0;
+  color: color-mix(in srgb, var(--color-fg) 62%, transparent);
+  font-size: var(--font-size-hint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .toggleGrid,
-.numberGrid {
+.recordingSelectGrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-1);
@@ -55,11 +88,6 @@
   font-size: var(--font-size-ui);
 }
 
-.sliderLabel {
-  color: var(--color-fg-hover);
-  text-transform: uppercase;
-}
-
 .sliderValue {
   justify-self: end;
   font-family: var(--font-family-mono);
@@ -71,245 +99,17 @@
   accent-color: var(--color-fg);
 }
 
-.automationPanel {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 3px;
-  align-items: center;
-  padding: var(--space-1);
-}
+@media (max-width: 720px) {
+  .panel,
+  .recordingSelectGrid {
+    grid-template-columns: 1fr;
+  }
 
-.automationHeader {
-  grid-column: 1 / -1;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 9px;
-  min-width: 0;
-  color: color-mix(in srgb, var(--color-fg) 72%, transparent);
-  font-size: var(--font-size-ui);
-  line-height: 1;
-}
+  .spanFull {
+    grid-column: 1;
+  }
 
-.automationHeader span:first-child {
-  color: var(--color-fg);
-  font-weight: var(--font-weight-medium);
-}
-
-.automationEffectiveBadge {
-  grid-column: 1 / -1;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 9px;
-  min-width: 0;
-  min-height: 18px;
-  padding: 0 6px;
-  border-radius: 3px;
-  background: var(--interaction-hover-bg);
-  color: color-mix(in srgb, var(--color-fg) 72%, transparent);
-  font-family: var(--font-family-base);
-  font-size: var(--font-size-ui);
-  line-height: 1;
-}
-
-.automationEffectiveBadge span {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.automationEffectiveBadge span:first-child {
-  color: var(--color-fg);
-  font-weight: var(--font-weight-medium);
-}
-
-.automationEffectiveBadge span:last-child {
-  font-family: var(--font-family-mono);
-}
-
-.automationEffectiveBadge[data-tone="idle"] {
-  background: var(--surface-subtle);
-  color: color-mix(in srgb, var(--color-fg) 48%, transparent);
-}
-
-.automationEffectiveBadge[data-tone="conflict"] span:first-child {
-  color: color-mix(in srgb, var(--color-fg) 82%, var(--color-fg));
-}
-
-.automationTargets {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 3px;
-  min-width: 0;
-}
-
-.automationActions {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-}
-
-.automationCurveSelect {
-  min-width: 96px;
-}
-
-.automationValueEditor {
-  grid-column: 1 / -1;
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 3px;
-  min-width: 0;
-  color: color-mix(in srgb, var(--color-fg) 74%, transparent);
-  font-size: var(--font-size-ui);
-}
-
-.automationValueEditor label {
-  display: grid;
-  grid-template-columns: 30px minmax(57px, 1fr) 42px;
-  align-items: center;
-  gap: 3px;
-  min-width: 0;
-}
-
-.automationValueEditor label span {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.automationValueEditor input {
-  width: 100%;
-  min-width: 0;
-  margin: 0;
-  accent-color: var(--color-fg);
-}
-
-.automationHandleRail {
-  grid-column: 1 / -1;
-  position: relative;
-  height: 24px;
-  margin-top: -1px;
-  border: var(--border-soft);
-  background: var(--interaction-mesh-current);
-  overflow: hidden;
-}
-
-.automationHandleLine {
-  position: absolute;
-  left: 9px;
-  right: 9px;
-  top: 50%;
-  height: 1px;
-  background: color-mix(in srgb, var(--color-fg) 32%, transparent);
-  transform: translateY(-50%);
-  pointer-events: none;
-}
-
-.automationHandleButton {
-  position: absolute;
-  top: 50%;
-  width: 18px;
-  height: 15px;
-  padding: 0;
-  border: var(--border-soft);
-  background: var(--color-bg);
-  color: var(--color-fg);
-  font-family: var(--font-family-mono);
-  font-size: var(--font-size-hint);
-  line-height: 1;
-  transform: translate(-50%, -50%);
-  cursor: ew-resize;
-  transition: var(--interaction-transition);
-}
-
-.automationHandleButton:hover,
-.automationHandleButtonActive {
-  background: var(--interaction-hover-bg);
-  box-shadow: 0 0 10px color-mix(in srgb, var(--color-fg) 28%, transparent);
-}
-
-.automationPointEditor {
-  grid-column: 1 / -1;
-  display: grid;
-  gap: 3px;
-  min-width: 0;
-  padding-top: 3px;
-  border-top: 1px solid color-mix(in srgb, var(--color-fg) 24%, transparent);
-}
-
-.automationPointHeader,
-.automationPointRow {
-  display: grid;
-  align-items: center;
-  gap: 3px;
-  min-width: 0;
-  font-size: var(--font-size-ui);
-}
-
-.automationPointHeader {
-  grid-template-columns: minmax(0, 1fr) auto;
-  color: color-mix(in srgb, var(--color-fg) 74%, transparent);
-}
-
-.automationPointTools {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 3px;
-  min-width: 0;
-}
-
-.automationPointHeader span {
-  font-weight: var(--font-weight-medium);
-}
-
-.automationPointRow {
-  grid-template-columns: 15px 21px minmax(72px, 0.8fr) minmax(81px, 1fr) 45px auto;
-}
-
-.automationPointRowSelected {
-  background: color-mix(in srgb, var(--color-fg) 8%, transparent);
-}
-
-.automationPointSelect {
-  width: 12px;
-  height: 12px;
-  margin: 0;
-  accent-color: var(--color-fg);
-}
-
-.automationPointIndex,
-.automationPointValue {
-  font-family: var(--font-family-mono);
-  color: color-mix(in srgb, var(--color-fg) 68%, transparent);
-}
-
-.automationPointRow label {
-  display: grid;
-  grid-template-columns: 30px minmax(0, 1fr);
-  align-items: center;
-  gap: 3px;
-  min-width: 0;
-}
-
-.automationPointRow label span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: color-mix(in srgb, var(--color-fg) 62%, transparent);
-}
-
-.automationPointRow label input {
-  width: 100%;
-  min-width: 0;
-  height: 24px;
-  padding: 0 3px;
-  border: 1px solid color-mix(in srgb, var(--color-fg) 45%, transparent);
-  background: var(--color-bg);
-  color: var(--color-fg);
-  font-family: var(--font-family-mono);
-  font-size: var(--font-size-ui);
+  .automationSummary {
+    grid-template-columns: 1fr;
+  }
 }

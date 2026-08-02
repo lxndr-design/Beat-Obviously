@@ -25,6 +25,8 @@ frontend/src/**/*.js
 .pnpm-store/
 .venv-stems/
 .venv-transcription/
+.venv-transkun/
+.venv-muscriptor/
 
 # Generated
 *.log
@@ -44,6 +46,7 @@ __pycache__/
 # Beat-specific
 *.beat.tmp
 samples-cache/
+generated-tests/**/work/
 
 # Misrouted local benchmark output
 --help/

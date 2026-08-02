@@ -197,65 +197,68 @@ export function AurumModulationBridge(props: AurumModulationBridgeProps) {
           <span>Mode</span>
           <span />
         </div>
-        <For each={routes()}>{(route, index) => (
-          <div class={styles.route} aria-label={`Aurum modulation route ${index() + 1}`}>
-            <Toggle
-              aria-label={`Aurum route ${index() + 1} enabled`}
-              checked={route.enabled}
-              onChange={(enabled) => updateRoute(route.id, { enabled })}
-            />
-            <FloatingSelect
-              layout="bare"
-              value={route.source}
-              ariaLabel={`Aurum route ${index() + 1} source`}
-              options={SOURCE_OPTIONS}
-              onChange={(source) => updateRoute(route.id, { source })}
-            />
-            <FloatingSelect
-              layout="bare"
-              value={route.target}
-              ariaLabel={`Aurum route ${index() + 1} destination`}
-              options={targetOptions()}
-              onChange={(target) => updateRoute(route.id, { target })}
-            />
-            <Slider
-              layout="bare"
-              min={-1}
-              max={1}
-              step={0.01}
-              value={route.amount}
-              ariaLabel={`Aurum route ${index() + 1} amount`}
-              readout={<span>{Math.round(route.amount * 100)}%</span>}
-              onChange={(amount) => updateRoute(route.id, { amount })}
-            />
-            <FloatingSelect
-              layout="bare"
-              value={route.curve ?? "linear"}
-              ariaLabel={`Aurum route ${index() + 1} response curve`}
-              options={REMAP_CURVES}
-              onChange={(curve) => updateRoute(route.id, { curve: curve as ModulationRemapCurve })}
-            />
-            <Button
-              size="xs"
-              variant="ghost"
-              selected={route.bipolar}
-              aria-pressed={route.bipolar}
-              aria-label={`Aurum route ${index() + 1} bipolar`}
-              onClick={() => updateRoute(route.id, { bipolar: !route.bipolar })}
-            >
-              {route.bipolar ? "+/-" : "+"}
-            </Button>
-            <Button
-              iconOnly
-              size="xs"
-              variant="ghost"
-              aria-label={`Remove Aurum route ${index() + 1}`}
-              onClick={() => removeRoute(route.id)}
-            >
-              <Icon name="ph:trash" size={18} decorative />
-            </Button>
-          </div>
-        )}</For>
+        <For each={routes().map((route) => route.id)}>{(routeId, index) => {
+          const route = () => routes().find((candidate) => candidate.id === routeId)!;
+          return (
+            <div class={styles.route} aria-label={`Aurum modulation route ${index() + 1}`}>
+              <Toggle
+                aria-label={`Aurum route ${index() + 1} enabled`}
+                checked={route().enabled}
+                onChange={(enabled) => updateRoute(routeId, { enabled })}
+              />
+              <FloatingSelect
+                layout="bare"
+                value={route().source}
+                ariaLabel={`Aurum route ${index() + 1} source`}
+                options={SOURCE_OPTIONS}
+                onChange={(source) => updateRoute(routeId, { source })}
+              />
+              <FloatingSelect
+                layout="bare"
+                value={route().target}
+                ariaLabel={`Aurum route ${index() + 1} destination`}
+                options={targetOptions()}
+                onChange={(target) => updateRoute(routeId, { target })}
+              />
+              <Slider
+                layout="bare"
+                min={-1}
+                max={1}
+                step={0.01}
+                value={route().amount}
+                ariaLabel={`Aurum route ${index() + 1} amount`}
+                readout={<span>{Math.round(route().amount * 100)}%</span>}
+                onChange={(amount) => updateRoute(routeId, { amount })}
+              />
+              <FloatingSelect
+                layout="bare"
+                value={route().curve ?? "linear"}
+                ariaLabel={`Aurum route ${index() + 1} response curve`}
+                options={REMAP_CURVES}
+                onChange={(curve) => updateRoute(routeId, { curve: curve as ModulationRemapCurve })}
+              />
+              <Button
+                size="xs"
+                variant="ghost"
+                selected={route().bipolar}
+                aria-pressed={route().bipolar}
+                aria-label={`Aurum route ${index() + 1} bipolar`}
+                onClick={() => updateRoute(routeId, { bipolar: !route().bipolar })}
+              >
+                {route().bipolar ? "+/-" : "+"}
+              </Button>
+              <Button
+                iconOnly
+                size="xs"
+                variant="ghost"
+                aria-label={`Remove Aurum route ${index() + 1}`}
+                onClick={() => removeRoute(routeId)}
+              >
+                <Icon name="ph:trash" size={18} decorative />
+              </Button>
+            </div>
+          );
+        }}</For>
       </Show>
     </section>
   );

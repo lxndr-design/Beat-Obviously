@@ -313,6 +313,24 @@
   min-width: 0;
 }
 
+.samplerModeBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 9px;
+  min-height: 33px;
+  padding: 3px 6px;
+  border: var(--border-fg);
+  font-size: var(--font-size-ui);
+  font-weight: var(--font-weight-bold);
+}
+
+.samplerModeBar > div {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
 .samplerPropertiesHead {
   display: flex;
   align-items: center;

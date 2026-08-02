@@ -1,0 +1,24 @@
+{
+  "category" : "Music production",
+  "description" : "Write, arrange, and shape sound.",
+  "documents" : {
+    "changelog" : "CHANGELOG.md",
+    "fileMap" : "FILEMAP.md",
+    "overview" : "OVERVIEW.md",
+    "relationshipGraph" : ".devaps/file-map.json",
+    "roadmap" : "ROADMAP.md"
+  },
+  "launch" : {
+    "appPaths" : [
+      "/Applications/Beat.app",
+      "~/beat/Beat.app"
+    ],
+    "bundleIdentifiers" : [
+      "com.beat.app"
+    ],
+    "kind" : "application"
+  },
+  "name" : "Beat",
+  "roadmapWritePolicy" : "direct-user-input-or-approved-plan-only",
+  "schemaVersion" : 1
+}

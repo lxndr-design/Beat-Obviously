@@ -1,0 +1,1188 @@
+{
+  "schemaVersion": 1,
+  "savedAt": 1785627146366,
+  "project": {
+    "id": "generated-test-1-project",
+    "name": "Generated_test_1",
+    "bpm": 62,
+    "timeSignature": {
+      "num": 4,
+      "denom": 4,
+      "boldBeats": [
+        1
+      ]
+    },
+    "lengthBeats": 80,
+    "tracks": [
+      {
+        "id": "generated-test-1-track-0",
+        "name": "Electronic Sub Bass",
+        "kind": "midi",
+        "instrumentId": "passive-electronic-sectional-instrument-0",
+        "gainDb": 0,
+        "pan": 0,
+        "mute": false,
+        "solo": false,
+        "recordArmed": false,
+        "inputMonitoring": false,
+        "inputDeviceId": "",
+        "inputChannelStart": 0,
+        "inputChannelCount": 2,
+        "recordGainDb": 0,
+        "outputEnabled": true,
+        "effects": {
+          "filters": []
+        },
+        "rowHeight": "normal",
+        "segments": [
+          {
+            "id": "generated-test-1-segment-0-0",
+            "trackId": "generated-test-1-track-0",
+            "name": "A · bass",
+            "startBeat": 0,
+            "lengthBeats": 16,
+            "repeats": 4,
+            "layer": 0,
+            "muted": false,
+            "instrumentId": "passive-electronic-sectional-instrument-0",
+            "payload": {
+              "kind": "midi",
+              "notes": [
+                {
+                  "pitch": 45,
+                  "velocity": 82,
+                  "startBeat": 0,
+                  "lengthBeats": 15.041666666666666
+                }
+              ],
+              "gainDb": -4.161458333333333
+            }
+          }
+        ],
+        "parentTrackId": "",
+        "sends": []
+      },
+      {
+        "id": "generated-test-1-track-1",
+        "name": "Motion Pad",
+        "kind": "midi",
+        "instrumentId": "passive-electronic-sectional-instrument-1",
+        "gainDb": 0,
+        "pan": 0,
+        "mute": false,
+        "solo": false,
+        "recordArmed": false,
+        "inputMonitoring": false,
+        "inputDeviceId": "",
+        "inputChannelStart": 0,
+        "inputChannelCount": 2,
+        "recordGainDb": 0,
+        "outputEnabled": true,
+        "effects": {
+          "filters": []
+        },
+        "rowHeight": "normal",
+        "segments": [
+          {
+            "id": "generated-test-1-segment-1-0",
+            "trackId": "generated-test-1-track-1",
+            "name": "A · harmony",
+            "startBeat": 0,
+            "lengthBeats": 16,
+            "repeats": 4,
+            "layer": 0,
+            "muted": false,
+            "instrumentId": "passive-electronic-sectional-instrument-1",
+            "payload": {
+              "kind": "midi",
+              "notes": [
+                {
+                  "pitch": 65,
+                  "velocity": 63,
+                  "startBeat": 0,
+                  "lengthBeats": 3.6822916666666665
+                },
+                {
+                  "pitch": 57,
+                  "velocity": 68,
+                  "startBeat": 0,
+                  "lengthBeats": 3.6822916666666665
+                },
+                {
+                  "pitch": 60,
+                  "velocity": 74,
+                  "startBeat": 0,
+                  "lengthBeats": 3.6822916666666665
+                },
+                {
+                  "pitch": 57,
+                  "velocity": 63,
+                  "startBeat": 4,
+                  "lengthBeats": 3.6822916666666665
+                },
+                {
+                  "pitch": 60,
+                  "velocity": 68,
+                  "startBeat": 4,
+                  "lengthBeats": 3.6822916666666665
+                },
+                {
+                  "pitch": 64,
+                  "velocity": 74,
+                  "startBeat": 4,
+                  "lengthBeats": 3.6822916666666665
+                },
+                {
+                  "pitch": 65,
+                  "velocity": 63,
+                  "startBeat": 8,
+                  "lengthBeats": 3.6822916666666665
+                },
+                {
+                  "pitch": 57,
+                  "velocity": 68,
+                  "startBeat": 8,
+                  "lengthBeats": 3.6822916666666665
+                },
+                {
+                  "pitch": 60,
+                  "velocity": 74,
+                  "startBeat": 8,
+                  "lengthBeats": 3.6822916666666665
+                },
+                {
+                  "pitch": 57,
+                  "velocity": 63,
+                  "startBeat": 12,
+                  "lengthBeats": 3.6822916666666665
+                },
+                {
+                  "pitch": 60,
+                  "velocity": 68,
+                  "startBeat": 12,
+                  "lengthBeats": 3.6822916666666665
+                },
+                {
+                  "pitch": 64,
+                  "velocity": 74,
+                  "startBeat": 12,
+                  "lengthBeats": 3.6822916666666665
+                }
+              ],
+              "gainDb": -4.161458333333333
+            }
+          }
+        ],
+        "parentTrackId": "",
+        "sends": []
+      },
+      {
+        "id": "generated-test-1-track-2",
+        "name": "Aether Synth Lead",
+        "kind": "midi",
+        "instrumentId": "passive-electronic-sectional-instrument-2",
+        "gainDb": 0,
+        "pan": 0,
+        "mute": false,
+        "solo": false,
+        "recordArmed": false,
+        "inputMonitoring": false,
+        "inputDeviceId": "",
+        "inputChannelStart": 0,
+        "inputChannelCount": 2,
+        "recordGainDb": 0,
+        "outputEnabled": true,
+        "effects": {
+          "filters": []
+        },
+        "rowHeight": "normal",
+        "segments": [
+          {
+            "id": "generated-test-1-segment-2-0",
+            "trackId": "generated-test-1-track-2",
+            "name": "A · lead",
+            "startBeat": 0,
+            "lengthBeats": 16,
+            "repeats": 4,
+            "layer": 0,
+            "muted": false,
+            "instrumentId": "passive-electronic-sectional-instrument-2",
+            "payload": {
+              "kind": "midi",
+              "notes": [
+                {
+                  "pitch": 69,
+                  "velocity": 93,
+                  "startBeat": 0,
+                  "lengthBeats": 1.9364583333333336
+                },
+                {
+                  "pitch": 72,
+                  "velocity": 87,
+                  "startBeat": 1,
+                  "lengthBeats": 1.6500000000000001
+                },
+                {
+                  "pitch": 76,
+                  "velocity": 79,
+                  "startBeat": 2,
+                  "lengthBeats": 1.9364583333333336
+                },
+                {
+                  "pitch": 74,
+                  "velocity": 83,
+                  "startBeat": 3,
+                  "lengthBeats": 1.9364583333333336
+                },
+                {
+                  "pitch": 72,
+                  "velocity": 80,
+                  "startBeat": 4,
+                  "lengthBeats": 6
+                },
+                {
+                  "pitch": 69,
+                  "velocity": 93,
+                  "startBeat": 8,
+                  "lengthBeats": 1.6500000000000001
+                },
+                {
+                  "pitch": 76,
+                  "velocity": 96,
+                  "startBeat": 9,
+                  "lengthBeats": 1.9364583333333336
+                },
+                {
+                  "pitch": 74,
+                  "velocity": 89,
+                  "startBeat": 10,
+                  "lengthBeats": 1.6500000000000001
+                },
+                {
+                  "pitch": 76,
+                  "velocity": 90,
+                  "startBeat": 11,
+                  "lengthBeats": 1.9364583333333336
+                },
+                {
+                  "pitch": 72,
+                  "velocity": 80,
+                  "startBeat": 12,
+                  "lengthBeats": 1.9364583333333336
+                },
+                {
+                  "pitch": 69,
+                  "velocity": 96,
+                  "startBeat": 13,
+                  "lengthBeats": 5.809375
+                }
+              ],
+              "gainDb": -4.161458333333333
+            }
+          }
+        ],
+        "parentTrackId": "",
+        "sends": []
+      },
+      {
+        "id": "generated-test-1-track-3",
+        "name": "Sequenced Pluck",
+        "kind": "midi",
+        "instrumentId": "passive-electronic-sectional-instrument-3",
+        "gainDb": 0,
+        "pan": 0,
+        "mute": false,
+        "solo": false,
+        "recordArmed": false,
+        "inputMonitoring": false,
+        "inputDeviceId": "",
+        "inputChannelStart": 0,
+        "inputChannelCount": 2,
+        "recordGainDb": 0,
+        "outputEnabled": true,
+        "effects": {
+          "filters": []
+        },
+        "rowHeight": "normal",
+        "segments": [],
+        "parentTrackId": "",
+        "sends": []
+      },
+      {
+        "id": "generated-test-1-track-4",
+        "name": "Electronic Drum Engine",
+        "kind": "midi",
+        "instrumentId": "passive-electronic-sectional-instrument-4",
+        "gainDb": 0,
+        "pan": 0,
+        "mute": false,
+        "solo": false,
+        "recordArmed": false,
+        "inputMonitoring": false,
+        "inputDeviceId": "",
+        "inputChannelStart": 0,
+        "inputChannelCount": 2,
+        "recordGainDb": 0,
+        "outputEnabled": true,
+        "effects": {
+          "filters": []
+        },
+        "rowHeight": "normal",
+        "segments": [],
+        "parentTrackId": "",
+        "sends": []
+      }
+    ],
+    "returnBuses": [],
+    "masterEqAutomation": [],
+    "masterChain": {
+      "inputGainDb": 0,
+      "compressorEnabled": false,
+      "compressorThresholdDb": -18,
+      "compressorRatio": 2,
+      "compressorAttackMs": 20,
+      "compressorReleaseMs": 160,
+      "compressorMakeupDb": 0,
+      "compressorMix": 100,
+      "outputGainDb": 0
+    },
+    "recordingInput": {
+      "inputDeviceId": "",
+      "inputDeviceName": "",
+      "inputChannelStart": 0,
+      "inputChannelCount": 2,
+      "calibrationSampleRate": 0,
+      "measuredRoundTripSamples": 0,
+      "reportedInputLatencySamples": 0,
+      "reportedOutputLatencySamples": 0,
+      "userLatencyAdjustmentSamples": 0
+    }
+  },
+  "instruments": [
+    {
+      "id": "passive-electronic-sectional-instrument-0",
+      "name": "Generated · Electronic Sub Bass",
+      "createdAt": 1785627146366,
+      "updatedAt": 1785627146366,
+      "icon": "ph:cube",
+      "kind": "wavetable",
+      "envelope": {
+        "attackMs": 7.389510582915859,
+        "decayMs": 92.29799108670512,
+        "sustain": 0.6727666171483618,
+        "releaseMs": 163.97465280154128
+      },
+      "knobs": {
+        "cutoff": 0.3291258819096549,
+        "resonance": 0.08820367619353431,
+        "drive": 0.09456294095482745,
+        "color": 0.4364073523870686
+      },
+      "filterType": "lowpass",
+      "waveform": "wavetable",
+      "detuneCents": 0,
+      "octave": 0,
+      "subOscLevel": 0.42,
+      "glideMs": 24,
+      "maxVoices": 1,
+      "mono": true,
+      "legato": true,
+      "pitchBendRangeSemitones": 2,
+      "ampLevel": 1,
+      "ampPan": 0,
+      "lfoWaveform": "sine",
+      "lfoRateHz": 0.13461102858060298,
+      "lfoDepth": 0.010922205716120592,
+      "lfoSync": false,
+      "lfoSyncedRate": "1/4",
+      "lfoSmoothing": 0,
+      "lfoRandomPhase": 0,
+      "lfoPhase": 0,
+      "lfoRetrigger": true,
+      "lfoOneShot": false,
+      "lfo2Waveform": "triangle",
+      "lfo2RateHz": 0.5,
+      "lfo2Sync": false,
+      "lfo2SyncedRate": "1/2",
+      "lfo2Smoothing": 0,
+      "lfo2RandomPhase": 0,
+      "lfo2Enabled": false,
+      "lfo2Phase": 0,
+      "lfo2Retrigger": true,
+      "lfo2OneShot": false,
+      "lfoPositionBipolar": true,
+      "lfoPitchBipolar": true,
+      "lfoFilterBipolar": true,
+      "lfoToPitch": 0,
+      "lfoToFilter": 0,
+      "envToFilter": 0,
+      "wavetable": {
+        "bank": "aether",
+        "position": 0.31371286667737014,
+        "warp": 0.13461102858060298,
+        "warpMode": "shape",
+        "unison": 1,
+        "detuneCents": 7.820367619353432,
+        "blend": 0.40461102858060294
+      },
+      "aether": {
+        "oscA": {
+          "enabled": true,
+          "level": 0.78,
+          "pan": 0,
+          "waveform": "sine",
+          "octave": 0,
+          "semitone": 0,
+          "fineCents": 0,
+          "phase": 0,
+          "randomPhase": 0.25,
+          "wavetable": {
+            "bank": "aether",
+            "position": 0.31371286667737014,
+            "warp": 0.13461102858060298,
+            "warpMode": "shape",
+            "unison": 1,
+            "detuneCents": 7.820367619353432,
+            "blend": 0.40461102858060294
+          }
+        },
+        "oscB": {
+          "enabled": false,
+          "level": 0.26,
+          "pan": 0.12,
+          "waveform": "wavetable",
+          "octave": 0,
+          "semitone": 7,
+          "fineCents": -4,
+          "phase": 0,
+          "randomPhase": 0.25,
+          "wavetable": {
+            "bank": "glass",
+            "position": 0.2,
+            "warp": 0.13461102858060298,
+            "warpMode": "shape",
+            "unison": 1,
+            "detuneCents": 7.820367619353432,
+            "blend": 0.40461102858060294
+          }
+        },
+        "sub": {
+          "enabled": true,
+          "level": 0.45,
+          "octave": -1,
+          "waveform": "sine"
+        },
+        "noise": {
+          "enabled": false,
+          "level": 0.05,
+          "color": 0.45
+        },
+        "sampleSlot1": {
+          "schemaVersion": 5,
+          "enabled": false,
+          "audioFileId": "",
+          "rootNote": 60,
+          "level": 0.8,
+          "pan": 0,
+          "route": "filter",
+          "startRatio": 0,
+          "endRatio": 1,
+          "loopEnabled": false,
+          "loopStartRatio": 0,
+          "loopEndRatio": 1,
+          "fxSends": [
+            0,
+            0
+          ],
+          "zones": []
+        },
+        "runtimeWarp": 0,
+        "runtimeWarpMode": "shape"
+      },
+      "sampleIds": [],
+      "setId": "user-instruments",
+      "taxonomy": {
+        "categoryId": "synth_electronic",
+        "instrumentId": "wavetable_synth"
+      },
+      "source": {
+        "kind": "created",
+        "label": "Start from Something test generation",
+        "edited": false
+      },
+      "descriptors": [
+        "bass",
+        "rounded-bass",
+        "electronic",
+        "passive",
+        "low",
+        "generated-song",
+        "generated-instrument",
+        "aether",
+        "wavetable"
+      ],
+      "userCreated": true
+    },
+    {
+      "id": "passive-electronic-sectional-instrument-1",
+      "name": "Generated · Motion Pad",
+      "createdAt": 1785627146366,
+      "updatedAt": 1785627146366,
+      "icon": "ph:cube",
+      "kind": "wavetable",
+      "envelope": {
+        "attackMs": 42.40987243745706,
+        "decayMs": 357.9378734147032,
+        "sustain": 0.7373191506688761,
+        "releaseMs": 627.0589142006493
+      },
+      "knobs": {
+        "cutoff": 0.5565059117056677,
+        "resonance": 0.18406619481604225,
+        "drive": 0.0932529558528338,
+        "color": 0.5081323896320845
+      },
+      "filterType": "lowpass",
+      "waveform": "wavetable",
+      "detuneCents": 0,
+      "octave": 0,
+      "subOscLevel": 0,
+      "glideMs": 0,
+      "maxVoices": 16,
+      "mono": false,
+      "legato": false,
+      "pitchBendRangeSemitones": 2,
+      "ampLevel": 1,
+      "ampPan": 0,
+      "lfoWaveform": "triangle",
+      "lfoRateHz": 0.24219858444812675,
+      "lfoDepth": 0.1448794337792507,
+      "lfoSync": false,
+      "lfoSyncedRate": "1/4",
+      "lfoSmoothing": 0,
+      "lfoRandomPhase": 0,
+      "lfoPhase": 0,
+      "lfoRetrigger": true,
+      "lfoOneShot": false,
+      "lfo2Waveform": "triangle",
+      "lfo2RateHz": 0.5,
+      "lfo2Sync": false,
+      "lfo2SyncedRate": "1/2",
+      "lfo2Smoothing": 0,
+      "lfo2RandomPhase": 0,
+      "lfo2Enabled": false,
+      "lfo2Phase": 0,
+      "lfo2Retrigger": true,
+      "lfo2OneShot": false,
+      "lfoPositionBipolar": true,
+      "lfoPitchBipolar": true,
+      "lfoFilterBipolar": true,
+      "lfoToPitch": 0,
+      "lfoToFilter": 0,
+      "envToFilter": 0,
+      "wavetable": {
+        "bank": "aether",
+        "position": 0.43923168185614786,
+        "warp": 0.24219858444812675,
+        "warpMode": "shape",
+        "unison": 1,
+        "detuneCents": 11.406619481604224,
+        "blend": 0.5121985844481267
+      },
+      "aether": {
+        "oscA": {
+          "enabled": true,
+          "level": 0.78,
+          "pan": 0,
+          "waveform": "wavetable",
+          "octave": 0,
+          "semitone": 0,
+          "fineCents": 0,
+          "phase": 0,
+          "randomPhase": 0.25,
+          "wavetable": {
+            "bank": "aether",
+            "position": 0.43923168185614786,
+            "warp": 0.24219858444812675,
+            "warpMode": "shape",
+            "unison": 1,
+            "detuneCents": 11.406619481604224,
+            "blend": 0.5121985844481267
+          }
+        },
+        "oscB": {
+          "enabled": true,
+          "level": 0.26,
+          "pan": 0.12,
+          "waveform": "wavetable",
+          "octave": 0,
+          "semitone": 7,
+          "fineCents": -4,
+          "phase": 0,
+          "randomPhase": 0.25,
+          "wavetable": {
+            "bank": "glass",
+            "position": 0.2,
+            "warp": 0.24219858444812675,
+            "warpMode": "shape",
+            "unison": 1,
+            "detuneCents": 11.406619481604224,
+            "blend": 0.5121985844481267
+          }
+        },
+        "sub": {
+          "enabled": false,
+          "level": 0.12,
+          "octave": -1,
+          "waveform": "sine"
+        },
+        "noise": {
+          "enabled": false,
+          "level": 0.05,
+          "color": 0.45
+        },
+        "sampleSlot1": {
+          "schemaVersion": 5,
+          "enabled": false,
+          "audioFileId": "",
+          "rootNote": 60,
+          "level": 0.8,
+          "pan": 0,
+          "route": "filter",
+          "startRatio": 0,
+          "endRatio": 1,
+          "loopEnabled": false,
+          "loopStartRatio": 0,
+          "loopEndRatio": 1,
+          "fxSends": [
+            0,
+            0
+          ],
+          "zones": []
+        },
+        "runtimeWarp": 0,
+        "runtimeWarpMode": "shape"
+      },
+      "sampleIds": [],
+      "setId": "user-instruments",
+      "taxonomy": {
+        "categoryId": "synth_electronic",
+        "instrumentId": "wavetable_synth"
+      },
+      "source": {
+        "kind": "created",
+        "label": "Start from Something test generation",
+        "edited": false
+      },
+      "descriptors": [
+        "harmony",
+        "sustained-pad",
+        "electronic",
+        "passive",
+        "low",
+        "generated-song",
+        "generated-instrument",
+        "aether",
+        "wavetable"
+      ],
+      "userCreated": true
+    },
+    {
+      "id": "passive-electronic-sectional-instrument-2",
+      "name": "Generated · Aether Synth Lead",
+      "createdAt": 1785627146366,
+      "updatedAt": 1785627146366,
+      "icon": "ph:cube",
+      "kind": "wavetable",
+      "envelope": {
+        "attackMs": 6.419628631439904,
+        "decayMs": 149.38885894319714,
+        "sustain": 0.7824535789299881,
+        "releaseMs": 259.58266946719556
+      },
+      "knobs": {
+        "cutoff": 0.5166254034933228,
+        "resonance": 0.3091408771833267,
+        "drive": 0.2633127017466614,
+        "color": 0.6982817543666534
+      },
+      "filterType": "lowpass",
+      "waveform": "wavetable",
+      "detuneCents": 0,
+      "octave": 0,
+      "subOscLevel": 0,
+      "glideMs": 0,
+      "maxVoices": 16,
+      "mono": false,
+      "legato": false,
+      "pitchBendRangeSemitones": 2,
+      "ampLevel": 1,
+      "ampPan": 0,
+      "lfoWaveform": "sine",
+      "lfoRateHz": 0.3174226315499801,
+      "lfoDepth": 0.04748452630999603,
+      "lfoSync": false,
+      "lfoSyncedRate": "1/4",
+      "lfoSmoothing": 0,
+      "lfoRandomPhase": 0,
+      "lfoPhase": 0,
+      "lfoRetrigger": true,
+      "lfoOneShot": false,
+      "lfo2Waveform": "triangle",
+      "lfo2RateHz": 0.5,
+      "lfo2Sync": false,
+      "lfo2SyncedRate": "1/2",
+      "lfo2Smoothing": 0,
+      "lfo2RandomPhase": 0,
+      "lfo2Enabled": false,
+      "lfo2Phase": 0,
+      "lfo2Retrigger": true,
+      "lfo2OneShot": false,
+      "lfoPositionBipolar": true,
+      "lfoPitchBipolar": true,
+      "lfoFilterBipolar": true,
+      "lfoToPitch": 0,
+      "lfoToFilter": 0,
+      "envToFilter": 0,
+      "wavetable": {
+        "bank": "aether",
+        "position": 0.5269930701416434,
+        "warp": 0.3174226315499801,
+        "warpMode": "shape",
+        "unison": 3,
+        "detuneCents": 13.914087718332672,
+        "blend": 0.5874226315499801
+      },
+      "aether": {
+        "oscA": {
+          "enabled": true,
+          "level": 0.78,
+          "pan": 0,
+          "waveform": "saw",
+          "octave": 0,
+          "semitone": 0,
+          "fineCents": 0,
+          "phase": 0,
+          "randomPhase": 0.25,
+          "wavetable": {
+            "bank": "aether",
+            "position": 0.5269930701416434,
+            "warp": 0.3174226315499801,
+            "warpMode": "shape",
+            "unison": 3,
+            "detuneCents": 13.914087718332672,
+            "blend": 0.5874226315499801
+          }
+        },
+        "oscB": {
+          "enabled": false,
+          "level": 0.26,
+          "pan": 0.12,
+          "waveform": "wavetable",
+          "octave": 0,
+          "semitone": 7,
+          "fineCents": -4,
+          "phase": 0,
+          "randomPhase": 0.25,
+          "wavetable": {
+            "bank": "glass",
+            "position": 0.2,
+            "warp": 0.3174226315499801,
+            "warpMode": "shape",
+            "unison": 3,
+            "detuneCents": 13.914087718332672,
+            "blend": 0.5874226315499801
+          }
+        },
+        "sub": {
+          "enabled": false,
+          "level": 0.12,
+          "octave": -1,
+          "waveform": "sine"
+        },
+        "noise": {
+          "enabled": false,
+          "level": 0.05,
+          "color": 0.45
+        },
+        "sampleSlot1": {
+          "schemaVersion": 5,
+          "enabled": false,
+          "audioFileId": "",
+          "rootNote": 60,
+          "level": 0.8,
+          "pan": 0,
+          "route": "filter",
+          "startRatio": 0,
+          "endRatio": 1,
+          "loopEnabled": false,
+          "loopStartRatio": 0,
+          "loopEndRatio": 1,
+          "fxSends": [
+            0,
+            0
+          ],
+          "zones": []
+        },
+        "runtimeWarp": 0,
+        "runtimeWarpMode": "shape"
+      },
+      "sampleIds": [],
+      "setId": "user-instruments",
+      "taxonomy": {
+        "categoryId": "synth_electronic",
+        "instrumentId": "wavetable_synth"
+      },
+      "source": {
+        "kind": "created",
+        "label": "Start from Something test generation",
+        "edited": false
+      },
+      "descriptors": [
+        "lead",
+        "reed",
+        "electronic",
+        "passive",
+        "low",
+        "generated-song",
+        "generated-instrument",
+        "aether",
+        "wavetable"
+      ],
+      "userCreated": true
+    },
+    {
+      "id": "passive-electronic-sectional-instrument-3",
+      "name": "Generated · Sequenced Pluck",
+      "createdAt": 1785627146366,
+      "updatedAt": 1785627146366,
+      "icon": "ph:cube",
+      "kind": "wavetable",
+      "envelope": {
+        "attackMs": 1.7991054193394038,
+        "decayMs": 80,
+        "sustain": 0.6546645322522765,
+        "releaseMs": 101.523321880685
+      },
+      "knobs": {
+        "cutoff": 0.6130351397798013,
+        "resonance": 0.1781469623623758,
+        "drive": 0.04651756988990064,
+        "color": 0.33629392472475156
+      },
+      "filterType": "lowpass",
+      "waveform": "wavetable",
+      "detuneCents": 0,
+      "octave": 0,
+      "subOscLevel": 0,
+      "glideMs": 0,
+      "maxVoices": 16,
+      "mono": false,
+      "legato": false,
+      "pitchBendRangeSemitones": 2,
+      "ampLevel": 1,
+      "ampPan": 0,
+      "lfoWaveform": "triangle",
+      "lfoRateHz": 0.1044408870871274,
+      "lfoDepth": 0.004888177417425479,
+      "lfoSync": false,
+      "lfoSyncedRate": "1/4",
+      "lfoSmoothing": 0,
+      "lfoRandomPhase": 0,
+      "lfoPhase": 0,
+      "lfoRetrigger": true,
+      "lfoOneShot": false,
+      "lfo2Waveform": "triangle",
+      "lfo2RateHz": 0.5,
+      "lfo2Sync": false,
+      "lfo2SyncedRate": "1/2",
+      "lfo2Smoothing": 0,
+      "lfo2RandomPhase": 0,
+      "lfo2Enabled": false,
+      "lfo2Phase": 0,
+      "lfo2Retrigger": true,
+      "lfo2OneShot": false,
+      "lfoPositionBipolar": true,
+      "lfoPitchBipolar": true,
+      "lfoFilterBipolar": true,
+      "lfoToPitch": 0,
+      "lfoToFilter": 0,
+      "envToFilter": 0,
+      "wavetable": {
+        "bank": "aether",
+        "position": 0.27851436826831527,
+        "warp": 0.1044408870871274,
+        "warpMode": "shape",
+        "unison": 1,
+        "detuneCents": 6.81469623623758,
+        "blend": 0.37444088708712736
+      },
+      "aether": {
+        "oscA": {
+          "enabled": true,
+          "level": 0.78,
+          "pan": 0,
+          "waveform": "triangle",
+          "octave": 0,
+          "semitone": 0,
+          "fineCents": 0,
+          "phase": 0,
+          "randomPhase": 0.25,
+          "wavetable": {
+            "bank": "aether",
+            "position": 0.27851436826831527,
+            "warp": 0.1044408870871274,
+            "warpMode": "shape",
+            "unison": 1,
+            "detuneCents": 6.81469623623758,
+            "blend": 0.37444088708712736
+          }
+        },
+        "oscB": {
+          "enabled": false,
+          "level": 0.26,
+          "pan": 0.12,
+          "waveform": "wavetable",
+          "octave": 0,
+          "semitone": 7,
+          "fineCents": -4,
+          "phase": 0,
+          "randomPhase": 0.25,
+          "wavetable": {
+            "bank": "glass",
+            "position": 0.2,
+            "warp": 0.1044408870871274,
+            "warpMode": "shape",
+            "unison": 1,
+            "detuneCents": 6.81469623623758,
+            "blend": 0.37444088708712736
+          }
+        },
+        "sub": {
+          "enabled": false,
+          "level": 0.12,
+          "octave": -1,
+          "waveform": "sine"
+        },
+        "noise": {
+          "enabled": false,
+          "level": 0.05,
+          "color": 0.45
+        },
+        "sampleSlot1": {
+          "schemaVersion": 5,
+          "enabled": false,
+          "audioFileId": "",
+          "rootNote": 60,
+          "level": 0.8,
+          "pan": 0,
+          "route": "filter",
+          "startRatio": 0,
+          "endRatio": 1,
+          "loopEnabled": false,
+          "loopStartRatio": 0,
+          "loopEndRatio": 1,
+          "fxSends": [
+            0,
+            0
+          ],
+          "zones": []
+        },
+        "runtimeWarp": 0,
+        "runtimeWarpMode": "shape"
+      },
+      "sampleIds": [],
+      "setId": "user-instruments",
+      "taxonomy": {
+        "categoryId": "synth_electronic",
+        "instrumentId": "wavetable_synth"
+      },
+      "source": {
+        "kind": "created",
+        "label": "Start from Something test generation",
+        "edited": false
+      },
+      "descriptors": [
+        "countermelody",
+        "plucked",
+        "electronic",
+        "passive",
+        "low",
+        "generated-song",
+        "generated-instrument",
+        "aether",
+        "wavetable"
+      ],
+      "userCreated": true
+    },
+    {
+      "id": "passive-electronic-sectional-instrument-4",
+      "name": "Generated · Electronic Drum Engine",
+      "createdAt": 1785627146366,
+      "updatedAt": 1785627146366,
+      "icon": "ph:cube",
+      "kind": "wavetable",
+      "envelope": {
+        "attackMs": 0.9519955586809654,
+        "decayMs": 80,
+        "sustain": 0.15599777934048273,
+        "releaseMs": 61.35966319997322
+      },
+      "knobs": {
+        "cutoff": 0.3079970391206437,
+        "resonance": 0.05999814945040228,
+        "drive": 0.2039985195603218,
+        "color": 0.45999629890080457
+      },
+      "filterType": "lowpass",
+      "waveform": "wavetable",
+      "detuneCents": 0,
+      "octave": 0,
+      "subOscLevel": 0,
+      "glideMs": 0,
+      "maxVoices": 16,
+      "mono": false,
+      "legato": false,
+      "pitchBendRangeSemitones": 2,
+      "ampLevel": 1,
+      "ampPan": 0,
+      "lfoWaveform": "sine",
+      "lfoRateHz": 0.16999444835120683,
+      "lfoDepth": 0.017998889670241366,
+      "lfoSync": false,
+      "lfoSyncedRate": "1/4",
+      "lfoSmoothing": 0,
+      "lfoRandomPhase": 0,
+      "lfoPhase": 0,
+      "lfoRetrigger": true,
+      "lfoOneShot": false,
+      "lfo2Waveform": "triangle",
+      "lfo2RateHz": 0.5,
+      "lfo2Sync": false,
+      "lfo2SyncedRate": "1/2",
+      "lfo2Smoothing": 0,
+      "lfo2RandomPhase": 0,
+      "lfo2Enabled": false,
+      "lfo2Phase": 0,
+      "lfo2Retrigger": true,
+      "lfo2OneShot": false,
+      "lfoPositionBipolar": true,
+      "lfoPitchBipolar": true,
+      "lfoFilterBipolar": true,
+      "lfoToPitch": 0,
+      "lfoToFilter": 0,
+      "envToFilter": 0,
+      "wavetable": {
+        "bank": "aether",
+        "position": 0.35499352307640797,
+        "warp": 0.16999444835120683,
+        "warpMode": "shape",
+        "unison": 1,
+        "detuneCents": 8.999814945040228,
+        "blend": 0.4399944483512068
+      },
+      "aether": {
+        "oscA": {
+          "enabled": false,
+          "level": 0.78,
+          "pan": 0,
+          "waveform": "sine",
+          "octave": 0,
+          "semitone": 0,
+          "fineCents": 0,
+          "phase": 0,
+          "randomPhase": 0.25,
+          "wavetable": {
+            "bank": "aether",
+            "position": 0.35499352307640797,
+            "warp": 0.16999444835120683,
+            "warpMode": "shape",
+            "unison": 1,
+            "detuneCents": 8.999814945040228,
+            "blend": 0.4399944483512068
+          }
+        },
+        "oscB": {
+          "enabled": false,
+          "level": 0.26,
+          "pan": 0.12,
+          "waveform": "wavetable",
+          "octave": 0,
+          "semitone": 7,
+          "fineCents": -4,
+          "phase": 0,
+          "randomPhase": 0.25,
+          "wavetable": {
+            "bank": "glass",
+            "position": 0.2,
+            "warp": 0.16999444835120683,
+            "warpMode": "shape",
+            "unison": 1,
+            "detuneCents": 8.999814945040228,
+            "blend": 0.4399944483512068
+          }
+        },
+        "sub": {
+          "enabled": false,
+          "level": 0.12,
+          "octave": -1,
+          "waveform": "sine"
+        },
+        "noise": {
+          "enabled": true,
+          "level": 0.82,
+          "color": 0.45
+        },
+        "sampleSlot1": {
+          "schemaVersion": 5,
+          "enabled": false,
+          "audioFileId": "",
+          "rootNote": 60,
+          "level": 0.8,
+          "pan": 0,
+          "route": "filter",
+          "startRatio": 0,
+          "endRatio": 1,
+          "loopEnabled": false,
+          "loopStartRatio": 0,
+          "loopEndRatio": 1,
+          "fxSends": [
+            0,
+            0
+          ],
+          "zones": []
+        },
+        "runtimeWarp": 0,
+        "runtimeWarpMode": "shape"
+      },
+      "sampleIds": [],
+      "setId": "user-instruments",
+      "taxonomy": {
+        "categoryId": "synth_electronic",
+        "instrumentId": "wavetable_synth"
+      },
+      "source": {
+        "kind": "created",
+        "label": "Start from Something test generation",
+        "edited": false
+      },
+      "descriptors": [
+        "rhythm",
+        "percussive",
+        "electronic",
+        "passive",
+        "low",
+        "generated-song",
+        "generated-instrument",
+        "aether",
+        "wavetable"
+      ],
+      "userCreated": true
+    }
+  ],
+  "audioFiles": [],
+  "components": [],
+  "componentFolders": [],
+  "plugins": [],
+  "assets": []
+}

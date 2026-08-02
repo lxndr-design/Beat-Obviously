@@ -1,0 +1,238 @@
+.editor {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.sourceRibbon,
+.playheadBar,
+.padHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 9px;
+  min-height: 36px;
+  padding: 3px 6px;
+  border: var(--border-fg);
+}
+
+.sourceIdentity {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  min-width: 0;
+  font-size: var(--font-size-ui);
+}
+
+.sourceIdentity strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sourceIdentity > span:last-child,
+.playheadBar > span,
+.padHeader > span:last-child {
+  font-family: var(--font-family-mono);
+  opacity: 0.65;
+}
+
+.eyebrow {
+  font-size: var(--font-size-ui);
+  font-weight: var(--font-weight-bold);
+  text-transform: uppercase;
+}
+
+.sourceActions,
+.playheadBar > div {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  flex: 0 0 auto;
+}
+
+.emptyState,
+.padEmpty {
+  display: grid;
+  place-items: center;
+  gap: 6px;
+  min-height: 150px;
+  padding: 21px;
+  border: var(--border-fg);
+  text-align: center;
+}
+
+.emptyState span,
+.padEmpty {
+  color: var(--color-fg);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-ui);
+  opacity: 0.65;
+}
+
+.waveformPanel {
+  display: grid;
+  border: var(--border-fg);
+}
+
+.waveform {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 150px;
+  overflow: hidden;
+  padding: 0;
+  color: var(--color-fg);
+  background:
+    repeating-linear-gradient(90deg, transparent 0, transparent calc(12.5% - 1px), color-mix(in srgb, var(--color-fg) 14%, transparent) calc(12.5% - 1px), color-mix(in srgb, var(--color-fg) 14%, transparent) 12.5%),
+    var(--color-bg);
+  border: 0;
+  cursor: crosshair;
+}
+
+.waveform svg {
+  position: absolute;
+  inset: 12px 0;
+  width: 100%;
+  height: calc(100% - 24px);
+  pointer-events: none;
+}
+
+.waveform polygon {
+  fill: color-mix(in srgb, var(--color-fg) 33%, transparent);
+  stroke: var(--color-fg);
+  stroke-width: 0.25;
+}
+
+.centerLine {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: color-mix(in srgb, var(--color-fg) 25%, transparent);
+}
+
+.waveformStatus {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-ui);
+  opacity: 0.55;
+}
+
+.playhead {
+  position: absolute;
+  z-index: 3;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--color-fg);
+  pointer-events: none;
+}
+
+.playhead::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -4px;
+  width: 9px;
+  height: 9px;
+  background: var(--color-fg);
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
+}
+
+.jumpMarker {
+  position: absolute;
+  z-index: 2;
+  bottom: 6px;
+  transform: translateX(-50%);
+  min-width: 27px;
+  padding: 2px 3px;
+  color: var(--color-fg);
+  background: var(--color-bg);
+  border: var(--border-fg);
+  font-family: var(--font-family-mono);
+  font-size: 9px;
+  line-height: 1;
+  pointer-events: none;
+}
+
+.jumpMarker[data-selected="true"] {
+  color: var(--color-bg);
+  background: var(--color-fg);
+}
+
+.padHeader {
+  min-height: 27px;
+  font-size: var(--font-size-ui);
+  font-weight: var(--font-weight-bold);
+}
+
+.padList {
+  display: grid;
+  max-height: 330px;
+  overflow: auto;
+  border: var(--border-fg);
+}
+
+.padRow {
+  display: grid;
+  grid-template-columns: 102px minmax(150px, 1fr) 138px 138px 27px 27px;
+  align-items: center;
+  gap: 3px;
+  min-height: 42px;
+  padding: 3px;
+  border-bottom: var(--border-fg);
+}
+
+.padRow:last-child {
+  border-bottom: 0;
+}
+
+.padRow[data-selected="true"] {
+  background: color-mix(in srgb, var(--color-fg) 9%, var(--color-bg));
+  box-shadow: inset 3px 0 0 var(--color-fg);
+}
+
+.pitchSelect,
+.padName,
+.timeInput {
+  min-width: 0;
+}
+
+.audioPicker {
+  display: grid;
+  max-height: 420px;
+  overflow: auto;
+  border: var(--border-fg);
+}
+
+.audioPickerRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  min-height: 33px;
+  padding: 0 9px;
+  border: 0;
+  border-bottom: var(--border-fg);
+  text-align: left;
+}
+
+.audioPickerRow > span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.audioPickerRow > span:last-child {
+  font-family: var(--font-family-mono);
+  opacity: 0.65;
+}
+
+@media (max-width: 900px) {
+  .padRow {
+    grid-template-columns: 93px minmax(120px, 1fr) 108px 108px 27px 27px;
+  }
+}

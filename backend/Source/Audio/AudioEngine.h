@@ -385,6 +385,7 @@ namespace beat
             int nextIndex { 0 };
             float attackMs { 1.0f };
             float releaseMs { 60.0f };
+            bool strictPitchMapping { false };
         };
 
         struct ActiveSampleVoice

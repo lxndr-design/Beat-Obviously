@@ -2176,6 +2176,7 @@ namespace beat
                     InstrumentDefinition instrument;
                     instrument.id = instrumentVar.getProperty("id", "").toString();
                     instrument.kind = instrumentVar.getProperty("kind", "").toString();
+                    instrument.samplerComplexity = instrumentVar.getProperty("samplerComplexity", "").toString();
                     if (instrument.id.isEmpty()) continue;
 
                     instrument.waveform = parseWaveform(instrumentVar.getProperty("waveform", "saw"), instrument.kind);
@@ -2844,6 +2845,10 @@ namespace beat
                 item->setProperty("endSeconds", note.endSeconds);
                 item->setProperty("pitch", note.pitch);
                 item->setProperty("velocity", note.velocity);
+                if (note.instrument.isNotEmpty())
+                    item->setProperty("instrument", note.instrument);
+                if (note.isDrum)
+                    item->setProperty("isDrum", true);
                 juce::Array<juce::var> pitchBends;
                 pitchBends.ensureStorageAllocated(static_cast<int>(note.pitchBends.size()));
                 for (const auto bend : note.pitchBends)

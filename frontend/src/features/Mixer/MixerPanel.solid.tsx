@@ -36,11 +36,19 @@ export function MixerPanel() {
         fallback={<div class={styles.empty}>Add tracks to build channel strips.</div>}
       >
         <div class={styles.stripScroller}>
-          <For each={tracks()}>
-            {(track) => <ChannelStrip track={track} groups={groups()} returnBuses={returnBuses()} />}
+          <For each={tracks().map((track) => track.id)}>
+            {(trackId) => (
+              <Show when={tracks().find((track) => track.id === trackId)}>
+                {(track) => <ChannelStrip track={track()} groups={groups()} returnBuses={returnBuses()} />}
+              </Show>
+            )}
           </For>
-          <For each={returnBuses()}>
-            {(bus) => <ReturnStrip bus={bus} />}
+          <For each={returnBuses().map((bus) => bus.id)}>
+            {(busId) => (
+              <Show when={returnBuses().find((bus) => bus.id === busId)}>
+                {(bus) => <ReturnStrip bus={bus()} />}
+              </Show>
+            )}
           </For>
           <MasterStrip inputGainDb={master().inputGainDb} outputGainDb={master().outputGainDb} />
         </div>

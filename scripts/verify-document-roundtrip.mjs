@@ -119,6 +119,23 @@ try {
     "MIDI note sampler-zone override metadata should survive document migration",
   );
   assert.deepEqual(
+    migratedMidiPayload.notes.map((note) => ({
+      groupId: note.groupId,
+      arpeggiation: note.arpeggiation,
+    })),
+    [
+      {
+        groupId: "note-group-arp",
+        arpeggiation: { schemaVersion: 1, loops: 3, sequence: "down-up" },
+      },
+      {
+        groupId: "note-group-arp",
+        arpeggiation: { schemaVersion: 1, loops: 3, sequence: "down-up" },
+      },
+    ],
+    "linked-note groups and nondestructive arpeggiation should survive document migration",
+  );
+  assert.deepEqual(
     migrated.project.tracks[0].segments[0].automation?.[0].points.map((point) => [point.beat, point.value, point.curve]),
     [
       [0, 0.2, "linear"],
@@ -535,6 +552,8 @@ function makeRepresentativeDocument() {
                     velocity: 100,
                     startBeat: 0,
                     lengthBeats: 2,
+                    groupId: "note-group-arp",
+                    arpeggiation: { schemaVersion: 1, loops: 3, sequence: "down-up" },
                     sampleZoneId: "zone-kick-main",
                     samplePath: "/Samples/Kick.wav",
                     sampleLabel: "Kick",
@@ -551,6 +570,14 @@ function makeRepresentativeDocument() {
                         ],
                       },
                     ],
+                  },
+                  {
+                    pitch: 67,
+                    velocity: 92,
+                    startBeat: 0,
+                    lengthBeats: 2,
+                    groupId: "note-group-arp",
+                    arpeggiation: { schemaVersion: 1, loops: 3, sequence: "down-up" },
                   },
                 ],
               },

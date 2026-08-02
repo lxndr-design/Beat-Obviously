@@ -10,6 +10,7 @@ import {
 } from "../state/aurum";
 import type { AurumFilterConfig, AurumOperatorConfig, AutomationCurve, CustomWavetableDefinition, CustomWavetableFrame, EnvelopeCurve, Instrument, ModulationRemapCurve, WavetableConfig } from "../state/types";
 import { sampleZoneStableId } from "../state/sampleZones";
+import { isTimelineJumpingInstrument } from "../state/timelineJumpingSampler";
 import { registerGlobalAudioStop } from "./globalAudioSafety";
 
 export type SynthRenderMode = "visual" | "audio";
@@ -132,10 +133,11 @@ export function startInstrumentPreviewAudition(
   onEnded?: () => void,
   sampleSelection?: SamplePlaybackSelection,
   expression?: SynthPreviewExpression,
+  frequencyOverride?: number,
 ): InstrumentPreviewAuditionHandle {
   const ctx = getBrowserPreviewAudioContext();
   if (ctx.state === "suspended") void ctx.resume().catch(() => undefined);
-  const source = createInstrumentBufferSource(ctx, instrument, durationS, previewFrequency(instrument), undefined, velocity, bpm, sampleSelection, expression);
+  const source = createInstrumentBufferSource(ctx, instrument, durationS, frequencyOverride ?? previewFrequency(instrument), undefined, velocity, bpm, sampleSelection, expression);
   const gain = ctx.createGain();
   let stopped = false;
 
@@ -194,7 +196,12 @@ export async function startInstrumentSampleZoneAudition(
   } else {
     await preloadInstrumentSample(ctx, instrument);
   }
-  return startInstrumentPreviewAudition(instrument, durationS, gainValue, bpm, velocity, onEnded, sampleSelection);
+  const selectedZone = (instrument.sampleMap ?? [])
+    .map((zone, index) => ({ ...zone, id: sampleZoneStableId(zone, index) }))
+    .find((zone) => zone.id === sampleSelection.sampleZoneId)
+    ?? (instrument.sampleMap ?? []).find((zone) => zone.path === sampleSelection.samplePath);
+  const zoneFrequency = selectedZone ? midiFrequency(selectedZone.rootNote) : undefined;
+  return startInstrumentPreviewAudition(instrument, durationS, gainValue, bpm, velocity, onEnded, sampleSelection, undefined, zoneFrequency);
 }
 
 export function getBrowserPreviewAudioContext(): AudioContext {
@@ -260,6 +267,8 @@ export function noteFrequency(midiPitch: number, instrument?: Instrument): numbe
 }
 
 export function previewFrequency(instrument: Instrument): number {
+  if (isTimelineJumpingInstrument(instrument) && instrument.sampleMap?.[0])
+    return midiFrequency(instrument.sampleMap[0].rootNote);
   const detune = instrument.detuneCents ?? 0;
   return SYNTH_PREVIEW_BASE_HZ * Math.pow(2, detune / 1200);
 }
@@ -813,6 +822,54 @@ export function instrumentSampleUrls(instrument: Instrument): string[] {
   ].filter(Boolean)));
 }
 
+export function instrumentSampleUrlsForPlayback(
+  instrument: Instrument,
+  frequency: number,
+  velocity = 127,
+  sampleSelection?: SamplePlaybackSelection,
+): string[] {
+  const zones = (instrument.sampleMap ?? [])
+    .map((zone, index) => ({ ...zone, id: sampleZoneStableId(zone, index) }));
+  if (sampleSelection?.sampleZoneId || sampleSelection?.samplePath) {
+    const selectedZone = zones.find((zone) => zone.id === sampleSelection.sampleZoneId)
+      ?? zones.find((zone) => zone.path === sampleSelection.samplePath);
+    if (selectedZone) return [selectedZone.path];
+    if (sampleSelection.samplePath) return [sampleSelection.samplePath];
+  }
+
+  const midiPitch = frequencyToMidi(frequency);
+  const matchingZones = zones.filter((zone) => (
+    midiPitch >= zone.loNote && midiPitch <= zone.hiNote
+    && velocity >= zone.loVel && velocity <= zone.hiVel
+  ));
+  if (matchingZones.length > 0)
+    return Array.from(new Set(matchingZones.map((zone) => zone.path)));
+  if (isTimelineJumpingInstrument(instrument)) return [];
+  const fallback = primaryInstrumentSampleUrl(instrument);
+  return fallback ? [fallback] : [];
+}
+
+export function hasCachedInstrumentSamplesForPlayback(
+  instrument: Instrument,
+  frequency: number,
+  velocity = 127,
+  sampleSelection?: SamplePlaybackSelection,
+): boolean {
+  const urls = instrumentSampleUrlsForPlayback(instrument, frequency, velocity, sampleSelection);
+  return urls.length > 0 && urls.every((url) => sampleBufferCache.has(url));
+}
+
+export async function preloadInstrumentSamplesForPlayback(
+  ctx: AudioContext,
+  instrument: Instrument,
+  frequency: number,
+  velocity = 127,
+  sampleSelection?: SamplePlaybackSelection,
+): Promise<void> {
+  const urls = instrumentSampleUrlsForPlayback(instrument, frequency, velocity, sampleSelection);
+  await Promise.all(urls.map((url) => preloadInstrumentSampleUrl(ctx, url)));
+}
+
 function sampleZoneTarget(zone: NonNullable<Instrument["sampleMap"]>[number]): SamplePlaybackTarget {
   return {
     url: zone.path,
@@ -854,6 +911,7 @@ function nextSampleTarget(
   }
   const zones = cachedZones
     .filter((zone) => midiPitch >= zone.loNote && midiPitch <= zone.hiNote && velocity >= zone.loVel && velocity <= zone.hiVel);
+  if (zones.length === 0 && isTimelineJumpingInstrument(instrument)) return undefined;
   const targets = zones.length > 0
     ? zones.map(sampleZoneTarget)
     : instrumentSampleUrls(instrument)

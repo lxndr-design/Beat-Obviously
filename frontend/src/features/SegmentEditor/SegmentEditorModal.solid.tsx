@@ -1,4 +1,5 @@
 import { For, createEffect, createMemo, createSignal, onCleanup, Show } from "solid-js";
+import { Portal } from "solid-js/web";
 import { DRUM_MAX_STEPS, type GeneratedDrumBeat } from "../../ai/drumBeatGenerator";
 import {
   AETHER_ARRANGEMENT_AUTOMATION_TARGETS,
@@ -34,10 +35,21 @@ import { AUTOMATION_CURVES, automationCurveLabel } from "../../automation/curves
 import { isSupportedAudioFileName, SUPPORTED_AUDIO_IMPORT_LABEL } from "../../audio/audioFormats";
 import { importAudioFile } from "../../audio/audioImport";
 import { createInstrumentBufferSource, noteFrequency } from "../../audio/synthPreview";
-import { appAlert, useModalStack } from "../../solid-ui";
+import {
+  appAlert,
+  Button,
+  Checkbox,
+  FloatingLayer,
+  FloatingSelect,
+  Icon,
+  Modal,
+  NumberInput,
+  Slider,
+  TextInput,
+  useModalStack,
+} from "../../solid-ui";
 import { updateDrumBeatFeedback } from "../../persistence/dexie";
 import { isNative, send } from "../../ipc/bridge";
-import { Button, Checkbox, FloatingSelect, Icon, Modal, NumberInput, Slider, TextInput } from "../../solid-ui";
 import { createStoreSelector } from "../../solid-utils/store";
 import { selectSegment } from "../../state/selectors";
 import {
@@ -51,9 +63,11 @@ import {
 import type { AutomationCurve, DrumRow, DrumSpeed, Instrument, MidiNote, Segment, TimeSignature } from "../../state/types";
 import { DrumSequencer } from "../DrumEditor/DrumSequencer.solid";
 import { PianoRoll } from "../MidiEditor/PianoRoll.solid";
+import { roundMidiNotesToNearest } from "../MidiEditor/midiNoteRounding";
 import { MidiTransport } from "../MidiEditor/MidiTransport.solid";
 import { AudioSegmentTransport } from "./AudioSegmentTransport.solid";
 import { SegmentLoopControl } from "./SegmentLoopControl.solid";
+import { SEGMENT_PASTEL_COLORS } from "./segmentColors";
 import {
   COMPUTER_PIANO_OCTAVES,
   MIDI_LIVE_MIN_LENGTH_BEATS,
@@ -79,6 +93,14 @@ type AudioPayload = Extract<Segment["payload"], { kind: "audio" }>;
 // automation needs a separate opt-in surface instead of living under every MIDI clip.
 const SHOW_SEGMENT_AUTOMATION_PANEL = false;
 const MIDI_LIVE_BASE_BPM = 120;
+const MIDI_ROUND_STEP_OPTIONS = [
+  { value: "1", label: "1 beat" },
+  { value: "0.5", label: "1/2 beat" },
+  { value: "0.25", label: "1/4 beat" },
+  { value: "0.125", label: "1/8 beat" },
+  { value: "0.0625", label: "1/16 beat" },
+  { value: "0.03125", label: "1/32 beat" },
+];
 
 export function SegmentEditorModal(props: SegmentEditorModalProps) {
   const source = createStoreSelector(useProjectStore, () => selectSegment(props.segmentId));
@@ -98,6 +120,7 @@ export function SegmentEditorModal(props: SegmentEditorModalProps) {
   const addAudioFile = useAudioFileStore.getState().addFile;
   const scopeId = () => `segment-${props.segmentId}`;
   const [draft, setDraftInternal] = createSignal<Segment | undefined>(source() ? structuredClone(source()) : undefined, { equals: false });
+  const [colorPicker, setColorPicker] = createSignal<{ x: number; y: number } | null>(null);
   const [touched, setTouched] = createSignal(false);
   const [instrumentSelectOpen, setInstrumentSelectOpen] = createSignal(false);
   const [segmentAutomationCurveOpen, setSegmentAutomationCurveOpen] = createSignal(false);
@@ -114,6 +137,9 @@ export function SegmentEditorModal(props: SegmentEditorModalProps) {
   const [midiLiveSourceNotes, setMidiLiveSourceNotes] = createSignal<MidiNote[] | null>(null);
   const [midiLiveCommittedNotes, setMidiLiveCommittedNotes] = createSignal<MidiNote[]>([]);
   const [midiLiveOverwriteSweepBeat, setMidiLiveOverwriteSweepBeat] = createSignal(0);
+  const [midiRoundStep, setMidiRoundStep] = createSignal("0.125");
+  const [midiRoundStepSelectOpen, setMidiRoundStepSelectOpen] = createSignal(false);
+  const [midiRoundPopover, setMidiRoundPopover] = createSignal<{ x: number; y: number } | null>(null);
   const [drumTrainingSessionId, setDrumTrainingSessionId] = createSignal<string | null>(null);
   let previewCtx: AudioContext | null = null;
   let midiLiveRaf: number | null = null;
@@ -126,6 +152,39 @@ export function SegmentEditorModal(props: SegmentEditorModalProps) {
     markTouched();
     setDraftInternal(next as Segment | undefined);
   }
+
+  function openColorPicker(event: MouseEvent) {
+    const rect = event.currentTarget instanceof HTMLElement ? event.currentTarget.getBoundingClientRect() : null;
+    if (!rect) return;
+    const popoverHeight = 174;
+    setColorPicker({
+      x: Math.max(8, Math.min(window.innerWidth - 218, rect.right - 210)),
+      y: Math.max(8, rect.bottom + 4 + popoverHeight > window.innerHeight ? rect.top - popoverHeight - 4 : rect.bottom + 4),
+    });
+  }
+
+  function setSegmentColor(color?: string) {
+    setDraft((current) => current ? { ...current, color } : current);
+    setColorPicker(null);
+  }
+
+  createEffect(() => {
+    if (!colorPicker()) return;
+    function closeColorPicker(event: PointerEvent) {
+      const target = event.target instanceof Element ? event.target : null;
+      if (target?.closest("[data-segment-color-trigger], [data-segment-color-popover]")) return;
+      setColorPicker(null);
+    }
+    function closeColorPickerOnEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") setColorPicker(null);
+    }
+    window.addEventListener("pointerdown", closeColorPicker, true);
+    window.addEventListener("keydown", closeColorPickerOnEscape, true);
+    onCleanup(() => {
+      window.removeEventListener("pointerdown", closeColorPicker, true);
+      window.removeEventListener("keydown", closeColorPickerOnEscape, true);
+    });
+  });
 
   createEffect(() => {
     const currentSource = source();
@@ -200,6 +259,18 @@ export function SegmentEditorModal(props: SegmentEditorModalProps) {
   });
 
   createEffect(() => {
+    if (!midiRoundPopover()) return;
+    const closeRoundPopover = (event: PointerEvent) => {
+      const target = event.target instanceof Element ? event.target : null;
+      if (target?.closest("[data-midi-round-trigger], [data-midi-round-popover], [data-floating-layer]")) return;
+      setMidiRoundStepSelectOpen(false);
+      setMidiRoundPopover(null);
+    };
+    window.addEventListener("pointerdown", closeRoundPopover, true);
+    onCleanup(() => window.removeEventListener("pointerdown", closeRoundPopover, true));
+  });
+
+  createEffect(() => {
     if (!midiLiveRecording()) {
       if (midiLiveRaf) cancelAnimationFrame(midiLiveRaf);
       midiLiveRaf = null;
@@ -260,6 +331,34 @@ export function SegmentEditorModal(props: SegmentEditorModalProps) {
       if (!current || (current.payload.kind !== "midi" && current.payload.kind !== "mixed")) return current;
       return { ...current, payload: { ...current.payload, notes } };
     });
+  }
+
+  function toggleMidiRoundPopover(event: MouseEvent & { currentTarget: HTMLButtonElement }) {
+    if (midiRoundPopover()) {
+      setMidiRoundStepSelectOpen(false);
+      setMidiRoundPopover(null);
+      return;
+    }
+    const rect = event.currentTarget.getBoundingClientRect();
+    const width = 252;
+    const margin = 8;
+    setMidiRoundPopover({
+      x: Math.max(margin, Math.min(rect.left, window.innerWidth - width - margin)),
+      y: Math.max(margin, Math.min(rect.bottom + 4, window.innerHeight - 174)),
+    });
+  }
+
+  function applyMidiRoundToNearest() {
+    const currentDraft = draft();
+    if (!currentDraft || (currentDraft.payload.kind !== "midi" && currentDraft.payload.kind !== "mixed")) return;
+    const result = roundMidiNotesToNearest(
+      currentDraft.payload.notes,
+      Number(midiRoundStep()),
+      currentDraft.lengthBeats,
+    );
+    updateMidi(result.notes);
+    setMidiRoundStepSelectOpen(false);
+    setMidiRoundPopover(null);
   }
 
   function currentMidiLiveBeat(nowMs = performance.now()) {
@@ -699,16 +798,27 @@ export function SegmentEditorModal(props: SegmentEditorModalProps) {
           lengthBeats={draft()!.lengthBeats}
           onChange={(repeats) => setDraft((current) => current ? { ...current, repeats } : current)}
         />
+        <div class={styles.segmentIdentityRow}>
+          <TextInput
+            label="Name"
+            layout="inline"
+            value={draft()?.name ?? ""}
+            placeholder="Segment name"
+            onInput={(event) => setDraft((current) => current ? { ...current, name: event.currentTarget.value } : current)}
+          />
+          <button
+            type="button"
+            class={styles.segmentColorButton}
+            style={{ "--segment-swatch": draft()?.color ?? "var(--color-fg)" }}
+            aria-label="Set segment color"
+            title="Segment color"
+            data-segment-color-trigger
+            onClick={openColorPicker}
+          />
+        </div>
         <Show when={isMidi()}>
           <>
             <div class={styles.midiTopFields}>
-              <TextInput
-                label="Name"
-                layout="inline"
-                value={draft()?.name ?? ""}
-                placeholder="Trackname"
-                onInput={(event) => setDraft((current) => current ? { ...current, name: event.currentTarget.value } : current)}
-              />
               <FloatingSelect
                 layout="inline"
                 label="Instrument"
@@ -767,6 +877,16 @@ export function SegmentEditorModal(props: SegmentEditorModalProps) {
                 >
                   Additive
                 </Button>
+                <Button
+                  size="xs"
+                  disabled={midiLiveRecording() || midiNotes().length === 0}
+                  data-midi-round-trigger
+                  aria-haspopup="dialog"
+                  aria-expanded={Boolean(midiRoundPopover())}
+                  onClick={toggleMidiRoundPopover}
+                >
+                  Round to nearest
+                </Button>
                 <span class={styles.midiLiveTime}>{midiLiveElapsedLabel()}</span>
               </div>
               <Show when={midiLiveRecording()}>
@@ -816,6 +936,51 @@ export function SegmentEditorModal(props: SegmentEditorModalProps) {
                 </div>
               </Show>
             </div>
+
+            <Show when={midiRoundPopover()}>
+              {(position) => (
+                <Portal mount={document.body}>
+                  <FloatingLayer
+                    class={styles.midiRoundPopover}
+                    x={position().x}
+                    y={position().y}
+                    width={252}
+                  >
+                    <div data-midi-round-popover role="dialog" aria-label="Round MIDI notes to nearest">
+                      <div class={styles.midiRoundTitle}>Round to nearest</div>
+                      <div class={styles.midiRoundDescription}>
+                        Snap every note start to the nearest interval. Notes shorter than the interval are extended; longer notes keep their length.
+                      </div>
+                      <FloatingSelect
+                        label="Interval"
+                        layout="inline"
+                        value={midiRoundStep()}
+                        options={MIDI_ROUND_STEP_OPTIONS}
+                        open={midiRoundStepSelectOpen()}
+                        ariaLabel="Round MIDI notes to nearest interval"
+                        onOpenChange={setMidiRoundStepSelectOpen}
+                        onChange={setMidiRoundStep}
+                      />
+                      <div class={styles.midiRoundActions}>
+                        <Button
+                          size="xs"
+                          variant="ghost"
+                          onClick={() => {
+                            setMidiRoundStepSelectOpen(false);
+                            setMidiRoundPopover(null);
+                          }}
+                        >
+                          Cancel
+                        </Button>
+                        <Button size="xs" variant="primary" onClick={applyMidiRoundToNearest}>
+                          Apply to all notes
+                        </Button>
+                      </div>
+                    </div>
+                  </FloatingLayer>
+                </Portal>
+              )}
+            </Show>
 
             <PianoRoll
               notes={liveMidiNotes()}
@@ -1036,13 +1201,6 @@ export function SegmentEditorModal(props: SegmentEditorModalProps) {
           {(payload) => (
           <div class={styles.audioPanel}>
             <div class={styles.audioFields}>
-              <TextInput
-                label="Name"
-                layout="inline"
-                value={draft()?.name ?? ""}
-                placeholder="Audio segment"
-                onInput={(event) => setDraft((current) => current ? { ...current, name: event.currentTarget.value } : current)}
-              />
               <NumberInput
                 label="Gain"
                 layout="inline"
@@ -1070,6 +1228,40 @@ export function SegmentEditorModal(props: SegmentEditorModalProps) {
               </span>
             </div>
           </div>
+          )}
+        </Show>
+
+        <Show when={colorPicker()}>
+          {(position) => (
+            <Portal mount={document.body}>
+              <FloatingLayer class={styles.segmentColorPopover} x={position().x} y={position().y} width={210} role="dialog">
+                <div data-segment-color-popover>
+                  <div class={styles.segmentColorHeader}>Segment color</div>
+                  <div class={styles.segmentColorGrid}>
+                  <button
+                    type="button"
+                    class={`${styles.segmentColorChoice} ${styles.segmentColorDefault}`}
+                    aria-label="Use default segment color"
+                    title="Default"
+                    onClick={() => setSegmentColor(undefined)}
+                  />
+                  <For each={SEGMENT_PASTEL_COLORS}>
+                    {(color) => (
+                      <button
+                        type="button"
+                        class={styles.segmentColorChoice}
+                        classList={{ [styles.segmentColorChoiceSelected]: draft()?.color === color }}
+                        style={{ "--segment-swatch": color }}
+                        aria-label={`Use segment color ${color}`}
+                        title={color}
+                        onClick={() => setSegmentColor(color)}
+                      />
+                    )}
+                  </For>
+                  </div>
+                </div>
+              </FloatingLayer>
+            </Portal>
           )}
         </Show>
       </Modal>

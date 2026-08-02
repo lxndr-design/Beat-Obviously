@@ -9,9 +9,68 @@
 
 .midiTopFields {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(219px, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: 6px;
   margin-bottom: 6px;
+}
+
+.segmentIdentityRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 33px;
+  gap: 3px;
+  min-width: 0;
+  margin-bottom: 6px;
+}
+
+.segmentColorButton,
+.segmentColorChoice {
+  border: var(--border-fg);
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--segment-swatch) 76%, white), var(--segment-swatch));
+  cursor: pointer;
+}
+
+.segmentColorButton {
+  width: 33px;
+  height: 33px;
+}
+
+.segmentColorButton:hover,
+.segmentColorChoice:hover,
+.segmentColorChoiceSelected {
+  box-shadow: inset 0 0 0 2px var(--color-bg), inset 0 0 0 3px var(--color-fg);
+}
+
+.segmentColorPopover {
+  padding: 6px;
+  border: var(--border-fg);
+  background: var(--color-bg);
+  color: var(--color-fg);
+}
+
+.segmentColorHeader {
+  margin-bottom: 6px;
+  font-size: var(--font-size-ui);
+  font-weight: var(--font-weight-medium);
+  text-transform: uppercase;
+}
+
+.segmentColorGrid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 3px;
+}
+
+.segmentColorChoice {
+  width: 33px;
+  height: 24px;
+  padding: 0;
+}
+
+.segmentColorDefault {
+  --segment-swatch: var(--color-fg);
+  background:
+    linear-gradient(135deg, var(--color-fg) 0 47%, var(--color-bg) 48% 52%, var(--color-fg) 53%);
 }
 
 /* Inline label + control — single-row field per spec. */
@@ -102,6 +161,37 @@
   font-family: var(--font-family-mono);
   font-size: var(--font-size-ui);
   line-height: 1;
+}
+
+.midiRoundPopover {
+  padding: 9px;
+  border: var(--border-fg);
+  background: var(--color-bg);
+  color: var(--color-fg);
+}
+
+.midiRoundPopover > div {
+  display: grid;
+  gap: 9px;
+}
+
+.midiRoundTitle {
+  font-size: var(--font-size-ui);
+  font-weight: var(--font-weight-medium);
+  line-height: 1;
+}
+
+.midiRoundDescription {
+  color: color-mix(in srgb, var(--color-fg) 68%, transparent);
+  font-size: var(--font-size-hint);
+  line-height: 1.25;
+}
+
+.midiRoundActions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
 }
 
 .midiLiveKeyboard {
@@ -448,7 +538,7 @@
 
 .audioFields {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(219px, 0.45fr);
+  grid-template-columns: minmax(219px, 0.45fr);
   gap: 6px;
 }
 

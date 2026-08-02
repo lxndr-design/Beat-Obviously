@@ -14,6 +14,7 @@ import {
   drumTimingOffsetBeats,
   normalizeDrumCell,
 } from "../state/drumSteps";
+import { renderMidiArpeggiations } from "../state/midiNoteGroups";
 
 const LOOKAHEAD_SECONDS = 0.12;
 
@@ -217,11 +218,12 @@ export function TimelineMidiPlayback() {
             currentInstruments.find((candidate) => candidate.name.toLowerCase() === "lead saw") ??
             fallbackInstrument;
 
-          payload.notes.forEach((note, noteIndex) => {
+          const playbackNotes = renderMidiArpeggiations(payload.notes);
+          playbackNotes.forEach((note, noteIndex) => {
             const sourceStartBeat = seg.sourceStartBeat ?? 0;
             const occEndBeat = occ.startBeat + occ.lengthBeats;
             const rawStart = occ.startBeat + note.startBeat - sourceStartBeat;
-            const target = connectedLaterNote(payload.notes, noteIndex);
+            const target = connectedLaterNote(playbackNotes, noteIndex);
             const rawDurationBeats = target ? Math.max(0.03, target.startBeat - note.startBeat) : note.lengthBeats;
             const rawEnd = rawStart + rawDurationBeats;
             const noteStart = Math.max(occ.startBeat, rawStart);

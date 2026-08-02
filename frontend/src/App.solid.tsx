@@ -19,6 +19,7 @@ import { redo, undo, useAudioFileStore, useDocumentStore, useInstrumentStore, us
 import { createDefaultLumenDraft, useSynthStore } from "./state/synthStore";
 import { useExportStore } from "./state/exportStore";
 import { useComponentStore } from "./state/components";
+import { projectWithRenderedMidiArpeggiations } from "./state/midiNoteGroups";
 import { listAudioFiles, listComponents, listInstruments, pruneBlankUntitledProjects, saveAudioFiles, saveComponents, saveInstruments, saveProject } from "./persistence/dexie";
 import { closeCurrentDocumentForHome, createNewDocument, openDocumentFromUserChoice, openRecentDocument, recoverCurrentDocumentFromBackup, saveCurrentDocument } from "./persistence/documentActions";
 import { buildCurrentBeatDocumentFingerprint } from "./persistence/beatDocument";
@@ -38,6 +39,8 @@ import { UiKitOnePager } from "./design/UiKitOnePager.solid";
 import { AurumEditor } from "./features/Aurum/AurumEditor.solid";
 import { createAurumTestInstruments } from "./state/aurumTestBank";
 import { SynthEditor } from "./features/Synth/SynthEditor/SynthEditor.solid";
+import { createGeneratedSongProject } from "./ai/generateSongAction";
+import type { GenerateSongOptions } from "./ai/songGenerator";
 
 type StartupReadinessKey = "instruments" | "components" | "audio";
 
@@ -257,6 +260,26 @@ export function App() {
     if (await createNewDocument()) closeHome();
   }
 
+  async function startFromSomething(options: GenerateSongOptions) {
+    try {
+      const result = await createGeneratedSongProject(options);
+      if (!result) return;
+      closeHome();
+      const created = result.createdInstrumentNames.length
+        ? ` Created ${result.createdInstrumentNames.length} new local instrument${result.createdInstrumentNames.length === 1 ? "" : "s"}.`
+        : "";
+      const acquisition = result.externalAcquisitionSuggestions.length
+        ? ` A compatible CC0 SFZ replacement is available for: ${result.externalAcquisitionSuggestions.join(", ")}.`
+        : "";
+      await appAlert(
+        `Generated an unsaved ${result.plan.speed} ${result.plan.genre} arrangement with ${result.plan.sections.length} sections, ${result.plan.motifCount} motif${result.plan.motifCount === 1 ? "" : "s"}, and ${result.plan.voices.length} pitch-niched voices.${created}${acquisition}`,
+        "Starting Point Created",
+      );
+    } catch (error) {
+      await appAlert(error instanceof Error ? error.message : "Song generation failed.", "Start from Something");
+    }
+  }
+
   async function openFromHome() {
     const startedAt = performance.now();
     writeFrontendDiagnostic("project-ui", "picker open requested from Home");
@@ -371,6 +394,7 @@ export function App() {
           const ctx = getTimelineAudioContext();
           for (const instrument of useInstrumentStore.getState().instruments) {
             if (!instrument.sampleUrl) continue;
+            if (instrument.samplerComplexity === "performance") continue;
             void preloadInstrumentSample(ctx, instrument).catch(() => {
               // Synth fallback remains available if a bundled sample cannot decode.
             });
@@ -570,10 +594,11 @@ export function App() {
     const apply = () => {
       if (timer) window.clearTimeout(timer);
       timer = window.setTimeout(() => {
-        const project = structuredClone(useProjectStore.getState().project);
-        const instruments = engineInstrumentsForProject(project, useInstrumentStore.getState().instruments)
+        const sourceProject = useProjectStore.getState().project;
+        const project = projectWithRenderedMidiArpeggiations(sourceProject);
+        const instruments = engineInstrumentsForProject(sourceProject, useInstrumentStore.getState().instruments)
           .map((instrument) => structuredClone(instrument));
-        const audioFiles = engineAudioFilesForProject(project, useAudioFileStore.getState().files)
+        const audioFiles = engineAudioFilesForProject(sourceProject, useAudioFileStore.getState().files)
           .map((file) => structuredClone(file));
         void send({ kind: "engine.applyProject", project, instruments, audioFiles });
       }, 120);
@@ -682,6 +707,7 @@ export function App() {
   const homeProps = () => ({
     onHome: () => undefined,
     onNew: () => void createFromHome(),
+    onStartFromSomething: (options: GenerateSongOptions) => void startFromSomething(options),
     onOpen: () => void openFromHome().catch((error) => appAlert(error instanceof Error ? error.message : "Open failed.")),
     onRecent: (path: string) => void openRecentFromHome(path).catch((error) => appAlert(error instanceof Error ? error.message : "Open recent failed.")),
     onRevealRecent: (path: string) => void revealRecentFromHome(path).catch((error) => appAlert(error instanceof Error ? error.message : "Reveal in Finder failed.")),

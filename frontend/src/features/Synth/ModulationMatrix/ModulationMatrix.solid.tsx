@@ -176,28 +176,29 @@ export function ModulationMatrix(props: ModulationMatrixProps = {}) {
           <span>Mode</span>
           <span />
         </div>
-        <For each={routes()}>
-          {(route, index) => {
-            const targets = () => targetsForSource(route.source);
-            const selectedTarget = () => targets().includes(route.target) ? route.target : targets()[0];
-            const display = () => modulationRouteDisplay(draft(), route);
-            const sourceAffordance = () => modulationSourceAffordance(draft(), route.source);
+        <For each={routes().map((route) => route.id)}>
+          {(routeId, index) => {
+            const route = () => routes().find((candidate) => candidate.id === routeId)!;
+            const targets = () => targetsForSource(route().source);
+            const selectedTarget = () => targets().includes(route().target) ? route().target : targets()[0];
+            const display = () => modulationRouteDisplay(draft(), route());
+            const sourceAffordance = () => modulationSourceAffordance(draft(), route().source);
             const routeNumber = () => index() + 1;
             return (
               <div
-                class={`${styles.routeRow} ${route.enabled ? "" : styles.routeRowDisabled}`}
+                class={`${styles.routeRow} ${route().enabled ? "" : styles.routeRowDisabled}`}
                 aria-label={`Modulation route ${routeNumber()}`}
-                data-modulation-route-id={route.id}
+                data-modulation-route-id={routeId}
               >
                 <div class={styles.onCell}>
                   <Button
                     iconOnly
                     size="xs"
                     className={styles.onButton}
-                    selected={route.enabled}
-                    aria-pressed={route.enabled}
+                    selected={route().enabled}
+                    aria-pressed={route().enabled}
                     aria-label={`Route ${routeNumber()} enabled`}
-                    onClick={() => updateRoute(route.id, { enabled: !route.enabled })}
+                    onClick={() => updateRoute(routeId, { enabled: !route().enabled })}
                   >
                     <Icon name="ph:power" size={18} decorative />
                   </Button>
@@ -206,15 +207,15 @@ export function ModulationMatrix(props: ModulationMatrixProps = {}) {
                   <FloatingSelect
                     layout="bare"
                     triggerClassName={`${styles.routeSelect} ${styles.sourceSelect}`}
-                    value={route.source}
+                    value={route().source}
                     aria-label={`Route ${routeNumber()} source`}
                     options={SOURCES.map((source) => ({ value: source, label: MODULATION_SOURCE_LABELS[source] }))}
                     onChange={(value) => {
                       const source = value as ModulationSourceId;
                       const nextTargets = targetsForSource(source);
-                      updateRoute(route.id, {
+                      updateRoute(routeId, {
                         source,
-                        target: nextTargets.includes(route.target) ? route.target : nextTargets[0],
+                        target: nextTargets.includes(route().target) ? route().target : nextTargets[0],
                       });
                     }}
                   />
@@ -222,7 +223,7 @@ export function ModulationMatrix(props: ModulationMatrixProps = {}) {
                     variant="ghost"
                     class={styles.sourceAffordance}
                     title={`${sourceAffordance().label}: ${sourceAffordance().detail}`}
-                    onClick={() => props.onFocusSource?.(route.source)}
+                    onClick={() => props.onFocusSource?.(route().source)}
                   >
                     <span>{sourceAffordance().label}</span>
                     <span>{sourceAffordance().detail}</span>
@@ -233,9 +234,9 @@ export function ModulationMatrix(props: ModulationMatrixProps = {}) {
                     className={styles.pickButton}
                     iconOnly
                     size="xs"
-                    selected={pickMode()?.routeId === route.id && pickMode()?.kind === "source"}
+                    selected={pickMode()?.routeId === routeId && pickMode()?.kind === "source"}
                     aria-label="Pick modulation source"
-                    onPointerDown={(event) => startPick(route.id, "source", event)}
+                    onPointerDown={(event) => startPick(routeId, "source", event)}
                   >
                     <Icon name="ph:plug" size={18} decorative />
                   </Button>
@@ -244,16 +245,16 @@ export function ModulationMatrix(props: ModulationMatrixProps = {}) {
                   value={selectedTarget()}
                   targets={targets()}
                   label={`Route ${routeNumber()} target`}
-                  onChange={(target) => updateRoute(route.id, { target })}
+                  onChange={(target) => updateRoute(routeId, { target })}
                 />
                 <HoverInfo content="Pick target">
                   <Button
                     className={styles.pickButton}
                     iconOnly
                     size="xs"
-                    selected={pickMode()?.routeId === route.id && pickMode()?.kind === "target"}
+                    selected={pickMode()?.routeId === routeId && pickMode()?.kind === "target"}
                     aria-label="Pick modulation target"
-                    onPointerDown={(event) => startPick(route.id, "target", event)}
+                    onPointerDown={(event) => startPick(routeId, "target", event)}
                   >
                     <Icon name="ph:plug" size={18} decorative />
                   </Button>
@@ -262,12 +263,12 @@ export function ModulationMatrix(props: ModulationMatrixProps = {}) {
                   layout="bare"
                   className={styles.strengthSlider}
                   readoutClassName={styles.strengthReadout}
-                  value={route.amount}
+                  value={route().amount}
                   min={-1}
                   max={1}
                   step={0.01}
                   ariaLabel={`Route ${routeNumber()} strength`}
-                  onChange={(amount) => updateRoute(route.id, { amount })}
+                  onChange={(amount) => updateRoute(routeId, { amount })}
                   readout={
                     <>
                       <span>{display().amountLabel}</span>
@@ -279,27 +280,27 @@ export function ModulationMatrix(props: ModulationMatrixProps = {}) {
                 <FloatingSelect
                   layout="bare"
                   triggerClassName={styles.curveSelect}
-                  value={route.curve ?? "linear"}
+                  value={route().curve ?? "linear"}
                   aria-label={`Route ${routeNumber()} response curve`}
                   options={REMAP_CURVES}
-                  onChange={(curve) => updateRoute(route.id, { curve: curve as ModulationRemapCurve })}
+                  onChange={(curve) => updateRoute(routeId, { curve: curve as ModulationRemapCurve })}
                 />
                 <div class={styles.modeCell}>
                   <Show
-                    when={route.source === "lfo.1" || route.source === "lfo.2"}
+                    when={route().source === "lfo.1" || route().source === "lfo.2"}
                     fallback={<span class={styles.modeStatic} aria-label="Polarity only applies to LFO routes">-</span>}
                   >
-                    <HoverInfo content={route.bipolar ? "LFO swings below and above the target value." : "LFO only pushes the target upward."}>
+                    <HoverInfo content={route().bipolar ? "LFO swings below and above the target value." : "LFO only pushes the target upward."}>
                       <Button
                         size="xs"
                         variant="ghost"
-                        selected={route.bipolar}
+                        selected={route().bipolar}
                         className={styles.modeButton}
-                        aria-pressed={route.bipolar}
+                        aria-pressed={route().bipolar}
                         aria-label="Toggle bipolar LFO modulation"
-                        onClick={() => updateRoute(route.id, { bipolar: !route.bipolar })}
+                        onClick={() => updateRoute(routeId, { bipolar: !route().bipolar })}
                       >
-                        {route.bipolar ? "+/-" : "+"}
+                        {route().bipolar ? "+/-" : "+"}
                       </Button>
                     </HoverInfo>
                   </Show>
@@ -311,7 +312,7 @@ export function ModulationMatrix(props: ModulationMatrixProps = {}) {
                     size="xs"
                     variant="ghost"
                     aria-label="Remove modulation route"
-                    onClick={() => removeRoute(route.id)}
+                    onClick={() => removeRoute(routeId)}
                   >
                     <Icon name="ph:trash" size={18} decorative />
                   </Button>

@@ -1,9 +1,9 @@
 import {
   createInstrumentBufferSource,
   createInstrumentCurveBufferSource,
-  hasCachedInstrumentSample,
+  hasCachedInstrumentSamplesForPlayback,
   noteFrequency,
-  preloadInstrumentSample,
+  preloadInstrumentSamplesForPlayback,
   primaryInstrumentSampleUrl,
   type SynthAutomationTarget,
   type SynthAutomationLane,
@@ -67,8 +67,11 @@ export function scheduleTimelineMidiNote(
   const targetFrequency = targetNote ? targetNote.frequencyHz ?? noteFrequency(targetNote.pitch, instrument) : undefined;
   const playbackDuration = Math.max(0.03, durationS);
   const scheduleToken = stopToken;
-  if (!instrument.aether && primaryInstrumentSampleUrl(instrument) && !hasCachedInstrumentSample(instrument)) {
-    void preloadInstrumentSample(audio, instrument)
+  const sampleSelection = { sampleZoneId: note.sampleZoneId, samplePath: note.samplePath };
+  if (!instrument.aether
+    && primaryInstrumentSampleUrl(instrument)
+    && !hasCachedInstrumentSamplesForPlayback(instrument, baseFrequency, note.velocity, sampleSelection)) {
+    void preloadInstrumentSamplesForPlayback(audio, instrument, baseFrequency, note.velocity, sampleSelection)
       .then(() => {
         if (scheduleToken !== stopToken) return;
         scheduleBufferSource(
@@ -82,7 +85,7 @@ export function scheduleTimelineMidiNote(
           durationS,
           note.velocity,
           bpm,
-          { sampleZoneId: note.sampleZoneId, samplePath: note.samplePath },
+          sampleSelection,
         );
       })
       .catch(() => undefined);

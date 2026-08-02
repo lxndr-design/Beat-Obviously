@@ -13,6 +13,7 @@ import {
 } from "../../solid-ui";
 import { useAnalyzerStore } from "../../state/analyzerStore";
 import { useProjectStore, useUiStore } from "../../state/store";
+import { trackAutomationTargetCount } from "../../automation/aetherArrangementAutomation";
 import { exportTrackAsWav } from "../ExportReview/exportActions";
 import styles from "./TrackHeader.module.css";
 import type { Id, Track } from "../../state/types";
@@ -21,7 +22,9 @@ interface Props {
   trackId: Id;
   index: number;
   selected?: boolean;
+  automationExpanded?: boolean;
   onSelect?: (event: MouseEvent) => void;
+  onToggleAutomation?: () => void;
 }
 
 const DND_MIME = "application/x-beat-track";
@@ -74,6 +77,11 @@ export function TrackHeader(props: Props) {
         label: "+ Effect",
         icon: "ph:sliders-horizontal",
         onSelect: () => projectStore.addTrackEffect(props.trackId),
+      },
+      {
+        label: props.automationExpanded ? "Hide automation lanes" : "Show automation lanes",
+        icon: "ph:wave-sine",
+        onSelect: () => props.onToggleAutomation?.(),
       },
       {
         label: "Duplicate track",
@@ -259,10 +267,11 @@ export function TrackHeader(props: Props) {
                 <span class={styles.meterFill} style={{ transform: `scaleX(${rightMeterPeak()})` }} />
               </span>
             </div>
-            <Show when={gainBadge() || panBadge() || current().recordArmed || current().inputMonitoring}>
+            <Show when={gainBadge() || panBadge() || current().recordArmed || current().inputMonitoring || trackAutomationTargetCount(current()) > 0}>
               <div class={styles.statusRow} aria-hidden="true">
                 <Show when={gainBadge()}>{(badge) => <StatusChip>{badge()}</StatusChip>}</Show>
                 <Show when={panBadge()}>{(badge) => <StatusChip>{badge()}</StatusChip>}</Show>
+                <Show when={trackAutomationTargetCount(current()) > 0}><StatusChip>A{trackAutomationTargetCount(current())}</StatusChip></Show>
                 <Show when={current().recordArmed}><StatusChip>REC</StatusChip></Show>
                 <Show when={current().inputMonitoring}><StatusChip>IN</StatusChip></Show>
               </div>
@@ -270,6 +279,19 @@ export function TrackHeader(props: Props) {
           </div>
 
           <div class={styles.controls}>
+            <HoverInfo content={props.automationExpanded ? "Hide automation lanes" : "Show automation lanes"}>
+              <MicroButton
+                active={props.automationExpanded}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  if (event.ctrlKey) return;
+                  props.onToggleAutomation?.();
+                }}
+                aria-label={props.automationExpanded ? "Hide automation lanes" : "Show automation lanes"}
+              >
+                <Icon name="ph:wave-sine" size={18} decorative />
+              </MicroButton>
+            </HoverInfo>
             <HoverInfo content={current().recordArmed ? "Disarm recording" : "Arm recording"}>
               <MicroButton
                 active={current().recordArmed}

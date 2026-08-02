@@ -2872,6 +2872,7 @@ namespace beat
                 instrumentById[instrument.id] = &instrument;
             if (instrument.sampleUrls.isEmpty() && instrument.sampleZones.empty()) continue;
             SampleInstrument sampleInstrument;
+            sampleInstrument.strictPitchMapping = instrument.samplerComplexity == "timeline-jumping";
             const bool hasDefaultSynthEnvelope = std::abs(instrument.attackMs - 5.0f) < 0.001f
                 && std::abs(instrument.releaseMs - 200.0f) < 0.001f;
             sampleInstrument.attackMs = hasDefaultSynthEnvelope
@@ -5233,6 +5234,8 @@ namespace beat
             candidateIndex = selectClosestDuration(pitchVelocityMatches);
 
         const int matchCount = countWhere(pitchVelocityMatches);
+        if (matchCount == 0 && instrument.strictPitchMapping)
+            return true;
         if (candidateIndex < 0 && matchCount > 0)
         {
             candidateIndex = selectRoundRobin(pitchVelocityMatches, matchCount);

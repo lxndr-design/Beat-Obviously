@@ -35,6 +35,23 @@ export function midiNoteSelectionAfterPointerDown({
   return selectedIndices.includes(noteIndex) ? selectedIndices : [noteIndex];
 }
 
+export function midiNoteSelectionForContextMenu(
+  selectedIndices: number[],
+  noteIndex: number,
+): number[] {
+  return selectedIndices.includes(noteIndex) ? selectedIndices : [noteIndex];
+}
+
+export function midiNotePointerRequestsContextMenu({
+  button,
+  ctrlKey,
+}: {
+  button: number;
+  ctrlKey: boolean;
+}): boolean {
+  return button === 2 || (button === 0 && ctrlKey);
+}
+
 export function midiNoteDragIndicesForSelection(selectedIndices: number[], noteIndex: number): number[] {
   return selectedIndices.includes(noteIndex) ? selectedIndices : [noteIndex];
 }
@@ -65,8 +82,25 @@ export function midiNoteSelectionAfterMarquee({
   return [...new Set([...selectedIndices, ...marqueeIndices])].sort((a, b) => a - b);
 }
 
+export type MidiGridLineKind = "bar" | "beat" | "half" | "quarter" | "eighth" | "sixteenth";
+
+export function midiGridLineKind(beat: number): MidiGridLineKind {
+  const sixteenthIndex = Math.round(beat * 16);
+  if (sixteenthIndex % 16 === 0) {
+    return Math.round(beat) % 4 === 0 ? "bar" : "beat";
+  }
+  if (sixteenthIndex % 8 === 0) return "half";
+  if (sixteenthIndex % 4 === 0) return "quarter";
+  if (sixteenthIndex % 2 === 0) return "eighth";
+  return "sixteenth";
+}
+
 export function midiVisibleGridSubdivision(pxPerBeat: number): number {
-  return pxPerBeat >= 240 ? 16 : pxPerBeat >= 120 ? 4 : 1;
+  if (pxPerBeat >= 240) return 16;
+  if (pxPerBeat >= 180) return 8;
+  if (pxPerBeat >= 120) return 4;
+  if (pxPerBeat >= 72) return 2;
+  return 1;
 }
 
 export function midiVisibleGridBeatStep(pxPerBeat: number): number {

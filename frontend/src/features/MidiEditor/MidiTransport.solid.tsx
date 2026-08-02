@@ -13,6 +13,7 @@ import { pauseTransport } from "../../audio/transportActions";
 import { useContextualHotkeyStore } from "../../hotkeys/contextualHotkeys";
 import { isNative, send } from "../../ipc/bridge";
 import { useTransportStore } from "../../state/store";
+import { renderMidiArpeggiations } from "../../state/midiNoteGroups";
 import type { Instrument, MidiAutomationLane, MidiAutomationTarget, MidiNote } from "../../state/types";
 import styles from "./MidiTransport.module.css";
 
@@ -366,11 +367,12 @@ function MidiTransportRuntime(props: { state: Accessor<MidiTransportProps> }) {
       latest.onPositionChange?.(pos);
 
       const lookaheadBeats = 0.25 * beatsPerSec;
-      latest.notes.forEach((note, index) => {
+      const previewNotes = renderMidiArpeggiations(latest.notes);
+      previewNotes.forEach((note, index) => {
         const key = midiPreviewScheduleKey(note, index);
         if (scheduled.has(key)) return;
         if (note.startBeat >= pos && note.startBeat <= pos + lookaheadBeats) {
-          const target = connectedLaterNote(latest.notes, index);
+          const target = connectedLaterNote(previewNotes, index);
           const noteDelaySec = (note.startBeat - pos) / beatsPerSec;
           const durBeats = target ? Math.max(0.03, target.startBeat - note.startBeat) : note.lengthBeats;
           const durSec = durBeats / beatsPerSec;

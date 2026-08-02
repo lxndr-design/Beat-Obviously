@@ -23,7 +23,7 @@ export type WavetableWarpMode =
   | "spectral-smear"
   | "spectral-skew"
   | "spectral-filter";
-export type SamplerComplexity = "single" | "layered" | "mapped" | "performance";
+export type SamplerComplexity = "single" | "layered" | "mapped" | "performance" | "timeline-jumping";
 
 export type MidiAutomationTarget =
   | "pitch"
@@ -60,6 +60,21 @@ export interface MidiAutomationLane {
   points: Array<{ beat: Beats; value: number; curve?: AutomationCurve }>;
 }
 
+export type MidiArpeggiationSequence = "up" | "down" | "up-down" | "down-up" | "played";
+export type MidiArpeggiationTimingType = "loops" | "notes-per-beat";
+export type MidiArpeggiationNoteValue = 1 | 2 | 4 | 8 | 16 | 32 | 64;
+
+export interface MidiArpeggiation {
+  /** Versioned so later arpeggiator controls can migrate without rewriting notes. */
+  schemaVersion: 1;
+  loops: number;
+  sequence: MidiArpeggiationSequence;
+  /** Legacy modifiers without this field use loop-count timing. */
+  timingType?: MidiArpeggiationTimingType;
+  /** Rhythmic denominator used when timingType is notes-per-beat. */
+  noteValue?: MidiArpeggiationNoteValue;
+}
+
 export interface MidiNote {
   pitch: number; // MIDI note number 0..127
   /** Optional exact oscillator frequency. Used by drum cells that store Hz. */
@@ -77,6 +92,10 @@ export interface MidiNote {
   sampleZoneId?: Id;
   samplePath?: string;
   sampleLabel?: string;
+  /** Notes with the same group id move and edit as one linked selection. */
+  groupId?: Id;
+  /** Nondestructive playback modifier shared by every note in its group. */
+  arpeggiation?: MidiArpeggiation;
 }
 
 export interface DrumCell {
@@ -1199,6 +1218,7 @@ export interface UiState {
     | { kind: "synth" }
     | { kind: "lumen" }
     | { kind: "track"; trackId: Id }
+    | { kind: "trackAutomation"; trackId: Id; target?: MidiAutomationTarget }
     | { kind: "segment"; segmentId: Id; discardIfUntouched?: boolean }
     | { kind: "component"; componentId: Id }
     | { kind: "plugin"; pluginId: Id }

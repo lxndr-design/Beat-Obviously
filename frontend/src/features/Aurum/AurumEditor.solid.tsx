@@ -1,4 +1,4 @@
-import { createMemo, createSignal, For, onCleanup, Show } from "solid-js";
+import { createMemo, createSignal, For, Index, onCleanup, Show } from "solid-js";
 import { appAlert, appConfirm, appPrompt, Button, FloatingSelect, Icon, Knob, NumberInput, Slider, TextInput, Toggle } from "../../solid-ui";
 import { sampleAurumOperatorWaveform, startInstrumentPreviewAudition, type InstrumentPreviewAuditionHandle, type SynthPreviewExpression } from "../../audio/synthPreview";
 import { deleteAurumPreset, listAurumPresets, saveAurumPreset } from "../../persistence/dexie";
@@ -567,32 +567,32 @@ export function AurumEditor(props: AurumEditorProps) {
                   </div>
                 </div>
                 <div class={styles.filterGrid}>
-                  <For each={aurum().filters}>{(filter, index) => (
-                    <section class={styles.filterBlock} aria-label={`Filter ${index() === 0 ? "A" : "B"}`}>
+                  <Index each={aurum().filters}>{(filter, index) => (
+                    <section class={styles.filterBlock} aria-label={`Filter ${index === 0 ? "A" : "B"}`}>
                       <div class={styles.filterTitle}>
-                        <strong>Filter {index() === 0 ? "A" : "B"}</strong>
-                        <Toggle label="Enabled" checked={filter.enabled} onChange={(enabled) => updateFilter(index(), { enabled })} />
+                        <strong>Filter {index === 0 ? "A" : "B"}</strong>
+                        <Toggle label="Enabled" checked={filter().enabled} onChange={(enabled) => updateFilter(index, { enabled })} />
                       </div>
                       <FloatingSelect
                         label="Mode"
                         layout="inline"
-                        value={filter.type}
+                        value={filter().type}
                         options={FILTER_OPTIONS}
-                        open={filterOpen() === index()}
-                        onOpenChange={(open) => setFilterOpen(open ? index() : null)}
-                        onChange={(type) => updateFilter(index(), { type: type as AurumFilterConfig["type"] })}
+                        open={filterOpen() === index}
+                        onOpenChange={(open) => setFilterOpen(open ? index : null)}
+                        onChange={(type) => updateFilter(index, { type: type as AurumFilterConfig["type"] })}
                       />
-                      <AurumModulatedControl routes={aurum().modulation} target={aurumFilterCutoffModulationTarget(index())}>
-                        <Slider label="Cutoff" layout="inline" min={0} max={1} step={0.01} value={filter.cutoff} readout={<span>{Math.round(filter.cutoff * 100)}%</span>} onChange={(cutoff) => updateFilter(index(), { cutoff })} />
+                      <AurumModulatedControl routes={aurum().modulation} target={aurumFilterCutoffModulationTarget(index)}>
+                        <Slider label="Cutoff" layout="inline" min={0} max={1} step={0.01} value={filter().cutoff} readout={<span>{Math.round(filter().cutoff * 100)}%</span>} onChange={(cutoff) => updateFilter(index, { cutoff })} />
                       </AurumModulatedControl>
-                      <AurumModulatedControl routes={aurum().modulation} target={aurumFilterModulationTarget(index(), "resonance")}>
-                        <Slider label="Resonance" layout="inline" min={0} max={1} step={0.01} value={filter.resonance} readout={<span>{Math.round(filter.resonance * 100)}%</span>} onChange={(resonance) => updateFilter(index(), { resonance })} />
+                      <AurumModulatedControl routes={aurum().modulation} target={aurumFilterModulationTarget(index, "resonance")}>
+                        <Slider label="Resonance" layout="inline" min={0} max={1} step={0.01} value={filter().resonance} readout={<span>{Math.round(filter().resonance * 100)}%</span>} onChange={(resonance) => updateFilter(index, { resonance })} />
                       </AurumModulatedControl>
-                      <AurumModulatedControl routes={aurum().modulation} target={aurumFilterModulationTarget(index(), "drive")}>
-                        <Slider label="Drive" layout="inline" min={0} max={1} step={0.01} value={filter.drive} readout={<span>{Math.round(filter.drive * 100)}%</span>} onChange={(drive) => updateFilter(index(), { drive })} />
+                      <AurumModulatedControl routes={aurum().modulation} target={aurumFilterModulationTarget(index, "drive")}>
+                        <Slider label="Drive" layout="inline" min={0} max={1} step={0.01} value={filter().drive} readout={<span>{Math.round(filter().drive * 100)}%</span>} onChange={(drive) => updateFilter(index, { drive })} />
                       </AurumModulatedControl>
                     </section>
-                  )}</For>
+                  )}</Index>
                 </div>
               </div>
               <AurumModulationBridge

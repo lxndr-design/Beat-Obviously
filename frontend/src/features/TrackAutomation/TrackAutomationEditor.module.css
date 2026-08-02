@@ -1,0 +1,218 @@
+.editor {
+  display: grid;
+  gap: 9px;
+  min-width: 0;
+}
+
+.toolbar {
+  display: grid;
+  grid-template-columns: minmax(240px, 1fr) minmax(180px, 0.45fr) 1fr auto;
+  align-items: center;
+  gap: 6px;
+}
+
+.parameterSelect,
+.curveSelect {
+  min-width: 0;
+}
+
+.toolbarSpacer {
+  min-width: 0;
+}
+
+.explanation {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: baseline;
+  gap: 9px;
+  padding: 6px 9px;
+  border: var(--border-soft);
+  background: var(--surface-subtle);
+  font-size: var(--font-size-ui);
+}
+
+.explanation span {
+  color: color-mix(in srgb, var(--color-fg) 66%, transparent);
+}
+
+.graphFrame {
+  position: relative;
+  min-height: 360px;
+  border: var(--border-fg);
+  background: var(--color-bg);
+  overflow: hidden;
+}
+
+.graph {
+  display: block;
+  width: 100%;
+  height: 360px;
+  overflow: visible;
+  touch-action: none;
+  user-select: none;
+}
+
+.graphBackground {
+  fill: var(--color-bg);
+}
+
+.valueGrid,
+.valueGridMajor,
+.timeGrid,
+.timeGridMajor {
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+}
+
+.valueGrid,
+.timeGrid {
+  stroke: color-mix(in srgb, var(--color-fg) 12%, transparent);
+  stroke-width: 1;
+}
+
+.valueGridMajor,
+.timeGridMajor {
+  stroke: color-mix(in srgb, var(--color-fg) 28%, transparent);
+  stroke-width: 1;
+}
+
+.valueLabel,
+.timeLabel {
+  fill: color-mix(in srgb, var(--color-fg) 62%, transparent);
+  font-family: var(--font-family-mono);
+  font-size: 11px;
+  pointer-events: none;
+}
+
+.valueLabel {
+  text-anchor: end;
+}
+
+.timeLabel {
+  text-anchor: middle;
+}
+
+.automationFill {
+  fill: color-mix(in srgb, var(--color-fg) 9%, transparent);
+  stroke: none;
+  pointer-events: none;
+}
+
+.automationLine {
+  fill: none;
+  stroke: var(--color-fg);
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+}
+
+.pointHit {
+  fill: transparent;
+  stroke: transparent;
+  cursor: grab;
+  touch-action: none;
+}
+
+.pointHit:active {
+  cursor: grabbing;
+}
+
+.pointHitSelected {
+  stroke: color-mix(in srgb, var(--color-fg) 52%, transparent);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.point {
+  fill: var(--color-bg);
+  stroke: var(--color-fg);
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+}
+
+.emptyGraph {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 6px;
+  padding: 24px;
+  text-align: center;
+}
+
+.emptyGraph span {
+  max-width: 420px;
+  color: color-mix(in srgb, var(--color-fg) 62%, transparent);
+  font-size: var(--font-size-ui);
+}
+
+.graphHint {
+  color: color-mix(in srgb, var(--color-fg) 58%, transparent);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-hint);
+}
+
+.pointInspector,
+.pointInspectorEmpty {
+  min-height: 57px;
+  padding: 9px;
+  border: var(--border-fg);
+  background: var(--color-bg);
+}
+
+.pointInspector {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.7fr) minmax(105px, 0.25fr) minmax(135px, 0.3fr) minmax(280px, 1fr) auto;
+  align-items: center;
+  gap: 9px;
+}
+
+.pointSummary {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.pointSummary strong {
+  font-size: var(--font-size-ui);
+}
+
+.pointSummary span {
+  min-width: 0;
+  color: color-mix(in srgb, var(--color-fg) 64%, transparent);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-hint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pointValue {
+  min-width: 0;
+}
+
+.pointInspectorEmpty {
+  display: grid;
+  place-items: center;
+  color: color-mix(in srgb, var(--color-fg) 58%, transparent);
+  font-size: var(--font-size-ui);
+}
+
+@media (max-width: 900px) {
+  .toolbar,
+  .pointInspector {
+    grid-template-columns: 1fr;
+  }
+
+  .toolbarSpacer {
+    display: none;
+  }
+
+  .graphFrame,
+  .graph {
+    min-height: 300px;
+    height: 300px;
+  }
+}

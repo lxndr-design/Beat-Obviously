@@ -17,6 +17,8 @@ try {
     [
       join(repoRoot, "frontend/src/testing/interactionRunner.ts"),
       join(repoRoot, "frontend/src/features/MidiEditor/pianoRollInteraction.ts"),
+      join(repoRoot, "frontend/src/features/MidiEditor/midiNoteRounding.ts"),
+      join(repoRoot, "frontend/src/state/midiNoteGroups.ts"),
       join(repoRoot, "frontend/src/features/SegmentEditor/midiLiveRecording.ts"),
       join(repoRoot, "frontend/src/features/DrumEditor/drumGridSelection.ts"),
       join(repoRoot, "frontend/src/automation/aetherNoteAutomation.ts"),
@@ -35,6 +37,8 @@ try {
 
   const runner = await import(pathToFileURL(join(outDir, "testing/interactionRunner.js")));
   const midiInteraction = await import(pathToFileURL(join(outDir, "features/MidiEditor/pianoRollInteraction.js")));
+  const midiNoteRounding = await import(pathToFileURL(join(outDir, "features/MidiEditor/midiNoteRounding.js")));
+  const midiNoteGroups = await import(pathToFileURL(join(outDir, "state/midiNoteGroups.js")));
   const midiLiveRecording = await import(pathToFileURL(join(outDir, "features/SegmentEditor/midiLiveRecording.js")));
   const drumGridSelection = await import(pathToFileURL(join(outDir, "features/DrumEditor/drumGridSelection.js")));
   const noteAutomation = await import(pathToFileURL(join(outDir, "automation/aetherNoteAutomation.js")));
@@ -46,7 +50,12 @@ try {
   const pianoRollSource = readFileSync(join(repoRoot, "frontend/src/features/MidiEditor/PianoRoll.solid.tsx"), "utf8");
   const pianoRollCss = readFileSync(join(repoRoot, "frontend/src/features/MidiEditor/PianoRoll.module.css"), "utf8");
   const midiTransportSource = readFileSync(join(repoRoot, "frontend/src/features/MidiEditor/MidiTransport.solid.tsx"), "utf8");
+  const timelineMidiPlaybackSource = readFileSync(join(repoRoot, "frontend/src/audio/TimelineMidiPlayback.solid.tsx"), "utf8");
   const segmentEditorSource = readFileSync(join(repoRoot, "frontend/src/features/SegmentEditor/SegmentEditorModal.solid.tsx"), "utf8");
+  const segmentColorsSource = readFileSync(join(repoRoot, "frontend/src/features/SegmentEditor/segmentColors.ts"), "utf8");
+  const segmentSource = readFileSync(join(repoRoot, "frontend/src/features/Tracks/Segment.solid.tsx"), "utf8");
+  const segmentCss = readFileSync(join(repoRoot, "frontend/src/features/Tracks/Segment.module.css"), "utf8");
+  const trackLaneCss = readFileSync(join(repoRoot, "frontend/src/features/Tracks/TrackLane.module.css"), "utf8");
   const audioSegmentTransportSource = readFileSync(join(repoRoot, "frontend/src/features/SegmentEditor/AudioSegmentTransport.solid.tsx"), "utf8");
   const segmentLoopControlSource = readFileSync(join(repoRoot, "frontend/src/features/SegmentEditor/SegmentLoopControl.solid.tsx"), "utf8");
   const numberInputSource = readFileSync(join(repoRoot, "frontend/src/solid-ui/NumberInput/NumberInput.solid.tsx"), "utf8");
@@ -62,6 +71,9 @@ try {
   const audioEngineHeaderSource = readFileSync(join(repoRoot, "backend/Source/Audio/AudioEngine.h"), "utf8");
   const audioEngineSource = readFileSync(join(repoRoot, "backend/Source/Audio/AudioEngine.cpp"), "utf8");
   const trackDetailsSource = readFileSync(join(repoRoot, "frontend/src/features/TrackDetails/TrackDetailsModal.solid.tsx"), "utf8");
+  const trackAutomationEditorSource = readFileSync(join(repoRoot, "frontend/src/features/TrackAutomation/TrackAutomationEditor.solid.tsx"), "utf8");
+  const trackAutomationEditorCss = readFileSync(join(repoRoot, "frontend/src/features/TrackAutomation/TrackAutomationEditor.module.css"), "utf8");
+  const hotkeysSource = readFileSync(join(repoRoot, "frontend/src/hotkeys/hotkeys.ts"), "utf8");
   const trackHeaderSource = readFileSync(join(repoRoot, "frontend/src/features/Tracks/TrackHeader.solid.tsx"), "utf8");
   const homeHubSource = readFileSync(join(repoRoot, "frontend/src/features/HomeHub/HomeHub.solid.tsx"), "utf8");
   const homeHubCss = readFileSync(join(repoRoot, "frontend/src/features/HomeHub/HomeHub.module.css"), "utf8");
@@ -104,6 +116,8 @@ try {
   const trackLaneSource = readFileSync(join(repoRoot, "frontend/src/features/Tracks/TrackLane.solid.tsx"), "utf8");
   const trackListSource = readFileSync(join(repoRoot, "frontend/src/features/Tracks/TrackList.solid.tsx"), "utf8");
   const trackListCss = readFileSync(join(repoRoot, "frontend/src/features/Tracks/TrackList.module.css"), "utf8");
+  const trackAutomationRowsSource = readFileSync(join(repoRoot, "frontend/src/features/Tracks/TrackAutomationRows.solid.tsx"), "utf8");
+  const trackAutomationRowsCss = readFileSync(join(repoRoot, "frontend/src/features/Tracks/TrackAutomationRows.module.css"), "utf8");
   const timelineSource = readFileSync(join(repoRoot, "frontend/src/features/Tracks/Timeline.solid.tsx"), "utf8");
   const knobSource = readFileSync(join(repoRoot, "frontend/src/solid-ui/Knob/Knob.solid.tsx"), "utf8");
   const audioRecordingModalSource = readFileSync(join(repoRoot, "frontend/src/features/Tracks/AudioRecordingModal.solid.tsx"), "utf8");
@@ -134,6 +148,144 @@ try {
   assert.equal(floatingSelectKeyboard.nextFloatingSelectOptionIndex("Home", 2, 3), 0);
   assert.equal(floatingSelectKeyboard.nextFloatingSelectOptionIndex("End", 0, 3), 2);
   assert.equal(floatingSelectKeyboard.nextFloatingSelectOptionIndex("ArrowDown", 0, 0), null);
+  const arpeggioSource = [
+    {
+      pitch: 60,
+      velocity: 80,
+      startBeat: 0,
+      lengthBeats: 2,
+      curve: [{ beat: 0, pitch: 60 }, { beat: 2, pitch: 61 }],
+      automation: [
+        { target: "pitch", points: [{ beat: 0, value: 60 }, { beat: 2, value: 61 }] },
+        { target: "filter.cutoff", points: [{ beat: 0, value: 800 }, { beat: 2, value: 1600 }] },
+      ],
+    },
+    { pitch: 64, velocity: 90, startBeat: 0, lengthBeats: 2 },
+    { pitch: 67, velocity: 100, startBeat: 0, lengthBeats: 2 },
+  ];
+  assert.equal(
+    midiNoteGroups.midiSelectionCanArpeggiate(arpeggioSource, [0, 1, 2]),
+    true,
+    "arpeggiation should be available when the selection contains different pitches",
+  );
+  const repeatedPitchSource = [
+    { pitch: 60, velocity: 80, startBeat: 0, lengthBeats: 1 },
+    { pitch: 60, velocity: 90, startBeat: 1, lengthBeats: 1 },
+  ];
+  assert.equal(
+    midiNoteGroups.midiSelectionCanArpeggiate(repeatedPitchSource, [0, 1]),
+    false,
+    "arpeggiation should be disabled when every selected note has the same pitch",
+  );
+  const rejectedRepeatedPitchArpeggio = midiNoteGroups.setMidiArpeggiation(
+    repeatedPitchSource,
+    [0, 1],
+    { loops: 2, sequence: "up" },
+    "rejected-same-pitch-arp",
+  );
+  assert.strictEqual(
+    rejectedRepeatedPitchArpeggio.notes,
+    repeatedPitchSource,
+    "same-pitch selections should not acquire an arpeggiation modifier",
+  );
+  const groupedArpeggio = midiNoteGroups.setMidiArpeggiation(
+    arpeggioSource,
+    [0, 1, 2],
+    { loops: 2, sequence: "up" },
+    "test-arp-group",
+  );
+  assert.deepEqual(groupedArpeggio.indices, [0, 1, 2], "arpeggiation should keep the whole source selection linked");
+  assert.deepEqual(
+    midiNoteGroups.midiGroupIndices(groupedArpeggio.notes, [1]),
+    [0, 1, 2],
+    "selecting one linked note should expand to its complete group",
+  );
+  const renderedArpeggio = midiNoteGroups.renderMidiArpeggiations(groupedArpeggio.notes);
+  const sourcePitchSet = new Set(arpeggioSource.map((note) => note.pitch));
+  assert.ok(
+    renderedArpeggio.every((note) => sourcePitchSet.has(note.pitch)),
+    "arpeggiation should never generate a MIDI pitch outside the selected group",
+  );
+  assert.ok(
+    renderedArpeggio.every((note) => note.curve == null && note.automation?.every((lane) => lane.target !== "pitch") !== false),
+    "arpeggiation should remove pitch curves and pitch automation that could leave the selected pitch set",
+  );
+  const rateArpeggio = midiNoteGroups.setMidiArpeggiation(
+    arpeggioSource,
+    [0, 1, 2],
+    { loops: 1, sequence: "up", timingType: "notes-per-beat", noteValue: 16 },
+    "test-rate-arp-group",
+  );
+  const renderedRateArpeggio = midiNoteGroups.renderMidiArpeggiations(rateArpeggio.notes);
+  assert.deepEqual(
+    renderedRateArpeggio.map((note) => [note.pitch, note.startBeat, note.lengthBeats]),
+    [
+      [60, 0, 0.25],
+      [64, 0.25, 0.25],
+      [67, 0.5, 0.25],
+      [60, 0.75, 0.25],
+      [64, 1, 0.25],
+      [67, 1.25, 0.25],
+      [60, 1.5, 0.25],
+      [64, 1.75, 0.25],
+    ],
+    "1/16 note timing should repeat only group pitches at quarter-beat intervals",
+  );
+  assert.deepEqual(
+    renderedArpeggio.map((note) => note.pitch),
+    [60, 64, 67, 60, 64, 67],
+    "two upward arpeggiation loops should repeat the selected pitch sequence",
+  );
+  assert.ok(
+    renderedArpeggio.every((note) => note.groupId == null && note.arpeggiation == null),
+    "rendered notes should not leak editor-only group modifiers into the audio engine",
+  );
+  assert.equal(groupedArpeggio.notes[0].startBeat, 0, "rendering should not rewrite source note placement");
+  const withoutArpeggiation = midiNoteGroups.removeMidiArpeggiation(groupedArpeggio.notes, [0]);
+  assert.ok(withoutArpeggiation.every((note) => note.groupId === "test-arp-group"), "removing arpeggiation should retain the note group");
+  assert.ok(withoutArpeggiation.every((note) => note.arpeggiation == null), "removing arpeggiation should clear the modifier from every group member");
+  const ungroupedArpeggio = midiNoteGroups.ungroupMidiNotes(groupedArpeggio.notes, [2]);
+  assert.ok(
+    ungroupedArpeggio.every((note) => note.groupId == null && note.arpeggiation == null),
+    "ungrouping any member should dissolve the group and its nondestructive modifier",
+  );
+  const pastedArpeggio = midiNoteGroups.remapPastedMidiGroups(groupedArpeggio.notes, () => "pasted-group");
+  assert.ok(
+    pastedArpeggio.every((note) => note.groupId === "pasted-group"),
+    "copied linked notes should stay linked to each other with a fresh group id",
+  );
+  const renderedProject = midiNoteGroups.projectWithRenderedMidiArpeggiations({
+    id: "arp-project",
+    name: "Arp project",
+    bpm: 120,
+    timeSignature: { num: 4, denom: 4, boldBeats: [1] },
+    lengthBeats: 8,
+    tracks: [{
+      id: "track",
+      name: "Track",
+      kind: "midi",
+      gainDb: 0,
+      pan: 0,
+      mute: false,
+      solo: false,
+      recordArmed: false,
+      inputMonitoring: false,
+      sends: [],
+      effects: [],
+      segments: [{
+        id: "segment",
+        trackId: "track",
+        startBeat: 0,
+        lengthBeats: 2,
+        payload: { kind: "midi", notes: groupedArpeggio.notes },
+      }],
+    }],
+    returnBuses: [],
+    masterEqAutomation: [],
+    masterChain: {},
+  });
+  assert.equal(renderedProject.tracks[0].segments[0].payload.notes.length, 6, "engine projects should expand arpeggiation before playback/export");
+  assert.equal(groupedArpeggio.notes.length, 3, "engine expansion should leave the editor project nondestructive");
   componentState.useComponentStore.getState().hydrate([], []);
   const componentFolderId = componentState.useComponentStore.getState().addFolder("Sketches");
   const componentId = componentState.useComponentStore.getState().add({
@@ -294,6 +446,31 @@ try {
     "MIDI note additive selection should extend the selection",
   );
   assert.deepEqual(
+    midiInteraction.midiNoteSelectionForContextMenu([0, 2], 2),
+    [0, 2],
+    "MIDI context-click on an already-selected note should preserve the full selection",
+  );
+  assert.deepEqual(
+    midiInteraction.midiNoteSelectionForContextMenu([0, 2], 1),
+    [1],
+    "MIDI context-click outside the selection should target only the clicked note",
+  );
+  assert.equal(
+    midiInteraction.midiNotePointerRequestsContextMenu({ button: 0, ctrlKey: true }),
+    true,
+    "macOS control-click should open the MIDI note menu instead of starting a drag",
+  );
+  assert.equal(
+    midiInteraction.midiNotePointerRequestsContextMenu({ button: 2, ctrlKey: false }),
+    true,
+    "secondary-click should open the MIDI note menu instead of starting a drag",
+  );
+  assert.equal(
+    midiInteraction.midiNotePointerRequestsContextMenu({ button: 0, ctrlKey: false }),
+    false,
+    "ordinary primary-click should retain MIDI note drag behavior",
+  );
+  assert.deepEqual(
     midiInteraction.midiNoteDragIndicesForSelection([0, 2], 2),
     [0, 2],
     "MIDI note edits should target the active selection when the pressed note is selected",
@@ -341,8 +518,16 @@ try {
     "MIDI note pointer movement at the threshold should start an edit",
   );
   assert.equal(midiInteraction.midiVisibleGridBeatStep(48), 1, "normal MIDI grid lines should snap shift-drags to whole-beat ticks");
+  assert.equal(midiInteraction.midiVisibleGridBeatStep(72), 0.5, "near zoom MIDI grid lines should reveal half-beat ticks");
   assert.equal(midiInteraction.midiVisibleGridBeatStep(120), 0.25, "medium zoom MIDI grid lines should snap shift-drags to quarter-beat ticks");
+  assert.equal(midiInteraction.midiVisibleGridBeatStep(180), 0.125, "high zoom MIDI grid lines should reveal eighth-beat ticks");
   assert.equal(midiInteraction.midiVisibleGridBeatStep(240), 0.0625, "close zoom MIDI grid lines should snap shift-drags to sixteenth-beat ticks");
+  assert.equal(midiInteraction.midiGridLineKind(0), "bar", "bar boundaries should be strongest");
+  assert.equal(midiInteraction.midiGridLineKind(1), "beat", "whole beats should retain a strong divider");
+  assert.equal(midiInteraction.midiGridLineKind(0.5), "half", "half beats should retain their own divider weight");
+  assert.equal(midiInteraction.midiGridLineKind(0.25), "quarter", "quarter beats should retain their own divider weight");
+  assert.equal(midiInteraction.midiGridLineKind(0.125), "eighth", "eighth beats should use a lighter divider");
+  assert.equal(midiInteraction.midiGridLineKind(0.0625), "sixteenth", "sixteenth beats should use the lightest divider");
   assert.equal(midiInteraction.snapMidiBeatToVisibleGrid(2.37, 48), 2, "visible-grid snapping should use whole-beat ticks at normal zoom");
   assert.equal(midiInteraction.snapMidiBeatToVisibleGrid(2.37, 120), 2.25, "visible-grid snapping should use quarter-beat ticks at medium zoom");
   assert.equal(midiInteraction.snapMidiBeatToVisibleGrid(2.37, 240), 2.375, "visible-grid snapping should use sixteenth-beat ticks at close zoom");
@@ -351,16 +536,117 @@ try {
       && pianoRollSource.includes("isSelected() && styles.noteSelected")
       && pianoRollSource.includes("const hoveredSide = () =>")
       && pianoRollSource.includes("const rect = createMemo(() => visibleNoteRect(n))")
-      && pianoRollSource.includes("style={noteStyle()}"),
-    "piano roll note selection, hover classes, and zoom-scaled note rects should be reactive after note nodes are created",
+      && pianoRollSource.includes("style={noteStyle()}")
+      && pianoRollCss.includes("0 0 0 3px var(--color-fg)")
+      && pianoRollCss.includes(".noteSelected::after")
+      && pianoRollCss.includes("opacity: 0.62")
+      && pianoRollSource.includes('const hasAutomation = midiNoteAutomationTargetCount(n) > 0')
+      && pianoRollSource.includes('aria-label="Note automation"')
+      && pianoRollSource.includes('title="Note automation"')
+      && !pianoRollSource.includes("const laneCount = midiNoteAutomationTargetCount(n)")
+      && pianoRollCss.includes(".noteAutomationBadge")
+      && pianoRollCss.includes("border-radius: 50%")
+      && pianoRollCss.includes("background: var(--color-bg)"),
+    "piano roll selection should be visibly outlined and automation should use a compact circular note marker",
   );
   assert.ok(
     pianoRollSource.includes('role="listbox"')
       && pianoRollSource.includes('role="option"')
       && pianoRollSource.includes("aria-selected={isSelected()}")
       && pianoRollSource.includes("midiNoteSelectionAfterAdditiveClick")
-      && pianoRollSource.includes("midiNoteSelectionAfterMarquee"),
-    "piano roll selection should expose accessible state and standard additive click/marquee behavior",
+      && pianoRollSource.includes("midiNoteSelectionAfterMarquee")
+      && pianoRollSource.includes('"meta+a"')
+      && pianoRollSource.includes("midiNoteSelectionForContextMenu")
+      && pianoRollSource.includes("midiNotePointerRequestsContextMenu"),
+    "piano roll selection should expose accessible state, scoped select-all, additive marquee, and selection-preserving context-click behavior",
+  );
+  assert.ok(
+    pianoRollSource.includes('"b",')
+      && pianoRollSource.includes('aria-label="Draw notes tool, B"')
+      && pianoRollSource.includes('"v",')
+      && pianoRollSource.includes('aria-label="Select notes tool, V"')
+      && hotkeysSource.includes('const blocksContextualHotkeys = isTextEntryTarget(target) || target?.tagName === "SELECT"')
+      && hotkeysSource.includes("!blocksContextualHotkeys && useContextualHotkeyStore.getState().run(combo)"),
+    "MIDI editor should map B to draw and V to select with visible tool hints",
+  );
+  assert.ok(
+    pianoRollSource.includes("Create arpeggiation…")
+      && pianoRollSource.includes("Remove arpeggiation")
+      && pianoRollSource.includes("Ungroup notes")
+      && pianoRollSource.includes("midiGroupIndices")
+      && pianoRollSource.includes("setMidiArpeggiation")
+      && pianoRollSource.includes("midiSelectionCanArpeggiate")
+      && pianoRollSource.includes("Select at least two different pitches")
+      && pianoRollSource.includes("canGroup={menuSelection.length >= 2}")
+      && pianoRollSource.includes("function ArpeggiationPopover(props:")
+      && pianoRollSource.includes("open={props.sequenceOpen}")
+      && pianoRollSource.includes('label="Type"')
+      && pianoRollSource.includes('label="Note value"')
+      && pianoRollSource.includes('label="Sequence"')
+      && pianoRollSource.includes('label: "Notes per beat"')
+      && pianoRollSource.includes("noteAnchoredViewportState")
+      && pianoRollSource.includes("target && rollWrapRef.current?.contains(target)")
+      && pianoRollSource.includes("rollWrapRef.current?.contains(target)")
+      && pianoRollSource.includes("const anchoredNoteMenu = createMemo")
+      && pianoRollSource.includes("const anchoredVolumePopover = createMemo")
+      && pianoRollSource.includes("const anchoredNoteEditor = createMemo")
+      && pianoRollSource.includes("const anchoredArpeggiationPopover = createMemo")
+      && pianoRollSource.includes("data-midi-note-group")
+      && pianoRollSource.includes("activeArpeggiationPitches")
+      && pianoRollSource.includes("renderMidiArpeggiations(props.notes.filter((note) => note.groupId === groupId))")
+      && pianoRollSource.includes("activeArpeggiationPitches().get(note.groupId)?.has(note.pitch)")
+      && pianoRollSource.includes('aria-label="Arpeggiated note"')
+      && pianoRollCss.includes(".noteGroupOutline")
+      && pianoRollCss.includes(".noteArpeggiated::before")
+      && pianoRollCss.includes("repeating-linear-gradient")
+      && pianoRollCss.includes(".noteArpeggiationBadge")
+      && pianoRollCss.includes("border: 1px dotted")
+      && pianoRollCss.includes("justify-content: flex-start")
+      && pianoRollCss.includes("min-height: 23px")
+      && pianoRollCss.includes("padding: 0 6px"),
+    "piano roll note menus should expose pitch-safe timed arpeggiation, note-anchored popovers, compact left-aligned items, and faint linked-group outlines",
+  );
+  assert.equal(
+    (segmentColorsSource.match(/#[0-9a-f]{6}/gi) ?? []).length,
+    24,
+    "segment color picker should expose exactly 24 pastel presets",
+  );
+  assert.ok(
+    segmentEditorSource.includes('aria-label="Set segment color"')
+      && segmentEditorSource.includes("SEGMENT_PASTEL_COLORS")
+      && segmentSource.includes('"--segment-color": liveSeg()?.color')
+      && segmentCss.includes(".colored")
+      && segmentCss.includes("linear-gradient"),
+    "segment editor color presets should persist onto gradient-tinted arrangement segments",
+  );
+  assert.ok(
+    segmentSource.includes("setSegmentLandingGhosts")
+      && trackLaneSource.includes("segmentLandingGhosts")
+      && trackLaneSource.includes("data-segment-landing-ghost")
+      && trackLaneCss.includes(".segmentLandingGhost"),
+    "cross-track segment drags should show a target-lane landing ghost from the pending move",
+  );
+  assert.ok(
+    trackDetailsSource.includes("<Knob")
+      && trackDetailsSource.includes('label="Output bus"')
+      && trackDetailsSource.includes("setTrackOutputBus")
+      && trackDetailsSource.includes('kind: "audio.listDevices"')
+      && trackDetailsSource.includes('label="Input device"')
+      && trackDetailsSource.includes('label="Input channels"')
+      && !trackDetailsSource.includes('label="Input Device ID"')
+      && !trackDetailsSource.includes('label="Channel Start"'),
+    "Track Details should provide knob mixing, explicit bus routing, device enumeration, and readable input-channel choices",
+  );
+  assert.ok(
+    floatingSelectSource.includes('"z-index": "calc(var(--z-toast) + 1)"'),
+    "floating select option lists should stack above note-editing popovers",
+  );
+  assert.ok(
+    appSource.includes("projectWithRenderedMidiArpeggiations")
+      && midiTransportSource.includes("renderMidiArpeggiations(latest.notes)")
+      && timelineMidiPlaybackSource.includes("renderMidiArpeggiations(payload.notes)")
+      && exportActionsSource.includes("projectWithRenderedMidiArpeggiations"),
+    "realtime native playback, browser playback, bounce, and export should render MIDI arpeggiation modifiers",
   );
   assert.ok(
     pianoRollSource.includes("has: (_target, property) => Reflect.has(props.notes, property)")
@@ -375,12 +661,19 @@ try {
       && pianoRollSource.includes("midiNotePointerMovedPastThreshold")
       && pianoRollSource.includes("snapMidiBeatToVisibleGrid(beat, pxPerBeat())")
       && pianoRollSource.includes("fixedGridStep != null || shiftKey ? snapShiftDrag(beat) : beat")
-      && pianoRollSource.includes("const startBeat = clamp(editBeat(rawStartBeat, e.shiftKey)")
-      && pianoRollSource.includes("const rawEnd = start.startBeat + start.lengthBeats + dLen")
-      && pianoRollSource.includes("const nextEnd = editBeat(rawEnd, e.shiftKey)")
-      && pianoRollSource.includes("const rawStart = start.startBeat + dLen")
-      && pianoRollSource.includes("const nextStart = clamp(editBeat(rawStart, e.shiftKey)"),
-    "piano roll note movement should use window-level tracking and visible or fixed-grid note drags/resizes",
+      && pianoRollSource.includes("const minimumBeatDelta = Math.max")
+      && pianoRollSource.includes("const maximumBeatDelta = Math.min")
+      && pianoRollSource.includes("const minimumPitchDelta = Math.max")
+      && pianoRollSource.includes("const maximumPitchDelta = Math.min")
+      && pianoRollSource.includes("const minimumLengthDelta = d.edge")
+      && pianoRollSource.includes("const maximumLengthDelta = d.edge")
+      && pianoRollSource.includes("data-midi-grid-division={line.kind}")
+      && pianoRollCss.includes(".beatLineWhole")
+      && pianoRollCss.includes(".beatLineHalf")
+      && pianoRollCss.includes(".beatLineQuarter")
+      && pianoRollCss.includes(".beatLineEighth")
+      && pianoRollCss.includes(".beatLineSixteenth"),
+    "piano roll edits should use visible-grid snapping, rigid shared deltas, and retain hierarchical divider weights through sixteenths",
   );
   assert.ok(
     pianoRollSource.includes("e.currentTarget.setPointerCapture(e.pointerId)")
@@ -392,18 +685,22 @@ try {
       && pianoRollSource.includes('window.addEventListener("mousemove", handleMouseMove, true)')
       && pianoRollSource.includes("onMouseDown={handleMouseDown}")
       && pianoRollCss.includes(".volumeSliderThumb")
-      && pianoRollCss.includes("grid-template-columns: 27px minmax(108px, 1fr) 36px")
+      && pianoRollCss.includes("grid-template-columns: max-content minmax(108px, 1fr) 36px")
+      && pianoRollCss.includes(".volumePopover::before")
+      && pianoRollCss.includes(".volumePopover::after")
+      && pianoRollCss.includes("background: var(--color-bg)")
       && pianoRollCss.includes("height: 21px")
       && pianoRollCss.includes("width: 9px")
       && pianoRollCss.includes("touch-action: none"),
     "piano roll note volume slider should stay compact while preserving pointer drag handling",
   );
   assert.ok(
-    pianoRollSource.includes("function noteDetailViewportState(state: VolumePopoverState)")
+    pianoRollSource.includes("function noteAnchoredViewportState<T extends")
       && pianoRollSource.includes("viewportVersion()")
       && pianoRollSource.includes("const x = clientX == null ? rect.width / 2 : clientX - rect.left")
-      && pianoRollSource.includes("state={noteDetailViewportState(currentNoteEditor)}"),
-    "piano roll zoom and scroll should keep note-attached editors anchored to the current note geometry",
+      && pianoRollSource.includes("const anchoredNoteEditor = createMemo")
+      && pianoRollSource.includes("state={currentNoteEditor}"),
+    "piano roll zoom and scroll should reactively keep note-attached editors anchored to the current note geometry",
   );
   assert.ok(
     pianoRollSource.includes('type="button"')
@@ -642,6 +939,59 @@ try {
       "live MIDI keyup should release the note stored for its physical key regardless of modifier changes",
     );
   }
+  {
+    const result = midiNoteRounding.roundMidiNotesToNearest([
+      {
+        pitch: 60,
+        startBeat: 0.06,
+        lengthBeats: 0.05,
+        velocity: 74,
+        curve: [{ beat: 0.06, pitch: 60 }, { beat: 0.11, pitch: 61 }],
+        automation: [{ target: "amp.level", points: [{ beat: 0.06, value: 0.2 }, { beat: 0.11, value: 0.8 }] }],
+      },
+      { pitch: 64, startBeat: 0.19, lengthBeats: 0.5, velocity: 90 },
+      { pitch: 67, startBeat: 3.98, lengthBeats: 0.02, velocity: 100 },
+    ], 0.125, 4);
+    assert.deepEqual(
+      result.notes.map((note) => [note.startBeat, note.lengthBeats]),
+      [[0, 0.125], [0.25, 0.5], [3.875, 0.125]],
+      "round-to-nearest should snap starts, preserve longer notes, and keep the last note inside the segment",
+    );
+    assert.deepEqual(
+      result.notes[0].curve,
+      [{ beat: 0, pitch: 60 }, { beat: 0.125, pitch: 61 }],
+      "round-to-nearest should keep pitch curves attached to extended notes",
+    );
+    assert.deepEqual(
+      result.notes[0].automation,
+      [{ target: "amp.level", points: [{ beat: 0, value: 0.2 }, { beat: 0.05, value: 0.8 }] }],
+      "round-to-nearest should shift absolute note automation with its note",
+    );
+    assert.equal(result.movedNoteCount, 3);
+    assert.equal(result.extendedNoteCount, 2);
+    assert.ok(
+      segmentEditorSource.indexOf("Round to nearest") > segmentEditorSource.indexOf("Additive")
+        && segmentEditorSource.includes("Apply to all notes")
+        && segmentEditorSource.includes("roundMidiNotesToNearest"),
+      "the segment MIDI toolbar should place the round-to-nearest popover action after Additive",
+    );
+    assert.ok(
+      !pianoRollSource.includes("selectionStatus")
+        && !pianoRollSource.includes('`${selected().length} selected`')
+        && !pianoRollSource.includes('"No selection"')
+        && !pianoRollCss.includes(".selectionStatus"),
+      "the MIDI editor toolbar should not show an X selected status beside the pointer tool",
+    );
+    assert.ok(
+      pianoRollSource.includes('label="Velocity"')
+        && pianoRollSource.includes("maxValue={127}")
+        && pianoRollSource.includes('secondaryLabel="Volume"')
+        && pianoRollSource.includes("velocityToPercent(Number(currentNoteEditor.value))")
+        && pianoRollCss.includes(".volumeSecondaryRow")
+        && pianoRollSource.includes("parseVelocityInput"),
+      "double-click note editing should expose exact MIDI velocity and its synchronized volume percentage",
+    );
+  }
   assert.ok(
     trackHeaderSource.includes("leftPeak") && trackHeaderSource.includes("rightPeak"),
     "track headers should render stereo channel meters instead of aggregate-only peak/RMS rows",
@@ -861,7 +1211,7 @@ try {
     "number inputs should capture and commit edited text before releasing their props-sync guard",
   );
   assert.ok(
-    trackListSource.indexOf("styles.timelineSpacer") < trackListSource.indexOf("<For each={tracks()}")
+    trackListSource.indexOf("styles.timelineSpacer") < trackListSource.indexOf("<For each={tracks().map((track) => track.id)}>")
       && trackListSource.includes("styles.timelineDock")
       && trackListSource.includes("<Timeline scrollLeft={horizontalScrollLeft()} />")
       && trackListSource.includes("onScroll={(event) => setHorizontalScrollLeft(event.currentTarget.scrollLeft)}")
@@ -941,8 +1291,8 @@ try {
     appSource.includes('send({ kind: "app.shellReady" })')
       && !appSource.includes('send({ kind: "audio.list"')
       && appSource.includes("useAudioFileStore.getState().hydrateFiles(localFiles)")
-      && appSource.includes("engineAudioFilesForProject(project, useAudioFileStore.getState().files)")
-      && appSource.includes("engineInstrumentsForProject(project, useInstrumentStore.getState().instruments)")
+      && appSource.includes("engineAudioFilesForProject(sourceProject, useAudioFileStore.getState().files)")
+      && appSource.includes("engineInstrumentsForProject(sourceProject, useInstrumentStore.getState().instruments)")
       && appSource.match(/allStartupReady\(startupReadiness\(\)\)\) scheduleCurrentDocumentDirtyState\(\);/g)?.length === 3
       && appSource.includes("}, 10_000);")
       && appSource.includes("}, 1_500);")
@@ -1627,12 +1977,46 @@ try {
     "track automation point paste should preserve copied and existing curve metadata",
   );
   assert.ok(
-    trackDetailsSource.includes("copyTrackAutomationPoints") && trackDetailsSource.includes("pasteTrackAutomationPoints"),
-    "track details visible automation point toolbar should stay wired to track copy/paste helpers",
+    trackDetailsSource.includes('header class={styles.sectionHeader}')
+      && trackDetailsSource.includes("Instrument automation")
+      && trackDetailsSource.includes("Edit automation")
+      && trackDetailsSource.includes('kind: "trackAutomation"')
+      && !trackDetailsSource.includes("setTrackAutomationTargetValues")
+      && !trackDetailsSource.includes("automationHandleRail")
+      && !trackDetailsSource.includes("Add point"),
+    "Track Details should summarize automation and hand off to the dedicated editor without redundant point controls",
   );
   assert.ok(
-    trackDetailsSource.includes("selectedAutomationPointIndices") && trackDetailsSource.includes("Select track automation point"),
-    "track details visible automation point panel should expose selectable point subsets",
+    trackAutomationEditorSource.includes('role="application"')
+      && trackAutomationEditorSource.includes("onDblClick={addPointAtPointer}")
+      && trackAutomationEditorSource.includes("updateTrackAutomationPoint")
+      && trackAutomationEditorSource.includes('label="Bar"')
+      && trackAutomationEditorSource.includes('label="Beat in bar"')
+      && trackAutomationEditorSource.includes("formatAetherArrangementAutomationValue")
+      && trackAutomationEditorSource.includes("Double-click to add a point")
+      && !trackAutomationEditorSource.includes("setTrackAutomationTargetValues")
+      && trackAutomationEditorCss.includes(".automationLine")
+      && trackAutomationEditorCss.includes(".pointInspector"),
+    "track automation should use one non-destructive time-versus-value graph with musical position and formatted values",
+  );
+  assert.ok(
+    trackListSource.includes("expandedAutomationTrackIds")
+      && trackListSource.includes("<TrackAutomationHeaderRows")
+      && trackListSource.includes("<TrackAutomationLaneRows")
+      && trackHeaderSource.includes('aria-label={props.automationExpanded ? "Hide automation lanes" : "Show automation lanes"}')
+      && trackAutomationRowsSource.includes('ariaLabel="Add instrument automation lane"')
+      && trackAutomationRowsSource.includes("activeTrackAutomationTargets")
+      && trackAutomationRowsSource.includes("upsertTrackAutomationTarget")
+      && trackAutomationRowsSource.includes("clearTrackAutomationTarget")
+      && trackAutomationRowsSource.includes("onDblClick={addPoint}")
+      && trackAutomationRowsSource.includes("updateTrackAutomationPoint")
+      && trackAutomationRowsSource.includes("data-track-automation-lane={props.target}")
+      && trackAutomationRowsSource.includes("data-track-automation-point")
+      && trackAutomationRowsCss.includes("height: 27px")
+      && trackAutomationRowsCss.includes("height: 44px")
+      && !trackLaneSource.includes("automationPreview")
+      && !trackLaneSource.includes("Add ${preview().label} arrangement automation point"),
+    "instrument automation should expand into paired multi-parameter timeline rows without the redundant single-lane miniature editor",
   );
   assert.ok(
     devHooksSource.includes('clickPanelButtonByText(pointPanelLabel, "Copy")')
@@ -1719,9 +2103,9 @@ try {
     synthEditorSource.includes('"Lumen instrument effects" : "Aether instrument effects"')
       && synthEditorSource.includes('aria-label="Add instrument effect"')
       && synthEditorSource.includes('"Current Lumen FX chain" : "Current Aether FX chain"')
-      && synthEditorSource.includes("Drag ${EFFECT_LABELS[effect.kind]} to reorder")
+      && synthEditorSource.includes("Drag ${EFFECT_LABELS[effect().kind]} to reorder")
       && synthEditorSource.includes("Bypass")
-      && synthEditorSource.includes("Remove ${EFFECT_LABELS[effect.kind]}"),
+      && synthEditorSource.includes("Remove ${EFFECT_LABELS[effect().kind]}"),
     "Aether Synth Editor should expose Instrument FX controls for browser coverage",
   );
   assert.ok(

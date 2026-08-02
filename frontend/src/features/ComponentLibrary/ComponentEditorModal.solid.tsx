@@ -175,6 +175,7 @@ export function ComponentEditorModal(props: ComponentEditorModalProps) {
               notes={midiDraft().notes}
               lengthBeats={midiDraft().lengthBeats}
               playheadBeat={null}
+              hotkeyScopeId={scopeId()}
               onChange={(notes: MidiNote[]) => setMidiPatch({ notes })}
               onPreviewNote={previewMidiNote}
             />

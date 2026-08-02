@@ -39,11 +39,42 @@
     color-mix(in srgb, var(--color-fg) 88%, var(--color-bg));
 }
 
+.colored {
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--segment-color) 88%, white),
+      color-mix(in srgb, var(--segment-color) 76%, var(--color-fg))
+    );
+}
+
+.colored:hover {
+  background:
+    var(--interaction-mesh-current),
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--segment-color) 80%, white),
+      color-mix(in srgb, var(--segment-color) 68%, var(--color-bg))
+    );
+}
+
 .selected {
   background:
     var(--interaction-mesh-current),
     color-mix(in srgb, var(--color-fg) 72%, var(--color-bg));
   outline: 0;
+}
+
+.colored.selected,
+.colored.selected:hover,
+.colored.editing {
+  background:
+    var(--interaction-mesh-current),
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--segment-color) 74%, white),
+      color-mix(in srgb, var(--segment-color) 58%, var(--color-bg))
+    );
 }
 
 .selected:hover {

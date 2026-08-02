@@ -536,6 +536,7 @@ namespace beat
 
         Id id;
         juce::String kind;
+        juce::String samplerComplexity;
         int waveform { 1 };
         float cutoff01 { 0.6f };
         float filterKeytrack { 0.0f };

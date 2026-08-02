@@ -1,0 +1,188 @@
+.groupHeader {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) 78px;
+  align-items: center;
+  gap: 3px;
+  height: 27px;
+  padding: 0 3px;
+  border-bottom: var(--border-fg);
+  background: var(--surface-subtle);
+  color: var(--color-fg);
+  font-size: var(--font-size-ui);
+}
+
+.disclosure,
+.groupTitle,
+.valueHeaderTitle {
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.disclosure {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.groupTitle,
+.valueHeaderTitle {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.groupTitle {
+  font-weight: var(--font-weight-medium);
+}
+
+.disclosure:hover,
+.groupTitle:hover,
+.valueHeaderTitle:hover {
+  color: color-mix(in srgb, var(--color-fg) 72%, transparent);
+}
+
+.disclosure:focus-visible,
+.groupTitle:focus-visible,
+.valueHeaderTitle:focus-visible {
+  box-shadow: var(--interaction-focus-ring);
+  outline: 0;
+}
+
+.addSelect {
+  width: 78px;
+  height: 21px;
+}
+
+.addSelectTrigger {
+  height: 21px;
+  padding: 0 3px;
+  background: var(--color-bg);
+  font-size: var(--font-size-ui);
+}
+
+.valueHeader {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) 24px;
+  align-items: center;
+  gap: 3px;
+  height: 44px;
+  padding: 0 3px;
+  border-bottom: var(--border-fg);
+  background: color-mix(in srgb, var(--color-fg) 4%, var(--color-bg));
+  color: var(--color-fg);
+  font-size: var(--font-size-ui);
+}
+
+.valueHeaderIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.66;
+}
+
+.groupLane,
+.valueLane {
+  position: relative;
+  flex-shrink: 0;
+  overflow: hidden;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-fg) 18%, transparent);
+}
+
+.groupLane {
+  height: 27px;
+  background: var(--surface-subtle);
+  cursor: zoom-in;
+}
+
+.valueLane {
+  height: 44px;
+  background: color-mix(in srgb, var(--color-fg) 2%, var(--color-bg));
+  cursor: crosshair;
+}
+
+.valueLane:hover {
+  background: color-mix(in srgb, var(--color-fg) 4%, var(--color-bg));
+}
+
+.gridLine {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: color-mix(in srgb, var(--color-fg) 6%, transparent);
+  pointer-events: none;
+}
+
+.gridLineMajor {
+  background: color-mix(in srgb, var(--color-fg) 13%, transparent);
+}
+
+.curve {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.curveLine {
+  fill: none;
+  stroke: color-mix(in srgb, var(--color-fg) 72%, transparent);
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+}
+
+.curveSummary {
+  opacity: 0.34;
+}
+
+.emptySummary {
+  position: sticky;
+  left: 6px;
+  display: inline-flex;
+  align-items: center;
+  height: 100%;
+  color: color-mix(in srgb, var(--color-fg) 52%, transparent);
+  font-size: var(--font-size-hint);
+  pointer-events: none;
+}
+
+.point {
+  position: absolute;
+  z-index: 2;
+  width: 9px;
+  height: 9px;
+  margin: -4.5px 0 0 -4.5px;
+  padding: 0;
+  border: 1px solid var(--color-fg);
+  border-radius: 50%;
+  background: var(--color-bg);
+  color: var(--color-fg);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-bg) 82%, transparent);
+  cursor: grab;
+  transition:
+    transform var(--duration-hover) var(--ease-linear),
+    box-shadow var(--duration-hover) var(--ease-linear);
+}
+
+.point:hover,
+.pointSelected,
+.pointDragging {
+  transform: scale(1.22);
+  background: var(--color-fg);
+  box-shadow:
+    0 0 0 1px var(--color-bg),
+    0 0 0 3px color-mix(in srgb, var(--color-fg) 18%, transparent);
+}
+
+.pointDragging {
+  cursor: grabbing;
+}

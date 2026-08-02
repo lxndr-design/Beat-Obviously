@@ -1,0 +1,2188 @@
+{
+  "schemaVersion": 1,
+  "savedAt": 1785627146366,
+  "project": {
+    "id": "generated-test-2-project",
+    "name": "Generated_test_2",
+    "bpm": 96,
+    "timeSignature": {
+      "num": 4,
+      "denom": 4,
+      "boldBeats": [
+        1
+      ]
+    },
+    "lengthBeats": 64,
+    "tracks": [
+      {
+        "id": "generated-test-2-track-0",
+        "name": "Upright Bass",
+        "kind": "midi",
+        "instrumentId": "slow-jazz-aaba-instrument-0",
+        "gainDb": 0,
+        "pan": 0,
+        "mute": false,
+        "solo": false,
+        "recordArmed": false,
+        "inputMonitoring": false,
+        "inputDeviceId": "",
+        "inputChannelStart": 0,
+        "inputChannelCount": 2,
+        "recordGainDb": 0,
+        "outputEnabled": true,
+        "effects": {
+          "filters": []
+        },
+        "rowHeight": "normal",
+        "segments": [
+          {
+            "id": "generated-test-2-segment-0-0",
+            "trackId": "generated-test-2-track-0",
+            "name": "A1 · bass",
+            "startBeat": 0,
+            "lengthBeats": 16,
+            "repeats": 1,
+            "layer": 0,
+            "muted": false,
+            "instrumentId": "slow-jazz-aaba-instrument-0",
+            "payload": {
+              "kind": "midi",
+              "notes": [
+                {
+                  "pitch": 46,
+                  "velocity": 88,
+                  "startBeat": 0,
+                  "lengthBeats": 3.3489583333333335
+                },
+                {
+                  "pitch": 46,
+                  "velocity": 88,
+                  "startBeat": 4,
+                  "lengthBeats": 3.3489583333333335
+                },
+                {
+                  "pitch": 46,
+                  "velocity": 88,
+                  "startBeat": 8,
+                  "lengthBeats": 3.3489583333333335
+                },
+                {
+                  "pitch": 46,
+                  "velocity": 88,
+                  "startBeat": 12,
+                  "lengthBeats": 3.3489583333333335
+                }
+              ],
+              "gainDb": -4.401041666666667
+            }
+          },
+          {
+            "id": "generated-test-2-segment-0-1",
+            "trackId": "generated-test-2-track-0",
+            "name": "B · bass",
+            "startBeat": 32,
+            "lengthBeats": 16,
+            "repeats": 0,
+            "layer": 0,
+            "muted": false,
+            "instrumentId": "slow-jazz-aaba-instrument-0",
+            "payload": {
+              "kind": "midi",
+              "notes": [
+                {
+                  "pitch": 46,
+                  "velocity": 88,
+                  "startBeat": 0,
+                  "lengthBeats": 3.3489583333333335
+                },
+                {
+                  "pitch": 46,
+                  "velocity": 88,
+                  "startBeat": 4,
+                  "lengthBeats": 2
+                },
+                {
+                  "pitch": 48,
+                  "velocity": 88,
+                  "startBeat": 6,
+                  "lengthBeats": 2
+                },
+                {
+                  "pitch": 46,
+                  "velocity": 88,
+                  "startBeat": 8,
+                  "lengthBeats": 3.3489583333333335
+                },
+                {
+                  "pitch": 46,
+                  "velocity": 88,
+                  "startBeat": 12,
+                  "lengthBeats": 2
+                },
+                {
+                  "pitch": 48,
+                  "velocity": 88,
+                  "startBeat": 14,
+                  "lengthBeats": 2
+                }
+              ],
+              "gainDb": -3.1979166666666665
+            }
+          },
+          {
+            "id": "generated-test-2-segment-0-2",
+            "trackId": "generated-test-2-track-0",
+            "name": "A3 · bass",
+            "startBeat": 48,
+            "lengthBeats": 16,
+            "repeats": 0,
+            "layer": 0,
+            "muted": false,
+            "instrumentId": "slow-jazz-aaba-instrument-0",
+            "payload": {
+              "kind": "midi",
+              "notes": [
+                {
+                  "pitch": 46,
+                  "velocity": 88,
+                  "startBeat": 0,
+                  "lengthBeats": 3.3489583333333335
+                },
+                {
+                  "pitch": 46,
+                  "velocity": 88,
+                  "startBeat": 4,
+                  "lengthBeats": 3.3489583333333335
+                },
+                {
+                  "pitch": 46,
+                  "velocity": 88,
+                  "startBeat": 8,
+                  "lengthBeats": 3.3489583333333335
+                },
+                {
+                  "pitch": 46,
+                  "velocity": 88,
+                  "startBeat": 12,
+                  "lengthBeats": 3.3489583333333335
+                }
+              ],
+              "gainDb": -2.5989583333333335
+            }
+          }
+        ],
+        "parentTrackId": "",
+        "sends": []
+      },
+      {
+        "id": "generated-test-2-track-1",
+        "name": "Warm Jazz Keys",
+        "kind": "midi",
+        "instrumentId": "slow-jazz-aaba-instrument-1",
+        "gainDb": 0,
+        "pan": 0,
+        "mute": false,
+        "solo": false,
+        "recordArmed": false,
+        "inputMonitoring": false,
+        "inputDeviceId": "",
+        "inputChannelStart": 0,
+        "inputChannelCount": 2,
+        "recordGainDb": 0,
+        "outputEnabled": true,
+        "effects": {
+          "filters": []
+        },
+        "rowHeight": "normal",
+        "segments": [
+          {
+            "id": "generated-test-2-segment-1-0",
+            "trackId": "generated-test-2-track-1",
+            "name": "A1 · harmony",
+            "startBeat": 0,
+            "lengthBeats": 16,
+            "repeats": 0,
+            "layer": 0,
+            "muted": false,
+            "instrumentId": "slow-jazz-aaba-instrument-1",
+            "payload": {
+              "kind": "midi",
+              "notes": [
+                {
+                  "pitch": 55,
+                  "velocity": 62,
+                  "startBeat": 0,
+                  "lengthBeats": 3.1979166666666665
+                },
+                {
+                  "pitch": 58,
+                  "velocity": 67,
+                  "startBeat": 0,
+                  "lengthBeats": 3.1979166666666665
+                },
+                {
+                  "pitch": 62,
+                  "velocity": 73,
+                  "startBeat": 0,
+                  "lengthBeats": 3.1979166666666665
+                },
+                {
+                  "pitch": 58,
+                  "velocity": 62,
+                  "startBeat": 4,
+                  "lengthBeats": 3.1979166666666665
+                },
+                {
+                  "pitch": 62,
+                  "velocity": 67,
+                  "startBeat": 4,
+                  "lengthBeats": 3.1979166666666665
+                },
+                {
+                  "pitch": 65,
+                  "velocity": 73,
+                  "startBeat": 4,
+                  "lengthBeats": 3.1979166666666665
+                },
+                {
+                  "pitch": 55,
+                  "velocity": 62,
+                  "startBeat": 8,
+                  "lengthBeats": 3.1979166666666665
+                },
+                {
+                  "pitch": 58,
+                  "velocity": 67,
+                  "startBeat": 8,
+                  "lengthBeats": 3.1979166666666665
+                },
+                {
+                  "pitch": 62,
+                  "velocity": 73,
+                  "startBeat": 8,
+                  "lengthBeats": 3.1979166666666665
+                },
+                {
+                  "pitch": 58,
+                  "velocity": 62,
+                  "startBeat": 12,
+                  "lengthBeats": 3.1979166666666665
+                },
+                {
+                  "pitch": 62,
+                  "velocity": 67,
+                  "startBeat": 12,
+                  "lengthBeats": 3.1979166666666665
+                },
+                {
+                  "pitch": 65,
+                  "velocity": 73,
+                  "startBeat": 12,
+                  "lengthBeats": 3.1979166666666665
+                }
+              ],
+              "gainDb": -4.401041666666667
+            }
+          },
+          {
+            "id": "generated-test-2-segment-1-1",
+            "trackId": "generated-test-2-track-1",
+            "name": "A2 · harmony",
+            "startBeat": 16,
+            "lengthBeats": 16,
+            "repeats": 0,
+            "layer": 0,
+            "muted": false,
+            "instrumentId": "slow-jazz-aaba-instrument-1",
+            "payload": {
+              "kind": "midi",
+              "notes": [
+                {
+                  "pitch": 55,
+                  "velocity": 63,
+                  "startBeat": 0,
+                  "lengthBeats": 3.1979166666666665
+                },
+                {
+                  "pitch": 58,
+                  "velocity": 69,
+                  "startBeat": 0,
+                  "lengthBeats": 3.1979166666666665
+                },
+                {
+                  "pitch": 62,
+                  "velocity": 75,
+                  "startBeat": 0,
+                  "lengthBeats": 3.1979166666666665
+                },
+                {
+                  "pitch": 58,
+                  "velocity": 63,
+                  "startBeat": 4,
+                  "lengthBeats": 3.1979166666666665
+                },
+                {
+                  "pitch": 62,
+                  "velocity": 69,
+                  "startBeat": 4,
+                  "lengthBeats": 3.1979166666666665
+                },
+                {
+                  "pitch": 65,
+                  "velocity": 75,
+                  "startBeat": 4,
+                  "lengthBeats": 3.1979166666666665
+                },
+                {
+                  "pitch": 55,
+                  "velocity": 63,
+                  "startBeat": 8,
+                  "lengthBeats": 3.1979166666666665
+                },
+                {
+                  "pitch": 58,
+                  "velocity": 69,
+                  "startBeat": 8,
+                  "lengthBeats": 3.1979166666666665
+                },
+                {
+                  "pitch": 62,
+                  "velocity": 75,
+                  "startBeat": 8,
+                  "lengthBeats": 3.1979166666666665
+                },
+                {
+                  "pitch": 58,
+                  "velocity": 63,
+                  "startBeat": 12,
+                  "lengthBeats": 3.1979166666666665
+                },
+                {
+                  "pitch": 62,
+                  "velocity": 69,
+                  "startBeat": 12,
+                  "lengthBeats": 3.1979166666666665
+                },
+                {
+                  "pitch": 65,
+                  "velocity": 75,
+                  "startBeat": 12,
+                  "lengthBeats": 3.1979166666666665
+                }
+              ],
+              "gainDb": -3.921875
+            }
+          },
+          {
+            "id": "generated-test-2-segment-1-2",
+            "trackId": "generated-test-2-track-1",
+            "name": "B · harmony",
+            "startBeat": 32,
+            "lengthBeats": 16,
+            "repeats": 0,
+            "layer": 0,
+            "muted": false,
+            "instrumentId": "slow-jazz-aaba-instrument-1",
+            "payload": {
+              "kind": "midi",
+              "notes": [
+                {
+                  "pitch": 55,
+                  "velocity": 66,
+                  "startBeat": 0,
+                  "lengthBeats": 1.5989583333333333
+                },
+                {
+                  "pitch": 58,
+                  "velocity": 72,
+                  "startBeat": 0,
+                  "lengthBeats": 1.5989583333333333
+                },
+                {
+                  "pitch": 62,
+                  "velocity": 78,
+                  "startBeat": 0,
+                  "lengthBeats": 1.5989583333333333
+                },
+                {
+                  "pitch": 55,
+                  "velocity": 66,
+                  "startBeat": 2,
+                  "lengthBeats": 1.5989583333333333
+                },
+                {
+                  "pitch": 58,
+                  "velocity": 72,
+                  "startBeat": 2,
+                  "lengthBeats": 1.5989583333333333
+                },
+                {
+                  "pitch": 62,
+                  "velocity": 78,
+                  "startBeat": 2,
+                  "lengthBeats": 1.5989583333333333
+                },
+                {
+                  "pitch": 55,
+                  "velocity": 66,
+                  "startBeat": 4,
+                  "lengthBeats": 1.5989583333333333
+                },
+                {
+                  "pitch": 58,
+                  "velocity": 72,
+                  "startBeat": 4,
+                  "lengthBeats": 1.5989583333333333
+                },
+                {
+                  "pitch": 62,
+                  "velocity": 78,
+                  "startBeat": 4,
+                  "lengthBeats": 1.5989583333333333
+                },
+                {
+                  "pitch": 65,
+                  "velocity": 66,
+                  "startBeat": 6,
+                  "lengthBeats": 1.5989583333333333
+                },
+                {
+                  "pitch": 57,
+                  "velocity": 72,
+                  "startBeat": 6,
+                  "lengthBeats": 1.5989583333333333
+                },
+                {
+                  "pitch": 60,
+                  "velocity": 78,
+                  "startBeat": 6,
+                  "lengthBeats": 1.5989583333333333
+                },
+                {
+                  "pitch": 55,
+                  "velocity": 66,
+                  "startBeat": 8,
+                  "lengthBeats": 1.5989583333333333
+                },
+                {
+                  "pitch": 58,
+                  "velocity": 72,
+                  "startBeat": 8,
+                  "lengthBeats": 1.5989583333333333
+                },
+                {
+                  "pitch": 62,
+                  "velocity": 78,
+                  "startBeat": 8,
+                  "lengthBeats": 1.5989583333333333
+                },
+                {
+                  "pitch": 55,
+                  "velocity": 66,
+                  "startBeat": 10,
+                  "lengthBeats": 1.5989583333333333
+                },
+                {
+                  "pitch": 58,
+                  "velocity": 72,
+                  "startBeat": 10,
+                  "lengthBeats": 1.5989583333333333
+                },
+                {
+                  "pitch": 62,
+                  "velocity": 78,
+                  "startBeat": 10,
+                  "lengthBeats": 1.5989583333333333
+                },
+                {
+                  "pitch": 55,
+                  "velocity": 66,
+                  "startBeat": 12,
+                  "lengthBeats": 1.5989583333333333
+                },
+                {
+                  "pitch": 58,
+                  "velocity": 72,
+                  "startBeat": 12,
+                  "lengthBeats": 1.5989583333333333
+                },
+                {
+                  "pitch": 62,
+                  "velocity": 78,
+                  "startBeat": 12,
+                  "lengthBeats": 1.5989583333333333
+                },
+                {
+                  "pitch": 65,
+                  "velocity": 66,
+                  "startBeat": 14,
+                  "lengthBeats": 1.5989583333333333
+                },
+                {
+                  "pitch": 57,
+                  "velocity": 72,
+                  "startBeat": 14,
+                  "lengthBeats": 1.5989583333333333
+                },
+                {
+                  "pitch": 60,
+                  "velocity": 78,
+                  "startBeat": 14,
+                  "lengthBeats": 1.5989583333333333
+                }
+              ],
+              "gainDb": -3.1979166666666665
+            }
+          },
+          {
+            "id": "generated-test-2-segment-1-3",
+            "trackId": "generated-test-2-track-1",
+            "name": "A3 · harmony",
+            "startBeat": 48,
+            "lengthBeats": 16,
+            "repeats": 0,
+            "layer": 0,
+            "muted": false,
+            "instrumentId": "slow-jazz-aaba-instrument-1",
+            "payload": {
+              "kind": "midi",
+              "notes": [
+                {
+                  "pitch": 55,
+                  "velocity": 68,
+                  "startBeat": 0,
+                  "lengthBeats": 3.1979166666666665
+                },
+                {
+                  "pitch": 58,
+                  "velocity": 74,
+                  "startBeat": 0,
+                  "lengthBeats": 3.1979166666666665
+                },
+                {
+                  "pitch": 62,
+                  "velocity": 81,
+                  "startBeat": 0,
+                  "lengthBeats": 3.1979166666666665
+                },
+                {
+                  "pitch": 58,
+                  "velocity": 68,
+                  "startBeat": 4,
+                  "lengthBeats": 3.1979166666666665
+                },
+                {
+                  "pitch": 62,
+                  "velocity": 74,
+                  "startBeat": 4,
+                  "lengthBeats": 3.1979166666666665
+                },
+                {
+                  "pitch": 65,
+                  "velocity": 81,
+                  "startBeat": 4,
+                  "lengthBeats": 3.1979166666666665
+                },
+                {
+                  "pitch": 55,
+                  "velocity": 68,
+                  "startBeat": 8,
+                  "lengthBeats": 3.1979166666666665
+                },
+                {
+                  "pitch": 58,
+                  "velocity": 74,
+                  "startBeat": 8,
+                  "lengthBeats": 3.1979166666666665
+                },
+                {
+                  "pitch": 62,
+                  "velocity": 81,
+                  "startBeat": 8,
+                  "lengthBeats": 3.1979166666666665
+                },
+                {
+                  "pitch": 58,
+                  "velocity": 68,
+                  "startBeat": 12,
+                  "lengthBeats": 3.1979166666666665
+                },
+                {
+                  "pitch": 62,
+                  "velocity": 74,
+                  "startBeat": 12,
+                  "lengthBeats": 3.1979166666666665
+                },
+                {
+                  "pitch": 65,
+                  "velocity": 81,
+                  "startBeat": 12,
+                  "lengthBeats": 3.1979166666666665
+                }
+              ],
+              "gainDb": -2.5989583333333335
+            }
+          }
+        ],
+        "parentTrackId": "",
+        "sends": []
+      },
+      {
+        "id": "generated-test-2-track-2",
+        "name": "Tenor Sax",
+        "kind": "midi",
+        "instrumentId": "slow-jazz-aaba-instrument-2",
+        "gainDb": 0,
+        "pan": 0,
+        "mute": false,
+        "solo": false,
+        "recordArmed": false,
+        "inputMonitoring": false,
+        "inputDeviceId": "",
+        "inputChannelStart": 0,
+        "inputChannelCount": 2,
+        "recordGainDb": 0,
+        "outputEnabled": true,
+        "effects": {
+          "filters": []
+        },
+        "rowHeight": "normal",
+        "segments": [
+          {
+            "id": "generated-test-2-segment-2-0",
+            "trackId": "generated-test-2-track-2",
+            "name": "A1 · lead",
+            "startBeat": 0,
+            "lengthBeats": 16,
+            "repeats": 0,
+            "layer": 0,
+            "muted": false,
+            "instrumentId": "slow-jazz-aaba-instrument-2",
+            "payload": {
+              "kind": "midi",
+              "notes": [
+                {
+                  "pitch": 70,
+                  "velocity": 96,
+                  "startBeat": 0,
+                  "lengthBeats": 1.3802083333333333
+                },
+                {
+                  "pitch": 74,
+                  "velocity": 88,
+                  "startBeat": 1,
+                  "lengthBeats": 0.5208333333333334
+                },
+                {
+                  "pitch": 72,
+                  "velocity": 86,
+                  "startBeat": 1.5,
+                  "lengthBeats": 0.4270833333333333
+                },
+                {
+                  "pitch": 77,
+                  "velocity": 82,
+                  "startBeat": 2,
+                  "lengthBeats": 1.046875
+                },
+                {
+                  "pitch": 77,
+                  "velocity": 103,
+                  "startBeat": 3,
+                  "lengthBeats": 1.1875
+                },
+                {
+                  "pitch": 74,
+                  "velocity": 90,
+                  "startBeat": 4,
+                  "lengthBeats": 2.640625
+                },
+                {
+                  "pitch": 70,
+                  "velocity": 90,
+                  "startBeat": 8,
+                  "lengthBeats": 0.5885416666666666
+                },
+                {
+                  "pitch": 74,
+                  "velocity": 98,
+                  "startBeat": 8.5,
+                  "lengthBeats": 0.5208333333333334
+                },
+                {
+                  "pitch": 77,
+                  "velocity": 95,
+                  "startBeat": 9,
+                  "lengthBeats": 1.1875
+                },
+                {
+                  "pitch": 75,
+                  "velocity": 82,
+                  "startBeat": 10,
+                  "lengthBeats": 0.6875
+                },
+                {
+                  "pitch": 67,
+                  "velocity": 97,
+                  "startBeat": 10.5,
+                  "lengthBeats": 0.4270833333333333
+                },
+                {
+                  "pitch": 77,
+                  "velocity": 86,
+                  "startBeat": 11,
+                  "lengthBeats": 0.8541666666666666
+                },
+                {
+                  "pitch": 74,
+                  "velocity": 77,
+                  "startBeat": 12,
+                  "lengthBeats": 1.3802083333333333
+                },
+                {
+                  "pitch": 67,
+                  "velocity": 95,
+                  "startBeat": 13,
+                  "lengthBeats": 2.640625
+                }
+              ],
+              "gainDb": -4.401041666666667
+            }
+          },
+          {
+            "id": "generated-test-2-segment-2-1",
+            "trackId": "generated-test-2-track-2",
+            "name": "A2 · lead",
+            "startBeat": 16,
+            "lengthBeats": 16,
+            "repeats": 0,
+            "layer": 0,
+            "muted": false,
+            "instrumentId": "slow-jazz-aaba-instrument-2",
+            "payload": {
+              "kind": "midi",
+              "notes": [
+                {
+                  "pitch": 70,
+                  "velocity": 101,
+                  "startBeat": 0,
+                  "lengthBeats": 1.3802083333333333
+                },
+                {
+                  "pitch": 74,
+                  "velocity": 90,
+                  "startBeat": 1,
+                  "lengthBeats": 0.5208333333333334
+                },
+                {
+                  "pitch": 72,
+                  "velocity": 85,
+                  "startBeat": 1.5,
+                  "lengthBeats": 0.4270833333333333
+                },
+                {
+                  "pitch": 77,
+                  "velocity": 92,
+                  "startBeat": 2,
+                  "lengthBeats": 1.3802083333333333
+                },
+                {
+                  "pitch": 75,
+                  "velocity": 105,
+                  "startBeat": 3,
+                  "lengthBeats": 0.8541666666666666
+                },
+                {
+                  "pitch": 72,
+                  "velocity": 91,
+                  "startBeat": 4,
+                  "lengthBeats": 2.640625
+                },
+                {
+                  "pitch": 70,
+                  "velocity": 93,
+                  "startBeat": 8,
+                  "lengthBeats": 0.5208333333333334
+                },
+                {
+                  "pitch": 74,
+                  "velocity": 92,
+                  "startBeat": 8.5,
+                  "lengthBeats": 0.4270833333333333
+                },
+                {
+                  "pitch": 77,
+                  "velocity": 99,
+                  "startBeat": 9,
+                  "lengthBeats": 1.3802083333333333
+                },
+                {
+                  "pitch": 75,
+                  "velocity": 93,
+                  "startBeat": 10,
+                  "lengthBeats": 0.5885416666666666
+                },
+                {
+                  "pitch": 67,
+                  "velocity": 104,
+                  "startBeat": 10.5,
+                  "lengthBeats": 0.5885416666666666
+                },
+                {
+                  "pitch": 77,
+                  "velocity": 80,
+                  "startBeat": 11,
+                  "lengthBeats": 0.8541666666666666
+                },
+                {
+                  "pitch": 74,
+                  "velocity": 78,
+                  "startBeat": 12,
+                  "lengthBeats": 1.046875
+                },
+                {
+                  "pitch": 70,
+                  "velocity": 98,
+                  "startBeat": 13,
+                  "lengthBeats": 3.4791666666666665
+                }
+              ],
+              "gainDb": -3.921875
+            }
+          },
+          {
+            "id": "generated-test-2-segment-2-2",
+            "trackId": "generated-test-2-track-2",
+            "name": "B · lead",
+            "startBeat": 32,
+            "lengthBeats": 16,
+            "repeats": 0,
+            "layer": 0,
+            "muted": false,
+            "instrumentId": "slow-jazz-aaba-instrument-2",
+            "payload": {
+              "kind": "midi",
+              "notes": [
+                {
+                  "pitch": 70,
+                  "velocity": 98,
+                  "startBeat": 0,
+                  "lengthBeats": 0.6927083333333334
+                },
+                {
+                  "pitch": 72,
+                  "velocity": 94,
+                  "startBeat": 0.5,
+                  "lengthBeats": 0.2604166666666667
+                },
+                {
+                  "pitch": 72,
+                  "velocity": 86,
+                  "startBeat": 0.75,
+                  "lengthBeats": 0.21354166666666666
+                },
+                {
+                  "pitch": 75,
+                  "velocity": 93,
+                  "startBeat": 1,
+                  "lengthBeats": 0.5260416666666666
+                },
+                {
+                  "pitch": 75,
+                  "velocity": 108,
+                  "startBeat": 1.5,
+                  "lengthBeats": 0.5989583333333334
+                },
+                {
+                  "pitch": 74,
+                  "velocity": 103,
+                  "startBeat": 2,
+                  "lengthBeats": 2.09375
+                },
+                {
+                  "pitch": 72,
+                  "velocity": 97,
+                  "startBeat": 4,
+                  "lengthBeats": 0.2604166666666667
+                },
+                {
+                  "pitch": 74,
+                  "velocity": 98,
+                  "startBeat": 4.25,
+                  "lengthBeats": 0.34375
+                },
+                {
+                  "pitch": 77,
+                  "velocity": 104,
+                  "startBeat": 4.5,
+                  "lengthBeats": 0.5260416666666666
+                },
+                {
+                  "pitch": 75,
+                  "velocity": 96,
+                  "startBeat": 5,
+                  "lengthBeats": 0.2604166666666667
+                },
+                {
+                  "pitch": 67,
+                  "velocity": 102,
+                  "startBeat": 5.25,
+                  "lengthBeats": 0.2604166666666667
+                },
+                {
+                  "pitch": 77,
+                  "velocity": 86,
+                  "startBeat": 5.5,
+                  "lengthBeats": 0.4322916666666667
+                },
+                {
+                  "pitch": 75,
+                  "velocity": 82,
+                  "startBeat": 6,
+                  "lengthBeats": 0.6927083333333334
+                },
+                {
+                  "pitch": 70,
+                  "velocity": 102,
+                  "startBeat": 6.5,
+                  "lengthBeats": 1.5729166666666667
+                },
+                {
+                  "pitch": 70,
+                  "velocity": 97,
+                  "startBeat": 8,
+                  "lengthBeats": 0.4322916666666667
+                },
+                {
+                  "pitch": 74,
+                  "velocity": 84,
+                  "startBeat": 8.5,
+                  "lengthBeats": 0.21354166666666666
+                },
+                {
+                  "pitch": 72,
+                  "velocity": 88,
+                  "startBeat": 8.75,
+                  "lengthBeats": 0.34375
+                },
+                {
+                  "pitch": 77,
+                  "velocity": 94,
+                  "startBeat": 9,
+                  "lengthBeats": 0.6927083333333334
+                },
+                {
+                  "pitch": 75,
+                  "velocity": 105,
+                  "startBeat": 9.5,
+                  "lengthBeats": 0.6927083333333334
+                },
+                {
+                  "pitch": 74,
+                  "velocity": 95,
+                  "startBeat": 10,
+                  "lengthBeats": 2.09375
+                },
+                {
+                  "pitch": 70,
+                  "velocity": 98,
+                  "startBeat": 12,
+                  "lengthBeats": 0.34375
+                },
+                {
+                  "pitch": 74,
+                  "velocity": 95,
+                  "startBeat": 12.25,
+                  "lengthBeats": 0.296875
+                },
+                {
+                  "pitch": 77,
+                  "velocity": 101,
+                  "startBeat": 12.5,
+                  "lengthBeats": 0.5260416666666666
+                },
+                {
+                  "pitch": 75,
+                  "velocity": 95,
+                  "startBeat": 13,
+                  "lengthBeats": 0.34375
+                },
+                {
+                  "pitch": 67,
+                  "velocity": 109,
+                  "startBeat": 13.25,
+                  "lengthBeats": 0.34375
+                },
+                {
+                  "pitch": 77,
+                  "velocity": 89,
+                  "startBeat": 13.5,
+                  "lengthBeats": 0.5989583333333334
+                },
+                {
+                  "pitch": 74,
+                  "velocity": 87,
+                  "startBeat": 14,
+                  "lengthBeats": 0.5989583333333334
+                },
+                {
+                  "pitch": 70,
+                  "velocity": 103,
+                  "startBeat": 14.5,
+                  "lengthBeats": 2.0729166666666665
+                }
+              ],
+              "gainDb": -3.1979166666666665
+            }
+          },
+          {
+            "id": "generated-test-2-segment-2-3",
+            "trackId": "generated-test-2-track-2",
+            "name": "A3 · lead",
+            "startBeat": 48,
+            "lengthBeats": 16,
+            "repeats": 0,
+            "layer": 0,
+            "muted": false,
+            "instrumentId": "slow-jazz-aaba-instrument-2",
+            "payload": {
+              "kind": "midi",
+              "notes": [
+                {
+                  "pitch": 72,
+                  "velocity": 104,
+                  "startBeat": 0,
+                  "lengthBeats": 1.125
+                },
+                {
+                  "pitch": 72,
+                  "velocity": 77,
+                  "startBeat": 0.5,
+                  "lengthBeats": 0.4166666666666667
+                },
+                {
+                  "pitch": 74,
+                  "velocity": 88,
+                  "startBeat": 1,
+                  "lengthBeats": 0.4270833333333333
+                },
+                {
+                  "pitch": 72,
+                  "velocity": 89,
+                  "startBeat": 1.5,
+                  "lengthBeats": 0.6875
+                },
+                {
+                  "pitch": 77,
+                  "velocity": 97,
+                  "startBeat": 2,
+                  "lengthBeats": 0.6979166666666666
+                },
+                {
+                  "pitch": 70,
+                  "velocity": 75,
+                  "startBeat": 2.5,
+                  "lengthBeats": 0.3385416666666667
+                },
+                {
+                  "pitch": 75,
+                  "velocity": 113,
+                  "startBeat": 3,
+                  "lengthBeats": 0.6979166666666666
+                },
+                {
+                  "pitch": 69,
+                  "velocity": 86,
+                  "startBeat": 3.5,
+                  "lengthBeats": 0.546875
+                },
+                {
+                  "pitch": 74,
+                  "velocity": 105,
+                  "startBeat": 4,
+                  "lengthBeats": 0.9739583333333334
+                },
+                {
+                  "pitch": 72,
+                  "velocity": 82,
+                  "startBeat": 6,
+                  "lengthBeats": 0.3697916666666667
+                },
+                {
+                  "pitch": 70,
+                  "velocity": 99,
+                  "startBeat": 8,
+                  "lengthBeats": 0.6875
+                },
+                {
+                  "pitch": 74,
+                  "velocity": 104,
+                  "startBeat": 8.5,
+                  "lengthBeats": 0.4270833333333333
+                },
+                {
+                  "pitch": 77,
+                  "velocity": 102,
+                  "startBeat": 9,
+                  "lengthBeats": 0.8541666666666666
+                },
+                {
+                  "pitch": 75,
+                  "velocity": 86,
+                  "startBeat": 9.5,
+                  "lengthBeats": 0.546875
+                },
+                {
+                  "pitch": 75,
+                  "velocity": 94,
+                  "startBeat": 10,
+                  "lengthBeats": 0.5208333333333334
+                },
+                {
+                  "pitch": 77,
+                  "velocity": 105,
+                  "startBeat": 10.5,
+                  "lengthBeats": 0.6875
+                },
+                {
+                  "pitch": 77,
+                  "velocity": 91,
+                  "startBeat": 11,
+                  "lengthBeats": 0.6979166666666666
+                },
+                {
+                  "pitch": 75,
+                  "velocity": 62,
+                  "startBeat": 11.5,
+                  "lengthBeats": 0.4166666666666667
+                },
+                {
+                  "pitch": 74,
+                  "velocity": 90,
+                  "startBeat": 12,
+                  "lengthBeats": 0.6979166666666666
+                },
+                {
+                  "pitch": 72,
+                  "velocity": 68,
+                  "startBeat": 12.5,
+                  "lengthBeats": 0.46875
+                },
+                {
+                  "pitch": 70,
+                  "velocity": 104,
+                  "startBeat": 13,
+                  "lengthBeats": 0.6979166666666666
+                }
+              ],
+              "gainDb": -2.5989583333333335
+            }
+          }
+        ],
+        "parentTrackId": "",
+        "sends": []
+      },
+      {
+        "id": "generated-test-2-track-3",
+        "name": "Vibraphone Countervoice",
+        "kind": "midi",
+        "instrumentId": "slow-jazz-aaba-instrument-3",
+        "gainDb": 0,
+        "pan": 0,
+        "mute": false,
+        "solo": false,
+        "recordArmed": false,
+        "inputMonitoring": false,
+        "inputDeviceId": "",
+        "inputChannelStart": 0,
+        "inputChannelCount": 2,
+        "recordGainDb": 0,
+        "outputEnabled": true,
+        "effects": {
+          "filters": []
+        },
+        "rowHeight": "normal",
+        "segments": [
+          {
+            "id": "generated-test-2-segment-3-0",
+            "trackId": "generated-test-2-track-3",
+            "name": "A3 · countermelody",
+            "startBeat": 48,
+            "lengthBeats": 16,
+            "repeats": 0,
+            "layer": 0,
+            "muted": false,
+            "instrumentId": "slow-jazz-aaba-instrument-3",
+            "payload": {
+              "kind": "midi",
+              "notes": [
+                {
+                  "pitch": 77,
+                  "velocity": 99,
+                  "startBeat": 5,
+                  "lengthBeats": 0.65
+                },
+                {
+                  "pitch": 77,
+                  "velocity": 88,
+                  "startBeat": 14,
+                  "lengthBeats": 0.65
+                },
+                {
+                  "pitch": 82,
+                  "velocity": 99,
+                  "startBeat": 15,
+                  "lengthBeats": 0.65
+                }
+              ],
+              "gainDb": -2.5989583333333335
+            }
+          }
+        ],
+        "parentTrackId": "",
+        "sends": []
+      },
+      {
+        "id": "generated-test-2-track-4",
+        "name": "Brush and Ride Kit",
+        "kind": "midi",
+        "instrumentId": "slow-jazz-aaba-instrument-4",
+        "gainDb": 0,
+        "pan": 0,
+        "mute": false,
+        "solo": false,
+        "recordArmed": false,
+        "inputMonitoring": false,
+        "inputDeviceId": "",
+        "inputChannelStart": 0,
+        "inputChannelCount": 2,
+        "recordGainDb": 0,
+        "outputEnabled": true,
+        "effects": {
+          "filters": []
+        },
+        "rowHeight": "normal",
+        "segments": [
+          {
+            "id": "generated-test-2-segment-4-0",
+            "trackId": "generated-test-2-track-4",
+            "name": "A1 · rhythm",
+            "startBeat": 0,
+            "lengthBeats": 16,
+            "repeats": 3,
+            "layer": 0,
+            "muted": false,
+            "instrumentId": "slow-jazz-aaba-instrument-4",
+            "payload": {
+              "kind": "midi",
+              "notes": [
+                {
+                  "pitch": 34,
+                  "velocity": 114,
+                  "startBeat": 0,
+                  "lengthBeats": 0.18229166666666666
+                },
+                {
+                  "pitch": 29,
+                  "velocity": 68,
+                  "startBeat": 2,
+                  "lengthBeats": 0.18229166666666666
+                },
+                {
+                  "pitch": 34,
+                  "velocity": 114,
+                  "startBeat": 4,
+                  "lengthBeats": 0.18229166666666666
+                },
+                {
+                  "pitch": 29,
+                  "velocity": 68,
+                  "startBeat": 6,
+                  "lengthBeats": 0.18229166666666666
+                },
+                {
+                  "pitch": 34,
+                  "velocity": 114,
+                  "startBeat": 8,
+                  "lengthBeats": 0.18229166666666666
+                },
+                {
+                  "pitch": 29,
+                  "velocity": 68,
+                  "startBeat": 10,
+                  "lengthBeats": 0.18229166666666666
+                },
+                {
+                  "pitch": 34,
+                  "velocity": 114,
+                  "startBeat": 12,
+                  "lengthBeats": 0.18229166666666666
+                },
+                {
+                  "pitch": 29,
+                  "velocity": 68,
+                  "startBeat": 14,
+                  "lengthBeats": 0.18229166666666666
+                }
+              ],
+              "gainDb": -4.401041666666667
+            }
+          }
+        ],
+        "parentTrackId": "",
+        "sends": []
+      }
+    ],
+    "returnBuses": [],
+    "masterEqAutomation": [],
+    "masterChain": {
+      "inputGainDb": 0,
+      "compressorEnabled": false,
+      "compressorThresholdDb": -18,
+      "compressorRatio": 2,
+      "compressorAttackMs": 20,
+      "compressorReleaseMs": 160,
+      "compressorMakeupDb": 0,
+      "compressorMix": 100,
+      "outputGainDb": 0
+    },
+    "recordingInput": {
+      "inputDeviceId": "",
+      "inputDeviceName": "",
+      "inputChannelStart": 0,
+      "inputChannelCount": 2,
+      "calibrationSampleRate": 0,
+      "measuredRoundTripSamples": 0,
+      "reportedInputLatencySamples": 0,
+      "reportedOutputLatencySamples": 0,
+      "userLatencyAdjustmentSamples": 0
+    }
+  },
+  "instruments": [
+    {
+      "id": "slow-jazz-aaba-instrument-0",
+      "name": "Generated · Upright Bass",
+      "createdAt": 1785627146366,
+      "updatedAt": 1785627146366,
+      "icon": "ph:cube",
+      "kind": "wavetable",
+      "envelope": {
+        "attackMs": 8.34274804398947,
+        "decayMs": 108.38387324232232,
+        "sustain": 0.7621326291240129,
+        "releaseMs": 188.9971361547236
+      },
+      "knobs": {
+        "cutoff": 0.4085623369991226,
+        "resonance": 0.1378514606244516,
+        "drive": 0.1342811684995613,
+        "color": 0.5357029212489033
+      },
+      "filterType": "lowpass",
+      "waveform": "wavetable",
+      "detuneCents": 0,
+      "octave": 0,
+      "subOscLevel": 0.42,
+      "glideMs": 24,
+      "maxVoices": 1,
+      "mono": true,
+      "legato": true,
+      "pitchBendRangeSemitones": 2,
+      "ampLevel": 1,
+      "ampPan": 0,
+      "lfoWaveform": "sine",
+      "lfoRateHz": 3.714058424978065,
+      "lfoDepth": 0.04071087637467097,
+      "lfoSync": false,
+      "lfoSyncedRate": "1/4",
+      "lfoSmoothing": 0,
+      "lfoRandomPhase": 0,
+      "lfoPhase": 0,
+      "lfoRetrigger": true,
+      "lfoOneShot": false,
+      "lfo2Waveform": "triangle",
+      "lfo2RateHz": 0.5,
+      "lfo2Sync": false,
+      "lfo2SyncedRate": "1/2",
+      "lfo2Smoothing": 0,
+      "lfo2RandomPhase": 0,
+      "lfo2Enabled": false,
+      "lfo2Phase": 0,
+      "lfo2Retrigger": true,
+      "lfo2OneShot": false,
+      "lfoPositionBipolar": true,
+      "lfoPitchBipolar": true,
+      "lfoFilterBipolar": true,
+      "lfoToPitch": 0,
+      "lfoToFilter": 0,
+      "envToFilter": 0,
+      "wavetable": {
+        "bank": "aether",
+        "position": 0.4874801121855806,
+        "warp": 0.28355438187335485,
+        "warpMode": "shape",
+        "unison": 1,
+        "detuneCents": 12.785146062445161,
+        "blend": 0.5535543818733548
+      },
+      "aether": {
+        "oscA": {
+          "enabled": true,
+          "level": 0.78,
+          "pan": 0,
+          "waveform": "sine",
+          "octave": 0,
+          "semitone": 0,
+          "fineCents": 0,
+          "phase": 0,
+          "randomPhase": 0.25,
+          "wavetable": {
+            "bank": "aether",
+            "position": 0.4874801121855806,
+            "warp": 0.28355438187335485,
+            "warpMode": "shape",
+            "unison": 1,
+            "detuneCents": 12.785146062445161,
+            "blend": 0.5535543818733548
+          }
+        },
+        "oscB": {
+          "enabled": false,
+          "level": 0.26,
+          "pan": 0.12,
+          "waveform": "wavetable",
+          "octave": 0,
+          "semitone": 7,
+          "fineCents": -4,
+          "phase": 0,
+          "randomPhase": 0.25,
+          "wavetable": {
+            "bank": "glass",
+            "position": 0.2,
+            "warp": 0.28355438187335485,
+            "warpMode": "shape",
+            "unison": 1,
+            "detuneCents": 12.785146062445161,
+            "blend": 0.5535543818733548
+          }
+        },
+        "sub": {
+          "enabled": true,
+          "level": 0.45,
+          "octave": -1,
+          "waveform": "sine"
+        },
+        "noise": {
+          "enabled": false,
+          "level": 0.05,
+          "color": 0.45
+        },
+        "sampleSlot1": {
+          "schemaVersion": 5,
+          "enabled": false,
+          "audioFileId": "",
+          "rootNote": 60,
+          "level": 0.8,
+          "pan": 0,
+          "route": "filter",
+          "startRatio": 0,
+          "endRatio": 1,
+          "loopEnabled": false,
+          "loopStartRatio": 0,
+          "loopEndRatio": 1,
+          "fxSends": [
+            0,
+            0
+          ],
+          "zones": []
+        },
+        "runtimeWarp": 0,
+        "runtimeWarpMode": "shape"
+      },
+      "sampleIds": [],
+      "setId": "user-instruments",
+      "taxonomy": {
+        "categoryId": "synth_electronic",
+        "instrumentId": "wavetable_synth"
+      },
+      "source": {
+        "kind": "created",
+        "label": "Start from Something test generation",
+        "edited": false
+      },
+      "descriptors": [
+        "bass",
+        "rounded-bass",
+        "jazz",
+        "slow",
+        "medium",
+        "generated-song",
+        "generated-instrument",
+        "aether",
+        "wavetable"
+      ],
+      "userCreated": true
+    },
+    {
+      "id": "slow-jazz-aaba-instrument-1",
+      "name": "Generated · Warm Jazz Keys",
+      "createdAt": 1785627146366,
+      "updatedAt": 1785627146366,
+      "icon": "ph:cube",
+      "kind": "wavetable",
+      "envelope": {
+        "attackMs": 17.65281310164668,
+        "decayMs": 344.43100512587256,
+        "sustain": 0.7155338792352783,
+        "releaseMs": 606.0482301958018
+      },
+      "knobs": {
+        "cutoff": 0.5371412259869142,
+        "resonance": 0.1719632662418213,
+        "drive": 0.08357061299345703,
+        "color": 0.4839265324836426
+      },
+      "filterType": "lowpass",
+      "waveform": "wavetable",
+      "detuneCents": 0,
+      "octave": 0,
+      "subOscLevel": 0,
+      "glideMs": 0,
+      "maxVoices": 16,
+      "mono": false,
+      "legato": false,
+      "pitchBendRangeSemitones": 2,
+      "ampLevel": 1,
+      "ampPan": 0,
+      "lfoWaveform": "triangle",
+      "lfoRateHz": 2.678530649672852,
+      "lfoDepth": 0.13035591949018555,
+      "lfoSync": false,
+      "lfoSyncedRate": "1/4",
+      "lfoSmoothing": 0,
+      "lfoRandomPhase": 0,
+      "lfoPhase": 0,
+      "lfoRetrigger": true,
+      "lfoOneShot": false,
+      "lfo2Waveform": "triangle",
+      "lfo2RateHz": 0.5,
+      "lfo2Sync": false,
+      "lfo2SyncedRate": "1/2",
+      "lfo2Smoothing": 0,
+      "lfo2RandomPhase": 0,
+      "lfo2Enabled": false,
+      "lfo2Phase": 0,
+      "lfo2Retrigger": true,
+      "lfo2OneShot": false,
+      "lfoPositionBipolar": true,
+      "lfoPitchBipolar": true,
+      "lfoFilterBipolar": true,
+      "lfoToPitch": 0,
+      "lfoToFilter": 0,
+      "envToFilter": 0,
+      "wavetable": {
+        "bank": "aether",
+        "position": 0.3968714318463745,
+        "warp": 0.20588979872546387,
+        "warpMode": "shape",
+        "unison": 1,
+        "detuneCents": 10.196326624182129,
+        "blend": 0.47588979872546383
+      },
+      "aether": {
+        "oscA": {
+          "enabled": true,
+          "level": 0.78,
+          "pan": 0,
+          "waveform": "wavetable",
+          "octave": 0,
+          "semitone": 0,
+          "fineCents": 0,
+          "phase": 0,
+          "randomPhase": 0.25,
+          "wavetable": {
+            "bank": "aether",
+            "position": 0.3968714318463745,
+            "warp": 0.20588979872546387,
+            "warpMode": "shape",
+            "unison": 1,
+            "detuneCents": 10.196326624182129,
+            "blend": 0.47588979872546383
+          }
+        },
+        "oscB": {
+          "enabled": true,
+          "level": 0.26,
+          "pan": 0.12,
+          "waveform": "wavetable",
+          "octave": 0,
+          "semitone": 7,
+          "fineCents": -4,
+          "phase": 0,
+          "randomPhase": 0.25,
+          "wavetable": {
+            "bank": "glass",
+            "position": 0.2,
+            "warp": 0.20588979872546387,
+            "warpMode": "shape",
+            "unison": 1,
+            "detuneCents": 10.196326624182129,
+            "blend": 0.47588979872546383
+          }
+        },
+        "sub": {
+          "enabled": false,
+          "level": 0.12,
+          "octave": -1,
+          "waveform": "sine"
+        },
+        "noise": {
+          "enabled": false,
+          "level": 0.05,
+          "color": 0.45
+        },
+        "sampleSlot1": {
+          "schemaVersion": 5,
+          "enabled": false,
+          "audioFileId": "",
+          "rootNote": 60,
+          "level": 0.8,
+          "pan": 0,
+          "route": "filter",
+          "startRatio": 0,
+          "endRatio": 1,
+          "loopEnabled": false,
+          "loopStartRatio": 0,
+          "loopEndRatio": 1,
+          "fxSends": [
+            0,
+            0
+          ],
+          "zones": []
+        },
+        "runtimeWarp": 0,
+        "runtimeWarpMode": "shape"
+      },
+      "sampleIds": [],
+      "setId": "user-instruments",
+      "taxonomy": {
+        "categoryId": "synth_electronic",
+        "instrumentId": "wavetable_synth"
+      },
+      "source": {
+        "kind": "created",
+        "label": "Start from Something test generation",
+        "edited": false
+      },
+      "descriptors": [
+        "harmony",
+        "sustained-pad",
+        "jazz",
+        "slow",
+        "medium",
+        "generated-song",
+        "generated-instrument",
+        "aether",
+        "wavetable"
+      ],
+      "userCreated": true
+    },
+    {
+      "id": "slow-jazz-aaba-instrument-2",
+      "name": "Generated · Tenor Sax",
+      "createdAt": 1785627146366,
+      "updatedAt": 1785627146366,
+      "icon": "ph:cube",
+      "kind": "wavetable",
+      "envelope": {
+        "attackMs": 18.97446233941579,
+        "decayMs": 146.54462339415787,
+        "sustain": 0.7706025974756578,
+        "releaseMs": 255.15830305757896
+      },
+      "knobs": {
+        "cutoff": 0.5060911977561403,
+        "resonance": 0.3025569985975877,
+        "drive": 0.17804559887807014,
+        "color": 0.6851139971951754
+      },
+      "filterType": "lowpass",
+      "waveform": "wavetable",
+      "detuneCents": 0,
+      "octave": 0,
+      "subOscLevel": 0,
+      "glideMs": 0,
+      "maxVoices": 16,
+      "mono": false,
+      "legato": false,
+      "pitchBendRangeSemitones": 2,
+      "ampLevel": 1,
+      "ampPan": 0,
+      "lfoWaveform": "sine",
+      "lfoRateHz": 3.902279943903508,
+      "lfoDepth": 0.04353419915855262,
+      "lfoSync": false,
+      "lfoSyncedRate": "1/4",
+      "lfoSmoothing": 0,
+      "lfoRandomPhase": 0,
+      "lfoPhase": 0,
+      "lfoRetrigger": true,
+      "lfoOneShot": false,
+      "lfo2Waveform": "triangle",
+      "lfo2RateHz": 0.5,
+      "lfo2Sync": false,
+      "lfo2SyncedRate": "1/2",
+      "lfo2Smoothing": 0,
+      "lfo2RandomPhase": 0,
+      "lfo2Enabled": false,
+      "lfo2Phase": 0,
+      "lfo2Retrigger": true,
+      "lfo2OneShot": false,
+      "lfoPositionBipolar": true,
+      "lfoPitchBipolar": true,
+      "lfoFilterBipolar": true,
+      "lfoToPitch": 0,
+      "lfoToFilter": 0,
+      "envToFilter": 0,
+      "wavetable": {
+        "bank": "aether",
+        "position": 0.5039494950915568,
+        "warp": 0.29767099579276307,
+        "warpMode": "shape",
+        "unison": 3,
+        "detuneCents": 13.25569985975877,
+        "blend": 0.567670995792763
+      },
+      "aether": {
+        "oscA": {
+          "enabled": true,
+          "level": 0.78,
+          "pan": 0,
+          "waveform": "saw",
+          "octave": 0,
+          "semitone": 0,
+          "fineCents": 0,
+          "phase": 0,
+          "randomPhase": 0.25,
+          "wavetable": {
+            "bank": "aether",
+            "position": 0.5039494950915568,
+            "warp": 0.29767099579276307,
+            "warpMode": "shape",
+            "unison": 3,
+            "detuneCents": 13.25569985975877,
+            "blend": 0.567670995792763
+          }
+        },
+        "oscB": {
+          "enabled": false,
+          "level": 0.26,
+          "pan": 0.12,
+          "waveform": "wavetable",
+          "octave": 0,
+          "semitone": 7,
+          "fineCents": -4,
+          "phase": 0,
+          "randomPhase": 0.25,
+          "wavetable": {
+            "bank": "glass",
+            "position": 0.2,
+            "warp": 0.29767099579276307,
+            "warpMode": "shape",
+            "unison": 3,
+            "detuneCents": 13.25569985975877,
+            "blend": 0.567670995792763
+          }
+        },
+        "sub": {
+          "enabled": false,
+          "level": 0.12,
+          "octave": -1,
+          "waveform": "sine"
+        },
+        "noise": {
+          "enabled": false,
+          "level": 0.05,
+          "color": 0.45
+        },
+        "sampleSlot1": {
+          "schemaVersion": 5,
+          "enabled": false,
+          "audioFileId": "",
+          "rootNote": 60,
+          "level": 0.8,
+          "pan": 0,
+          "route": "filter",
+          "startRatio": 0,
+          "endRatio": 1,
+          "loopEnabled": false,
+          "loopStartRatio": 0,
+          "loopEndRatio": 1,
+          "fxSends": [
+            0,
+            0
+          ],
+          "zones": []
+        },
+        "runtimeWarp": 0,
+        "runtimeWarpMode": "shape"
+      },
+      "sampleIds": [],
+      "setId": "user-instruments",
+      "taxonomy": {
+        "categoryId": "synth_electronic",
+        "instrumentId": "wavetable_synth"
+      },
+      "source": {
+        "kind": "created",
+        "label": "Start from Something test generation",
+        "edited": false
+      },
+      "descriptors": [
+        "lead",
+        "reed",
+        "jazz",
+        "slow",
+        "medium",
+        "generated-song",
+        "generated-instrument",
+        "aether",
+        "wavetable"
+      ],
+      "userCreated": true
+    },
+    {
+      "id": "slow-jazz-aaba-instrument-3",
+      "name": "Generated · Vibraphone Countervoice",
+      "createdAt": 1785627146366,
+      "updatedAt": 1785627146366,
+      "icon": "ph:cube",
+      "kind": "wavetable",
+      "envelope": {
+        "attackMs": 1.8614653725785821,
+        "decayMs": 80,
+        "sustain": 0.6780495147169683,
+        "releaseMs": 105.70663541047988
+      },
+      "knobs": {
+        "cutoff": 0.6338217908595274,
+        "resonance": 0.1911386192872046,
+        "drive": 0.056910895429763686,
+        "color": 0.3622772385744092
+      },
+      "filterType": "lowpass",
+      "waveform": "wavetable",
+      "detuneCents": 0,
+      "octave": 0,
+      "subOscLevel": 0,
+      "glideMs": 0,
+      "maxVoices": 16,
+      "mono": false,
+      "legato": false,
+      "pitchBendRangeSemitones": 2,
+      "ampLevel": 1,
+      "ampPan": 0,
+      "lfoWaveform": "triangle",
+      "lfoRateHz": 1.8455447714881843,
+      "lfoDepth": 0.012683171572322764,
+      "lfoSync": false,
+      "lfoSyncedRate": "1/4",
+      "lfoSmoothing": 0,
+      "lfoRandomPhase": 0,
+      "lfoPhase": 0,
+      "lfoRetrigger": true,
+      "lfoOneShot": false,
+      "lfo2Waveform": "triangle",
+      "lfo2RateHz": 0.5,
+      "lfo2Sync": false,
+      "lfo2SyncedRate": "1/2",
+      "lfo2Smoothing": 0,
+      "lfo2RandomPhase": 0,
+      "lfo2Enabled": false,
+      "lfo2Phase": 0,
+      "lfo2Retrigger": true,
+      "lfo2OneShot": false,
+      "lfoPositionBipolar": true,
+      "lfoPitchBipolar": true,
+      "lfoFilterBipolar": true,
+      "lfoToPitch": 0,
+      "lfoToFilter": 0,
+      "envToFilter": 0,
+      "wavetable": {
+        "bank": "aether",
+        "position": 0.3239851675052161,
+        "warp": 0.14341585786161382,
+        "warpMode": "shape",
+        "unison": 1,
+        "detuneCents": 8.11386192872046,
+        "blend": 0.4134158578616138
+      },
+      "aether": {
+        "oscA": {
+          "enabled": true,
+          "level": 0.78,
+          "pan": 0,
+          "waveform": "triangle",
+          "octave": 0,
+          "semitone": 0,
+          "fineCents": 0,
+          "phase": 0,
+          "randomPhase": 0.25,
+          "wavetable": {
+            "bank": "aether",
+            "position": 0.3239851675052161,
+            "warp": 0.14341585786161382,
+            "warpMode": "shape",
+            "unison": 1,
+            "detuneCents": 8.11386192872046,
+            "blend": 0.4134158578616138
+          }
+        },
+        "oscB": {
+          "enabled": false,
+          "level": 0.26,
+          "pan": 0.12,
+          "waveform": "wavetable",
+          "octave": 0,
+          "semitone": 7,
+          "fineCents": -4,
+          "phase": 0,
+          "randomPhase": 0.25,
+          "wavetable": {
+            "bank": "glass",
+            "position": 0.2,
+            "warp": 0.14341585786161382,
+            "warpMode": "shape",
+            "unison": 1,
+            "detuneCents": 8.11386192872046,
+            "blend": 0.4134158578616138
+          }
+        },
+        "sub": {
+          "enabled": false,
+          "level": 0.12,
+          "octave": -1,
+          "waveform": "sine"
+        },
+        "noise": {
+          "enabled": false,
+          "level": 0.05,
+          "color": 0.45
+        },
+        "sampleSlot1": {
+          "schemaVersion": 5,
+          "enabled": false,
+          "audioFileId": "",
+          "rootNote": 60,
+          "level": 0.8,
+          "pan": 0,
+          "route": "filter",
+          "startRatio": 0,
+          "endRatio": 1,
+          "loopEnabled": false,
+          "loopStartRatio": 0,
+          "loopEndRatio": 1,
+          "fxSends": [
+            0,
+            0
+          ],
+          "zones": []
+        },
+        "runtimeWarp": 0,
+        "runtimeWarpMode": "shape"
+      },
+      "sampleIds": [],
+      "setId": "user-instruments",
+      "taxonomy": {
+        "categoryId": "synth_electronic",
+        "instrumentId": "wavetable_synth"
+      },
+      "source": {
+        "kind": "created",
+        "label": "Start from Something test generation",
+        "edited": false
+      },
+      "descriptors": [
+        "countermelody",
+        "plucked",
+        "jazz",
+        "slow",
+        "medium",
+        "generated-song",
+        "generated-instrument",
+        "aether",
+        "wavetable"
+      ],
+      "userCreated": true
+    },
+    {
+      "id": "slow-jazz-aaba-instrument-4",
+      "name": "Generated · Brush and Ride Kit",
+      "createdAt": 1785627146366,
+      "updatedAt": 1785627146366,
+      "icon": "ph:cube",
+      "kind": "wavetable",
+      "envelope": {
+        "attackMs": 0.9274466715118491,
+        "decayMs": 80,
+        "sustain": 0.14372333575592453,
+        "releaseMs": 59.49803925631522
+      },
+      "knobs": {
+        "cutoff": 0.29163111434123273,
+        "resonance": 0.049769446463270445,
+        "drive": 0.19581555717061636,
+        "color": 0.4395388929265409
+      },
+      "filterType": "lowpass",
+      "waveform": "wavetable",
+      "detuneCents": 0,
+      "octave": 0,
+      "subOscLevel": 0,
+      "glideMs": 0,
+      "maxVoices": 16,
+      "mono": false,
+      "legato": false,
+      "pitchBendRangeSemitones": 2,
+      "ampLevel": 1,
+      "ampPan": 0,
+      "lfoWaveform": "sine",
+      "lfoRateHz": 1.7907778585308178,
+      "lfoDepth": 0.011861667877962268,
+      "lfoSync": false,
+      "lfoSyncedRate": "1/4",
+      "lfoSmoothing": 0,
+      "lfoRandomPhase": 0,
+      "lfoPhase": 0,
+      "lfoRetrigger": true,
+      "lfoOneShot": false,
+      "lfo2Waveform": "triangle",
+      "lfo2RateHz": 0.5,
+      "lfo2Sync": false,
+      "lfo2SyncedRate": "1/2",
+      "lfo2Smoothing": 0,
+      "lfo2RandomPhase": 0,
+      "lfo2Enabled": false,
+      "lfo2Phase": 0,
+      "lfo2Retrigger": true,
+      "lfo2OneShot": false,
+      "lfoPositionBipolar": true,
+      "lfoPitchBipolar": true,
+      "lfoFilterBipolar": true,
+      "lfoToPitch": 0,
+      "lfoToFilter": 0,
+      "envToFilter": 0,
+      "wavetable": {
+        "bank": "aether",
+        "position": 0.31919306262144653,
+        "warp": 0.13930833938981135,
+        "warpMode": "shape",
+        "unison": 1,
+        "detuneCents": 7.976944646327045,
+        "blend": 0.4093083393898113
+      },
+      "aether": {
+        "oscA": {
+          "enabled": false,
+          "level": 0.78,
+          "pan": 0,
+          "waveform": "sine",
+          "octave": 0,
+          "semitone": 0,
+          "fineCents": 0,
+          "phase": 0,
+          "randomPhase": 0.25,
+          "wavetable": {
+            "bank": "aether",
+            "position": 0.31919306262144653,
+            "warp": 0.13930833938981135,
+            "warpMode": "shape",
+            "unison": 1,
+            "detuneCents": 7.976944646327045,
+            "blend": 0.4093083393898113
+          }
+        },
+        "oscB": {
+          "enabled": false,
+          "level": 0.26,
+          "pan": 0.12,
+          "waveform": "wavetable",
+          "octave": 0,
+          "semitone": 7,
+          "fineCents": -4,
+          "phase": 0,
+          "randomPhase": 0.25,
+          "wavetable": {
+            "bank": "glass",
+            "position": 0.2,
+            "warp": 0.13930833938981135,
+            "warpMode": "shape",
+            "unison": 1,
+            "detuneCents": 7.976944646327045,
+            "blend": 0.4093083393898113
+          }
+        },
+        "sub": {
+          "enabled": false,
+          "level": 0.12,
+          "octave": -1,
+          "waveform": "sine"
+        },
+        "noise": {
+          "enabled": true,
+          "level": 0.82,
+          "color": 0.45
+        },
+        "sampleSlot1": {
+          "schemaVersion": 5,
+          "enabled": false,
+          "audioFileId": "",
+          "rootNote": 60,
+          "level": 0.8,
+          "pan": 0,
+          "route": "filter",
+          "startRatio": 0,
+          "endRatio": 1,
+          "loopEnabled": false,
+          "loopStartRatio": 0,
+          "loopEndRatio": 1,
+          "fxSends": [
+            0,
+            0
+          ],
+          "zones": []
+        },
+        "runtimeWarp": 0,
+        "runtimeWarpMode": "shape"
+      },
+      "sampleIds": [],
+      "setId": "user-instruments",
+      "taxonomy": {
+        "categoryId": "synth_electronic",
+        "instrumentId": "wavetable_synth"
+      },
+      "source": {
+        "kind": "created",
+        "label": "Start from Something test generation",
+        "edited": false
+      },
+      "descriptors": [
+        "rhythm",
+        "percussive",
+        "jazz",
+        "slow",
+        "medium",
+        "generated-song",
+        "generated-instrument",
+        "aether",
+        "wavetable"
+      ],
+      "userCreated": true
+    }
+  ],
+  "audioFiles": [],
+  "components": [],
+  "componentFolders": [],
+  "plugins": [],
+  "assets": []
+}

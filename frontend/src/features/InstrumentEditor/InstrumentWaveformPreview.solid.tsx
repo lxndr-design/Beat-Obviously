@@ -5,10 +5,11 @@ import {
   cachedInstrumentSampleBuffer,
   createInstrumentBufferSource,
   createSynthRenderState,
-  hasCachedInstrumentSample,
+  hasCachedInstrumentSamplesForPlayback,
   instrumentRequiresSamplePlayback,
   modulationAtTime,
-  preloadInstrumentSample,
+  preloadInstrumentSampleUrl,
+  preloadInstrumentSamplesForPlayback,
   previewFrequency,
   primaryInstrumentSampleUrl,
   renderInstrumentSample,
@@ -80,7 +81,6 @@ function InstrumentWaveformPreviewRuntime(props: { state: Accessor<InstrumentWav
 
   createEffect(() => {
     let cancelled = false;
-    const instrument = props.state().instrument;
     const primarySampleUrl = primarySampleUrlValue();
     if (!shouldDrawSample() || !primarySampleUrl) {
       setSampleEnvelope(null);
@@ -94,7 +94,7 @@ function InstrumentWaveformPreviewRuntime(props: { state: Accessor<InstrumentWav
     }
 
     const ctx = getAudioContext();
-    void preloadInstrumentSample(ctx, instrument)
+    void preloadInstrumentSampleUrl(ctx, primarySampleUrl)
       .then(() => {
         if (cancelled) return;
         const buffer = cachedInstrumentSampleBuffer(primarySampleUrl);
@@ -225,14 +225,15 @@ function InstrumentWaveformPreviewRuntime(props: { state: Accessor<InstrumentWav
     const bpm = useProjectStore.getState().project.bpm;
     if (ctx.state === "suspended") void ctx.resume();
     try {
-      await preloadInstrumentSample(ctx, instrument);
+      await preloadInstrumentSamplesForPlayback(ctx, instrument, previewFrequency(instrument), 127);
     } catch {
       if (instrumentRequiresSamplePlayback(instrument)) {
         void appAlert("This sampler's audio file could not be loaded.");
         return;
       }
     }
-    if (instrumentRequiresSamplePlayback(instrument) && !hasCachedInstrumentSample(instrument)) {
+    if (instrumentRequiresSamplePlayback(instrument)
+      && !hasCachedInstrumentSamplesForPlayback(instrument, previewFrequency(instrument), 127)) {
       void appAlert("This sampler has no playable audio file.");
       return;
     }
@@ -271,14 +272,15 @@ function InstrumentWaveformPreviewRuntime(props: { state: Accessor<InstrumentWav
     const bpm = useProjectStore.getState().project.bpm;
     if (ctx.state === "suspended") void ctx.resume();
     try {
-      await preloadInstrumentSample(ctx, latestInstrument);
+      await preloadInstrumentSamplesForPlayback(ctx, latestInstrument, previewFrequency(latestInstrument), 127);
     } catch {
       if (instrumentRequiresSamplePlayback(latestInstrument)) {
         void appAlert("This sampler's audio file could not be loaded.");
         return;
       }
     }
-    if (instrumentRequiresSamplePlayback(latestInstrument) && !hasCachedInstrumentSample(latestInstrument)) {
+    if (instrumentRequiresSamplePlayback(latestInstrument)
+      && !hasCachedInstrumentSamplesForPlayback(latestInstrument, previewFrequency(latestInstrument), 127)) {
       void appAlert("This sampler has no playable audio file.");
       return;
     }

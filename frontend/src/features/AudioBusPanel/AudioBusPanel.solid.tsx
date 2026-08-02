@@ -1,4 +1,4 @@
-import { createEffect, createMemo, createSignal, For, Show, type JSX } from "solid-js";
+import { createEffect, createMemo, createSignal, For, Index, Show, type JSX } from "solid-js";
 import { appConfirm, Button, FloatingSelect, HoverInfo, Icon, Knob, MicroButton, RowItem, SectionRibbon, Slider, TextInput } from "../../solid-ui";
 import { createStoreSelector } from "../../solid-utils/store";
 import { useAnalyzerStore } from "../../state/analyzerStore";
@@ -174,7 +174,7 @@ function MasterEditorPanel(props: { buses: ReturnBus[]; header: JSX.Element }) {
           <SectionTitle title="Inputs" meta={`${inputSources().length} ${inputSources().length === 1 ? "bus" : "buses"}`} />
           <ul class={styles.inputRows}>
             <Show when={inputSources().length > 0} fallback={<li class={styles.emptyState}>No buses routed to Master</li>}>
-              <For each={inputSources()}>{(source) => <BusInputRow source={source} />}</For>
+              <Index each={inputSources()}>{(source) => <BusInputRow source={source} />}</Index>
             </Show>
           </ul>
         </section>
@@ -250,28 +250,28 @@ function SectionTitle(props: { title: string; meta?: string }) {
   );
 }
 
-function BusInputRow(props: { source: BusInputSource }) {
+function BusInputRow(props: { source: () => BusInputSource }) {
   return (
     <RowItem
       className={styles.inputRow}
       density="media"
       cursor="default"
-      name={props.source.name}
-      meta={props.source.detail}
-      title={`${props.source.name} · ${props.source.detail}`}
+      name={props.source().name}
+      meta={props.source().detail}
+      title={`${props.source().name} · ${props.source().detail}`}
       action={(
         <Knob
           className={styles.inputLevelKnob}
           size="sm"
-          label={`${props.source.name} input volume`}
+          label={`${props.source().name} input volume`}
           min={-96}
           max={24}
           step={0.1}
-          value={props.source.levelDb}
+          value={props.source().levelDb}
           defaultValue={0}
           unit="dB"
           formatValue={formatCompact}
-          onChange={props.source.onLevelChange}
+          onChange={props.source().onLevelChange}
         />
       )}
     />
@@ -421,7 +421,7 @@ function BusEditorPanel(props: BusEditorPanelProps) {
           <SectionTitle title="Inputs" meta={`${primaryTrackInputs()} tracks · ${primaryBusInputs()} buses · ${sendInputs()} sends`} />
           <ul class={styles.inputRows}>
             <Show when={inputSources().length > 0} fallback={<li class={styles.emptyState}>No routed inputs</li>}>
-              <For each={inputSources()}>{(source) => <BusInputRow source={source} />}</For>
+              <Index each={inputSources()}>{(source) => <BusInputRow source={source} />}</Index>
             </Show>
           </ul>
         </section>
@@ -462,15 +462,22 @@ function BusEditorPanel(props: BusEditorPanelProps) {
           />
           <div class={styles.insertCards}>
             <Show when={props.bus.effects.filters.length > 0} fallback={<span class={styles.emptyState}>No inserts</span>}>
-              <For each={props.bus.effects.filters}>
-                {(effect, index) => (
-                  <InsertCard
-                    busId={props.bus.id}
-                    effect={effect}
-                    index={index()}
-                    count={props.bus.effects.filters.length}
-                  />
-                )}
+              <For each={props.bus.effects.filters.map((effect) => effect.id)}>
+                {(effectId, index) => {
+                  const effect = () => props.bus.effects.filters.find((candidate) => candidate.id === effectId);
+                  return (
+                    <Show when={effect()}>
+                      {(currentEffect) => (
+                        <InsertCard
+                          busId={props.bus.id}
+                          effect={currentEffect()}
+                          index={index()}
+                          count={props.bus.effects.filters.length}
+                        />
+                      )}
+                    </Show>
+                  );
+                }}
               </For>
             </Show>
           </div>
@@ -507,8 +514,15 @@ function BusEditorPanel(props: BusEditorPanelProps) {
           />
           <div class={styles.sendRows}>
             <Show when={(props.bus.sends?.length ?? 0) > 0} fallback={<span class={styles.emptyState}>No sends</span>}>
-              <For each={props.bus.sends ?? []}>
-                {(send) => <SendRow bus={props.bus} send={send} buses={props.buses} />}
+              <For each={(props.bus.sends ?? []).map((send) => send.busId)}>
+                {(destinationBusId) => {
+                  const send = () => props.bus.sends?.find((candidate) => candidate.busId === destinationBusId);
+                  return (
+                    <Show when={send()}>
+                      {(currentSend) => <SendRow bus={props.bus} send={currentSend()} buses={props.buses} />}
+                    </Show>
+                  );
+                }}
               </For>
             </Show>
           </div>

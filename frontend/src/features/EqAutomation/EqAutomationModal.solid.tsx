@@ -1,4 +1,4 @@
-import { For, Show } from "solid-js";
+import { For, Index, Show } from "solid-js";
 import { Button, Knob, Modal, NumberInput } from "../../solid-ui";
 import { send } from "../../ipc/bridge";
 import { useProjectStore, useUiStore } from "../../state/store";
@@ -75,20 +75,20 @@ export function EqAutomationModal() {
         fallback={<p class={styles.empty}>No automation points yet. Click "Add point".</p>}
       >
         <div class={styles.list}>
-          <For each={points()}>
+          <Index each={points()}>
             {(point, index) => (
               <div class={styles.point}>
                 <NumberInput
                   label="@beat"
-                  value={point.atBeat}
+                  value={point().atBeat}
                   min={0}
                   step={0.25}
-                  onChange={(value) => updatePointBeat(index(), value)}
+                  onChange={(value) => updatePointBeat(index, value)}
                 />
                 <For each={EQ_BAND_LABELS}>
                   {(label, band) => (
                     <Knob
-                      value={point.bandsDb[band()] ?? 0}
+                      value={point().bandsDb[band()] ?? 0}
                       min={-24}
                       max={24}
                       step={0.1}
@@ -96,16 +96,16 @@ export function EqAutomationModal() {
                       label={label}
                       bipolar
                       size="sm"
-                      onChange={(value) => updateBand(index(), band(), value)}
+                      onChange={(value) => updateBand(index, band(), value)}
                     />
                   )}
                 </For>
-                <Button variant="ghost" size="sm" onClick={() => removePoint(index())}>
+                <Button variant="ghost" size="sm" onClick={() => removePoint(index)}>
                   Remove
                 </Button>
               </div>
             )}
-          </For>
+          </Index>
         </div>
       </Show>
     </Modal>

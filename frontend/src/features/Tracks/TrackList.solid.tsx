@@ -9,6 +9,7 @@ import { TrackEffectHeaderRows, TrackEffectLaneRows } from "./TrackEffectRows.so
 import { Timeline } from "./Timeline.solid";
 import { Playhead } from "./Playhead.solid";
 import { TrackHeader } from "./TrackHeader.solid";
+import { TrackAutomationHeaderRows, TrackAutomationLaneRows } from "./TrackAutomationRows.solid";
 import {
   marqueeStyleFromClientPoints,
   normalizedTimelineRect,
@@ -47,6 +48,7 @@ export function TrackList() {
   const [marquee, setMarquee] = createSignal<MarqueeState | null>(null, { equals: false });
   const [horizontalScrollLeft, setHorizontalScrollLeft] = createSignal(0);
   const [expandedEffectIds, setExpandedEffectIds] = createSignal<Set<Id>>(new Set(), { equals: false });
+  const [expandedAutomationTrackIds, setExpandedAutomationTrackIds] = createSignal<Set<Id>>(new Set(), { equals: false });
   const [audioRecordingRequest, setAudioRecordingRequest] = createSignal<{ trackId: Id; startBeat: number; recordingGroupId: Id } | null>(null);
   const selectedSegments = createMemo(() => {
     const ids = new Set(selectedSegmentIds());
@@ -132,7 +134,7 @@ export function TrackList() {
   function onLanePointerDown(event: PointerEvent) {
     if (event.button !== 0 || event.ctrlKey) return;
     const target = event.target as Element;
-    if (target.closest("[data-timeline-ruler], [data-segment-body], [data-segment-handle], [data-segment-fade-handle], [data-track-timepoint-selection-key], input, button, [data-floating-layer]")) return;
+    if (target.closest("[data-timeline-ruler], [data-segment-body], [data-segment-handle], [data-segment-fade-handle], [data-track-timepoint-selection-key], [data-track-automation-lane], input, button, [data-floating-layer]")) return;
     const inner = laneScrollElement?.querySelector<HTMLElement>(`.${styles.lanesInner}`);
     if (!inner?.contains(target)) return;
     const next = {
@@ -213,6 +215,15 @@ export function TrackList() {
       const next = new Set(current);
       if (next.has(effectId)) next.delete(effectId);
       else next.add(effectId);
+      return next;
+    });
+  }
+
+  function toggleAutomationRows(trackId: Id) {
+    setExpandedAutomationTrackIds((current) => {
+      const next = new Set(current);
+      if (next.has(trackId)) next.delete(trackId);
+      else next.add(trackId);
       return next;
     });
   }
@@ -303,17 +314,24 @@ export function TrackList() {
       <div class={styles.area}>
         <div class={styles.headerCol}>
           <div class={styles.timelineSpacer} aria-hidden="true" />
-          <For each={tracks()}>
-            {(track, index) => (
+          <For each={tracks().map((track) => track.id)}>
+            {(trackId, index) => (
               <div>
                 <TrackHeader
-                  trackId={track.id}
+                  trackId={trackId}
                   index={index()}
-                  selected={selectedTrackIds().includes(track.id)}
-                  onSelect={(event) => selectTrack(track.id, event.shiftKey)}
+                  selected={selectedTrackIds().includes(trackId)}
+                  automationExpanded={expandedAutomationTrackIds().has(trackId)}
+                  onSelect={(event) => selectTrack(trackId, event.shiftKey)}
+                  onToggleAutomation={() => toggleAutomationRows(trackId)}
+                />
+                <TrackAutomationHeaderRows
+                  trackId={trackId}
+                  expanded={expandedAutomationTrackIds().has(trackId)}
+                  onToggle={() => toggleAutomationRows(trackId)}
                 />
                 <TrackEffectHeaderRows
-                  trackId={track.id}
+                  trackId={trackId}
                   expandedEffectIds={expandedEffectIds()}
                   onToggleEffect={toggleEffectRows}
                 />
@@ -383,16 +401,21 @@ export function TrackList() {
               onContextMenu={cancelPendingMarquee}
               onClick={onLaneClickCapture}
             >
-              <For each={tracks()}>
-                {(track) => (
+              <For each={tracks().map((track) => track.id)}>
+                {(trackId) => (
                   <div>
                     <TrackLane
-                      trackId={track.id}
-                      selected={selectedTrackIds().includes(track.id)}
+                      trackId={trackId}
+                      selected={selectedTrackIds().includes(trackId)}
                       onRequestAudioRecording={(request) => setAudioRecordingRequest(request)}
                     />
+                    <TrackAutomationLaneRows
+                      trackId={trackId}
+                      expanded={expandedAutomationTrackIds().has(trackId)}
+                      onToggle={() => toggleAutomationRows(trackId)}
+                    />
                     <TrackEffectLaneRows
-                      trackId={track.id}
+                      trackId={trackId}
                       expandedEffectIds={expandedEffectIds()}
                       onToggleEffect={toggleEffectRows}
                     />

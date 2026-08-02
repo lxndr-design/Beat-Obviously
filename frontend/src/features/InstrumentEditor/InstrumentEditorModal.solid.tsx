@@ -1,4 +1,4 @@
-import { createEffect, createMemo, createSignal, For, onCleanup, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, For, Index, onCleanup, Show } from "solid-js";
 import { appAlert, useModalStack } from "../../solid-ui";
 import { Modal, Button, FieldActionButton, FloatingSelect, HoverInfo, Icon, Knob, NumberInput, Slider, TextInput, Toggle } from "../../solid-ui";
 import { ai, type GeneratedInstrument } from "../../ai/aiService";
@@ -18,6 +18,7 @@ import type { AudioFile, Instrument, InstrumentSampleZone, InstrumentSnapshot, W
 import { createStoreSelector } from "../../solid-utils/store";
 import { WaveformPicker } from "./WaveformPicker.solid";
 import { InstrumentWaveformPreview } from "./InstrumentWaveformPreview.solid";
+import { TimelineJumpingSamplerEditor } from "./TimelineJumpingSamplerEditor.solid";
 import styles from "./InstrumentEditorModal.module.css";
 
 export interface Props {
@@ -691,21 +692,64 @@ export function InstrumentEditorModal(props: Props) {
         <Show when={showSamples()}>
           <section class={`${styles.section} ${styles.spanFull}`}>
             <h3 class={styles.sectionHeading}>Sampler</h3>
-            <SamplerZoneEditor
-              instrument={currentDraft()}
-              audioFiles={audioFiles()}
-              onImportAudio={importSamplerAudioFiles}
-              onRegisterAudioFiles={(files) => files.forEach(addAudioFile)}
-              onChange={(sampleMap) => {
-                const paths = uniqueSamplePaths(sampleMap.map((zone) => zone.path));
-                setDraft({
-                  ...currentDraft(),
-                  sampleMap,
-                  sampleUrl: paths[0],
-                  sampleUrls: paths,
-                });
-              }}
-            />
+            <div class={styles.samplerModeBar}>
+              <span>Sampler Mode</span>
+              <div>
+                <Button
+                  size="xs"
+                  selected={currentDraft().samplerComplexity !== "timeline-jumping"}
+                  onClick={() => setDraft({ ...currentDraft(), samplerComplexity: "mapped" })}
+                >
+                  Mapped Samples
+                </Button>
+                <Button
+                  size="xs"
+                  selected={currentDraft().samplerComplexity === "timeline-jumping"}
+                  onClick={() => {
+                    const path = currentDraft().sampleUrl ?? currentDraft().sampleMap?.[0]?.path;
+                    const compatible = (currentDraft().sampleMap ?? []).filter((zone) => (
+                      zone.path === path
+                      && zone.rootNote === zone.loNote
+                      && zone.rootNote === zone.hiNote
+                    ));
+                    setDraft({
+                      ...currentDraft(),
+                      samplerComplexity: "timeline-jumping",
+                      sampleMap: compatible,
+                      sampleUrl: path,
+                      sampleUrls: path ? [path] : [],
+                    });
+                  }}
+                >
+                  Timeline Jumping
+                </Button>
+              </div>
+            </div>
+            <Show when={currentDraft().samplerComplexity === "timeline-jumping"} fallback={
+              <SamplerZoneEditor
+                instrument={currentDraft()}
+                audioFiles={audioFiles()}
+                onImportAudio={importSamplerAudioFiles}
+                onRegisterAudioFiles={(files) => files.forEach(addAudioFile)}
+                onChange={(sampleMap) => {
+                  const paths = uniqueSamplePaths(sampleMap.map((zone) => zone.path));
+                  setDraft({
+                    ...currentDraft(),
+                    sampleMap,
+                    sampleUrl: paths[0],
+                    sampleUrls: paths,
+                  });
+                }}
+              />
+            }>
+              <TimelineJumpingSamplerEditor
+                instrument={currentDraft()}
+                audioFiles={audioFiles()}
+                onImportAudio={importSamplerAudioFiles}
+                onRegisterAudioFiles={(files) => files.forEach(addAudioFile)}
+                onChange={(patch) => setDraft({ ...currentDraft(), ...patch })}
+              />
+            </Show>
           </section>
         </Show>
 
@@ -962,30 +1006,30 @@ function SamplerZoneEditor(props: {
       </div>
       <div class={styles.samplerPropertyGrid}>
         <Show when={properties().length > 0} fallback={<p class={styles.hint}>Add a property to create sampler assignment slots.</p>}>
-          <For each={properties()}>{(property) => (
+          <Index each={properties()}>{(property) => (
           <div class={styles.samplerPropertyCard}>
             <Button
               iconOnly
               size="xs"
-              aria-label={`Remove ${property.label} property`}
+              aria-label={`Remove ${property().label} property`}
               className={styles.samplerPropertyClose}
-              onClick={() => removeProperty(property.kind)}
+              onClick={() => removeProperty(property().kind)}
             >
               <Icon name="ph:x" size={18} decorative />
             </Button>
-            <div class={styles.samplerPropertyTitle}>{property.label}</div>
+            <div class={styles.samplerPropertyTitle}>{property().label}</div>
             <Slider
               layout="inline"
               label="Steps"
               min={1}
               max={16}
               step={1}
-              value={property.steps}
-              readout={`${property.steps} step${property.steps === 1 ? "" : "s"}`}
-              onChange={(value) => updateProperty(property.kind, { steps: clampInteger(value, 1, 16) })}
+              value={property().steps}
+              readout={`${property().steps} step${property().steps === 1 ? "" : "s"}`}
+              onChange={(value) => updateProperty(property().kind, { steps: clampInteger(value, 1, 16) })}
             />
           </div>
-          )}</For>
+          )}</Index>
         </Show>
       </div>
 
@@ -1590,6 +1634,7 @@ function restoreSnapshot(snapshot: InstrumentSnapshot): Partial<Instrument> {
     sampleUrl: snapshot.sampleUrl,
     sampleUrls: snapshot.sampleUrls ? [...snapshot.sampleUrls] : undefined,
     sampleMap: snapshot.sampleMap ? structuredClone(snapshot.sampleMap) : undefined,
+    samplerComplexity: snapshot.samplerComplexity,
     parentIds: snapshot.parentIds ? [...snapshot.parentIds] : undefined,
     descriptors: snapshot.descriptors ? [...snapshot.descriptors] : undefined,
   };

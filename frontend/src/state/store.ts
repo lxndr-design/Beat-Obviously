@@ -8,6 +8,7 @@ import { pruneDevFixtureInstruments } from "./instrumentLibraryGuards";
 import { normalizeInstrumentTaxonomy } from "./instrumentTaxonomy";
 import { normalizeSampleMap } from "./sampleZones";
 import { createAurumTestInstruments } from "./aurumTestBank";
+import { createSalamanderCompactGrand } from "./factoryPiano";
 import { FACTORY_SYNTH_PRESETS, synthDraftToInstrumentPatch } from "./synthStore";
 import { audioBusExists, canSetAudioBusOutput, canSetAudioBusSend } from "./audioBusRouting";
 import { AUDIO_BUS_SCHEMA_VERSION } from "./types";
@@ -2028,6 +2029,7 @@ interface InstrumentLibrarySlice {
 }
 
 export const FACTORY_DRUM_SET_ID = "factory-drums";
+export const FACTORY_KEYS_SET_ID = "factory-keys";
 export const FACTORY_SYNTH_SET_ID = "factory-synths";
 export const AURUM_TEST_SET_ID = "aurum-test";
 /** Stable library ID retained so existing project grouping references remain valid. */
@@ -2041,6 +2043,7 @@ function defaultInstrumentSets(): InstrumentSet[] {
   return [
     { id: ROCK_DRUM_SET_ID, name: "Rock & Roll", factory: true },
     { id: FACTORY_DRUM_SET_ID, name: "Classic Machines", factory: true },
+    { id: FACTORY_KEYS_SET_ID, name: "Acoustic Keys", factory: true },
     { id: ORCHESTRA_SET_ID, name: "Orchestra Pit", factory: true },
     { id: FACTORY_SYNTH_SET_ID, name: "Synths", factory: true },
     { id: AURUM_TEST_SET_ID, name: "Aurum Test", factory: true },
@@ -2235,6 +2238,7 @@ export function snapshotInstrument(instrument: Instrument): InstrumentSnapshot {
     sampleUrl: instrument.sampleUrl,
     sampleUrls: instrument.sampleUrls ? [...instrument.sampleUrls] : undefined,
     sampleMap: instrument.sampleMap ? structuredClone(instrument.sampleMap) : undefined,
+    samplerComplexity: instrument.samplerComplexity,
     taxonomy: instrument.taxonomy ? structuredClone(instrument.taxonomy) : undefined,
     parentIds: instrument.parentIds ? [...instrument.parentIds] : undefined,
     descriptors: instrument.descriptors ? [...instrument.descriptors] : undefined,
@@ -2646,6 +2650,7 @@ export const useInstrumentStore = create<InstrumentLibrarySlice>()(
         });
 
       const seeds: Instrument[] = [
+        withOriginal(createSalamanderCompactGrand(FACTORY_KEYS_SET_ID)),
         withOriginal({
           id: nanoid(),
           name: "Basic Kick",
@@ -2980,6 +2985,8 @@ function sameEditor(
   if (a.kind === "synthInstrument" && b.kind === "synthInstrument")
     return a.instrumentId === b.instrumentId;
   if (a.kind === "track" && b.kind === "track")
+    return a.trackId === b.trackId;
+  if (a.kind === "trackAutomation" && b.kind === "trackAutomation")
     return a.trackId === b.trackId;
   if (a.kind === "segment" && b.kind === "segment")
     return a.segmentId === b.segmentId;

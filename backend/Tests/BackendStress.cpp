@@ -2186,6 +2186,185 @@ namespace
         return project;
     }
 
+    beat::Project makeProcessingCapacityProject(int trackCount)
+    {
+        const auto denseTemplate = makeDenseAetherProject();
+        beat::Project project;
+        project.id = "processing-capacity-project";
+        project.name = "Processing Capacity";
+        project.bpm = denseTemplate.bpm;
+        project.lengthBeats = denseTemplate.lengthBeats;
+        project.masterChain.compressorEnabled = true;
+        project.masterChain.compressorThresholdDb = -16.0f;
+        project.masterChain.compressorRatio = 2.5f;
+        project.masterChain.compressorAttackMs = 12.0f;
+        project.masterChain.compressorReleaseMs = 140.0f;
+        project.masterChain.compressorMix = 100.0f;
+
+        beat::ReturnBus spaceBus;
+        spaceBus.id = "capacity-space-bus";
+        spaceBus.name = "Capacity Space";
+        spaceBus.inputTrimDb = -3.0f;
+        spaceBus.gainDb = -4.0f;
+        {
+            beat::TrackEffect reverb;
+            reverb.id = "capacity-space-reverb";
+            reverb.kind = beat::TrackEffectKind::Reverb;
+            reverb.params.push_back({ "roomSize", 62.0f });
+            reverb.params.push_back({ "damping", 48.0f });
+            reverb.params.push_back({ "mix", 38.0f });
+            spaceBus.effects.push_back(std::move(reverb));
+
+            beat::TrackEffect compressor;
+            compressor.id = "capacity-space-compressor";
+            compressor.kind = beat::TrackEffectKind::Compressor;
+            compressor.params.push_back({ "thresholdDb", -20.0f });
+            compressor.params.push_back({ "ratio", 3.0f });
+            compressor.params.push_back({ "attackMs", 8.0f });
+            compressor.params.push_back({ "releaseMs", 110.0f });
+            compressor.params.push_back({ "mix", 100.0f });
+            spaceBus.effects.push_back(std::move(compressor));
+        }
+
+        beat::ReturnBus delayBus;
+        delayBus.id = "capacity-delay-bus";
+        delayBus.name = "Capacity Delay";
+        delayBus.outputBusId = spaceBus.id;
+        delayBus.inputTrimDb = -2.0f;
+        delayBus.gainDb = -5.0f;
+        {
+            beat::TrackEffect delay;
+            delay.id = "capacity-delay-effect";
+            delay.kind = beat::TrackEffectKind::Delay;
+            delay.params.push_back({ "timeMs", 185.0f });
+            delay.params.push_back({ "feedback", 34.0f });
+            delay.params.push_back({ "mix", 28.0f });
+            delayBus.effects.push_back(std::move(delay));
+
+            beat::TrackEffect saturator;
+            saturator.id = "capacity-delay-saturator";
+            saturator.kind = beat::TrackEffectKind::Saturator;
+            saturator.params.push_back({ "drive", 22.0f });
+            saturator.params.push_back({ "mix", 24.0f });
+            delayBus.effects.push_back(std::move(saturator));
+        }
+
+        project.returnBuses.push_back(std::move(delayBus));
+        project.returnBuses.push_back(std::move(spaceBus));
+
+        for (int trackIndex = 0; trackIndex < trackCount; ++trackIndex)
+        {
+            const auto suffix = juce::String(trackIndex + 1);
+            const auto instrumentId = juce::String("capacity-instrument-") + suffix;
+            const auto trackId = juce::String("capacity-track-") + suffix;
+
+            auto instrument = denseTemplate.instruments.front();
+            instrument.id = instrumentId;
+            instrument.maxVoices = 24;
+            instrument.ampLevel = 0.42f;
+            for (size_t effectIndex = 0; effectIndex < instrument.effects.size(); ++effectIndex)
+                instrument.effects[effectIndex].id = instrumentId + "-effect-" + juce::String((int) effectIndex + 1);
+            project.instruments.push_back(std::move(instrument));
+
+            auto track = denseTemplate.tracks.front();
+            track.id = trackId;
+            track.name = juce::String("Capacity Track ") + suffix;
+            track.instrumentId = instrumentId;
+            track.gainDb = -12.0f;
+            track.pan = trackCount > 1
+                ? -0.7f + 1.4f * (float) trackIndex / (float) (trackCount - 1)
+                : 0.0f;
+            track.sends.clear();
+            track.sends.push_back({ "capacity-space-bus", -15.0f, -0.1f, true, false });
+            track.sends.push_back({ "capacity-delay-bus", -18.0f, 0.1f, true, trackIndex % 2 == 0 });
+
+            for (size_t effectIndex = 0; effectIndex < track.effects.size(); ++effectIndex)
+            {
+                auto& effect = track.effects[effectIndex];
+                effect.id = trackId + "-effect-" + juce::String((int) effectIndex + 1);
+                if (effectIndex == 0)
+                {
+                    beat::MidiAutomationLane lane;
+                    lane.target = "cutoffHz";
+                    lane.points.push_back({ 0.0, 2200.0f });
+                    lane.points.push_back({ 2.0, 9800.0f, beat::AutomationCurve::Smoothstep });
+                    lane.points.push_back({ 8.0, 3400.0f });
+                    effect.automation.push_back(std::move(lane));
+                }
+            }
+
+            for (auto& segment : track.segments)
+            {
+                segment.id = trackId + "-segment";
+                segment.trackId = trackId;
+                segment.instrumentId = instrumentId;
+                segment.notes.clear();
+                for (int noteIndex = 0; noteIndex < 24; ++noteIndex)
+                {
+                    beat::MidiNote note;
+                    note.instrumentId = instrumentId;
+                    note.pitch = 36 + (noteIndex * 5 + trackIndex) % 48;
+                    note.velocity = 76 + noteIndex % 40;
+                    note.startBeat = 0.0;
+                    note.lengthBeats = 4.0;
+
+                    beat::MidiAutomationLane positionLane;
+                    positionLane.target = "osc.a.position";
+                    positionLane.points.push_back({ 0.0, 0.2f + (float) (noteIndex % 4) * 0.1f });
+                    positionLane.points.push_back({ 4.0, 0.82f, beat::AutomationCurve::Smoothstep });
+                    note.automation.push_back(std::move(positionLane));
+
+                    if (noteIndex % 3 == 0)
+                    {
+                        beat::MidiAutomationLane macroLane;
+                        macroLane.target = "macro.3";
+                        macroLane.points.push_back({ 0.0, 0.0f });
+                        macroLane.points.push_back({ 4.0, 0.9f, beat::AutomationCurve::Linear });
+                        note.automation.push_back(std::move(macroLane));
+                    }
+                    segment.notes.push_back(std::move(note));
+                }
+            }
+
+            beat::ProjectAutomationLane instrumentLane;
+            instrumentLane.trackId = trackId;
+            instrumentLane.instrumentId = instrumentId;
+            instrumentLane.target = "filter.cutoff";
+            instrumentLane.points.push_back({ 0.0, 0.32f });
+            instrumentLane.points.push_back({ 3.0, 0.86f, beat::AutomationCurve::Smoothstep });
+            instrumentLane.points.push_back({ 8.0, 0.48f });
+            project.automation.push_back(std::move(instrumentLane));
+
+            beat::ProjectAutomationLane panLane;
+            panLane.trackId = trackId;
+            panLane.target = "track.pan";
+            panLane.points.push_back({ 0.0, track.pan });
+            panLane.points.push_back({ 4.0, -track.pan, beat::AutomationCurve::Linear });
+            panLane.points.push_back({ 8.0, track.pan });
+            project.automation.push_back(std::move(panLane));
+
+            project.tracks.push_back(std::move(track));
+        }
+
+        beat::ProjectAutomationLane spaceTrimLane;
+        spaceTrimLane.trackId = "capacity-space-bus";
+        spaceTrimLane.target = "bus.inputTrimDb";
+        spaceTrimLane.points.push_back({ 0.0, -4.0f });
+        spaceTrimLane.points.push_back({ 4.0, -1.0f, beat::AutomationCurve::Linear });
+        spaceTrimLane.points.push_back({ 8.0, -4.0f });
+        project.automation.push_back(std::move(spaceTrimLane));
+
+        beat::ProjectAutomationLane delayMixLane;
+        delayMixLane.trackId = "capacity-delay-bus";
+        delayMixLane.target = "effect.capacity-delay-effect.mix";
+        delayMixLane.points.push_back({ 0.0, 18.0f });
+        delayMixLane.points.push_back({ 4.0, 42.0f, beat::AutomationCurve::Smoothstep });
+        delayMixLane.points.push_back({ 8.0, 18.0f });
+        project.automation.push_back(std::move(delayMixLane));
+
+        return project;
+    }
+
     beat::TrackEffect makeSerumBenchmarkEffect(
         const juce::String& id,
         beat::TrackEffectKind kind,
@@ -4686,7 +4865,11 @@ namespace
         return project;
     }
 
-    beat::Project makeSampleZoneOffsetProject(const juce::File& file, int startSample, int endSample)
+    beat::Project makeSampleZoneOffsetProject(const juce::File& file,
+                                              int startSample,
+                                              int endSample,
+                                              int notePitch = 60,
+                                              bool strictPitchMapping = false)
     {
         beat::Project project;
         project.id = "sample-zone-offset-project";
@@ -4697,6 +4880,7 @@ namespace
         beat::InstrumentDefinition instrument;
         instrument.id = "sample-zone-offset-instrument";
         instrument.kind = "sampler";
+        instrument.samplerComplexity = strictPitchMapping ? "timeline-jumping" : "";
         instrument.attackMs = 0.0f;
         instrument.releaseMs = 1.0f;
         instrument.sampleUrls.add(file.getFullPathName());
@@ -4704,8 +4888,8 @@ namespace
         beat::InstrumentDefinition::SampleZone zone;
         zone.path = file.getFullPathName();
         zone.rootNote = 60;
-        zone.loNote = 0;
-        zone.hiNote = 127;
+        zone.loNote = strictPitchMapping ? 60 : 0;
+        zone.hiNote = strictPitchMapping ? 60 : 127;
         zone.loVel = 0;
         zone.hiVel = 127;
         zone.oneShot = true;
@@ -4730,7 +4914,7 @@ namespace
 
         beat::MidiNote note;
         note.instrumentId = "sample-zone-offset-instrument";
-        note.pitch = 60;
+        note.pitch = notePitch;
         note.velocity = 127;
         note.startBeat = 0.0;
         note.lengthBeats = 0.25;
@@ -8068,6 +8252,28 @@ namespace
             std::cerr << "Sample zone start/end slicing fullEarly=" << fullEarlyEnergy
                       << " slicedEarly=" << slicedEarlyEnergy
                       << " slicedLate=" << slicedLateEnergy << "\n";
+        return ok;
+    }
+
+    bool stressAudioEngineTimelineJumpingStrictPitchMapping()
+    {
+        auto sampleFile = juce::File("/private/tmp").getChildFile("BeatBackendStress-timeline-jumping.wav");
+        if (!writeSampleZoneOffsetFixture(sampleFile))
+            return false;
+
+        auto mapped = renderOfflineBlock(makeSampleZoneOffsetProject(sampleFile, 2048, 3072, 60, true), 4096);
+        auto unassigned = renderOfflineBlock(makeSampleZoneOffsetProject(sampleFile, 2048, 3072, 61, true), 4096);
+        const double mappedEnergy = bufferEnergy(mapped);
+        const double unassignedEnergy = bufferEnergy(unassigned);
+
+        sampleFile.deleteFile();
+        const bool ok = std::isfinite(mappedEnergy)
+            && std::isfinite(unassignedEnergy)
+            && mappedEnergy > 0.0001
+            && unassignedEnergy < 1.0e-12;
+        if (!ok)
+            std::cerr << "Timeline Jumping strict map mappedEnergy=" << mappedEnergy
+                      << " unassignedEnergy=" << unassignedEnergy << "\n";
         return ok;
     }
 
@@ -16756,6 +16962,161 @@ namespace
         return true;
     }
 
+    bool benchmarkAudioEngineProcessingCapacity(bool extreme)
+    {
+        constexpr double sampleRate = 48000.0;
+        constexpr int warmupSamples = 2048;
+        constexpr int measuredSamples = 8192;
+        const std::vector<int> blockSizes = extreme
+            ? std::vector<int> { 128, 256, 512 }
+            : std::vector<int> { 256 };
+        const std::vector<int> trackTiers = extreme
+            ? std::vector<int> { 1, 2, 4, 8, 16, 32, 64, 72 }
+            : std::vector<int> { 1, 2, 4, 6, 8, 12, 16, 24, 32 };
+
+        struct CapacityRow
+        {
+            int tracks { 0 };
+            int voices { 0 };
+            int routes { 0 };
+            int automationEvents { 0 };
+            double medianLoad { 0.0 };
+            double p95Load { 0.0 };
+            double peakLoad { 0.0 };
+            double peakTotalMs { 0.0 };
+            double peakSynthMs { 0.0 };
+            double peakFxMs { 0.0 };
+            int64_t routeEffectSamples { 0 };
+            int64_t deadlineOverruns { 0 };
+            int64_t blockEventOverflows { 0 };
+            int64_t callbackSafetyViolations { 0 };
+            int64_t overloadSafetyMutes { 0 };
+            int64_t pendingNoteOffOverflows { 0 };
+        };
+
+        std::cout << (extreme ? "Beat extreme processing capacity benchmark\n" : "Beat processing capacity benchmark\n")
+                  << "48 kHz; callback load is measured against each buffer's realtime deadline.\n"
+                  << "Each track: dense Aether voices, per-note + segment + track automation, "
+                     "3 serial insert FX, 2 sends, nested 2-bus FX chain; master compression enabled.\n";
+
+        for (const int blockSize : blockSizes)
+        {
+            std::vector<CapacityRow> rows;
+            int recommendedTracks = 0;
+            int edgeTracks = 0;
+            int firstOverloadedTracks = 0;
+            const int warmupBlocks = juce::jmax(1, (warmupSamples + blockSize - 1) / blockSize);
+            const int measuredBlocks = juce::jmax(1, (measuredSamples + blockSize - 1) / blockSize);
+            const double deadlineMs = (double) blockSize * 1000.0 / sampleRate;
+            std::cout << "buffer=" << blockSize << " deadlineMs=" << deadlineMs
+                      << " measuredBlocks=" << measuredBlocks << "\n";
+
+            for (const int trackCount : trackTiers)
+            {
+                beat::AudioEngine engine;
+                if (extreme)
+                    engine.prepareForOffline(sampleRate, blockSize, 2);
+                else
+                    engine.prepareForRealtime(sampleRate, blockSize, 2);
+                engine.applyProject(makeProcessingCapacityProject(trackCount));
+                engine.requestSeek(0.0);
+                engine.requestPlay();
+
+                for (int block = 0; block < warmupBlocks; ++block)
+                    (void) renderEngineBlock(engine, blockSize);
+
+                std::vector<double> loads((size_t) measuredBlocks);
+                CapacityRow row;
+                row.tracks = trackCount;
+                double energy = 0.0;
+                beat::AudioEngine::RenderTimingSnapshot timing;
+                for (int block = 0; block < measuredBlocks; ++block)
+                {
+                    const auto output = renderEngineBlock(engine, blockSize);
+                    energy += bufferEnergy(output);
+
+                    if (!engine.pullRenderTimingSnapshot(timing)
+                        || !std::isfinite(timing.loadPercent)
+                        || !std::isfinite(timing.totalMs)
+                        || !std::isfinite(timing.synthMs)
+                        || !std::isfinite(timing.fxMs))
+                        return false;
+
+                    loads[(size_t) block] = timing.loadPercent;
+                    row.voices = juce::jmax(row.voices, timing.activeSynthVoices);
+                    row.routes = juce::jmax(row.routes, timing.routeCount);
+                    row.automationEvents = juce::jmax(row.automationEvents, timing.automationEventCount);
+                    row.peakLoad = juce::jmax(row.peakLoad, timing.loadPercent);
+                    row.peakTotalMs = juce::jmax(row.peakTotalMs, timing.totalMs);
+                    row.peakSynthMs = juce::jmax(row.peakSynthMs, timing.synthMs);
+                    row.peakFxMs = juce::jmax(row.peakFxMs, timing.fxMs);
+                    row.routeEffectSamples = juce::jmax(row.routeEffectSamples, timing.routeEffectSamples);
+                }
+                engine.requestStop();
+
+                const bool expectedSafetySilence = !extreme && timing.overloadSafetyMutes > 0;
+                if (!std::isfinite(energy) || (energy <= 0.000001 && !expectedSafetySilence))
+                    return false;
+
+                row.deadlineOverruns = timing.deadlineOverruns;
+                row.blockEventOverflows = timing.blockEventOverflows;
+                row.callbackSafetyViolations = timing.callbackSafetyViolations;
+                row.overloadSafetyMutes = timing.overloadSafetyMutes;
+                row.pendingNoteOffOverflows = timing.pendingNoteOffOverflows;
+                std::sort(loads.begin(), loads.end());
+                row.medianLoad = loads[loads.size() / 2];
+                row.p95Load = loads[(loads.size() * 95 - 1) / 100];
+                rows.push_back(row);
+
+                const bool structurallyClean = row.blockEventOverflows == 0
+                    && row.callbackSafetyViolations == 0
+                    && row.overloadSafetyMutes == 0
+                    && row.pendingNoteOffOverflows == 0;
+                const bool hasHeadroom = row.p95Load <= 70.0 && row.deadlineOverruns == 0 && structurallyClean;
+                const bool meetsDeadline = row.p95Load <= 100.0 && row.deadlineOverruns == 0 && structurallyClean;
+                if (hasHeadroom)
+                    recommendedTracks = trackCount;
+                if (meetsDeadline)
+                    edgeTracks = trackCount;
+                if (!meetsDeadline && firstOverloadedTracks == 0)
+                    firstOverloadedTracks = trackCount;
+
+                std::cout << "tracks=" << row.tracks
+                          << " voices=" << row.voices
+                          << " routes=" << row.routes
+                          << " automation=" << row.automationEvents
+                          << " medianLoad=" << row.medianLoad << "%"
+                          << " p95Load=" << row.p95Load << "%"
+                          << " peakLoad=" << row.peakLoad << "%"
+                          << " peakMs=" << row.peakTotalMs
+                          << " synthMs=" << row.peakSynthMs
+                          << " fxMs=" << row.peakFxMs
+                          << " routeFxSamples=" << row.routeEffectSamples
+                          << " deadlineOverruns=" << row.deadlineOverruns
+                          << " eventOverflows=" << row.blockEventOverflows
+                          << " callbackSafety=" << row.callbackSafetyViolations
+                          << " safetyMutes=" << row.overloadSafetyMutes
+                          << " noteOffOverflows=" << row.pendingNoteOffOverflows
+                          << "\n";
+
+                // The normal mode finds the first boundary quickly. Extreme mode
+                // deliberately continues through CPU and fixed-capacity failure.
+                if (!extreme && !meetsDeadline)
+                    break;
+            }
+
+            if (rows.empty())
+                return false;
+
+            std::cout << "capacitySummary buffer=" << blockSize
+                      << " recommendedTracks=" << recommendedTracks
+                      << " edgeTracks=" << edgeTracks
+                      << " firstOverloadedTracks=" << firstOverloadedTracks
+                      << " interpretation=keep_p95_below_70_percent_for_realtime_headroom\n";
+        }
+        return true;
+    }
+
     bool stressAudioEngineDenseAetherRoute()
     {
         beat::AudioEngine engine;
@@ -22848,6 +23209,31 @@ namespace
 
 int main(int argc, char** argv)
 {
+    if (argc == 2 && juce::String(argv[1]) == "--timeline-jumping")
+    {
+        if (!stressAudioEngineSampleZoneStartEndSlicing()
+            || !stressAudioEngineTimelineJumpingStrictPitchMapping())
+        {
+            std::cerr << "Timeline Jumping focused stress failed\n";
+            return 1;
+        }
+        std::cout << "Timeline Jumping focused stress passed\n";
+        return 0;
+    }
+
+    if (argc == 2
+        && (juce::String(argv[1]) == "--processing-capacity"
+            || juce::String(argv[1]) == "--processing-capacity-extreme"))
+    {
+        const bool extreme = juce::String(argv[1]) == "--processing-capacity-extreme";
+        if (!benchmarkAudioEngineProcessingCapacity(extreme))
+        {
+            std::cerr << "Processing capacity benchmark failed\n";
+            return 1;
+        }
+        return 0;
+    }
+
     if (argc == 2 && juce::String(argv[1]) == "--note-automation")
     {
         if (!stressInstrumentVoiceLiveBaselineVsNoteAutomation()

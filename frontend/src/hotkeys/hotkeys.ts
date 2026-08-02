@@ -186,7 +186,8 @@ export function installGlobalHotkeys() {
     }
     const combo = comboFromEvent(e);
     if (hasActiveModalScope()) {
-      if (!isNativeKeyboardControlTarget(target) && useContextualHotkeyStore.getState().run(combo)) {
+      const blocksContextualHotkeys = isTextEntryTarget(target) || target?.tagName === "SELECT";
+      if (!blocksContextualHotkeys && useContextualHotkeyStore.getState().run(combo)) {
         e.preventDefault();
         return;
       }

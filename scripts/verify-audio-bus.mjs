@@ -30,8 +30,13 @@ try {
   assert.ok(!panelSource.includes("styles.sectionTitle") && !/\.sectionTitle\s*\{/.test(panelCss), "Bus section headers should retain the shared SectionRibbon geometry instead of feature-local overrides");
   assert.ok(!panelSource.includes("<button"), "Bus panel should not introduce raw feature-local buttons");
   const inputRowSource = panelSource.slice(panelSource.indexOf("function BusInputRow"), panelSource.indexOf("function BusEditorPanel"));
-  assert.ok(inputRowSource.includes("<Knob") && inputRowSource.includes("props.source.onLevelChange"), "input rows should use the shared Knob as a functional per-input volume control");
+  assert.ok(inputRowSource.includes("<Knob") && inputRowSource.includes("props.source().onLevelChange"), "input rows should use the shared Knob as a functional per-input volume control");
   assert.ok(!inputRowSource.includes('role="meter"'), "input-row volume controls should not remain read-only meter rings");
+  assert.equal(
+    panelSource.match(/<Index each=\{inputSources\(\)\}>/g)?.length,
+    2,
+    "Master and Bus input rows should retain their Knob instances while reactive gain values change during a pointer drag",
+  );
   assert.ok(panelSource.includes("updateTrack(track.id, { gainDb })"), "primary Track input knobs should update Track gain");
   assert.ok(panelSource.includes("updateReturnBus(bus.id, { gainDb })"), "primary Bus input knobs should update Bus gain");
   assert.ok(panelSource.includes("upsertTrackSend(track.id, props.bus.id, { gainDb })"), "Track-send input knobs should update the routed send gain");

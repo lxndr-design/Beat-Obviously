@@ -1,4 +1,4 @@
-import { createMemo, createSignal, Show } from "solid-js";
+import { createMemo, createSignal, onCleanup, Show } from "solid-js";
 import { createStoreSelector } from "../../solid-utils/store";
 import {
   useInstrumentStore,
@@ -41,9 +41,12 @@ import {
 import {
   audioToMidiState,
   cancelAudioToMidi,
+  convertMultiInstrumentToMidi,
+  convertPianoToMidi,
   convertStemToMidi,
 } from "../../audio/audioToMidi";
 import { linkedResizeTargets, linkedSegmentsFor } from "../../audio/stemGrouping";
+import { setSegmentLandingGhosts } from "./segmentDragPreview";
 import styles from "./Segment.module.css";
 import type { Id, Segment as SegmentType } from "../../state/types";
 
@@ -137,6 +140,11 @@ export function Segment(props: Props) {
       setDragPreview(pendingPreview);
     });
   }
+
+  onCleanup(() => {
+    if (previewRaf != null) window.cancelAnimationFrame(previewRaf);
+    setSegmentLandingGhosts([]);
+  });
 
   function startDrag(mode: DragState["mode"], event: PointerEvent) {
     if (event.button !== 0 || event.ctrlKey || props.repetition > 0) return;
@@ -250,6 +258,19 @@ export function Segment(props: Props) {
         return [{ segmentId: segment.id, toTrackId: targetTrackId, toStartBeat: newStart }];
       });
       currentDrag.pendingMoves = moves;
+      const segmentById = new Map(projectState.tracks.flatMap((track) => track.segments).map((candidate) => [candidate.id, candidate]));
+      setSegmentLandingGhosts(moves.flatMap((move) => {
+        const original = segmentById.get(move.segmentId);
+        if (!original || original.trackId === move.toTrackId) return [];
+        return [{
+          segmentId: original.id,
+          targetTrackId: move.toTrackId,
+          startBeat: move.toStartBeat,
+          lengthBeats: original.lengthBeats,
+          name: original.name?.trim() || defaultName(original.payload.kind),
+          color: original.color,
+        }];
+      }));
       const ownMove = moves.find((move) => move.segmentId === props.segmentId);
       scheduleDragPreview(ownMove ? { startBeat: ownMove.toStartBeat, lengthBeats: props.lengthBeats } : { startBeat: props.startBeat, lengthBeats: props.lengthBeats });
     } else if (currentDrag.mode === "resize-right") {
@@ -318,6 +339,7 @@ export function Segment(props: Props) {
       projectStore.applySegmentEditCommand({ kind: "fade", segmentId: props.segmentId, fadeOutBeats: currentDrag.pendingFade.fadeOutBeats });
     }
     drag = null;
+    setSegmentLandingGhosts([]);
     scheduleDragPreview(null);
     setFadePreview(null);
     setDragging(false);
@@ -492,7 +514,7 @@ export function Segment(props: Props) {
               onSelect: () => void separateSegmentIntoStems(segment.id),
             } as ContextMenuItem]
         : []),
-      ...(isAudio && segment.stemKind !== "drums" && segment.stemKind != null
+      ...(isAudio
         ? activeTranscriptionJob?.segmentId === segment.id
           ? [{
               label: "Cancel Audio-to-MIDI",
@@ -501,11 +523,31 @@ export function Segment(props: Props) {
               onSelect: () => void cancelAudioToMidi(),
             } as ContextMenuItem]
           : [{
-              label: "Convert Stem to MIDI…",
+              label: "Convert to MIDI…",
               icon: "ph:music-notes",
               separatorBefore: true,
               disabled: Boolean(activeTranscriptionJob || activeStemJob),
-              onSelect: () => void convertStemToMidi(segment.id),
+              submenu: [
+                ...(segment.stemKind != null && segment.stemKind !== "drums"
+                  ? [{
+                      label: `${segment.stemKind === "bass" ? "Bass" : segment.stemKind === "vocals" ? "Vocals" : "Other"} stem · Basic Pitch`,
+                      icon: "ph:waveform",
+                      onSelect: () => void convertStemToMidi(segment.id),
+                    } as ContextMenuItem]
+                  : []),
+                ...(segment.stemKind !== "drums"
+                  ? [{
+                      label: "Piano performance · Transkun",
+                      icon: "ph:piano-keys",
+                      onSelect: () => void convertPianoToMidi(segment.id),
+                    } as ContextMenuItem]
+                  : []),
+                {
+                  label: "General / multi-instrument · MuScriptor",
+                  icon: "ph:music-notes",
+                  onSelect: () => void convertMultiInstrumentToMidi(segment.id),
+                },
+              ],
             } as ContextMenuItem]
         : []),
       ...(segment.groupId
@@ -664,10 +706,18 @@ export function Segment(props: Props) {
         editing() && styles.editing,
         dragging() && styles.dragging,
         playing() && styles.playing,
+        liveSeg()?.color && styles.colored,
         props.layer > 0 && styles.layered,
         props.repetition > 0 && styles.virtual,
       ].filter(Boolean).join(" ")}
-      style={{ left: `${left()}px`, width: `${width()}px`, top: `${top()}px`, bottom: "0", "z-index": dragging() ? 90 : 10 + visualLayer() }}
+      style={{
+        left: `${left()}px`,
+        width: `${width()}px`,
+        top: `${top()}px`,
+        bottom: "0",
+        "z-index": dragging() ? 90 : 10 + visualLayer(),
+        "--segment-color": liveSeg()?.color,
+      }}
       onDblClick={(event) => {
         event.stopPropagation();
         useUiStore.getState().setSelectedSegments([props.segmentId]);
@@ -687,6 +737,7 @@ export function Segment(props: Props) {
           onPointerDown={(event) => startDrag("resize-left", event)}
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
+          onPointerCancel={onPointerUp}
         />
       </Show>
 
@@ -696,6 +747,7 @@ export function Segment(props: Props) {
         onPointerDown={(event) => startDrag("move", event)}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
       >
         <div class={styles.labelStrip}>
           <span class={styles.nameplate}>
@@ -804,6 +856,7 @@ export function Segment(props: Props) {
                   onPointerDown={(event) => startDrag("fade-in", event)}
                   onPointerMove={onPointerMove}
                   onPointerUp={onPointerUp}
+                  onPointerCancel={onPointerUp}
                   onKeyDown={(event) => onFadeHandleKeyDown("fade-in", event)}
                 />
               </Show>
@@ -817,6 +870,7 @@ export function Segment(props: Props) {
                   onPointerDown={(event) => startDrag("fade-out", event)}
                   onPointerMove={onPointerMove}
                   onPointerUp={onPointerUp}
+                  onPointerCancel={onPointerUp}
                   onKeyDown={(event) => onFadeHandleKeyDown("fade-out", event)}
                 />
               </Show>
@@ -832,6 +886,7 @@ export function Segment(props: Props) {
           onPointerDown={(event) => startDrag("resize-right", event)}
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
+          onPointerCancel={onPointerUp}
         />
       </Show>
 
