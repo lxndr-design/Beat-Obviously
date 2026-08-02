@@ -194,6 +194,85 @@
   gap: 6px;
 }
 
+.midiRemixPopover {
+  max-height: calc(100vh - 16px);
+  overflow: auto;
+  padding: 9px;
+  border: var(--border-fg);
+  background: var(--color-bg);
+  color: var(--color-fg);
+}
+
+.midiRemixPopover > div {
+  display: grid;
+  gap: 9px;
+}
+
+.midiRemixHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.midiRemixHeader > div {
+  display: grid;
+  gap: 3px;
+}
+
+.midiRemixHeader span {
+  color: color-mix(in srgb, var(--color-fg) 62%, transparent);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-hint);
+  line-height: 1;
+}
+
+.midiRemixHeader strong {
+  font-size: var(--font-size-ui);
+  font-weight: var(--font-weight-medium);
+  line-height: 1.1;
+}
+
+.midiRemixSummary,
+.midiRemixDescription {
+  color: color-mix(in srgb, var(--color-fg) 72%, transparent);
+  font-size: var(--font-size-hint);
+  line-height: 1.3;
+}
+
+.midiRemixEvidence {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+
+.midiRemixEvidence span,
+.midiRemixChords div span {
+  min-height: 18px;
+  padding: 3px 6px;
+  border: var(--border-soft);
+  background: var(--surface-subtle);
+  color: color-mix(in srgb, var(--color-fg) 78%, transparent);
+  font-size: var(--font-size-hint);
+  line-height: 1;
+}
+
+.midiRemixChords {
+  display: grid;
+  gap: 4px;
+}
+
+.midiRemixChords > span {
+  color: color-mix(in srgb, var(--color-fg) 62%, transparent);
+  font-size: var(--font-size-hint);
+}
+
+.midiRemixChords div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+
 .midiLiveKeyboard {
   display: flex;
   flex-direction: column;

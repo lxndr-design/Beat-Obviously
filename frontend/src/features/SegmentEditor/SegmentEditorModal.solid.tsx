@@ -64,6 +64,12 @@ import type { AutomationCurve, DrumRow, DrumSpeed, Instrument, MidiNote, Segment
 import { DrumSequencer } from "../DrumEditor/DrumSequencer.solid";
 import { PianoRoll } from "../MidiEditor/PianoRoll.solid";
 import { roundMidiNotesToNearest } from "../MidiEditor/midiNoteRounding";
+import {
+  analyzeMidiForRemix,
+  midiRemixOptions,
+  remixMidiNotes,
+  type MidiRemixVariation,
+} from "../MidiEditor/midiRemix";
 import { MidiTransport } from "../MidiEditor/MidiTransport.solid";
 import { AudioSegmentTransport } from "./AudioSegmentTransport.solid";
 import { SegmentLoopControl } from "./SegmentLoopControl.solid";
@@ -104,6 +110,7 @@ const MIDI_ROUND_STEP_OPTIONS = [
 
 export function SegmentEditorModal(props: SegmentEditorModalProps) {
   const source = createStoreSelector(useProjectStore, () => selectSegment(props.segmentId));
+  const project = createStoreSelector(useProjectStore, (s) => s.project);
   const instruments = createStoreSelector(useInstrumentStore, (s) => s.instruments);
   const audioFiles = createStoreSelector(useAudioFileStore, (s) => s.files);
   const positionBeat = createStoreSelector(useTransportStore, (s) => s.positionBeat);
@@ -140,6 +147,9 @@ export function SegmentEditorModal(props: SegmentEditorModalProps) {
   const [midiRoundStep, setMidiRoundStep] = createSignal("0.125");
   const [midiRoundStepSelectOpen, setMidiRoundStepSelectOpen] = createSignal(false);
   const [midiRoundPopover, setMidiRoundPopover] = createSignal<{ x: number; y: number } | null>(null);
+  const [midiRemixVariation, setMidiRemixVariation] = createSignal<MidiRemixVariation>("melody-inversion");
+  const [midiRemixVariationSelectOpen, setMidiRemixVariationSelectOpen] = createSignal(false);
+  const [midiRemixPopover, setMidiRemixPopover] = createSignal<{ x: number; y: number } | null>(null);
   const [drumTrainingSessionId, setDrumTrainingSessionId] = createSignal<string | null>(null);
   let previewCtx: AudioContext | null = null;
   let midiLiveRaf: number | null = null;
@@ -205,6 +215,24 @@ export function SegmentEditorModal(props: SegmentEditorModalProps) {
     return id ? audioFiles().find((file) => file.id === id) : undefined;
   });
   const midiNotes = createMemo<MidiNote[]>(() => isMidi() ? (draft()?.payload as MidiLikePayload).notes : []);
+  const currentTrack = createMemo(() => project().tracks.find((track) => track.id === draft()?.trackId));
+  const midiRemixAnalysis = createMemo(() => {
+    const currentDraft = draft();
+    return analyzeMidiForRemix(
+      midiNotes(),
+      currentDraft?.lengthBeats ?? 1,
+      currentDraft?.timeSignature ?? timeSignature(),
+      {
+        segmentName: currentDraft?.name,
+        trackName: currentTrack()?.name,
+        instrumentName: instruments().find((instrument) => instrument.id === currentDraft?.instrumentId)?.name,
+      },
+    );
+  });
+  const midiRemixVariationOptions = createMemo(() => midiRemixOptions(midiRemixAnalysis().kind));
+  const activeMidiRemixOption = createMemo(() =>
+    midiRemixVariationOptions().find((option) => option.value === midiRemixVariation()) ?? midiRemixVariationOptions()[0]
+  );
   const midiGainDb = createMemo(() => draft() ? midiSegmentGainDb(draft()!.payload) : 0);
   const activeSegmentAutomationMeta = createMemo(() => aetherArrangementAutomationTargetMeta(activeSegmentAutomationTarget()));
   const segmentAutomationRange = createMemo(() => segmentAutomationValueRange(draft(), activeSegmentAutomationTarget()));
@@ -268,6 +296,25 @@ export function SegmentEditorModal(props: SegmentEditorModalProps) {
     };
     window.addEventListener("pointerdown", closeRoundPopover, true);
     onCleanup(() => window.removeEventListener("pointerdown", closeRoundPopover, true));
+  });
+
+  createEffect(() => {
+    const options = midiRemixVariationOptions();
+    if (!options.some((option) => option.value === midiRemixVariation())) {
+      setMidiRemixVariation(options[0]?.value ?? "melody-inversion");
+    }
+  });
+
+  createEffect(() => {
+    if (!midiRemixPopover()) return;
+    const closeRemixPopover = (event: PointerEvent) => {
+      const target = event.target instanceof Element ? event.target : null;
+      if (target?.closest("[data-midi-remix-trigger], [data-midi-remix-popover], [data-floating-layer]")) return;
+      setMidiRemixVariationSelectOpen(false);
+      setMidiRemixPopover(null);
+    };
+    window.addEventListener("pointerdown", closeRemixPopover, true);
+    onCleanup(() => window.removeEventListener("pointerdown", closeRemixPopover, true));
   });
 
   createEffect(() => {
@@ -340,11 +387,30 @@ export function SegmentEditorModal(props: SegmentEditorModalProps) {
       return;
     }
     const rect = event.currentTarget.getBoundingClientRect();
+    setMidiRemixVariationSelectOpen(false);
+    setMidiRemixPopover(null);
     const width = 252;
     const margin = 8;
     setMidiRoundPopover({
       x: Math.max(margin, Math.min(rect.left, window.innerWidth - width - margin)),
       y: Math.max(margin, Math.min(rect.bottom + 4, window.innerHeight - 174)),
+    });
+  }
+
+  function toggleMidiRemixPopover(event: MouseEvent & { currentTarget: HTMLButtonElement }) {
+    if (midiRemixPopover()) {
+      setMidiRemixVariationSelectOpen(false);
+      setMidiRemixPopover(null);
+      return;
+    }
+    const rect = event.currentTarget.getBoundingClientRect();
+    const width = 360;
+    const margin = 8;
+    setMidiRoundStepSelectOpen(false);
+    setMidiRoundPopover(null);
+    setMidiRemixPopover({
+      x: Math.max(margin, Math.min(rect.left, window.innerWidth - width - margin)),
+      y: Math.max(margin, Math.min(rect.bottom + 4, window.innerHeight - 400)),
     });
   }
 
@@ -359,6 +425,21 @@ export function SegmentEditorModal(props: SegmentEditorModalProps) {
     updateMidi(result.notes);
     setMidiRoundStepSelectOpen(false);
     setMidiRoundPopover(null);
+  }
+
+  function applyMidiRemix() {
+    const currentDraft = draft();
+    const variation = activeMidiRemixOption()?.value;
+    if (!currentDraft || !variation || (currentDraft.payload.kind !== "midi" && currentDraft.payload.kind !== "mixed")) return;
+    const result = remixMidiNotes(
+      currentDraft.payload.notes,
+      midiRemixAnalysis(),
+      variation,
+      currentDraft.lengthBeats,
+    );
+    updateMidi(result.notes);
+    setMidiRemixVariationSelectOpen(false);
+    setMidiRemixPopover(null);
   }
 
   function currentMidiLiveBeat(nowMs = performance.now()) {
@@ -887,6 +968,16 @@ export function SegmentEditorModal(props: SegmentEditorModalProps) {
                 >
                   Round to nearest
                 </Button>
+                <Button
+                  size="xs"
+                  disabled={midiLiveRecording() || midiNotes().length < 2}
+                  data-midi-remix-trigger
+                  aria-haspopup="dialog"
+                  aria-expanded={Boolean(midiRemixPopover())}
+                  onClick={toggleMidiRemixPopover}
+                >
+                  Remix
+                </Button>
                 <span class={styles.midiLiveTime}>{midiLiveElapsedLabel()}</span>
               </div>
               <Show when={midiLiveRecording()}>
@@ -974,6 +1065,76 @@ export function SegmentEditorModal(props: SegmentEditorModalProps) {
                         </Button>
                         <Button size="xs" variant="primary" onClick={applyMidiRoundToNearest}>
                           Apply to all notes
+                        </Button>
+                      </div>
+                    </div>
+                  </FloatingLayer>
+                </Portal>
+              )}
+            </Show>
+
+            <Show when={midiRemixPopover()}>
+              {(position) => (
+                <Portal mount={document.body}>
+                  <FloatingLayer
+                    class={styles.midiRemixPopover}
+                    x={position().x}
+                    y={position().y}
+                    width={360}
+                  >
+                    <div data-midi-remix-popover role="dialog" aria-label="Remix MIDI">
+                      <div class={styles.midiRemixHeader}>
+                        <div>
+                          <span>Detected</span>
+                          <strong>{midiRemixAnalysis().label}</strong>
+                        </div>
+                        <span>{Math.round(midiRemixAnalysis().confidence * 100)}%</span>
+                      </div>
+                      <Show when={midiRemixAnalysis().summary}>
+                        <div class={styles.midiRemixSummary}>{midiRemixAnalysis().summary}</div>
+                      </Show>
+                      <div class={styles.midiRemixEvidence} aria-label="MIDI classification evidence">
+                        <For each={midiRemixAnalysis().evidence}>
+                          {(evidence) => <span>{evidence}</span>}
+                        </For>
+                      </div>
+                      <Show when={midiRemixAnalysis().chords.length > 0}>
+                        <div class={styles.midiRemixChords}>
+                          <span>Recognized harmony</span>
+                          <div>
+                            <For each={midiRemixAnalysis().chords.slice(0, 8)}>
+                              {(chord) => <span>{chord.label}</span>}
+                            </For>
+                            <Show when={midiRemixAnalysis().chords.length > 8}>
+                              <span>+{midiRemixAnalysis().chords.length - 8}</span>
+                            </Show>
+                          </div>
+                        </div>
+                      </Show>
+                      <FloatingSelect
+                        label="Variation"
+                        layout="inline"
+                        value={midiRemixVariation()}
+                        options={midiRemixVariationOptions()}
+                        open={midiRemixVariationSelectOpen()}
+                        ariaLabel="MIDI remix variation"
+                        onOpenChange={setMidiRemixVariationSelectOpen}
+                        onChange={(value) => setMidiRemixVariation(value as MidiRemixVariation)}
+                      />
+                      <div class={styles.midiRemixDescription}>{activeMidiRemixOption()?.description}</div>
+                      <div class={styles.midiRoundActions}>
+                        <Button
+                          size="xs"
+                          variant="ghost"
+                          onClick={() => {
+                            setMidiRemixVariationSelectOpen(false);
+                            setMidiRemixPopover(null);
+                          }}
+                        >
+                          Cancel
+                        </Button>
+                        <Button size="xs" variant="primary" onClick={applyMidiRemix}>
+                          Apply remix
                         </Button>
                       </div>
                     </div>
