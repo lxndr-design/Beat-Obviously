@@ -2,6 +2,34 @@
 
 All notable Beat changes are tracked here. Dates use local project dates.
 
+## 0.3.0 - 2026-08-01
+
+### Added
+
+- Added Timeline Jumping, a sampler mode that maps independent source-audio
+  timeline slices to MIDI notes without pitch-shifting the recording.
+- Added a velocity-layered, multisampled Salamander grand piano instrument.
+- Added role-aware song generation with configurable speed, genre, and
+  randomness, plus saved generation fixtures.
+- Added Transkun-led piano transcription, multi-instrument transcription
+  routing, repeated-pattern detection, and saved MP3 translation fixtures.
+- Added editable track automation lanes and nondestructive grouped-note
+  arpeggiation in the timeline and MIDI editor.
+
+### Changed
+
+- Improved MIDI selection, quantization, note-property editing, grid hierarchy,
+  segment coloring, cross-track drag previews, and instrument-editor controls.
+- Simplified track recording, export review, audio-bus controls, and automation
+  editing while extending browser/native playback parity.
+
+### Fixed
+
+- Fixed strict sampler pitch mapping so unassigned Timeline Jumping keys remain
+  silent rather than falling back to an unrelated sample or synth voice.
+- Fixed sample-zone offsets, sampler audition pitch, MIDI velocity visibility,
+  context-menu selection, and stable drag interaction across DAW controls.
+
 ## 0.2.2 - 2026-07-29
 
 ### Added

@@ -1833,7 +1833,7 @@ export const usePluginStore = create<PluginLibrarySlice>()(
         id: PLUGIN_BRIDGE_ID,
         name: "Aether Bridge Host",
         vendor: "Beat",
-        version: "0.2.2",
+        version: "0.3.0",
         kind: "synth",
         format: "bridge",
         status: "available",
