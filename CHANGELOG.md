@@ -2,7 +2,7 @@
 
 All notable Beat changes are tracked here. Dates use local project dates.
 
-## Unreleased
+## 0.3.1 - 2026-08-02
 
 ### Changed
 

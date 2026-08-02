@@ -5397,7 +5397,7 @@ namespace beat
         {
             juce::DynamicObject::Ptr o = new juce::DynamicObject();
             o->setProperty("pong", true);
-            o->setProperty("backendVersion", "0.3.0");
+            o->setProperty("backendVersion", "0.3.1");
             return juce::var(o.get());
         }
 
