@@ -453,12 +453,21 @@ export interface Instrument {
   source?: InstrumentSource;
   /** Lightweight local sound descriptors used by beat/instrument generation. */
   descriptors?: string[];
+  /** Songs that created or used this repository instrument. Searchable by title. */
+  songAssociations?: InstrumentSongAssociation[];
   /** Original non-recursive settings, used for source-preserving revert. */
   original?: InstrumentSnapshot;
   /** Source instruments this was derived from (for merge lineage). */
   parentIds?: Id[];
   /** When true, this is a user-created instrument (vs. built-in factory). */
   userCreated: boolean;
+}
+
+export interface InstrumentSongAssociation {
+  projectId: Id;
+  title: string;
+  linkedAt: number;
+  trackNames?: string[];
 }
 
 export interface InstrumentSampleZone {

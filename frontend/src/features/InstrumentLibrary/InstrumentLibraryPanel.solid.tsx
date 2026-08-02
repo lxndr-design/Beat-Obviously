@@ -5,6 +5,7 @@ import { registerGlobalAudioStop } from "../../audio/globalAudioSafety";
 import { LUMEN_TEST_INSTRUMENT_SET_ID, TEMPORARY_DS_INSTRUMENT_SET_ID, snapshotInstrument, useInstrumentStore, usePluginStore, useProjectStore, useUiStore } from "../../state/store";
 import { createAurumInstrument } from "../../state/aurum";
 import { instrumentIcon, instrumentIconLabel } from "../../state/instrumentIcons";
+import { instrumentRepositorySearchText } from "../../state/instrumentSongAssociations";
 import {
   FACTORY_SYNTH_PRESETS,
   canCloneAetherInstrumentAsLumen,
@@ -386,7 +387,7 @@ export function InstrumentLibraryPanel(props: InstrumentLibraryPanelProps) {
       <LibrarySearch
         value={searchQuery()}
         onInput={(event) => setSearchQuery(event.currentTarget.value)}
-        placeholder="Search..."
+        placeholder="Search instruments or songs..."
         aria-label="Search instruments"
       />
       <Show when={selectMode() && props.expanded}>
@@ -417,7 +418,7 @@ export function InstrumentLibraryPanel(props: InstrumentLibraryPanelProps) {
               const setOpen = () => openSets()[set.id] ?? false;
               const items = () => instruments().filter((instrument) =>
                 instrumentSetId(instrument) === set.id
-                && (!normalizedSearch() || `${instrument.name} ${instrument.kind}`.toLowerCase().includes(normalizedSearch())),
+                && (!normalizedSearch() || instrumentRepositorySearchText(instrument).includes(normalizedSearch())),
               );
               return (
                 <Show when={!normalizedSearch() || items().length > 0}>

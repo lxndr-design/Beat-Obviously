@@ -15,6 +15,11 @@ export async function createGeneratedSongProject(options: GenerateSongOptions): 
   if (plan.pitchNicheIssues.length > 0)
     throw new Error(`Generated instrumentation failed pitch-niche validation: ${plan.pitchNicheIssues[0]}`);
 
+  const projectStore = useProjectStore.getState();
+  projectStore.rename(plan.name);
+  projectStore.setBpm(plan.bpm);
+  projectStore.setLengthBeats(plan.lengthBeats);
+
   const createdInstrumentNames: string[] = [];
   const reusedInstrumentNames: string[] = [];
   const externalAcquisitionSuggestions: string[] = [];
@@ -55,11 +60,6 @@ export async function createGeneratedSongProject(options: GenerateSongOptions): 
   const createdTrackIds: string[] = [];
   const createdSegmentIds: string[] = [];
   runProjectHistoryGroup(() => {
-    const projectStore = useProjectStore.getState();
-    projectStore.rename(plan.name);
-    projectStore.setBpm(plan.bpm);
-    projectStore.setLengthBeats(plan.lengthBeats);
-
     const initialBlankTrack = projectStore.project.tracks.length === 1
       && projectStore.project.tracks[0].segments.length === 0
       ? projectStore.project.tracks[0].id
@@ -89,6 +89,8 @@ export async function createGeneratedSongProject(options: GenerateSongOptions): 
     }
     if (initialBlankTrack) projectStore.removeTrack(initialBlankTrack);
   });
+
+  useInstrumentStore.getState().associateProjectInstruments(useProjectStore.getState().project);
 
   useUiStore.getState().setSelectedTracks(createdTrackIds.slice(0, 1));
   useUiStore.getState().setSelectedSegments(createdSegmentIds.slice(0, 1));

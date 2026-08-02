@@ -7,6 +7,11 @@ import { defaultTrackEffectParams } from "./effects";
 import { pruneDevFixtureInstruments } from "./instrumentLibraryGuards";
 import { normalizeInstrumentTaxonomy } from "./instrumentTaxonomy";
 import { normalizeSampleMap } from "./sampleZones";
+import {
+  associateInstrumentWithSong,
+  mergeInstrumentSongAssociations,
+  projectInstrumentAssociations,
+} from "./instrumentSongAssociations";
 import { createAurumTestInstruments } from "./aurumTestBank";
 import { createSalamanderCompactGrand } from "./factoryPiano";
 import { FACTORY_SYNTH_PRESETS, synthDraftToInstrumentPatch } from "./synthStore";
@@ -1135,10 +1140,14 @@ export const useProjectStore = create<ProjectSlice>()(
           Object.assign(s.project.recordingInput, patch);
         }),
 
-      rename: (name) =>
+      rename: (name) => {
         set((s) => {
           s.project.name = name;
-        }),
+        });
+        queueMicrotask(() => {
+          useInstrumentStore.getState().associateProjectInstruments(useProjectStore.getState().project);
+        });
+      },
 
       loadProject: (project) =>
         set((s) => {
@@ -2001,6 +2010,8 @@ interface InstrumentLibrarySlice {
   updateInstrument: (id: Id, patch: Partial<Instrument>) => void;
   duplicateInstrument: (id: Id) => Id;
   hydrateInstruments: (instruments: Instrument[], sets?: InstrumentSet[]) => void;
+  mergeProjectInstruments: (instruments: Instrument[], project: Project, sets?: InstrumentSet[]) => void;
+  associateProjectInstruments: (project: Project) => void;
   addInstrumentSet: (name?: string) => Id;
   renameInstrumentSet: (id: Id, name: string) => void;
   ungroupInstrumentSet: (id: Id, targetSetId?: Id) => void;
@@ -2250,6 +2261,7 @@ function normalizeInstrument(instrument: Instrument): Instrument {
     source,
     taxonomy: normalizeInstrumentTaxonomy(instrument),
     descriptors: instrument.descriptors ?? characterizeInstrument(instrument),
+    songAssociations: mergeInstrumentSongAssociations(instrument.songAssociations),
     original: instrument.original ?? (source.kind === "created" ? undefined : snapshotInstrument(instrument)),
   };
 }
@@ -2450,6 +2462,14 @@ export const useInstrumentStore = create<InstrumentLibrarySlice>()(
         : nanoid();
       let i = normalizeInstrument({ ...defaultInstrumentForPatch(normalizedPatch), ...normalizedPatch, id });
       i = { ...i, name: uniqueInstrumentName(i.name, get().instruments, i.id) };
+      if (useDocumentStore.getState().documentOpen) {
+        const project = useProjectStore.getState().project;
+        i = associateInstrumentWithSong(i, {
+          projectId: project.id,
+          title: project.name,
+          linkedAt: Date.now(),
+        });
+      }
       set((s) => {
         s.instruments.push(i);
       });
@@ -2515,6 +2535,51 @@ export const useInstrumentStore = create<InstrumentLibrarySlice>()(
         s.instrumentSets = normalizeInstrumentSets(sets);
         s.instruments = pruneDevFixtureInstruments(instruments).map((instrument) => normalizeInstrument(instrument));
         s.loading = false;
+      }),
+    mergeProjectInstruments: (instruments, project, sets) =>
+      set((s) => {
+        const incomingById = new Map(
+          pruneDevFixtureInstruments(instruments).map((instrument) => [instrument.id, instrument]),
+        );
+        const associations = projectInstrumentAssociations(project, Date.now());
+        for (const association of associations) {
+          const existingIndex = s.instruments.findIndex((instrument) => instrument.id === association.instrumentId);
+          const existing = existingIndex >= 0 ? current(s.instruments[existingIndex]) : undefined;
+          const incoming = incomingById.get(association.instrumentId);
+          if (incoming) {
+            const next = normalizeInstrument({
+              ...incoming,
+              songAssociations: mergeInstrumentSongAssociations(
+                existing?.songAssociations,
+                incoming.songAssociations,
+                [association],
+              ),
+            });
+            if (existingIndex >= 0) s.instruments[existingIndex] = next;
+            else s.instruments.push(next);
+          } else if (existingIndex >= 0) {
+            s.instruments[existingIndex].songAssociations = mergeInstrumentSongAssociations(
+              existing?.songAssociations,
+              [association],
+            );
+          }
+        }
+        s.instrumentSets = normalizeInstrumentSets([
+          ...current(s.instrumentSets),
+          ...(sets ?? []),
+        ]);
+        s.loading = false;
+      }),
+    associateProjectInstruments: (project) =>
+      set((s) => {
+        for (const association of projectInstrumentAssociations(project, Date.now())) {
+          const instrument = s.instruments.find((candidate) => candidate.id === association.instrumentId);
+          if (!instrument) continue;
+          instrument.songAssociations = mergeInstrumentSongAssociations(
+            current(instrument).songAssociations,
+            [association],
+          );
+        }
       }),
     addInstrumentSet: (name) => {
       const id = nanoid();

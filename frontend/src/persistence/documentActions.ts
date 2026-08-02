@@ -2,13 +2,14 @@ import { stopTimelineAudio } from "../audio/timelineAudio";
 import { appAlert, appConfirm } from "../solid-ui";
 import type { BeatProjectAsset, BeatProjectDocument, ProjectBackupEntry } from "../ipc/schema";
 import { isNative, send } from "../ipc/bridge";
-import { createEmptyProject, useDocumentStore, useProjectStore, useTransportStore } from "../state/store";
+import { createEmptyProject, useDocumentStore, useInstrumentStore, useProjectStore, useTransportStore } from "../state/store";
 import { saveProject } from "./dexie";
 import { applyBeatDocument, beatDocumentFingerprint, buildCurrentBeatDocument, buildCurrentBeatDocumentFingerprint, replaceBeatDocumentAssetPath } from "./beatDocument";
 
 export async function saveCurrentDocument(options: { saveAs?: boolean; force?: boolean } = {}): Promise<"saved" | "cancelled"> {
   const documentState = useDocumentStore.getState();
   if (!documentState.documentOpen) return "cancelled";
+  useInstrumentStore.getState().associateProjectInstruments(useProjectStore.getState().project);
   if (!documentState.dirty && !options.saveAs && !options.force && documentState.currentFilePath) {
     return "saved";
   }

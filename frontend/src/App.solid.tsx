@@ -20,7 +20,7 @@ import { createDefaultLumenDraft, useSynthStore } from "./state/synthStore";
 import { useExportStore } from "./state/exportStore";
 import { useComponentStore } from "./state/components";
 import { projectWithRenderedMidiArpeggiations } from "./state/midiNoteGroups";
-import { listAudioFiles, listComponents, listInstruments, pruneBlankUntitledProjects, saveAudioFiles, saveComponents, saveInstruments, saveProject } from "./persistence/dexie";
+import { listAudioFiles, listComponents, listInstruments, listProjects, pruneBlankUntitledProjects, saveAudioFiles, saveComponents, saveInstruments, saveProject } from "./persistence/dexie";
 import { closeCurrentDocumentForHome, createNewDocument, openDocumentFromUserChoice, openRecentDocument, recoverCurrentDocumentFromBackup, saveCurrentDocument } from "./persistence/documentActions";
 import { buildCurrentBeatDocumentFingerprint } from "./persistence/beatDocument";
 import { createStoreSelector } from "./solid-utils/store";
@@ -384,11 +384,14 @@ export function App() {
     const startedAt = performance.now();
 
     void listInstruments()
-      .then(({ instruments, sets }) => {
+      .then(async ({ instruments, sets }) => {
         if (instruments.length > 0 || sets.length > 0) {
           useInstrumentStore.getState().hydrateInstruments(instruments, sets);
         }
         useInstrumentStore.getState().seedSystemInstruments();
+        const savedProjects = await listProjects();
+        for (const project of savedProjects)
+          useInstrumentStore.getState().associateProjectInstruments(project);
         useComponentStore.getState().seedDefaultDrumLoops(useInstrumentStore.getState().instruments);
         if (!isNative()) {
           const ctx = getTimelineAudioContext();
@@ -400,6 +403,10 @@ export function App() {
             });
           }
         }
+        await saveInstruments(
+          useInstrumentStore.getState().instruments.map((instrument) => structuredClone(instrument)),
+          useInstrumentStore.getState().instrumentSets.map((set) => structuredClone(set)),
+        );
         hydrated = true;
         finishStartupStage("instruments", startedAt, useInstrumentStore.getState().instruments.length);
       })

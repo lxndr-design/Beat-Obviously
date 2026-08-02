@@ -7,11 +7,16 @@ import { saveAudioFiles, saveComponents, saveInstruments, saveProject } from "./
 import type { Instrument, Project, Track } from "../state/types";
 import { assetPolicy, buildAssetManifest, stableAssetId } from "./assetReferenceGraph";
 import { normalizeTrackEffectChain } from "../state/effects";
+import { associateInstrumentWithSong, projectInstrumentAssociations } from "../state/instrumentSongAssociations";
 
 const CURRENT_SCHEMA_VERSION = 1;
 
 export function buildCurrentBeatDocument(): BeatProjectDocument {
-  const instruments = useInstrumentStore.getState().instruments.map((instrument) => structuredClone(instrument));
+  const project = useProjectStore.getState().project;
+  const associations = new Map(projectInstrumentAssociations(project).map((association) => [association.instrumentId, association]));
+  const instruments = useInstrumentStore.getState().instruments
+    .filter((instrument) => associations.has(instrument.id))
+    .map((instrument) => associateInstrumentWithSong(structuredClone(instrument), associations.get(instrument.id)!));
   const audioFiles = useAudioFileStore.getState().files.map((file) => structuredClone(file));
   const plugins = usePluginStore.getState().plugins
     .filter((plugin) => !plugin.factory)
@@ -19,7 +24,7 @@ export function buildCurrentBeatDocument(): BeatProjectDocument {
   return {
     schemaVersion: CURRENT_SCHEMA_VERSION,
     savedAt: Date.now(),
-    project: structuredClone(useProjectStore.getState().project),
+    project: structuredClone(project),
     instruments,
     instrumentSets: useInstrumentStore.getState().instrumentSets.map((set) => structuredClone(set)),
     audioFiles,
@@ -34,7 +39,7 @@ export function buildCurrentBeatDocument(): BeatProjectDocument {
       instruments,
       audioFiles,
       plugins,
-      project: useProjectStore.getState().project,
+      project,
     }),
   };
 }
@@ -128,8 +133,10 @@ export async function applyBeatDocument(
 
   useProjectStore.getState().loadProject(migrated.project);
   if (instruments.length > 0 || instrumentSets) {
-    useInstrumentStore.getState().hydrateInstruments(instruments, instrumentSets);
+    useInstrumentStore.getState().mergeProjectInstruments(instruments, migrated.project, instrumentSets);
     useInstrumentStore.getState().seedSystemInstruments();
+  } else {
+    useInstrumentStore.getState().associateProjectInstruments(migrated.project);
   }
   useAudioFileStore.getState().hydrateFiles(audioFiles);
   useComponentStore.getState().hydrate(components, componentFolders);

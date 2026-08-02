@@ -20,6 +20,7 @@ import {
   taxonomyAssignmentForInstrumentId,
 } from "../../state/instrumentTaxonomy";
 import { TEMPORARY_DS_INSTRUMENT_SET_ID, useInstrumentStore, useProjectStore } from "../../state/store";
+import { instrumentRepositorySearchText, instrumentSongTitles } from "../../state/instrumentSongAssociations";
 import type { Instrument, InstrumentSet, Project } from "../../state/types";
 import { createStoreSelector } from "../../solid-utils/store";
 import { AssetPageShell, AssetStateMessage } from "./AssetPageShell.solid";
@@ -127,13 +128,12 @@ export function InstrumentsPage() {
       if (!instrumentMatchesFilter(instrument, filterMode())) return false;
       if (!query) return true;
       const setName = instrumentSetDisplayName(sets().find((set) => set.id === (instrument.setId ?? "user-instruments")));
-      return [
-        instrument.name,
+      return instrumentRepositorySearchText(instrument, [
         formatInstrumentType(instrument),
         instrumentCategoryLabel(instrument),
         setName,
         instrument.userCreated ? "user" : "factory",
-      ].some((value) => value.toLowerCase().includes(query));
+      ]).includes(query);
     });
     return [...filtered].sort((a, b) => compareInstruments(a, b, sortMode(), usageByInstrument()));
   });
@@ -428,7 +428,7 @@ export function InstrumentsPage() {
                 className={styles.searchInput}
                 value={searchQuery()}
                 onInput={(event) => setSearchQuery(event.currentTarget.value)}
-                placeholder="Search name, engine, set…"
+                placeholder="Search name, song, engine, set…"
                 aria-label="Search instruments"
               />
             </span>
@@ -656,6 +656,7 @@ export function InstrumentsPage() {
               <Info label="Source" value={activeInstrument()!.source?.label ?? "Made in Beat"} />
               <Info label="Reference" value={activeReference()?.detail ?? "Unknown"} />
               <Info label="Used In" value={activeUsage()?.projectLabel ?? "0 projects"} />
+              <Info label="Songs" value={instrumentSongTitles(activeInstrument()!).join(", ") || "–"} />
               <Info label="Segments" value={activeUsage()?.segmentLabel ?? "0 segments"} />
               <Info label="Preview Mode" value={isSustainedPreview(activeInstrument()!) ? "Sustain until pause" : loopPreview() ? "Looping sample" : "One-shot sample"} />
               <Info label="Preview Source" value={activeSampleUrl() ? sampleName(activeSampleUrl()!) : "Rendered instrument"} />
