@@ -6,6 +6,7 @@ import { normalizeAetherEffectPresetRecord, type AetherEffectPresetRecord } from
 import { pruneDevFixtureInstruments } from "../state/instrumentLibraryGuards";
 import { normalizeAurumPresetRecord, normalizeSynthPresetRecord, type AurumPresetRecord, type InstrumentPresetRecord, type SynthPresetRecord } from "../state/synthPresets";
 import type { AudioFile, Instrument, InstrumentSet, MidiNote, Project, Segment } from "../state/types";
+import type { ProjectOperation } from "../collaboration/projectOperations";
 
 export interface DrumBeatFeedback {
   id: string;
@@ -109,6 +110,7 @@ export class BeatDB extends Dexie {
   midiSongFeedback!: Table<MidiSongFeedback, string>;
   synthPresets!: Table<InstrumentPresetRecord, string>;
   effectPresets!: Table<AetherEffectPresetRecord, string>;
+  projectOperations!: Table<ProjectOperation, string>;
 
   constructor() {
     super("beat");
@@ -204,10 +206,32 @@ export class BeatDB extends Dexie {
       synthPresets: "id, kind, name, updatedAt",
       effectPresets: "id, kind, name, updatedAt",
     });
+    this.version(11).stores({
+      projects: "id, name, savedAt",
+      instruments: "id, name, userCreated, setId",
+      instrumentSets: "id, name, factory",
+      audioFiles: "id, name, path",
+      components: "id, name, kind, factory, createdAt, folderId",
+      componentFolders: "id, name, factory",
+      drumBeatFeedback: "id, genre, rating, createdAt",
+      instrumentGenerationFeedback: "id, rating, createdAt",
+      midiSongFeedback: "id, rating, createdAt",
+      synthPresets: "id, kind, name, updatedAt",
+      effectPresets: "id, kind, name, updatedAt",
+      projectOperations: "operationId, projectId, actorId, clientId, transactionId, lamport, createdAt",
+    });
   }
 }
 
 export const db = new BeatDB();
+
+export async function appendProjectOperation(operation: ProjectOperation): Promise<void> {
+  await db.projectOperations.put(operation);
+}
+
+export async function listProjectOperations(projectId: string): Promise<ProjectOperation[]> {
+  return db.projectOperations.where("projectId").equals(projectId).sortBy("lamport");
+}
 
 export async function saveProject(project: Project) {
   await db.projects.put({ ...project, savedAt: Date.now() });

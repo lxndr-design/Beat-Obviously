@@ -1,0 +1,4 @@
+VS Chamber Orchestra: Community Edition
+Pinned source: https://github.com/sgossner/VSCO-2-CE/tree/6dd651d55dde97fd4028699be9d4481f26917891
+License: CC0 1.0 Universal
+Beat packages a pitch- and velocity-mapped subset for offline score playback.

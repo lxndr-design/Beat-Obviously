@@ -49,7 +49,7 @@
 
 .summary {
   color: color-mix(in srgb, var(--color-fg) 68%, transparent);
-  font-family: var(--font-family-mono);
+  font-family: var(--font-family-base);
   font-size: var(--font-size-ui);
   text-align: right;
   white-space: nowrap;

@@ -1,4 +1,5 @@
-export type DialogKind = "alert" | "confirm" | "prompt";
+export type DialogKind = "alert" | "confirm" | "prompt" | "save-confirm";
+export type SaveConfirmChoice = "save" | "dont-save" | "cancel";
 
 export interface DialogRequest<T = unknown> {
   id: number;
@@ -9,7 +10,7 @@ export interface DialogRequest<T = unknown> {
   resolve: (value: T) => void;
 }
 
-export type ActiveDialog = DialogRequest<void> | DialogRequest<boolean> | DialogRequest<string | null>;
+export type ActiveDialog = DialogRequest<void> | DialogRequest<boolean> | DialogRequest<string | null> | DialogRequest<SaveConfirmChoice>;
 
 let nextDialogId = 1;
 let activeDialog: ActiveDialog | null = null;
@@ -67,4 +68,8 @@ export function appConfirm(message: string, title = "Confirm"): Promise<boolean>
 
 export function appPrompt(message: string, defaultValue = "", title = "Input"): Promise<string | null> {
   return enqueueDialog<string | null>({ kind: "prompt", title, message, defaultValue });
+}
+
+export function appSaveConfirm(message: string, title = "Unsaved changes"): Promise<SaveConfirmChoice> {
+  return enqueueDialog<SaveConfirmChoice>({ kind: "save-confirm", title, message });
 }

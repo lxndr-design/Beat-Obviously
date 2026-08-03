@@ -1,6 +1,8 @@
 import { createNewDocument } from "../persistence/documentActions";
 import { runProjectHistoryGroup, useInstrumentStore, useProjectStore, useUiStore } from "../state/store";
 import { generateSongPlan, type GenerateSongOptions, type GeneratedSongPlan } from "./songGenerator";
+import { generateLocalDrumBeat } from "./drumBeatGenerator";
+import type { DrumSpeed } from "../state/types";
 
 export interface GeneratedSongInstallResult {
   plan: GeneratedSongPlan;
@@ -87,6 +89,45 @@ export async function createGeneratedSongProject(options: GenerateSongOptions): 
         createdSegmentIds.push(segmentId);
       }
     }
+    if (plan.percussion) {
+      const drumTrackId = projectStore.addTrack({ name: plan.percussion.name, kind: "midi" });
+      createdTrackIds.push(drumTrackId);
+      let sectionStart = 0;
+      plan.sections.forEach((section, index) => {
+        const speed = drumSpeedForSong(plan.speed);
+        const sourceLengthBeats = 4 * speed;
+        const beat = generateLocalDrumBeat({
+          genre: plan.percussion!.genre,
+          instruments: useInstrumentStore.getState().instruments,
+          stepCount: sourceLengthBeats,
+          lengthBeats: sourceLengthBeats,
+          speed,
+          timeSignature: projectStore.project.timeSignature,
+          complexity: Math.max(0, Math.min(100, plan.percussion!.complexity + Math.round((section.energy - 0.6) * 24))),
+          variationSeed: stableSectionSeed(plan.name, section.label, section.material, section.dynamicFunction, index),
+        });
+        const segmentId = projectStore.addSegment(drumTrackId, {
+          name: `${section.label} · drums`,
+          startBeat: sectionStart,
+          lengthBeats: 4,
+          repeats: Math.max(0, Math.round(section.lengthBeats / 4) - 1),
+          layer: 0,
+          muted: false,
+          payload: {
+            kind: "drum",
+            rows: beat.rows,
+            stepCount: beat.stepCount,
+            speed: beat.speed,
+            sourceLengthBeats: beat.lengthBeats,
+            swingPercent: beat.swingPercent,
+            defaultPitchHz: beat.defaultPitchHz,
+            timeSignature: projectStore.project.timeSignature,
+          },
+        });
+        createdSegmentIds.push(segmentId);
+        sectionStart += section.lengthBeats;
+      });
+    }
     if (initialBlankTrack) projectStore.removeTrack(initialBlankTrack);
   });
 
@@ -95,6 +136,18 @@ export async function createGeneratedSongProject(options: GenerateSongOptions): 
   useUiStore.getState().setSelectedTracks(createdTrackIds.slice(0, 1));
   useUiStore.getState().setSelectedSegments(createdSegmentIds.slice(0, 1));
   return { plan, createdInstrumentNames, reusedInstrumentNames, externalAcquisitionSuggestions };
+}
+
+function drumSpeedForSong(speed: GeneratedSongPlan["speed"]): DrumSpeed {
+  if (speed === "slow") return 2;
+  if (speed === "hyper") return 6;
+  return 4;
+}
+
+function stableSectionSeed(name: string, label: string, material: string, dynamicFunction: string, index: number) {
+  const sectionFamily = label.replace(/\s*\d+|final\s+/gi, "").trim().toLowerCase();
+  const normalizedIndex = /verse|chorus/i.test(label) ? 0 : index;
+  return Math.floor(instrumentFlavor(`${name}|${sectionFamily}|${material}|${dynamicFunction}|${normalizedIndex}`) * 0x7fffffff);
 }
 
 function instrumentFlavor(value: string) {

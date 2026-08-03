@@ -28,7 +28,7 @@
 
 .sectionHeader span:last-child {
   color: color-mix(in srgb, var(--color-fg) 60%, transparent);
-  font-family: var(--font-family-mono);
+  font-family: var(--font-family-base);
   font-weight: var(--font-weight-regular);
 }
 
@@ -90,7 +90,7 @@
 
 .sliderValue {
   justify-self: end;
-  font-family: var(--font-family-mono);
+  font-family: var(--font-family-base);
   font-size: var(--font-size-ui);
 }
 

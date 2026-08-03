@@ -44,7 +44,7 @@
 }
 
 .meterLabel {
-  font-family: var(--font-family-mono);
+  font-family: var(--font-family-base);
   text-transform: uppercase;
 }
 
@@ -67,7 +67,7 @@
   display: block;
   width: 48px;
   overflow: hidden;
-  font-family: var(--font-family-mono);
+  font-family: var(--font-family-base);
   font-size: var(--font-size-ui);
   line-height: 1;
   text-align: right;
@@ -86,7 +86,7 @@
 }
 
 .scopeLabel {
-  font-family: var(--font-family-mono);
+  font-family: var(--font-family-base);
   font-size: var(--font-size-ui);
   line-height: 1;
   text-transform: uppercase;

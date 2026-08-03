@@ -1,8 +1,15 @@
 .audioBrowser.audioBrowser {
-  grid-template-rows: 39px minmax(0, 1fr);
+  grid-template-rows: 66px minmax(0, 1fr);
 }
 
 .browserControls {
+  display: grid;
+  grid-template-rows: repeat(2, 33px);
+  min-width: 0;
+}
+
+.searchControls,
+.actions {
   display: flex;
   align-items: center;
   gap: 3px;
@@ -12,15 +19,8 @@
 }
 
 .actions {
-  display: flex;
-  align-items: center;
   justify-content: flex-end;
-  flex: 0 0 auto;
-  gap: 3px;
-  min-width: 0;
-  margin-left: 3px;
-  padding-left: 3px;
-  border-left: var(--border-soft);
+  overflow: hidden;
 }
 
 .searchField {
@@ -72,13 +72,13 @@
 .headerRow,
 .row {
   display: grid;
-  grid-template-columns: minmax(180px, 1fr) 78px 120px 81px 81px 132px;
+  grid-template-columns: minmax(150px, 1fr) 66px minmax(72px, 0.7fr) 63px 63px minmax(105px, 0.8fr);
   align-items: center;
 }
 
 .tableSelectMode .headerRow,
 .tableSelectMode .row {
-  grid-template-columns: 27px minmax(159px, 1fr) 78px 120px 81px 81px 132px;
+  grid-template-columns: 27px minmax(129px, 1fr) 66px minmax(72px, 0.7fr) 63px 63px minmax(105px, 0.8fr);
 }
 
 .headerRow {
@@ -312,13 +312,13 @@
 
 .waveformDbTop {
   top: 25%;
-  left: 14px;
+  left: 15px;
   transform: translateY(-50%);
 }
 
 .waveformDbBottom {
   top: 75%;
-  left: 14px;
+  left: 15px;
   transform: translateY(-50%);
 }
 

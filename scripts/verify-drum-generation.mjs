@@ -33,6 +33,8 @@ try {
     instrument("crash", "Crash"),
     instrument("rim", "Rim"),
     instrument("tom-mid", "Mid Tom"),
+    instrument("tom-low", "Low Tom"),
+    instrument("tom-high", "High Tom"),
     instrument("ride", "Ride"),
     instrument("cowbell", "Cowbell"),
     instrument("amen", "Uploaded Amen Break", { userCreated: true, sampleUrl: "/samples/amen.wav", descriptors: ["amen", "breakbeat", "chopped"] }),
@@ -267,6 +269,51 @@ function assertGenreAnchors(drums, opts) {
 
   const breakcore = drums.generateLocalDrumBeat({ ...opts, genre: "breakcore", lengthBeats: 16, stepCount: 16, speed: 4, complexity: 95, variationSeed: 906 });
   assert.equal(Boolean(rowByName(breakcore, /amen break/i)), true, "Breakcore should use an uploaded Amen/breakbeat instrument when available");
+
+  const jazz = drums.generateLocalDrumBeat({ ...opts, genre: "jazz", lengthBeats: 16, stepCount: 16, speed: 4, complexity: 58, variationSeed: 907 });
+  assert.ok(jazz.swingPercent >= 58, "Jazz should use an audible swung subdivision");
+  assert.equal(hitCount([rowByName(jazz, /ride/i)]) >= 4, true, "Jazz should be led by a ride pattern");
+  assertSteps(rowByName(jazz, /closed hat/i), [jazz.speed + 1, jazz.speed * 3 + 1], "Jazz hi-hat foot should mark beats 2 and 4");
+  assertVelocityShape(jazz.rows, "jazz beat");
+
+  const orchestralInstruments = [
+    instrument("orchestral-bass-drum", "VSCO Orchestral Bass Drum", { descriptors: ["bass drum"] }),
+    instrument("orchestral-snare", "Pearl Orchestral Snare"),
+    instrument("closed-hat", "Pearl Closed Hi-Hat"),
+    instrument("open-hat", "Pearl Open Hi-Hat"),
+    instrument("ride-cymbal", "Pearl Ride Cymbal"),
+    instrument("crash-cymbal", "Pearl Crash Cymbal"),
+    instrument("low-tom", "Pearl Low Tom"),
+    instrument("mid-tom", "Pearl Mid Tom"),
+    instrument("high-tom", "Pearl High Tom"),
+  ];
+  const orchestral = drums.generateLocalDrumBeat({ ...opts, genre: "orchestral", instruments: orchestralInstruments, lengthBeats: 64, stepCount: 64, speed: 4, complexity: 58, variationSeed: 908 });
+  assert.ok(rowByName(orchestral, /bass drum/i), "Orchestral bass drum labels should resolve as the kick role");
+  assert.ok(orchestral.rows.length >= 3, "Orchestral percussion should distribute a phrase across multiple timbres");
+  assert.equal(
+    orchestral.rows.some((row) => /crash|cymbal|ride|hat/i.test(row.name) && stepOn(row, 1)),
+    false,
+    "Orchestral loops must not retrigger a cymbal at the start of every segment",
+  );
+  assertVelocityShape(orchestral.rows, "orchestral phrase");
+
+  const remixSource = {
+    rows: [
+      { id: "kick", instrumentId: "kick", name: "Kick", steps: [{ on: true, velocity: 112 }, false, false, false, { on: true, velocity: 100 }, false, false, false] },
+      { id: "hat", instrumentId: "hat", name: "Closed Hat", steps: [{ on: true, velocity: 68 }, false, { on: true, velocity: 62 }, false, { on: true, velocity: 66 }, false, { on: true, velocity: 60 }, false] },
+      { id: "crash", instrumentId: "crash", name: "Suspended Cymbal", steps: [{ on: true, velocity: 86 }, false, false, false, false, false, false, false] },
+    ],
+    stepCount: 8,
+    lengthBeats: 8,
+    speed: 4,
+    swingPercent: 54,
+    variationSeed: 909,
+  };
+  const remixed = drums.remixDrumBeat(remixSource);
+  assert.deepEqual(remixed.rows.map((row) => row.id), remixSource.rows.map((row) => row.id), "Remix should preserve row identity");
+  assert.deepEqual(remixed.rows.map((row) => row.instrumentId), remixSource.rows.map((row) => row.instrumentId), "Remix should preserve instrument assignments");
+  assert.equal(stepOn(rowByName(remixed, /cymbal/i), 1), false, "Remix should move an opening cymbal away from the loop boundary");
+  assert.notDeepEqual(remixed.rows, remixSource.rows, "Remix should produce an audible pattern variation");
 }
 
 function rowByName(beat, pattern) {
@@ -276,7 +323,8 @@ function rowByName(beat, pattern) {
 }
 
 function stepOn(row, stepOneBased) {
-  return Boolean(row.steps[stepOneBased - 1]);
+  const step = row.steps[stepOneBased - 1];
+  return typeof step === "object" && step !== null ? Boolean(step.on) : Boolean(step);
 }
 
 function assertSteps(row, steps, message) {

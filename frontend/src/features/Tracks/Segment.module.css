@@ -1,4 +1,5 @@
 .segment {
+  --segment-color: var(--color-fg);
   position: absolute;
   background: var(--color-fg);          /* white body — same for audio & midi */
   color: var(--color-fg-inverse);
@@ -208,9 +209,9 @@
   display: inline-flex;
   align-items: center;
   flex: 0 0 auto;
-  gap: 2px;
+  gap: 3px;
   color: color-mix(in srgb, var(--color-fg) 76%, transparent);
-  font-family: var(--font-family-mono);
+  font-family: var(--font-family-base);
   font-size: var(--font-size-hint);
   line-height: 1;
 }

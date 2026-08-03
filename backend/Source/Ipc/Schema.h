@@ -86,6 +86,12 @@ namespace beat::ipc
         constexpr const char* AUDIO_SELECT_INPUT_DEVICE = "audio.selectInputDevice";
         constexpr const char* AUDIO_SELECT_OUTPUT_DEVICE = "audio.selectOutputDevice";
 
+        // Notated scores
+        constexpr const char* SCORE_IMPORT = "score.import";
+        constexpr const char* SCORE_IMPORT_LIBRARY = "score.importLibrary";
+        constexpr const char* SCORE_REVEAL_ARTIFACTS = "score.revealArtifacts";
+        constexpr const char* SCORE_OPEN_OCR_REVIEW = "score.openOcrReview";
+
         // Recording
         constexpr const char* RECORDING_PLAN      = "recording.plan";
         constexpr const char* RECORDING_PREPARE   = "recording.prepare";

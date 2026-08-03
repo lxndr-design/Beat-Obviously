@@ -16,7 +16,7 @@
 }
 
 .headerRow {
-  font-family: var(--font-family-mono);
+  font-family: var(--font-family-base);
   font-size: var(--font-size-ui);
   text-transform: uppercase;
 }
@@ -108,7 +108,7 @@
 }
 
 .sourceAffordance span:last-child {
-  font-family: var(--font-family-mono);
+  font-family: var(--font-family-base);
   color: color-mix(in srgb, currentColor 58%, transparent);
 }
 
@@ -211,7 +211,7 @@
   justify-content: end;
   min-width: 111px;
   overflow: hidden;
-  font-family: var(--font-family-mono);
+  font-family: var(--font-family-base);
   font-size: var(--font-size-ui);
   line-height: 1;
   text-align: right;

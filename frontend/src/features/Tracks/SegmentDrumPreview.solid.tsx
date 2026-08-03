@@ -17,7 +17,7 @@ export function SegmentDrumPreview(props: Props) {
   const drumPayload = () => props.segment.payload.kind === "drum" ? props.segment.payload : null;
   const sourceLength = () => {
     const payload = drumPayload();
-    return payload ? Math.max(0.25, payload.sourceLengthBeats ?? props.segment.lengthBeats) : props.segment.lengthBeats;
+    return payload ? Math.max(0.25, payload.sourceLengthBeats ?? payload.stepCount) : props.segment.lengthBeats;
   };
   const viewLength = () => Math.max(0.001, props.displayLengthBeats ?? props.segment.lengthBeats);
   const sourceOffset = () => Math.max(0, props.segment.sourceStartBeat ?? 0);

@@ -393,6 +393,7 @@ namespace beat
             return target == "track.gainDb"
                 || target == "track.gain"
                 || target == "track.pan"
+                || target == "track.mute"
                 || target == "bus.gainDb"
                 || target == "bus.gain"
                 || target == "bus.pan"
@@ -958,6 +959,11 @@ namespace beat
         block = juce::jmax(1, block);
         const int scratchBlock = scratchBlockCapacity(block);
         channels = juce::jmax(1, channels);
+        // The engine always mixes in at least stereo, even when CoreAudio is
+        // temporarily reporting a mono (or not-yet-active) output layout.
+        // Every channel-duplicating master processor must therefore be
+        // prepared for the internal mix width rather than the device width.
+        const int processingChannels = juce::jmax(2, channels);
 
         seq.setSampleRate(sampleRate);
         synth.setCurrentPlaybackSampleRate(sampleRate);
@@ -984,15 +990,15 @@ namespace beat
         }
 
         bitcrush.prepare(sampleRate, scratchBlock);
-        masterEq.prepare(sampleRate, scratchBlock, channels);
-        masterLimiter.prepare(sampleRate, scratchBlock, channels);
-        masterDcBlocker.prepare(sampleRate, channels);
+        masterEq.prepare(sampleRate, scratchBlock, processingChannels);
+        masterLimiter.prepare(sampleRate, scratchBlock, processingChannels);
+        masterDcBlocker.prepare(sampleRate, processingChannels);
         masterLimiter.setCeilingDb(-0.3f);
         masterLimiter.setReleaseMs(35.0f);
         masterAnalyzer.prepare(sampleRate);
-        prepareMasterLoudnessMeter(channels);
-        mixBuf.setSize(juce::jmax(2, channels), scratchBlock, false, false, true);
-        routeBuf.setSize(juce::jmax(2, channels), scratchBlock, false, false, true);
+        prepareMasterLoudnessMeter(processingChannels);
+        mixBuf.setSize(processingChannels, scratchBlock, false, false, true);
+        routeBuf.setSize(processingChannels, scratchBlock, false, false, true);
     }
 
     void AudioEngine::prepareForRealtime(double sr, int block, int channels)
@@ -1497,7 +1503,9 @@ namespace beat
                                              float glideMs)
     {
         const juce::ScopedLock lock(sampleLock);
-        if (findTrackRenderState(trackId, instrumentId) == nullptr
+        const bool hasTrackSampleRoute = findTrackRouteState(trackId) != nullptr
+            && sampleInstruments.find(instrumentId) != sampleInstruments.end();
+        if ((findTrackRenderState(trackId, instrumentId) == nullptr && !hasTrackSampleRoute)
             || scheduledPreviewNotes.size() >= scheduledPreviewNotes.capacity())
             return false;
 
@@ -2064,6 +2072,9 @@ namespace beat
         route.pan = route.basePan;
         route.inputTrimDb = route.baseInputTrimDb;
         route.mute = route.baseMute;
+        route.audibilityGain = route.baseMute ? 0.0f : 1.0f;
+        route.audibilityTargetGain = route.audibilityGain;
+        route.audibilityRampSamplesRemaining = 0;
         route.sends = route.baseSends;
         route.effects = route.baseEffects;
         route.effectGraphTransition.reset();
@@ -3008,6 +3019,8 @@ namespace beat
                 route.baseGainDb = track.gainDb;
                 route.basePan = track.pan;
                 route.baseMute = track.mute;
+                route.audibilityGain = track.mute ? 0.0f : 1.0f;
+                route.audibilityTargetGain = route.audibilityGain;
                 route.baseSends = route.sends;
                 route.baseEffects = track.effects;
                 route.groupBus = true;
@@ -3073,6 +3086,8 @@ namespace beat
             route.baseGainDb = track.gainDb;
             route.basePan = track.pan;
             route.baseMute = track.mute;
+            route.audibilityGain = track.mute ? 0.0f : 1.0f;
+            route.audibilityTargetGain = route.audibilityGain;
             route.baseSends = route.sends;
             route.baseEffects = route.effects;
             route.routeLatencySamples = routeEffectsLatencySamples(project, route.effects);
@@ -3374,6 +3389,8 @@ namespace beat
             route.basePan = bus.pan;
             route.baseInputTrimDb = bus.inputTrimDb;
             route.baseMute = bus.mute;
+            route.audibilityGain = bus.mute ? 0.0f : 1.0f;
+            route.audibilityTargetGain = route.audibilityGain;
             route.baseSends = route.sends;
             route.baseEffects = bus.effects;
             route.routeLatencySamples = routeEffectsLatencySamples(project, route.effects);
@@ -3875,6 +3892,23 @@ namespace beat
         while (drained < RenderBudgets::realtimeEventsDrainedPerBlock && realtimeParameterChanges.pop(change))
         {
             ++drained;
+            if (change.parameterIdView() == "track.mute")
+            {
+                const auto trackId = change.instrumentIdView();
+                const bool muted = change.value >= 0.5f;
+                const auto applyMute = [&](InstrumentRenderState& route) noexcept {
+                    const auto* routeId = route.trackId.toRawUTF8();
+                    if (trackId != std::string_view(routeId != nullptr ? routeId : ""))
+                        return;
+                    route.baseMute = muted;
+                    route.mute = muted;
+                    route.audibilityTargetGain = muted ? 0.0f : 1.0f;
+                    route.audibilityRampSamplesRemaining = juce::jmax(1, change.rampSamples);
+                };
+                for (auto& route : instrumentRenderStates) applyMute(route);
+                for (auto& route : groupRenderStates) applyMute(route);
+                continue;
+            }
             if (change.sampleOffset >= numSamples)
             {
                 // Keep the path bounded: future sample-accurate scheduling can
@@ -4213,7 +4247,7 @@ namespace beat
         if (returnRenderStates.empty() || numSamples <= 0)
             return;
 
-        const float routeGain = juce::Decibels::decibelsToGain(routeState.gainDb);
+        const float routeGain = juce::Decibels::decibelsToGain(routeState.gainDb) * routeState.audibilityGain;
         const auto panGains = equalPowerPan(routeState.pan);
         for (size_t busIndex = 0; busIndex < routeState.sourceFxBuffers.size(); ++busIndex)
         {
@@ -4272,7 +4306,7 @@ namespace beat
                                              int startSample,
                                              int numSamples) noexcept
     {
-        if (!routeState.outputEnabled || routeState.mute || !routeState.audible)
+        if (!routeState.outputEnabled || !routeState.audible)
             return;
         if (routeState.outputBusId.isNotEmpty())
             addRouteToBusLocked(routeState, route, routeState.outputBusId, startSample, numSamples);
@@ -5014,9 +5048,11 @@ namespace beat
             return true;
         }
 
-        if (target == "bus.mute")
+        if (target == "track.mute" || target == "bus.mute")
         {
             route.mute = event.value >= 0.5f;
+            route.audibilityTargetGain = route.mute ? 0.0f : 1.0f;
+            route.audibilityRampSamplesRemaining = juce::jmax(1, event.rampSamples);
             return true;
         }
 
@@ -5101,6 +5137,7 @@ namespace beat
                 const auto effectStartTicks = juce::Time::getHighResolutionTicks();
                 processRouteEffectsLocked(route, buffer, cursor, chunkSamples, routeEffectWork);
                 processEffectGraphTransitionLocked(route, buffer, cursor, chunkSamples);
+                applyRouteAudibilityRampLocked(route, buffer, cursor, chunkSamples);
                 if (routeEffectTicks != nullptr)
                 {
                     *routeEffectTicks += juce::jmax<int64_t>(
@@ -5108,9 +5145,9 @@ namespace beat
                         juce::Time::getHighResolutionTicks() - effectStartTicks);
                 }
                 accumulateTrackMeterLocked(route.trackId, buffer, cursor, chunkSamples, route.gainDb, route.pan);
-                if (!route.mute && route.audible)
+                if (route.audible)
                     addRouteSendsLocked(route, buffer, cursor, chunkSamples);
-                if (route.parentTrackId.isNotEmpty() && route.outputEnabled && !route.mute && route.audible)
+                if (route.parentTrackId.isNotEmpty() && route.outputEnabled && route.audible)
                     addRouteToGroupLocked(route, buffer, cursor, chunkSamples);
                 else
                     addRouteToOutputLocked(route, buffer, cursor, chunkSamples);
@@ -5118,6 +5155,35 @@ namespace beat
 
             cursor = nextOffset;
         }
+    }
+
+    void AudioEngine::applyRouteAudibilityRampLocked(InstrumentRenderState& route,
+                                                      juce::AudioBuffer<float>& buffer,
+                                                      int startSample,
+                                                      int numSamples) noexcept
+    {
+        if (numSamples <= 0)
+            return;
+
+        int cursor = startSample;
+        int remaining = numSamples;
+        if (route.audibilityRampSamplesRemaining > 0)
+        {
+            const int rampSamples = juce::jmin(remaining, route.audibilityRampSamplesRemaining);
+            const float endGain = route.audibilityGain
+                + (route.audibilityTargetGain - route.audibilityGain)
+                    * ((float) rampSamples / (float) route.audibilityRampSamplesRemaining);
+            buffer.applyGainRamp(cursor, rampSamples, route.audibilityGain, endGain);
+            route.audibilityGain = endGain;
+            route.audibilityRampSamplesRemaining -= rampSamples;
+            cursor += rampSamples;
+            remaining -= rampSamples;
+            if (route.audibilityRampSamplesRemaining == 0)
+                route.audibilityGain = route.audibilityTargetGain;
+        }
+
+        if (remaining > 0 && std::abs(route.audibilityGain - 1.0f) > 0.000001f)
+            buffer.applyGain(cursor, remaining, route.audibilityGain);
     }
 
     void AudioEngine::processEffectGraphTransitionLocked(InstrumentRenderState& route,
@@ -5746,7 +5812,10 @@ namespace beat
                     auto note = std::move(scheduledPreviewNotes[previewRead]);
                     if (note.samplesUntilOn < numSamples)
                     {
-                        if (auto* route = findTrackRenderState(note.trackId, note.instrumentId))
+                        auto* route = findTrackRenderState(note.trackId, note.instrumentId);
+                        if (route == nullptr && sampleInstruments.find(note.instrumentId) != sampleInstruments.end())
+                            route = findTrackRouteState(note.trackId);
+                        if (route != nullptr)
                         {
                             const int onSample = juce::jmax(0, note.samplesUntilOn);
                             const auto previewLengthBeats = note.hasSourceNote

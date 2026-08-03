@@ -18,6 +18,9 @@ const segment = read("frontend/src/features/Tracks/Segment.solid.tsx");
 const setup = read("scripts/setup-audio-to-midi.sh");
 const pianoSetup = read("scripts/setup-piano-transcription.sh");
 const multiInstrumentSetup = read("scripts/setup-multi-instrument-transcription.sh");
+const audioLock = read("scripts/requirements/audio-to-midi-macos-py311.lock");
+const pianoLock = read("scripts/requirements/piano-transcription-macos-py311.lock");
+const multiInstrumentLock = read("scripts/requirements/multi-instrument-transcription-macos-py311.lock");
 const muscriptorEvaluation = read("scripts/evaluate-muscriptor-private.sh");
 
 for (const kind of ["audio.transcriptionStart", "audio.transcriptionStatus", "audio.transcriptionCancel"])
@@ -54,15 +57,17 @@ assert(action.includes('candidate.name.toLowerCase() === "lead saw"'), "generate
 assert(segment.includes('label: "Convert to MIDI…"'), "audio context menu must expose transcription choices");
 assert(segment.includes('label: "Piano performance · Transkun"'), "audio context menu must expose the piano-specific path");
 assert(segment.includes('label: "General / multi-instrument · MuScriptor"'), "audio context menu must expose general multi-instrument transcription");
-assert(setup.includes('basic-pitch==0.4.0'), "runtime setup must pin the reviewed Spotify release");
-assert(setup.includes('"setuptools<81"'), "runtime setup must retain pkg_resources for Basic Pitch's resampy dependency");
-for (const dependency of ['"coremltools==9.0"', '"numpy==2.4.6"', '"resampy==0.4.2"', '"scikit-learn==1.5.1"'])
-  assert(setup.includes(dependency), `runtime setup must retain the smoke-tested dependency pin ${dependency}`);
+assert(setup.includes("audio-to-midi-macos-py311.lock"), "runtime setup must install the reviewed complete dependency lock");
+assert(setup.includes('"pip==26.2" "setuptools==80.10.2"'), "runtime setup must retain the reviewed bootstrap toolchain");
+for (const dependency of ["basic-pitch==0.4.0", "coremltools==9.0", "numpy==2.4.6", "resampy==0.4.2", "scikit-learn==1.5.1"])
+  assert(audioLock.includes(dependency), `audio lock must retain the smoke-tested dependency pin ${dependency}`);
 assert((statSync(join(repoRoot, "scripts/setup-audio-to-midi.sh")).mode & 0o111) !== 0, "runtime setup script must be executable");
-assert(pianoSetup.includes('"transkun==2.0.1"'), "piano setup must pin the reviewed Transkun release");
-assert(pianoSetup.includes('"torch==2.13.0"'), "piano setup must pin the smoke-tested Torch runtime");
+assert(pianoSetup.includes("piano-transcription-macos-py311.lock"), "piano setup must install the complete reviewed dependency lock");
+assert(pianoLock.includes("transkun==2.0.1"), "piano lock must pin the reviewed Transkun release");
+assert(pianoLock.includes("torch==2.13.0"), "piano lock must pin the smoke-tested Torch runtime");
 assert((statSync(join(repoRoot, "scripts/setup-piano-transcription.sh")).mode & 0o111) !== 0, "piano runtime setup script must be executable");
-assert(multiInstrumentSetup.includes('"muscriptor==0.2.2"'), "multi-instrument setup must pin the reviewed MuScriptor release");
+assert(multiInstrumentSetup.includes("multi-instrument-transcription-macos-py311.lock"), "multi-instrument setup must install the complete reviewed dependency lock");
+assert(multiInstrumentLock.includes("muscriptor==0.2.2"), "multi-instrument lock must pin the reviewed MuScriptor release");
 assert(multiInstrumentSetup.includes("CC BY-NC 4.0"), "multi-instrument setup must disclose the model-weight license");
 assert((statSync(join(repoRoot, "scripts/setup-multi-instrument-transcription.sh")).mode & 0o111) !== 0, "multi-instrument runtime setup script must be executable");
 assert(muscriptorEvaluation.includes("CC BY-NC 4.0"), "MuScriptor evaluation must disclose its non-commercial weights");

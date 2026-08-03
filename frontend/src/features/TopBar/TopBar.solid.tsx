@@ -14,6 +14,8 @@ export interface TopBarProps {
   onNew: () => void;
   onOpen: () => void;
   onImportAudio: () => void;
+  onImportScore: () => void;
+  onImportStandards: () => void;
   onSave: () => void;
   onSaveAs: () => void;
   onExport: () => void;

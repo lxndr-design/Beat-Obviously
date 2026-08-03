@@ -193,7 +193,7 @@
   display: grid;
   align-content: start;
   gap: 3px;
-  font-family: var(--font-family-mono);
+  font-family: var(--font-family-base);
   font-size: var(--font-size-ui);
 }
 
@@ -212,7 +212,7 @@
 .clipPianoRoll {
   grid-column: 1 / -1;
   min-width: 0;
-  max-height: 610px;
+  max-height: 609px;
   overflow: hidden;
   border: var(--border-soft);
 }
@@ -341,7 +341,7 @@
   border-radius: 3px;
   background: color-mix(in srgb, var(--color-fg) 20%, transparent);
   color: color-mix(in srgb, var(--color-fg) 70%, transparent);
-  font-family: var(--font-family-mono);
+  font-family: var(--font-family-base);
   font-size: var(--font-size-ui);
   line-height: 1;
   white-space: nowrap;
@@ -490,7 +490,7 @@
   min-width: 0;
   overflow: hidden;
   color: color-mix(in srgb, var(--color-fg) 58%, transparent);
-  font-family: var(--font-family-mono);
+  font-family: var(--font-family-base);
   font-size: var(--font-size-ui);
   line-height: 1.15;
   text-overflow: ellipsis;
@@ -597,7 +597,7 @@
   border: 1px solid currentColor;
   border-radius: 50%;
   color: color-mix(in srgb, var(--color-fg) 62%, transparent);
-  font-family: var(--font-family-mono);
+  font-family: var(--font-family-base);
   font-size: var(--font-size-hint);
   font-style: normal;
   line-height: 1;
@@ -619,7 +619,7 @@
 }
 
 .expressionSummaryItem small {
-  font-family: var(--font-family-mono);
+  font-family: var(--font-family-base);
   font-size: var(--font-size-ui);
   line-height: 1;
 }
@@ -692,7 +692,7 @@
 
 .importPresetMeta {
   color: color-mix(in srgb, var(--color-fg) 62%, transparent);
-  font-family: var(--font-family-mono);
+  font-family: var(--font-family-base);
   font-size: var(--font-size-ui);
 }
 
@@ -745,7 +745,7 @@
   min-width: 0;
   overflow: hidden;
   color: color-mix(in srgb, var(--color-fg) 62%, transparent);
-  font-family: var(--font-family-mono);
+  font-family: var(--font-family-base);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -757,7 +757,7 @@
   gap: 3px;
   min-width: 0;
   color: color-mix(in srgb, var(--color-fg) 58%, transparent);
-  font-family: var(--font-family-mono);
+  font-family: var(--font-family-base);
 }
 
 .macroConflictDetail span {
@@ -855,7 +855,7 @@
 .lfoSyncValue {
   overflow: hidden;
   color: color-mix(in srgb, var(--color-fg) 58%, transparent);
-  font-family: var(--font-family-mono);
+  font-family: var(--font-family-base);
   font-size: var(--font-size-ui);
   line-height: 1;
   text-overflow: ellipsis;
@@ -1140,7 +1140,7 @@
   min-width: 0;
   overflow: hidden;
   color: color-mix(in srgb, var(--color-fg) 58%, transparent);
-  font-family: var(--font-family-mono);
+  font-family: var(--font-family-base);
   font-size: var(--font-size-ui);
   line-height: 1;
 }
@@ -1166,7 +1166,7 @@
   width: 100%;
   min-height: 18px;
   color: inherit;
-  font-family: var(--font-family-mono);
+  font-family: var(--font-family-base);
   font-size: var(--font-size-ui);
   line-height: 18px;
   text-align: right;
@@ -1221,7 +1221,7 @@
   min-width: 0;
   overflow: hidden;
   color: color-mix(in srgb, var(--color-fg) 58%, transparent);
-  font-family: var(--font-family-mono);
+  font-family: var(--font-family-base);
   font-size: var(--font-size-ui);
   line-height: 1;
   text-overflow: ellipsis;
@@ -1346,7 +1346,7 @@
 }
 
 .sampleControlGrid {
-  grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(93px, 1fr));
   gap: 6px;
 }
 
@@ -1420,7 +1420,7 @@
 }
 
 .shapeControlLabel {
-  font-family: var(--font-family-mono);
+  font-family: var(--font-family-base);
   opacity: 0.72;
 }
 

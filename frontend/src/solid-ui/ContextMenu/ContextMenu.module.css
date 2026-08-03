@@ -65,7 +65,7 @@
 }
 
 .itemHint {
-  font-family: var(--font-family-mono);
+  font-family: var(--font-family-base);
   opacity: 0.6;
   padding-left: var(--space-2);
 }

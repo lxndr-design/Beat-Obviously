@@ -2,6 +2,34 @@
 
 All notable Beat changes are tracked here. Dates use local project dates.
 
+## 0.3.2 - 2026-08-03
+
+### Added
+
+- Added MusicXML and PDF/image score import with Audiveris primary recognition,
+  homr page recovery, retained review artifacts, orchestral track mapping, and
+  high-definition factory score samplers.
+- Added collaboration-ready project and library metadata, beta-readiness gates,
+  deterministic packaging checks, and dense native/project stress fixtures.
+- Added standards-corpus indexing, improved generated bass and drum
+  accompaniment, MIDI remix support, and saved sheet-to-song test projects.
+
+### Changed
+
+- Added Almarai typography, light/dark/mellow theme contrast behavior, refined
+  asset-library layouts, and expanded loading feedback across the app.
+- Made release dependency installation reproducible with `npm ci`, pinned
+  Python audio/OMR runtime locks, and weekly npm, PyPI, and JUCE freshness
+  checks; updated compatible frontend packages without crossing major-version
+  boundaries.
+
+### Fixed
+
+- Fixed a macOS 26 CoreAudio buffer-size mismatch that could corrupt memory and
+  crash Beat during startup or the first instrument audition.
+- Fixed mono and not-yet-active output layouts preparing fewer master-effect
+  channels than Beat's stereo mix bus requires.
+
 ## 0.3.1 - 2026-08-02
 
 ### Changed

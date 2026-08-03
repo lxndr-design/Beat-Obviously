@@ -285,7 +285,11 @@ export function Segment(props: Props) {
       const clampedStart = Math.min(rightBeat - GRID_TICK_BEATS, snappedStart);
       const newLen = rightBeat - clampedStart;
       if (clampedStart === props.startBeat && newLen === props.lengthBeats) return;
-      currentDrag.pendingResize = { startBeat: clampedStart, lengthBeats: newLen };
+      const drumEndTrim = liveSeg()?.payload.kind === "drum" && newLen < currentDrag.startLen;
+      currentDrag.pendingResize = {
+        startBeat: drumEndTrim ? currentDrag.startBeat : clampedStart,
+        lengthBeats: newLen,
+      };
       scheduleDragPreview(currentDrag.pendingResize);
     } else if (currentDrag.mode === "fade-in") {
       const next = {
@@ -590,7 +594,7 @@ export function Segment(props: Props) {
                     rows: segment.payload.rows,
                     stepCount: segment.payload.stepCount,
                     speed: segment.payload.speed,
-                    lengthBeats: segment.payload.sourceLengthBeats ?? segment.lengthBeats,
+                    lengthBeats: segment.payload.sourceLengthBeats ?? segment.payload.stepCount,
                     defaultPitchHz: segment.payload.defaultPitchHz,
                     swingPercent: segment.payload.swingPercent,
                     timeSignature: segment.payload.timeSignature,

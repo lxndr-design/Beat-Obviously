@@ -1,7 +1,8 @@
 import { createStore as create } from "zustand/vanilla";
 import { immer } from "zustand/middleware/immer";
 import { nanoid } from "nanoid";
-import type { DrumRow, DrumSpeed, DrumStep, Id, Instrument, MidiNote, TimeSignature } from "./types";
+import type { DrumRow, DrumSpeed, DrumStep, Id, Instrument, LibraryItemMetadata, MidiNote, TimeSignature } from "./types";
+import { normalizeLibraryMetadata, touchLibraryMetadata } from "./libraryMetadata";
 
 /**
  * MidiComponent — a reusable MIDI pattern saved from a segment.
@@ -21,6 +22,8 @@ export interface MidiComponent {
   instrumentId?: Id;
   /** Creation timestamp (ms since epoch). */
   createdAt: number;
+  updatedAt?: number;
+  libraryMetadata?: LibraryItemMetadata;
   factory?: boolean;
   folderId?: Id;
 }
@@ -37,6 +40,8 @@ export interface DrumComponent {
   swingPercent?: number;
   timeSignature?: TimeSignature;
   createdAt: number;
+  updatedAt?: number;
+  libraryMetadata?: LibraryItemMetadata;
   factory?: boolean;
   folderId?: Id;
 }
@@ -46,6 +51,7 @@ export interface ComponentFolder {
   id: Id;
   name: string;
   factory?: boolean;
+  libraryMetadata?: LibraryItemMetadata;
 }
 
 export const FACTORY_COMPONENT_FOLDER_ID = "factory-components";
@@ -53,8 +59,8 @@ export const USER_COMPONENT_FOLDER_ID = "user-components";
 
 function defaultComponentFolders(): ComponentFolder[] {
   return [
-    { id: FACTORY_COMPONENT_FOLDER_ID, name: "Factory", factory: true },
-    { id: USER_COMPONENT_FOLDER_ID, name: "User" },
+    { id: FACTORY_COMPONENT_FOLDER_ID, name: "Factory", factory: true, libraryMetadata: normalizeLibraryMetadata(undefined, { factory: true }) },
+    { id: USER_COMPONENT_FOLDER_ID, name: "User", libraryMetadata: normalizeLibraryMetadata(undefined) },
   ];
 }
 type ComponentInput =
@@ -84,22 +90,28 @@ export const useComponentStore = create<ComponentSlice>()(
       const id = nanoid();
       set((s) => {
         if (c.kind === "drum") {
+          const now = Date.now();
           s.components.unshift({
             id,
-            createdAt: Date.now(),
+            createdAt: now,
+            updatedAt: now,
             folderId: USER_COMPONENT_FOLDER_ID,
             ...c,
+            libraryMetadata: normalizeLibraryMetadata(c.libraryMetadata, { createdAt: now, updatedAt: now }),
             rows: structuredClone(c.rows),
           });
           return;
         }
         const midi = { ...(c as Omit<MidiComponent, "id" | "createdAt">) };
         delete midi.instrumentId;
+        const now = Date.now();
         s.components.unshift({
           id,
-          createdAt: Date.now(),
+          createdAt: now,
+          updatedAt: now,
           folderId: USER_COMPONENT_FOLDER_ID,
           ...midi,
+          libraryMetadata: normalizeLibraryMetadata(midi.libraryMetadata, { createdAt: now, updatedAt: now }),
           kind: "midi",
           notes: normalizeMidiPatternNotes(midi.notes),
         });
@@ -115,13 +127,19 @@ export const useComponentStore = create<ComponentSlice>()(
         s.components = [...user, ...factory];
         const defaults = defaultComponentFolders();
         const custom = (folders ?? []).filter((folder) => !defaults.some((item) => item.id === folder.id));
-        s.componentFolders = [...defaults, ...custom];
+        s.componentFolders = [
+          ...defaults,
+          ...custom.map((folder) => ({
+            ...folder,
+            libraryMetadata: normalizeLibraryMetadata(folder.libraryMetadata, { factory: folder.factory }),
+          })),
+        ];
       }),
     seedDefaultDrumLoops: (instruments) =>
       set((s) => {
         s.components = [
           ...s.components.filter((component) => !(component.factory && component.kind === "drum")),
-          ...makeFactoryDrumLoops(instruments),
+          ...makeFactoryDrumLoops(instruments).map((component) => normalizeComponentFolder(component)),
         ];
       }),
     update: (id, patch) =>
@@ -135,6 +153,8 @@ export const useComponentStore = create<ComponentSlice>()(
             ...(patch as Partial<DrumComponent>),
             rows: structuredClone((patch as Partial<DrumComponent>).rows ?? (current as DrumComponent).rows),
           };
+          next.updatedAt = Date.now();
+          next.libraryMetadata = touchLibraryMetadata(next.libraryMetadata, { createdAt: next.createdAt });
           s.components[index] = next;
           return;
         }
@@ -143,6 +163,8 @@ export const useComponentStore = create<ComponentSlice>()(
           ...(patch as Partial<MidiComponent>),
           notes: normalizeMidiPatternNotes((patch as Partial<MidiComponent>).notes ?? (current as MidiComponent).notes),
         };
+        next.updatedAt = Date.now();
+        next.libraryMetadata = touchLibraryMetadata(next.libraryMetadata, { createdAt: next.createdAt });
         delete next.instrumentId;
         s.components[index] = next;
       }),
@@ -153,13 +175,17 @@ export const useComponentStore = create<ComponentSlice>()(
     rename: (id, name) =>
       set((s) => {
         const c = s.components.find((x) => x.id === id);
-        if (c) c.name = name;
+        if (c) {
+          c.name = name;
+          c.updatedAt = Date.now();
+          c.libraryMetadata = touchLibraryMetadata(c.libraryMetadata, { createdAt: c.createdAt });
+        }
       }),
     addFolder: (name) => {
       const id = nanoid();
       set((s) => {
         const count = s.componentFolders.filter((folder) => !folder.factory && folder.id !== USER_COMPONENT_FOLDER_ID).length + 1;
-        s.componentFolders.push({ id, name: name?.trim() || `Folder ${count}` });
+        s.componentFolders.push({ id, name: name?.trim() || `Folder ${count}`, libraryMetadata: normalizeLibraryMetadata(undefined) });
       });
       return id;
     },
@@ -169,6 +195,7 @@ export const useComponentStore = create<ComponentSlice>()(
         const next = name.trim();
         if (!folder || folder.factory || id === USER_COMPONENT_FOLDER_ID || !next) return;
         folder.name = next.slice(0, 48);
+        folder.libraryMetadata = touchLibraryMetadata(folder.libraryMetadata);
       }),
     ungroupFolder: (id) =>
       set((s) => {
@@ -195,10 +222,20 @@ export const useComponentStore = create<ComponentSlice>()(
 );
 
 function normalizeComponentFolder(component: BeatComponent): BeatComponent {
+  const createdAt = component.createdAt || Date.now();
+  const common = {
+    createdAt,
+    updatedAt: component.updatedAt ?? createdAt,
+    libraryMetadata: normalizeLibraryMetadata(component.libraryMetadata, {
+      factory: component.factory,
+      createdAt,
+      updatedAt: component.updatedAt,
+    }),
+  };
   if (component.kind === "drum") {
-    return { ...component, folderId: component.folderId ?? USER_COMPONENT_FOLDER_ID };
+    return { ...component, ...common, folderId: component.folderId ?? USER_COMPONENT_FOLDER_ID };
   }
-  const normalized = { ...component, kind: "midi" as const, folderId: component.folderId ?? USER_COMPONENT_FOLDER_ID };
+  const normalized = { ...component, ...common, kind: "midi" as const, folderId: component.folderId ?? USER_COMPONENT_FOLDER_ID };
   delete normalized.instrumentId;
   normalized.notes = normalizeMidiPatternNotes(component.notes);
   return normalized;
@@ -207,6 +244,7 @@ function normalizeComponentFolder(component: BeatComponent): BeatComponent {
 export function normalizeMidiPatternNotes(notes: MidiNote[]): MidiNote[] {
   return notes.map((note) => {
     const portable = structuredClone(note);
+    portable.id ??= nanoid();
     delete portable.frequencyHz;
     delete portable.sampleZoneId;
     delete portable.samplePath;

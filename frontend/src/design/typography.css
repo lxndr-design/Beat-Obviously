@@ -12,8 +12,6 @@
 .text-medium  { font-weight: var(--font-weight-medium); }
 .text-bold    { font-weight: var(--font-weight-bold); }
 
-.text-mono { font-family: var(--font-family-mono); }
-
 .text-uppercase {
   text-transform: uppercase;
   letter-spacing: var(--letter-spacing-uppercase);
@@ -35,7 +33,6 @@
 
 .text-meta {
   font-size: var(--font-size-1);
-  font-family: var(--font-family-mono);
 }
 
 .text-heading {

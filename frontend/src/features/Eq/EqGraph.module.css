@@ -42,13 +42,13 @@
 
 .freqLabel {
   fill: var(--color-fg);
-  font-family: var(--font-family-mono);
+  font-family: var(--font-family-base);
   font-size: var(--font-size-ui);
   opacity: 0.6;
 }
 
 .dbReadout {
   fill: var(--color-fg);
-  font-family: var(--font-family-mono);
+  font-family: var(--font-family-base);
   font-size: var(--font-size-ui);
 }

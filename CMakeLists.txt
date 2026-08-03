@@ -21,7 +21,7 @@ include(FetchContent)
 FetchContent_Declare(
     JUCE
     GIT_REPOSITORY https://github.com/juce-framework/JUCE.git
-    GIT_TAG        8.0.4
+    GIT_TAG        8.0.15
     GIT_SHALLOW    TRUE
 )
 FetchContent_MakeAvailable(JUCE)
@@ -36,7 +36,7 @@ option(BEAT_BUILD_FRONTEND "Build the Solid frontend and embed it" ON)
 if(BEAT_BUILD_FRONTEND AND CMAKE_BUILD_TYPE STREQUAL "Release")
     find_program(NPM_EXECUTABLE npm REQUIRED)
     add_custom_target(beat_frontend_build ALL
-        COMMAND ${NPM_EXECUTABLE} install
+        COMMAND ${NPM_EXECUTABLE} ci
         COMMAND ${NPM_EXECUTABLE} run build
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/frontend
         COMMENT "Building Solid frontend"

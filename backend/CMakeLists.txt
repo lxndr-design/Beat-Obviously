@@ -142,6 +142,8 @@ target_sources(Beat PRIVATE
     Source/Ipc/MessageBridge.cpp
     Source/Ipc/MessageBridge.h
     Source/Ipc/Schema.h
+    Source/Score/PdfPageRenderer.cpp
+    Source/Score/PdfPageRenderer.h
 )
 
 target_compile_definitions(Beat PRIVATE
@@ -153,6 +155,7 @@ target_compile_definitions(Beat PRIVATE
 )
 
 if(APPLE)
+    target_link_libraries(Beat PRIVATE "-framework CoreGraphics" "-framework ImageIO")
     add_custom_command(TARGET Beat POST_BUILD
         COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/../scripts/register-beat-document-type.sh"
                 "$<TARGET_BUNDLE_DIR:Beat>/Contents/Info.plist"
@@ -180,6 +183,17 @@ target_link_libraries(Beat PRIVATE
 )
 
 target_compile_features(Beat PRIVATE cxx_std_20)
+
+add_executable(BeatPdfPageRendererSmoke
+    Tests/PdfPageRendererSmoke.cpp
+    Source/Score/PdfPageRenderer.cpp
+    Source/Score/PdfPageRenderer.h
+)
+target_link_libraries(BeatPdfPageRendererSmoke PRIVATE juce::juce_core juce::juce_graphics)
+if(APPLE)
+    target_link_libraries(BeatPdfPageRendererSmoke PRIVATE "-framework CoreGraphics" "-framework ImageIO")
+endif()
+target_compile_features(BeatPdfPageRendererSmoke PRIVATE cxx_std_20)
 
 # macOS worker threads default to a 512 KB stack. Keep individual production
 # frames well below that ceiling so large realtime state cannot accidentally be
@@ -381,6 +395,9 @@ if(APPLE)
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
             "${CMAKE_CURRENT_SOURCE_DIR}/Assets/BeatIcon.png"
             "$<TARGET_BUNDLE_CONTENT_DIR:Beat>/Resources/BeatIcon.png"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${CMAKE_SOURCE_DIR}/scripts/run-homr-for-beat.py"
+            "$<TARGET_BUNDLE_CONTENT_DIR:Beat>/Resources/run-homr-for-beat.py"
         COMMAND "${CMAKE_SOURCE_DIR}/scripts/register-beat-document-type.sh"
             "$<TARGET_BUNDLE_CONTENT_DIR:Beat>/Info.plist"
         COMMENT "Copying Beat app icon and registering Beat document type"

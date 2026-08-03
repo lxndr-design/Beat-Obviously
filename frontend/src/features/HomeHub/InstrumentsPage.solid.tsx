@@ -21,6 +21,7 @@ import {
 } from "../../state/instrumentTaxonomy";
 import { TEMPORARY_DS_INSTRUMENT_SET_ID, useInstrumentStore, useProjectStore } from "../../state/store";
 import { instrumentRepositorySearchText, instrumentSongTitles } from "../../state/instrumentSongAssociations";
+import { instrumentIcon } from "../../state/instrumentIcons";
 import type { Instrument, InstrumentSet, Project } from "../../state/types";
 import { createStoreSelector } from "../../solid-utils/store";
 import { AssetPageShell, AssetStateMessage } from "./AssetPageShell.solid";
@@ -520,7 +521,7 @@ export function InstrumentsPage() {
                     setActiveId(instrument.id);
                   }}
                 >
-                  <Icon name={instrument.icon || "ph:piano-keys"} size={18} decorative />
+                  <Icon name={instrumentIcon(instrument)} size={18} decorative />
                   <MarqueeText className={styles.rowName} text={instrument.name} />
                   <span class={styles.rowMeta}>
                     <span class={styles.rowType}>{formatInstrumentType(instrument)}</span>
@@ -582,7 +583,7 @@ export function InstrumentsPage() {
               )}
             </div>
             <div class={styles.previewName}>
-              <Icon name={activeInstrument()!.icon || "ph:piano-keys"} size={18} decorative />
+              <Icon name={instrumentIcon(activeInstrument()!)} size={18} decorative />
               <MarqueeText text={activeInstrument()!.name} />
             </div>
             <div

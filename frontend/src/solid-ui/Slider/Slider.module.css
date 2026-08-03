@@ -121,7 +121,7 @@
 .readout {
   min-width: 0;
   overflow: hidden;
-  font-family: var(--font-family-mono);
+  font-family: var(--font-family-base);
   font-size: var(--font-size-ui);
   line-height: 1;
   text-align: right;

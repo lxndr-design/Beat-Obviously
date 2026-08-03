@@ -155,7 +155,7 @@
   min-width: 0;
   overflow: hidden;
   color: color-mix(in srgb, var(--color-fg) 58%, transparent);
-  font-family: var(--font-family-mono);
+  font-family: var(--font-family-base);
   font-size: var(--font-size-ui);
   line-height: 1;
   text-overflow: ellipsis;
@@ -456,7 +456,7 @@
 }
 
 .wavetableControlLabel {
-  font-family: var(--font-family-mono);
+  font-family: var(--font-family-base);
   opacity: 0.72;
 }
 
@@ -506,7 +506,7 @@
   min-width: 0;
   max-width: min(100%, 519px);
   margin-left: auto;
-  font-family: var(--font-family-mono);
+  font-family: var(--font-family-base);
   font-size: var(--font-size-ui);
   line-height: 1;
   color: color-mix(in srgb, var(--color-fg) 72%, transparent);
@@ -580,7 +580,7 @@
   min-width: 0;
   padding: 0 6px 6px;
   color: color-mix(in srgb, var(--color-fg) 64%, transparent);
-  font-family: var(--font-family-mono);
+  font-family: var(--font-family-base);
   font-size: var(--font-size-ui);
   line-height: 1;
 }
@@ -678,7 +678,7 @@
 
 .manualRangeReadout {
   min-width: 42px;
-  font-family: var(--font-family-mono);
+  font-family: var(--font-family-base);
   font-size: var(--font-size-hint);
   line-height: 1;
   color: color-mix(in srgb, var(--color-fg) 62%, transparent);
@@ -702,7 +702,7 @@
   min-width: 0;
   padding: 6px 9px;
   color: color-mix(in srgb, var(--color-fg) 72%, transparent);
-  font-family: var(--font-family-mono);
+  font-family: var(--font-family-base);
   font-size: var(--font-size-hint);
   line-height: 1;
 }
@@ -767,7 +767,7 @@
   min-height: 24px;
   margin: 0 -6px;
   border-bottom: var(--border-fg);
-  font-family: var(--font-family-mono);
+  font-family: var(--font-family-base);
   font-size: var(--font-size-ui-lg);
   line-height: 1;
   text-align: center;

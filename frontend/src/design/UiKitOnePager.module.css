@@ -114,7 +114,7 @@
 }
 
 .referenceMeta span:first-of-type {
-  font-family: var(--font-family-mono);
+  font-family: var(--font-family-base);
   font-size: var(--font-size-hint);
 }
 
@@ -260,7 +260,7 @@
 
 .iconItem span {
   color: color-mix(in srgb, var(--color-fg) 58%, transparent);
-  font-family: var(--font-family-mono);
+  font-family: var(--font-family-base);
 }
 
 .tile {
@@ -317,7 +317,7 @@
   border-radius: 6px;
   background: var(--demo-meta);
   color: var(--demo-muted);
-  font-family: var(--font-family-mono);
+  font-family: var(--font-family-base);
   font-size: var(--font-size-hint);
   line-height: 1;
   white-space: nowrap;

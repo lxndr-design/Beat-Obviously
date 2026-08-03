@@ -5,6 +5,7 @@ set -eu
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 REPO_DIR=$(CDPATH= cd -- "${SCRIPT_DIR}/.." && pwd)
 VENV_DIR="${REPO_DIR}/.venv-stems"
+LOCK_FILE="${REPO_DIR}/scripts/requirements/stem-separation-macos-py313.lock"
 MODEL_CACHE="${BEAT_STEM_MODEL_CACHE:-${HOME}/Library/Application Support/Beat/Stem Models}"
 
 find_python() {
@@ -12,12 +13,10 @@ find_python() {
     "${BEAT_STEM_PYTHON:-}" \
     /opt/homebrew/bin/python3.13 \
     /usr/local/bin/python3.13 \
-    python3.13 \
-    python3.12 \
-    python3.11
+    python3.13
   do
     if [ -n "${candidate}" ] && command -v "${candidate}" >/dev/null 2>&1; then
-      "${candidate}" -c 'import sys; raise SystemExit(0 if (3, 11) <= sys.version_info[:2] <= (3, 13) else 1)' \
+      "${candidate}" -c 'import sys; raise SystemExit(0 if sys.version_info[:2] == (3, 13) else 1)' \
         && printf '%s\n' "${candidate}" \
         && return 0
     fi
@@ -27,7 +26,7 @@ find_python() {
 
 PYTHON=$(find_python || true)
 if [ -z "${PYTHON}" ]; then
-  echo "Beat stem separation requires Python 3.11, 3.12, or 3.13."
+  echo "Beat stem separation requires Python 3.13 for its reproducible runtime lock."
   echo "On macOS with Homebrew: brew install python@3.13"
   exit 1
 fi
@@ -35,9 +34,14 @@ fi
 if [ ! -x "${VENV_DIR}/bin/python" ]; then
   "${PYTHON}" -m venv "${VENV_DIR}"
 fi
+if ! "${VENV_DIR}/bin/python" -c 'import sys; raise SystemExit(0 if sys.version_info[:2] == (3, 13) else 1)'; then
+  echo "Existing ${VENV_DIR} does not use Python 3.13; move it aside and run setup again."
+  exit 1
+fi
 
-"${VENV_DIR}/bin/python" -m pip install --upgrade pip
-"${VENV_DIR}/bin/python" -m pip install "demucs-onnx==0.3.4"
+"${VENV_DIR}/bin/python" -m pip install --upgrade "pip==26.2"
+"${VENV_DIR}/bin/python" -m pip install --upgrade --requirement "${LOCK_FILE}"
+"${VENV_DIR}/bin/python" -m pip check
 "${VENV_DIR}/bin/demucs-onnx" list-models >/dev/null
 "${VENV_DIR}/bin/demucs-onnx" prewarm \
   --models htdemucs \

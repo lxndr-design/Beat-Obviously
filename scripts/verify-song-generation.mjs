@@ -19,6 +19,8 @@ assert.match(modalSource, /SONG_GENRES/);
 assert.match(modalSource, /SONG_RANDOMNESS_LEVELS/);
 assert.match(modalSource, /Create Unsaved Project/);
 assert.match(actionSource, /addInstrument\(/, "every generated voice must receive a newly created instrument");
+assert.match(actionSource, /kind: "drum"/, "generated percussion must use Beat's drum sequencer payload");
+assert.match(actionSource, /generateLocalDrumBeat/, "generated percussion must use the audible factory-instrument drum engine");
 assert.doesNotMatch(actionSource, /findMatchingInstrument|saveCurrentDocument|project\.saveFile|createDirectory/);
 assert.match(actionSource, /createNewDocument\(\)/);
 assert.match(documentActionSource, /markUnsavedNewDocument\(\)/);
@@ -42,7 +44,7 @@ const behavioralCheck = await build({
       const plan = generateSongPlan({ style: "small jazz quartet in Bb major", key: "Bb major", seed: 421 });
       assert.equal(plan.form, "aaba");
       assert.equal(plan.sections.length, 4);
-      assert.equal(plan.lengthBeats, 64);
+      assert.equal(plan.lengthBeats, 60);
       assert.ok(plan.seedMelody.some((note) => note.startBeat < 8));
       assert.ok(plan.seedMelody.some((note) => note.startBeat >= 8), "seed melody must contain two phrases");
       assert.deepEqual(plan.pitchNicheIssues, []);
@@ -72,7 +74,8 @@ const behavioralCheck = await build({
 
       const passive = generateSongPlan({ genre: "electronic", speed: "passive", randomness: "medium", seed: 22 });
       assert.equal(passive.bpm, 62);
-      assert.ok(passive.voices.find((voice) => voice.role === "rhythm")?.segments.every((segment) => segment.notes.length === 0));
+      assert.equal(passive.percussion, undefined, "passive generation must omit percussion instead of creating an empty track");
+      assert.ok(passive.voices.every((voice) => voice.segments.some((segment) => segment.notes.length > 0)), "generated plans must omit empty voices");
       assert.ok(passive.voices.find((voice) => voice.role === "lead")?.segments.flatMap((segment) => segment.notes).some((note) => note.lengthBeats >= 1.5));
 
       const mediumPop = generateSongPlan({ genre: "pop", speed: "medium", randomness: "medium", seed: 23 });
@@ -112,8 +115,9 @@ const behavioralCheck = await build({
       assert.equal(hyper.motifCount, 3);
       assert.ok(hyper.rhythmShiftCount >= 2);
       assert.ok(hyper.keyShiftCount >= 2);
-      const hyperRhythmNotes = hyper.voices.find((voice) => voice.role === "rhythm")?.segments.flatMap((segment) => segment.notes) ?? [];
-      assert.ok(hyperRhythmNotes.length > 80, "hyper rhythm must be dense and chopped rather than a medium pulse at a higher BPM");
+      assert.equal(hyper.percussion?.genre, "dnb", "hyper DnB must request a real DnB drum-sequencer groove");
+      assert.ok(hyper.percussion && hyper.percussion.complexity >= 70, "hyper high-randomness percussion must request a complex groove");
+      assert.ok(new Set(hyper.sections.map((section) => section.lengthBeats)).size > 1, "song architecture must not force every segment to the same duration");
     `,
   },
   bundle: true,

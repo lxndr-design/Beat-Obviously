@@ -5909,6 +5909,9 @@ namespace
         if (sampleFixtureReady)
         {
             auto sampleProject = makeSampleInstrumentOfflineProject(sampleFile);
+            auto rowSampleInstrument = sampleProject.instruments.front();
+            rowSampleInstrument.id = "sample-row-cymbal-instrument";
+            sampleProject.instruments.push_back(std::move(rowSampleInstrument));
             const auto sampleNote = sampleProject.tracks.front().segments.front().notes.front();
             sampleProject.tracks.front().segments.clear();
             beat::AudioEngine sampleEngine;
@@ -5917,7 +5920,7 @@ namespace
             sampleEngine.requestPause();
             renderEngineBlock(sampleEngine, 256);
             sampleAccepted = sampleEngine.requestMidiPreviewNote(
-                "sample-route-track", "sample-route-instrument", sampleNote.pitch, sampleNote.velocity,
+                "sample-route-track", "sample-row-cymbal-instrument", sampleNote.pitch, sampleNote.velocity,
                 0.0, 0.02, 0.0f, &sampleNote);
             sampleActiveAtRequest = sampleEngine.isMidiPreviewActiveForTest();
             for (int blockIndex = 0; blockIndex < 192; ++blockIndex)
@@ -6445,6 +6448,84 @@ namespace
                       << " meanAbsDiff=" << residual.meanAbsDiff
                       << " maxAbsDiff=" << residual.maxAbsDiff << "\n";
         }
+        return ok;
+    }
+
+    bool stressAudioEngineDrumRowPreviewParity()
+    {
+        const auto sampleFile = juce::File("/private/tmp").getChildFile("BeatBackendStress-drum-row-preview.wav");
+        if (!writeAudioClipFixture(sampleFile, 12000))
+            return false;
+
+        auto project = makeSampleInstrumentOfflineProject(sampleFile);
+        project.id = "drum-row-preview-parity";
+        project.bpm = 120.0;
+        project.lengthBeats = 0.5;
+        auto rowInstrument = project.instruments.front();
+        rowInstrument.id = "drum-row-snare-instrument";
+        project.instruments.push_back(std::move(rowInstrument));
+
+        auto& track = project.tracks.front();
+        track.gainDb = -5.0f;
+        auto& segment = track.segments.front();
+        segment.audioGainDb = -1.5f;
+        auto& note = segment.notes.front();
+        note.instrumentId = "drum-row-snare-instrument";
+        note.velocity = 52;
+        note.lengthBeats = 0.25;
+
+        constexpr int samples = 8192;
+        constexpr int blockSize = 257;
+        const auto arrangement = renderOfflineChunks(project, samples, blockSize, 44100.0);
+
+        const auto previewNote = note;
+        const auto previewTrackId = track.id;
+        const auto previewGainDb = segment.audioGainDb;
+        project.tracks.front().segments.clear();
+        beat::AudioEngine previewEngine;
+        previewEngine.prepareForOffline(44100.0, blockSize, 2);
+        previewEngine.applyProject(std::move(project));
+        previewEngine.requestPause();
+        const bool accepted = previewEngine.requestMidiPreviewNote(
+            previewTrackId,
+            previewNote.instrumentId,
+            previewNote.pitch,
+            previewNote.velocity,
+            0.0,
+            previewNote.lengthBeats * 0.5,
+            previewGainDb,
+            &previewNote);
+
+        juce::AudioBuffer<float> preview(2, samples);
+        preview.clear();
+        int written = 0;
+        while (written < samples)
+        {
+            const int samplesThisBlock = juce::jmin(blockSize, samples - written);
+            const auto block = renderEngineBlock(previewEngine, samplesThisBlock);
+            for (int channel = 0; channel < preview.getNumChannels(); ++channel)
+                preview.copyFrom(channel, written, block, channel, 0, samplesThisBlock);
+            written += samplesThisBlock;
+        }
+        previewEngine.requestStopMidiPreview(previewTrackId);
+        sampleFile.deleteFile();
+
+        const auto residual = bufferResidualStats(arrangement, preview, samples);
+        const auto relativeResidual = residual.sourceEnergy > 0.0
+            ? residual.residualEnergy / residual.sourceEnergy
+            : std::numeric_limits<double>::infinity();
+        const bool ok = accepted
+            && residual.ok
+            && residual.sourceEnergy > 1.0e-6
+            && residual.maxAbsDiff <= 1.0e-6f
+            && relativeResidual <= 1.0e-10;
+        if (!ok)
+            std::cerr << "Drum row editor/global sample parity failed accepted=" << accepted
+                      << " arrangementEnergy=" << residual.sourceEnergy
+                      << " residualEnergy=" << residual.residualEnergy
+                      << " relativeResidual=" << relativeResidual
+                      << " meanAbsDiff=" << residual.meanAbsDiff
+                      << " maxAbsDiff=" << residual.maxAbsDiff << "\n";
         return ok;
     }
 
@@ -14907,6 +14988,32 @@ namespace
         return ok;
     }
 
+    bool stressAudioEngineMinimumStereoMasterPreparation()
+    {
+        const auto project = makeTinyOfflineProject();
+        for (const int reportedOutputChannels : { 0, 1 })
+        {
+            auto engine = std::make_unique<beat::AudioEngine>();
+            engine->prepareForRealtime(44100.0, 257, reportedOutputChannels);
+            engine->applyProject(project);
+            engine->requestPlay();
+
+            for (int blockIndex = 0; blockIndex < 8; ++blockIndex)
+            {
+                const auto block = renderEngineBlock(*engine, 257);
+                if (block.getNumChannels() != 2
+                    || block.getNumSamples() != 257
+                    || !std::isfinite(bufferEnergy(block)))
+                {
+                    std::cerr << "Minimum-stereo master preparation failed reportedChannels="
+                              << reportedOutputChannels << " block=" << blockIndex << "\n";
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
     bool stressAudioEngineMasterChainCompressor()
     {
         auto dryProject = makeTinyOfflineProject();
@@ -15764,6 +15871,60 @@ namespace
         }
 
         return true;
+    }
+
+    bool stressAudioEngineRealtimeTrackMute()
+    {
+        beat::AudioEngine engine;
+        engine.prepareForOffline(48000.0, 256, 2);
+        engine.applyProject(makeTinyOfflineProject());
+        engine.requestPlay();
+
+        const auto before = renderEngineBlock(engine, 1024);
+        const double beforeEnergy = bufferEnergy(before);
+        const double positionBeforeMute = engine.sequencer().getPosition();
+        if (!(beforeEnergy > 0.0001)
+            || !engine.queueRealtimeParameterChange("offline-track", "track.mute", 1.0f, 0, 256))
+            return false;
+
+        const auto fadeOut = renderEngineBlock(engine, 512);
+        const auto muted = renderEngineBlock(engine, 512);
+        const double positionAfterMute = engine.sequencer().getPosition();
+        const double fadeOutEnergy = bufferEnergy(fadeOut);
+        const double mutedEnergy = bufferEnergy(muted);
+        if (!(fadeOutEnergy > 0.0)
+            // The master limiter/DC blocker may retain a tiny state tail even
+            // when the routed track has reached zero. Require a decisive drop.
+            || mutedEnergy >= fadeOutEnergy * 0.001
+            || !(positionAfterMute > positionBeforeMute))
+        {
+            std::cerr << "Realtime mute fade failed before=" << beforeEnergy
+                      << " fadeOut=" << fadeOutEnergy
+                      << " muted=" << mutedEnergy
+                      << " positionBefore=" << positionBeforeMute
+                      << " positionAfter=" << positionAfterMute << "\n";
+            return false;
+        }
+
+        if (!engine.queueRealtimeParameterChange("offline-track", "track.mute", 0.0f, 0, 256))
+            return false;
+        const auto fadeIn = renderEngineBlock(engine, 512);
+        const double fadeInEnergy = bufferEnergy(fadeIn);
+        if (!(fadeInEnergy > 0.000001))
+        {
+            std::cerr << "Realtime mute fade-in failed energy=" << fadeInEnergy << "\n";
+            return false;
+        }
+
+        engine.requestPause();
+        renderEngineBlock(engine, 256);
+        const double pausedPosition = engine.sequencer().getPosition();
+        if (!engine.queueRealtimeParameterChange("offline-track", "track.mute", 1.0f, 0, 256))
+            return false;
+        renderEngineBlock(engine, 512);
+        if (std::abs(engine.sequencer().getPosition() - pausedPosition) > 0.0000001)
+            return false;
+        return engine.queueRealtimeParameterChange("offline-track", "track.mute", 0.0f, 0, 256);
     }
 
     bool stressAudioEngineDurableTelemetry()
@@ -17121,6 +17282,305 @@ namespace
                       << " interpretation=keep_p95_below_70_percent_for_realtime_headroom\n";
         }
         return true;
+    }
+
+    beat::Project makeDenseProjectBenchmark(int tier)
+    {
+        const int trackCount = tier == 1 ? 5 : (tier == 2 ? 12 : 21);
+        auto project = makeProcessingCapacityProject(trackCount);
+        project.id = "dense-" + juce::String(tier) + "-native";
+        project.name = "dense_" + juce::String(tier);
+        project.bpm = tier == 1 ? 128.0 : 300.0;
+
+        const std::array<beat::TrackEffectKind, 12> allBuiltInEffects {{
+            beat::TrackEffectKind::Lowpass,
+            beat::TrackEffectKind::Highpass,
+            beat::TrackEffectKind::Saturator,
+            beat::TrackEffectKind::Distortion,
+            beat::TrackEffectKind::Bitcrush,
+            beat::TrackEffectKind::Compressor,
+            beat::TrackEffectKind::Chorus,
+            beat::TrackEffectKind::Phaser,
+            beat::TrackEffectKind::Flanger,
+            beat::TrackEffectKind::Delay,
+            beat::TrackEffectKind::Reverb,
+            beat::TrackEffectKind::Plugin,
+        }};
+        const int effectTarget = tier == 1 ? 4 : (tier == 2 ? 8 : (int) allBuiltInEffects.size());
+        const int segmentsPerTrack = tier == 1 ? 4 : (tier == 2 ? 12 : 16);
+        const int notesPerSegment = tier == 1 ? 25 : (tier == 2 ? 80 : 112);
+        const int chordSize = tier == 1 ? 4 : (tier == 2 ? 12 : 20);
+        project.lengthBeats = (double) segmentsPerTrack * 2.0;
+
+        for (int trackIndex = 0; trackIndex < (int) project.tracks.size(); ++trackIndex)
+        {
+            auto& track = project.tracks[(size_t) trackIndex];
+            const auto instrumentId = track.instrumentId;
+            track.effects.clear();
+            for (int effectIndex = 0; effectIndex < effectTarget; ++effectIndex)
+            {
+                beat::TrackEffect effect;
+                effect.id = track.id + "-dense-fx-" + juce::String(effectIndex + 1);
+                effect.kind = allBuiltInEffects[(size_t) effectIndex];
+                if (effect.kind == beat::TrackEffectKind::Plugin)
+                {
+                    effect.pluginId = "dense-latency-placeholder";
+                    effect.pluginName = "Dense latency placeholder";
+                    effect.pluginFormat = "internal-test";
+                    effect.latencySamples = 2048;
+                }
+                beat::MidiAutomationLane lane;
+                lane.target = (effect.kind == beat::TrackEffectKind::Lowpass
+                    || effect.kind == beat::TrackEffectKind::Highpass) ? "cutoffHz" : "mix";
+                lane.points.push_back({ 0.0, effect.kind == beat::TrackEffectKind::Highpass ? 45.0f : 20.0f });
+                lane.points.push_back({ 4.0, effect.kind == beat::TrackEffectKind::Highpass ? 420.0f : 82.0f,
+                                        beat::AutomationCurve::Smoothstep });
+                lane.points.push_back({ project.lengthBeats,
+                                        effect.kind == beat::TrackEffectKind::Highpass ? 70.0f : 34.0f });
+                effect.automation.push_back(std::move(lane));
+                track.effects.push_back(std::move(effect));
+            }
+
+            track.segments.clear();
+            for (int segmentIndex = 0; segmentIndex < segmentsPerTrack; ++segmentIndex)
+            {
+                beat::Segment segment;
+                segment.id = track.id + "-dense-segment-" + juce::String(segmentIndex + 1);
+                segment.trackId = track.id;
+                segment.instrumentId = instrumentId;
+                segment.kind = beat::SegmentPayloadKind::Midi;
+                segment.startBeat = (double) segmentIndex * 2.0;
+                segment.lengthBeats = 2.0;
+
+                beat::MidiAutomationLane segmentPan;
+                segmentPan.target = "amp.pan";
+                segmentPan.points.push_back({ 0.0, -0.8f });
+                segmentPan.points.push_back({ 1.0, 0.8f, beat::AutomationCurve::Smoothstep });
+                segmentPan.points.push_back({ 2.0, -0.35f });
+                segment.automation.push_back(std::move(segmentPan));
+
+                for (int noteIndex = 0; noteIndex < notesPerSegment; ++noteIndex)
+                {
+                    beat::MidiNote note;
+                    note.instrumentId = instrumentId;
+                    note.pitch = 24 + (trackIndex * 3 + noteIndex * 7 + segmentIndex * 5) % 84;
+                    note.velocity = 28 + (trackIndex * 17 + noteIndex * 23 + segmentIndex * 11) % 100;
+                    note.startBeat = (double) (noteIndex / chordSize) / (tier == 1 ? 4.0 : 16.0);
+                    note.lengthBeats = juce::jmin(1.95 - note.startBeat,
+                        0.015625 + (double) ((noteIndex * 13 + trackIndex * 7) % 64) / 32.0);
+                    note.connectToIndex = noteIndex % 5 == 0 && noteIndex + 1 < notesPerSegment
+                        ? noteIndex + 1 : -1;
+                    if (noteIndex % 3 == 0)
+                    {
+                        note.curve.push_back({ note.startBeat, (double) note.pitch });
+                        note.curve.push_back({ note.startBeat + note.lengthBeats * 0.5,
+                                               (double) note.pitch + (noteIndex % 2 == 0 ? 0.67 : -0.42) });
+                        note.curve.push_back({ note.startBeat + note.lengthBeats, (double) note.pitch });
+                    }
+                    beat::MidiAutomationLane levelLane;
+                    levelLane.target = "amp.level";
+                    levelLane.points.push_back({ 0.0, 0.18f + (float) (noteIndex % 5) * 0.13f });
+                    levelLane.points.push_back({ note.lengthBeats * 0.5, 0.92f, beat::AutomationCurve::EaseOut });
+                    levelLane.points.push_back({ note.lengthBeats, 0.12f });
+                    note.automation.push_back(std::move(levelLane));
+                    beat::MidiAutomationLane notePan;
+                    notePan.target = "amp.pan";
+                    notePan.points.push_back({ 0.0, -0.9f + (float) (noteIndex % 7) * 0.3f });
+                    notePan.points.push_back({ note.lengthBeats, 0.9f - (float) (noteIndex % 7) * 0.3f });
+                    note.automation.push_back(std::move(notePan));
+                    segment.notes.push_back(std::move(note));
+                }
+                track.segments.push_back(std::move(segment));
+            }
+        }
+
+        return project;
+    }
+
+    bool benchmarkDenseProjects()
+    {
+        constexpr double sampleRate = 48000.0;
+        constexpr int blockSize = 256;
+        constexpr int warmupBlocks = 8;
+        constexpr int measuredBlocks = 96;
+        const double deadlineMs = (double) blockSize * 1000.0 / sampleRate;
+        auto outputDirectory = juce::File::getCurrentWorkingDirectory()
+            .getChildFile("generated-tests").getChildFile("dense-exports");
+        if (!outputDirectory.createDirectory())
+        {
+            std::cerr << "Unable to create dense export directory: " << outputDirectory.getFullPathName() << "\n";
+            return false;
+        }
+
+        juce::String json("{\n  \"sampleRate\": 48000,\n  \"blockSize\": 256,\n  \"deadlineMs\": ");
+        json += juce::String(deadlineMs, 6) + ",\n  \"projects\": [\n";
+        bool allValid = true;
+        for (int tier = 1; tier <= 3; ++tier)
+        {
+            auto project = makeDenseProjectBenchmark(tier);
+            int noteCount = 0;
+            int effectCount = 0;
+            int automationPointCount = 0;
+            for (const auto& track : project.tracks)
+            {
+                effectCount += (int) track.effects.size();
+                for (const auto& effect : track.effects)
+                    for (const auto& lane : effect.automation)
+                        automationPointCount += (int) lane.points.size();
+                for (const auto& segment : track.segments)
+                {
+                    noteCount += (int) segment.notes.size();
+                    for (const auto& lane : segment.automation)
+                        automationPointCount += (int) lane.points.size();
+                    for (const auto& note : segment.notes)
+                        for (const auto& lane : note.automation)
+                            automationPointCount += (int) lane.points.size();
+                }
+            }
+            for (const auto& instrument : project.instruments)
+                effectCount += (int) instrument.effects.size();
+            for (const auto& bus : project.returnBuses)
+                effectCount += (int) bus.effects.size();
+
+            beat::AudioEngine engine;
+            engine.prepareForRealtime(sampleRate, blockSize, 2);
+            const int latencySamples = beat::AudioEngine::estimateProjectLatencySamples(project);
+            engine.applyProject(project);
+            engine.requestSeek(0.0);
+            engine.requestPlay();
+            for (int block = 0; block < warmupBlocks; ++block)
+                (void) renderEngineBlock(engine, blockSize);
+
+            std::vector<double> loads;
+            loads.reserve(measuredBlocks);
+            double energy = 0.0;
+            double peakLoad = 0.0;
+            double peakTotalMs = 0.0;
+            double peakSynthMs = 0.0;
+            double peakFxMs = 0.0;
+            beat::AudioEngine::RenderTimingSnapshot timing;
+            const auto liveStarted = std::chrono::steady_clock::now();
+            for (int block = 0; block < measuredBlocks; ++block)
+            {
+                const auto output = renderEngineBlock(engine, blockSize);
+                energy += bufferEnergy(output);
+                if (!engine.pullRenderTimingSnapshot(timing))
+                    return false;
+                loads.push_back(timing.loadPercent);
+                peakLoad = juce::jmax(peakLoad, timing.loadPercent);
+                peakTotalMs = juce::jmax(peakTotalMs, timing.totalMs);
+                peakSynthMs = juce::jmax(peakSynthMs, timing.synthMs);
+                peakFxMs = juce::jmax(peakFxMs, timing.fxMs);
+            }
+            const double liveWallMs = std::chrono::duration<double, std::milli>(
+                std::chrono::steady_clock::now() - liveStarted).count();
+            engine.requestStop();
+            std::sort(loads.begin(), loads.end());
+            const double medianLoad = loads[loads.size() / 2];
+            const double p95Load = loads[(loads.size() * 95 - 1) / 100];
+            const double p99Load = loads[(loads.size() * 99 - 1) / 100];
+            const bool structurallyClean = timing.blockEventOverflows == 0
+                && timing.callbackSafetyViolations == 0
+                && timing.pendingNoteOffOverflows == 0;
+            const bool realtimeMeetsDeadline = p95Load <= 100.0
+                && timing.deadlineOverruns == 0 && structurallyClean;
+
+            auto exportFile = outputDirectory.getChildFile("dense_" + juce::String(tier) + ".wav");
+            exportFile.deleteFile();
+            juce::String exportError;
+            const auto exportStarted = std::chrono::steady_clock::now();
+            bool timedOut = false;
+            const bool exported = beat::AudioEngine::renderProjectToWav(
+                project, exportFile, sampleRate, blockSize, 2, &exportError,
+                [&] (double, juce::int64, juce::int64)
+                {
+                    const auto elapsed = std::chrono::duration<double>(
+                        std::chrono::steady_clock::now() - exportStarted).count();
+                    timedOut = elapsed > 120.0;
+                    return !timedOut;
+                },
+                24, beat::AudioQuality::standardLive, true);
+            const double exportMs = std::chrono::duration<double, std::milli>(
+                std::chrono::steady_clock::now() - exportStarted).count();
+            const auto analysis = exported ? beat::AudioFileAnalyzer::analyzeFile(exportFile) : std::nullopt;
+            const double exportFactor = analysis && exportMs > 0.0
+                ? analysis->durationSeconds / (exportMs / 1000.0) : 0.0;
+            const bool exportValid = exported && analysis.has_value()
+                && analysis->lengthInSamples > 0 && analysis->clippingRatio >= 0.0f;
+            const bool benchmarkValid = std::isfinite(energy)
+                && timing.callbackSafetyViolations == 0 && exportValid;
+            allValid = allValid && benchmarkValid;
+
+            std::cout << "denseProject=" << tier
+                      << " bpm=" << project.bpm
+                      << " tracks=" << project.tracks.size()
+                      << " notes=" << noteCount
+                      << " effects=" << effectCount
+                      << " automationPoints=" << automationPointCount
+                      << " latencySamples=" << latencySamples
+                      << " medianLoad=" << medianLoad << "%"
+                      << " p95Load=" << p95Load << "%"
+                      << " p99Load=" << p99Load << "%"
+                      << " peakLoad=" << peakLoad << "%"
+                      << " peakMs=" << peakTotalMs
+                      << " synthMs=" << peakSynthMs
+                      << " fxMs=" << peakFxMs
+                      << " liveWallMs=" << liveWallMs
+                      << " deadlineOverruns=" << timing.deadlineOverruns
+                      << " eventOverflows=" << timing.blockEventOverflows
+                      << " callbackSafety=" << timing.callbackSafetyViolations
+                      << " noteOffOverflows=" << timing.pendingNoteOffOverflows
+                      << " realtimeMeetsDeadline=" << (realtimeMeetsDeadline ? 1 : 0)
+                      << " structurallyClean=" << (structurallyClean ? 1 : 0)
+                      << " exportMs=" << exportMs
+                      << " exportRealtimeFactor=" << exportFactor
+                      << " exportTimedOut=" << (timedOut ? 1 : 0)
+                      << " truePeakDbTP=" << (analysis ? analysis->truePeakDbTP : -999.0f)
+                      << " integratedLufs=" << (analysis ? analysis->integratedLufs : -999.0f)
+                      << " clippingRatio=" << (analysis ? analysis->clippingRatio : -1.0f)
+                      << " exportValid=" << (exportValid ? 1 : 0)
+                      << " benchmarkValid=" << (benchmarkValid ? 1 : 0) << "\n";
+
+            if (tier > 1) json += ",\n";
+            json += "    {\"name\":\"dense_" + juce::String(tier)
+                + "\",\"bpm\":" + juce::String(project.bpm)
+                + ",\"tracks\":" + juce::String((int) project.tracks.size())
+                + ",\"notes\":" + juce::String(noteCount)
+                + ",\"effects\":" + juce::String(effectCount)
+                + ",\"automationPoints\":" + juce::String(automationPointCount)
+                + ",\"latencySamples\":" + juce::String(latencySamples)
+                + ",\"medianLoadPercent\":" + juce::String(medianLoad, 4)
+                + ",\"p95LoadPercent\":" + juce::String(p95Load, 4)
+                + ",\"p99LoadPercent\":" + juce::String(p99Load, 4)
+                + ",\"peakLoadPercent\":" + juce::String(peakLoad, 4)
+                + ",\"peakTotalMs\":" + juce::String(peakTotalMs, 6)
+                + ",\"peakSynthMs\":" + juce::String(peakSynthMs, 6)
+                + ",\"peakFxMs\":" + juce::String(peakFxMs, 6)
+                + ",\"deadlineOverruns\":" + juce::String(timing.deadlineOverruns)
+                + ",\"eventOverflows\":" + juce::String(timing.blockEventOverflows)
+                + ",\"callbackSafetyViolations\":" + juce::String(timing.callbackSafetyViolations)
+                + ",\"pendingNoteOffOverflows\":" + juce::String(timing.pendingNoteOffOverflows)
+                + ",\"realtimeMeetsDeadline\":" + juce::String(realtimeMeetsDeadline ? 1 : 0)
+                + ",\"structurallyClean\":" + juce::String(structurallyClean ? 1 : 0)
+                + ",\"exportMs\":" + juce::String(exportMs, 3)
+                + ",\"exportRealtimeFactor\":" + juce::String(exportFactor, 4)
+                + ",\"exportTimedOut\":" + juce::String(timedOut ? 1 : 0)
+                + ",\"durationSeconds\":" + juce::String(analysis ? analysis->durationSeconds : 0.0, 4)
+                + ",\"fileBytes\":" + juce::String(exportFile.existsAsFile() ? exportFile.getSize() : 0)
+                + ",\"truePeakDbTP\":" + juce::String(analysis ? analysis->truePeakDbTP : -999.0f, 4)
+                + ",\"integratedLufs\":" + juce::String(analysis ? analysis->integratedLufs : -999.0f, 4)
+                + ",\"clippingRatio\":" + juce::String(analysis ? analysis->clippingRatio : -1.0f, 8)
+                + ",\"exportValid\":" + juce::String(exportValid ? 1 : 0)
+                + ",\"benchmarkValid\":" + juce::String(benchmarkValid ? 1 : 0) + "}";
+
+            if (!exported)
+                std::cerr << "dense_" << tier << " export failed: " << exportError << "\n";
+        }
+        json += "\n  ]\n}\n";
+        const auto metricsFile = outputDirectory.getParentDirectory().getChildFile("dense-native-metrics.json");
+        if (!metricsFile.replaceWithText(json))
+            return false;
+        return allValid;
     }
 
     bool stressAudioEngineDenseAetherRoute()
@@ -23251,6 +23711,17 @@ int main(int argc, char** argv)
         return 0;
     }
 
+    if (argc == 2 && juce::String(argv[1]) == "--dense-projects")
+    {
+        if (!benchmarkDenseProjects())
+        {
+            std::cerr << "Dense project benchmark failed\n";
+            return 1;
+        }
+        std::cout << "Dense project benchmark passed\n";
+        return 0;
+    }
+
     if (argc == 2 && juce::String(argv[1]) == "--note-automation")
     {
         if (!stressInstrumentVoiceLiveBaselineVsNoteAutomation()
@@ -23312,6 +23783,17 @@ int main(int argc, char** argv)
         return 0;
     }
 
+    if (argc == 2 && juce::String(argv[1]) == "--master-channel-layout")
+    {
+        if (!stressAudioEngineMinimumStereoMasterPreparation())
+        {
+            std::cerr << "Master channel-layout focused stress failed\n";
+            return 1;
+        }
+        std::cout << "Master channel-layout focused stress passed\n";
+        return 0;
+    }
+
     if (argc == 2 && juce::String(argv[1]) == "--midi-preview")
     {
         if (!stressAudioEngineMidiEditorPreview()
@@ -23331,6 +23813,7 @@ int main(int argc, char** argv)
             || !stressAudioEngineMidiPreviewLifecycleCleanup()
             || !stressAudioEngineLumenMidiPreviewParity()
             || !stressAudioEngineMidiEditorDetailedParity()
+            || !stressAudioEngineDrumRowPreviewParity()
             || !stressAudioEngineAudioSegmentPreviewParity())
         {
             std::cerr << "Editor native preview focused stress failed\n";
@@ -23491,6 +23974,11 @@ int main(int argc, char** argv)
     if (!stressAudioEngineMidiEditorDetailedParity())
     {
         std::cerr << "Detailed MIDI editor/global preview parity stress failed\n";
+        return 1;
+    }
+    if (!stressAudioEngineDrumRowPreviewParity())
+    {
+        std::cerr << "Drum row editor/global sample parity stress failed\n";
         return 1;
     }
     if (!stressAudioEngineAudioSegmentPreviewParity())
@@ -24437,6 +24925,11 @@ int main(int argc, char** argv)
         std::cerr << "Audio engine master limiter stress failed\n";
         return 1;
     }
+    if (!stressAudioEngineMinimumStereoMasterPreparation())
+    {
+        std::cerr << "Audio engine minimum-stereo master preparation stress failed\n";
+        return 1;
+    }
     if (!stressAudioEngineMasterChainCompressor())
     {
         std::cerr << "Audio engine master chain compressor stress failed\n";
@@ -24488,6 +24981,11 @@ int main(int argc, char** argv)
     if (!stressAudioEngineProjectApplyChurn())
     {
         std::cerr << "Audio engine project apply churn stress failed\n";
+        return 1;
+    }
+    if (!stressAudioEngineRealtimeTrackMute())
+    {
+        std::cerr << "Audio engine realtime track mute stress failed\n";
         return 1;
     }
     if (!stressAudioEngineDurableTelemetry())

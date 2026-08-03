@@ -103,7 +103,7 @@
   background: var(--color-bg);
   color: var(--color-fg);
   border: var(--border-fg);
-  font-family: var(--font-family-mono);
+  font-family: var(--font-family-base);
   font-size: var(--font-size-ui);
   white-space: nowrap;
 }
@@ -156,7 +156,7 @@
   padding: 0 var(--space-1);
   background: transparent;
   color: var(--color-fg);
-  font-family: var(--font-family-mono);
+  font-family: var(--font-family-base);
   font-size: var(--font-size-ui);
   text-align: left;
   transition: var(--interaction-transition);
@@ -186,7 +186,7 @@
 
 .actionStatus {
   min-width: 72px;
-  font-family: var(--font-family-mono);
+  font-family: var(--font-family-base);
   font-size: var(--font-size-ui);
   line-height: 1;
   opacity: 0.65;

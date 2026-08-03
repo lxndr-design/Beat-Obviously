@@ -15,6 +15,7 @@ import { isNative, send } from "../../ipc/bridge";
 import { useTransportStore } from "../../state/store";
 import { renderMidiArpeggiations } from "../../state/midiNoteGroups";
 import type { Instrument, MidiAutomationLane, MidiAutomationTarget, MidiNote } from "../../state/types";
+import { midiPreviewDelaySeconds } from "./midiPreviewScheduling";
 import styles from "./MidiTransport.module.css";
 
 export interface MidiTransportProps {
@@ -371,14 +372,13 @@ function MidiTransportRuntime(props: { state: Accessor<MidiTransportProps> }) {
       previewNotes.forEach((note, index) => {
         const key = midiPreviewScheduleKey(note, index);
         if (scheduled.has(key)) return;
-        if (note.startBeat >= pos && note.startBeat <= pos + lookaheadBeats) {
-          const target = connectedLaterNote(previewNotes, index);
-          const noteDelaySec = (note.startBeat - pos) / beatsPerSec;
-          const durBeats = target ? Math.max(0.03, target.startBeat - note.startBeat) : note.lengthBeats;
-          const durSec = durBeats / beatsPerSec;
-          scheduleNote(note, noteDelaySec, durSec, applyGainToVelocity(note.velocity, latest.gainDb ?? 0), target);
-          scheduled.add(key);
-        }
+        const noteDelaySec = midiPreviewDelaySeconds(note.startBeat, pos, lookaheadBeats, beatsPerSec);
+        if (noteDelaySec == null) return;
+        const target = connectedLaterNote(previewNotes, index);
+        const durBeats = target ? Math.max(0.03, target.startBeat - note.startBeat) : note.lengthBeats;
+        const durSec = durBeats / beatsPerSec;
+        scheduleNote(note, noteDelaySec, durSec, applyGainToVelocity(note.velocity, latest.gainDb ?? 0), target);
+        scheduled.add(key);
       });
 
       raf = requestAnimationFrame(tick);

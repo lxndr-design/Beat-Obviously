@@ -68,7 +68,7 @@
 
 .valueHeaderValue {
   opacity: 0.62;
-  font-family: var(--font-family-mono);
+  font-family: var(--font-family-base);
 }
 
 .effectLane {

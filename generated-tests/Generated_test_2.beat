@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "savedAt": 1785627146366,
+  "savedAt": 1785652054168,
   "project": {
     "id": "generated-test-2-project",
     "name": "Generated_test_2",
@@ -12,7 +12,7 @@
         1
       ]
     },
-    "lengthBeats": 64,
+    "lengthBeats": 60,
     "tracks": [
       {
         "id": "generated-test-2-track-0",
@@ -55,7 +55,7 @@
                   "lengthBeats": 3.3489583333333335
                 },
                 {
-                  "pitch": 46,
+                  "pitch": 50,
                   "velocity": 88,
                   "startBeat": 4,
                   "lengthBeats": 3.3489583333333335
@@ -81,7 +81,7 @@
             "trackId": "generated-test-2-track-0",
             "name": "B · bass",
             "startBeat": 32,
-            "lengthBeats": 16,
+            "lengthBeats": 12,
             "repeats": 0,
             "layer": 0,
             "muted": false,
@@ -99,31 +99,13 @@
                   "pitch": 46,
                   "velocity": 88,
                   "startBeat": 4,
-                  "lengthBeats": 2
-                },
-                {
-                  "pitch": 48,
-                  "velocity": 88,
-                  "startBeat": 6,
-                  "lengthBeats": 2
+                  "lengthBeats": 3.3489583333333335
                 },
                 {
                   "pitch": 46,
                   "velocity": 88,
                   "startBeat": 8,
                   "lengthBeats": 3.3489583333333335
-                },
-                {
-                  "pitch": 46,
-                  "velocity": 88,
-                  "startBeat": 12,
-                  "lengthBeats": 2
-                },
-                {
-                  "pitch": 48,
-                  "velocity": 88,
-                  "startBeat": 14,
-                  "lengthBeats": 2
                 }
               ],
               "gainDb": -3.1979166666666665
@@ -133,7 +115,7 @@
             "id": "generated-test-2-segment-0-2",
             "trackId": "generated-test-2-track-0",
             "name": "A3 · bass",
-            "startBeat": 48,
+            "startBeat": 44,
             "lengthBeats": 16,
             "repeats": 0,
             "layer": 0,
@@ -149,7 +131,7 @@
                   "lengthBeats": 3.3489583333333335
                 },
                 {
-                  "pitch": 46,
+                  "pitch": 50,
                   "velocity": 88,
                   "startBeat": 4,
                   "lengthBeats": 3.3489583333333335
@@ -209,38 +191,38 @@
               "kind": "midi",
               "notes": [
                 {
-                  "pitch": 55,
-                  "velocity": 62,
-                  "startBeat": 0,
-                  "lengthBeats": 3.1979166666666665
-                },
-                {
                   "pitch": 58,
-                  "velocity": 67,
+                  "velocity": 62,
                   "startBeat": 0,
                   "lengthBeats": 3.1979166666666665
                 },
                 {
                   "pitch": 62,
-                  "velocity": 73,
-                  "startBeat": 0,
-                  "lengthBeats": 3.1979166666666665
-                },
-                {
-                  "pitch": 58,
-                  "velocity": 62,
-                  "startBeat": 4,
-                  "lengthBeats": 3.1979166666666665
-                },
-                {
-                  "pitch": 62,
                   "velocity": 67,
-                  "startBeat": 4,
+                  "startBeat": 0,
                   "lengthBeats": 3.1979166666666665
                 },
                 {
                   "pitch": 65,
                   "velocity": 73,
+                  "startBeat": 0,
+                  "lengthBeats": 3.1979166666666665
+                },
+                {
+                  "pitch": 62,
+                  "velocity": 62,
+                  "startBeat": 4,
+                  "lengthBeats": 3.1979166666666665
+                },
+                {
+                  "pitch": 65,
+                  "velocity": 67,
+                  "startBeat": 4,
+                  "lengthBeats": 3.1979166666666665
+                },
+                {
+                  "pitch": 57,
+                  "velocity": 73,
                   "startBeat": 4,
                   "lengthBeats": 3.1979166666666665
                 },
@@ -263,19 +245,19 @@
                   "lengthBeats": 3.1979166666666665
                 },
                 {
-                  "pitch": 58,
+                  "pitch": 55,
                   "velocity": 62,
                   "startBeat": 12,
                   "lengthBeats": 3.1979166666666665
                 },
                 {
-                  "pitch": 62,
+                  "pitch": 58,
                   "velocity": 67,
                   "startBeat": 12,
                   "lengthBeats": 3.1979166666666665
                 },
                 {
-                  "pitch": 65,
+                  "pitch": 62,
                   "velocity": 73,
                   "startBeat": 12,
                   "lengthBeats": 3.1979166666666665
@@ -298,38 +280,38 @@
               "kind": "midi",
               "notes": [
                 {
-                  "pitch": 55,
-                  "velocity": 63,
-                  "startBeat": 0,
-                  "lengthBeats": 3.1979166666666665
-                },
-                {
                   "pitch": 58,
-                  "velocity": 69,
+                  "velocity": 63,
                   "startBeat": 0,
                   "lengthBeats": 3.1979166666666665
                 },
                 {
                   "pitch": 62,
-                  "velocity": 75,
-                  "startBeat": 0,
-                  "lengthBeats": 3.1979166666666665
-                },
-                {
-                  "pitch": 58,
-                  "velocity": 63,
-                  "startBeat": 4,
-                  "lengthBeats": 3.1979166666666665
-                },
-                {
-                  "pitch": 62,
                   "velocity": 69,
-                  "startBeat": 4,
+                  "startBeat": 0,
                   "lengthBeats": 3.1979166666666665
                 },
                 {
                   "pitch": 65,
                   "velocity": 75,
+                  "startBeat": 0,
+                  "lengthBeats": 3.1979166666666665
+                },
+                {
+                  "pitch": 62,
+                  "velocity": 63,
+                  "startBeat": 4,
+                  "lengthBeats": 3.1979166666666665
+                },
+                {
+                  "pitch": 65,
+                  "velocity": 69,
+                  "startBeat": 4,
+                  "lengthBeats": 3.1979166666666665
+                },
+                {
+                  "pitch": 57,
+                  "velocity": 75,
                   "startBeat": 4,
                   "lengthBeats": 3.1979166666666665
                 },
@@ -352,19 +334,19 @@
                   "lengthBeats": 3.1979166666666665
                 },
                 {
-                  "pitch": 58,
+                  "pitch": 55,
                   "velocity": 63,
                   "startBeat": 12,
                   "lengthBeats": 3.1979166666666665
                 },
                 {
-                  "pitch": 62,
+                  "pitch": 58,
                   "velocity": 69,
                   "startBeat": 12,
                   "lengthBeats": 3.1979166666666665
                 },
                 {
-                  "pitch": 65,
+                  "pitch": 62,
                   "velocity": 75,
                   "startBeat": 12,
                   "lengthBeats": 3.1979166666666665
@@ -378,7 +360,7 @@
             "trackId": "generated-test-2-track-1",
             "name": "B · harmony",
             "startBeat": 32,
-            "lengthBeats": 16,
+            "lengthBeats": 12,
             "repeats": 0,
             "layer": 0,
             "muted": false,
@@ -387,19 +369,19 @@
               "kind": "midi",
               "notes": [
                 {
-                  "pitch": 55,
+                  "pitch": 58,
                   "velocity": 66,
                   "startBeat": 0,
                   "lengthBeats": 1.5989583333333333
                 },
                 {
-                  "pitch": 58,
+                  "pitch": 62,
                   "velocity": 72,
                   "startBeat": 0,
                   "lengthBeats": 1.5989583333333333
                 },
                 {
-                  "pitch": 62,
+                  "pitch": 65,
                   "velocity": 78,
                   "startBeat": 0,
                   "lengthBeats": 1.5989583333333333
@@ -423,19 +405,19 @@
                   "lengthBeats": 1.5989583333333333
                 },
                 {
-                  "pitch": 55,
+                  "pitch": 63,
                   "velocity": 66,
                   "startBeat": 4,
                   "lengthBeats": 1.5989583333333333
                 },
                 {
-                  "pitch": 58,
+                  "pitch": 55,
                   "velocity": 72,
                   "startBeat": 4,
                   "lengthBeats": 1.5989583333333333
                 },
                 {
-                  "pitch": 62,
+                  "pitch": 58,
                   "velocity": 78,
                   "startBeat": 4,
                   "lengthBeats": 1.5989583333333333
@@ -459,75 +441,57 @@
                   "lengthBeats": 1.5989583333333333
                 },
                 {
-                  "pitch": 55,
-                  "velocity": 66,
-                  "startBeat": 8,
-                  "lengthBeats": 1.5989583333333333
-                },
-                {
                   "pitch": 58,
-                  "velocity": 72,
-                  "startBeat": 8,
+                  "velocity": 66,
+                  "startBeat": 6,
                   "lengthBeats": 1.5989583333333333
                 },
                 {
                   "pitch": 62,
-                  "velocity": 78,
-                  "startBeat": 8,
-                  "lengthBeats": 1.5989583333333333
-                },
-                {
-                  "pitch": 55,
-                  "velocity": 66,
-                  "startBeat": 10,
-                  "lengthBeats": 1.5989583333333333
-                },
-                {
-                  "pitch": 58,
                   "velocity": 72,
-                  "startBeat": 10,
-                  "lengthBeats": 1.5989583333333333
-                },
-                {
-                  "pitch": 62,
-                  "velocity": 78,
-                  "startBeat": 10,
-                  "lengthBeats": 1.5989583333333333
-                },
-                {
-                  "pitch": 55,
-                  "velocity": 66,
-                  "startBeat": 12,
-                  "lengthBeats": 1.5989583333333333
-                },
-                {
-                  "pitch": 58,
-                  "velocity": 72,
-                  "startBeat": 12,
-                  "lengthBeats": 1.5989583333333333
-                },
-                {
-                  "pitch": 62,
-                  "velocity": 78,
-                  "startBeat": 12,
+                  "startBeat": 6,
                   "lengthBeats": 1.5989583333333333
                 },
                 {
                   "pitch": 65,
-                  "velocity": 66,
-                  "startBeat": 14,
-                  "lengthBeats": 1.5989583333333333
-                },
-                {
-                  "pitch": 57,
-                  "velocity": 72,
-                  "startBeat": 14,
-                  "lengthBeats": 1.5989583333333333
-                },
-                {
-                  "pitch": 60,
                   "velocity": 78,
-                  "startBeat": 14,
+                  "startBeat": 6,
+                  "lengthBeats": 1.5989583333333333
+                },
+                {
+                  "pitch": 55,
+                  "velocity": 66,
+                  "startBeat": 8,
+                  "lengthBeats": 1.5989583333333333
+                },
+                {
+                  "pitch": 58,
+                  "velocity": 72,
+                  "startBeat": 8,
+                  "lengthBeats": 1.5989583333333333
+                },
+                {
+                  "pitch": 62,
+                  "velocity": 78,
+                  "startBeat": 8,
+                  "lengthBeats": 1.5989583333333333
+                },
+                {
+                  "pitch": 63,
+                  "velocity": 66,
+                  "startBeat": 10,
+                  "lengthBeats": 1.5989583333333333
+                },
+                {
+                  "pitch": 55,
+                  "velocity": 72,
+                  "startBeat": 10,
+                  "lengthBeats": 1.5989583333333333
+                },
+                {
+                  "pitch": 58,
+                  "velocity": 78,
+                  "startBeat": 10,
                   "lengthBeats": 1.5989583333333333
                 }
               ],
@@ -538,7 +502,7 @@
             "id": "generated-test-2-segment-1-3",
             "trackId": "generated-test-2-track-1",
             "name": "A3 · harmony",
-            "startBeat": 48,
+            "startBeat": 44,
             "lengthBeats": 16,
             "repeats": 0,
             "layer": 0,
@@ -548,38 +512,38 @@
               "kind": "midi",
               "notes": [
                 {
-                  "pitch": 55,
-                  "velocity": 68,
-                  "startBeat": 0,
-                  "lengthBeats": 3.1979166666666665
-                },
-                {
                   "pitch": 58,
-                  "velocity": 74,
+                  "velocity": 68,
                   "startBeat": 0,
                   "lengthBeats": 3.1979166666666665
                 },
                 {
                   "pitch": 62,
-                  "velocity": 81,
-                  "startBeat": 0,
-                  "lengthBeats": 3.1979166666666665
-                },
-                {
-                  "pitch": 58,
-                  "velocity": 68,
-                  "startBeat": 4,
-                  "lengthBeats": 3.1979166666666665
-                },
-                {
-                  "pitch": 62,
                   "velocity": 74,
-                  "startBeat": 4,
+                  "startBeat": 0,
                   "lengthBeats": 3.1979166666666665
                 },
                 {
                   "pitch": 65,
                   "velocity": 81,
+                  "startBeat": 0,
+                  "lengthBeats": 3.1979166666666665
+                },
+                {
+                  "pitch": 62,
+                  "velocity": 68,
+                  "startBeat": 4,
+                  "lengthBeats": 3.1979166666666665
+                },
+                {
+                  "pitch": 65,
+                  "velocity": 74,
+                  "startBeat": 4,
+                  "lengthBeats": 3.1979166666666665
+                },
+                {
+                  "pitch": 57,
+                  "velocity": 81,
                   "startBeat": 4,
                   "lengthBeats": 3.1979166666666665
                 },
@@ -602,19 +566,19 @@
                   "lengthBeats": 3.1979166666666665
                 },
                 {
-                  "pitch": 58,
+                  "pitch": 55,
                   "velocity": 68,
                   "startBeat": 12,
                   "lengthBeats": 3.1979166666666665
                 },
                 {
-                  "pitch": 62,
+                  "pitch": 58,
                   "velocity": 74,
                   "startBeat": 12,
                   "lengthBeats": 3.1979166666666665
                 },
                 {
-                  "pitch": 65,
+                  "pitch": 62,
                   "velocity": 81,
                   "startBeat": 12,
                   "lengthBeats": 3.1979166666666665
@@ -662,88 +626,76 @@
               "kind": "midi",
               "notes": [
                 {
-                  "pitch": 70,
-                  "velocity": 96,
-                  "startBeat": 0,
-                  "lengthBeats": 1.3802083333333333
-                },
-                {
                   "pitch": 74,
-                  "velocity": 88,
-                  "startBeat": 1,
-                  "lengthBeats": 0.5208333333333334
+                  "velocity": 93,
+                  "startBeat": 0,
+                  "lengthBeats": 0.9635416666666666
                 },
                 {
                   "pitch": 72,
-                  "velocity": 86,
-                  "startBeat": 1.5,
-                  "lengthBeats": 0.4270833333333333
-                },
-                {
-                  "pitch": 77,
-                  "velocity": 82,
-                  "startBeat": 2,
-                  "lengthBeats": 1.046875
-                },
-                {
-                  "pitch": 77,
-                  "velocity": 103,
-                  "startBeat": 3,
-                  "lengthBeats": 1.1875
+                  "velocity": 91,
+                  "startBeat": 0.75,
+                  "lengthBeats": 0.23958333333333334
                 },
                 {
                   "pitch": 74,
+                  "velocity": 96,
+                  "startBeat": 1,
+                  "lengthBeats": 0.4010416666666667
+                },
+                {
+                  "pitch": 72,
                   "velocity": 90,
+                  "startBeat": 1.5,
+                  "lengthBeats": 0.4895833333333333
+                },
+                {
+                  "pitch": 67,
+                  "velocity": 89,
+                  "startBeat": 2,
+                  "lengthBeats": 2.2135416666666665
+                },
+                {
+                  "pitch": 77,
+                  "velocity": 96,
                   "startBeat": 4,
                   "lengthBeats": 2.640625
                 },
                 {
                   "pitch": 70,
-                  "velocity": 90,
+                  "velocity": 81,
                   "startBeat": 8,
-                  "lengthBeats": 0.5885416666666666
+                  "lengthBeats": 0.828125
                 },
                 {
-                  "pitch": 74,
-                  "velocity": 98,
-                  "startBeat": 8.5,
-                  "lengthBeats": 0.5208333333333334
+                  "pitch": 72,
+                  "velocity": 80,
+                  "startBeat": 8.75,
+                  "lengthBeats": 0.23958333333333334
                 },
                 {
                   "pitch": 77,
-                  "velocity": 95,
+                  "velocity": 90,
                   "startBeat": 9,
-                  "lengthBeats": 1.1875
+                  "lengthBeats": 0.5572916666666666
                 },
                 {
-                  "pitch": 75,
-                  "velocity": 82,
+                  "pitch": 69,
+                  "velocity": 87,
+                  "startBeat": 9.5,
+                  "lengthBeats": 0.6458333333333334
+                },
+                {
+                  "pitch": 72,
+                  "velocity": 72,
                   "startBeat": 10,
-                  "lengthBeats": 0.6875
+                  "lengthBeats": 1.59375
                 },
                 {
-                  "pitch": 67,
-                  "velocity": 97,
-                  "startBeat": 10.5,
-                  "lengthBeats": 0.4270833333333333
-                },
-                {
-                  "pitch": 77,
-                  "velocity": 86,
-                  "startBeat": 11,
-                  "lengthBeats": 0.8541666666666666
-                },
-                {
-                  "pitch": 74,
-                  "velocity": 77,
+                  "pitch": 70,
+                  "velocity": 87,
                   "startBeat": 12,
-                  "lengthBeats": 1.3802083333333333
-                },
-                {
-                  "pitch": 67,
-                  "velocity": 95,
-                  "startBeat": 13,
-                  "lengthBeats": 2.640625
+                  "lengthBeats": 2.1614583333333335
                 }
               ],
               "gainDb": -4.401041666666667
@@ -763,88 +715,76 @@
               "kind": "midi",
               "notes": [
                 {
-                  "pitch": 70,
-                  "velocity": 101,
+                  "pitch": 74,
+                  "velocity": 98,
                   "startBeat": 0,
-                  "lengthBeats": 1.3802083333333333
+                  "lengthBeats": 0.9635416666666666
+                },
+                {
+                  "pitch": 72,
+                  "velocity": 94,
+                  "startBeat": 0.75,
+                  "lengthBeats": 0.23958333333333334
                 },
                 {
                   "pitch": 74,
-                  "velocity": 90,
+                  "velocity": 96,
                   "startBeat": 1,
-                  "lengthBeats": 0.5208333333333334
+                  "lengthBeats": 0.4010416666666667
                 },
                 {
                   "pitch": 72,
-                  "velocity": 85,
+                  "velocity": 100,
                   "startBeat": 1.5,
-                  "lengthBeats": 0.4270833333333333
+                  "lengthBeats": 0.6458333333333334
                 },
                 {
                   "pitch": 77,
-                  "velocity": 92,
+                  "velocity": 90,
                   "startBeat": 2,
-                  "lengthBeats": 1.3802083333333333
+                  "lengthBeats": 1.59375
                 },
                 {
                   "pitch": 75,
-                  "velocity": 105,
-                  "startBeat": 3,
-                  "lengthBeats": 0.8541666666666666
-                },
-                {
-                  "pitch": 72,
-                  "velocity": 91,
+                  "velocity": 97,
                   "startBeat": 4,
                   "lengthBeats": 2.640625
                 },
                 {
                   "pitch": 70,
-                  "velocity": 93,
+                  "velocity": 83,
                   "startBeat": 8,
-                  "lengthBeats": 0.5208333333333334
+                  "lengthBeats": 0.7291666666666666
                 },
                 {
-                  "pitch": 74,
-                  "velocity": 92,
-                  "startBeat": 8.5,
-                  "lengthBeats": 0.4270833333333333
+                  "pitch": 72,
+                  "velocity": 74,
+                  "startBeat": 8.75,
+                  "lengthBeats": 0.19791666666666666
                 },
                 {
                   "pitch": 77,
-                  "velocity": 99,
+                  "velocity": 94,
                   "startBeat": 9,
-                  "lengthBeats": 1.3802083333333333
+                  "lengthBeats": 0.6458333333333334
                 },
                 {
-                  "pitch": 75,
-                  "velocity": 93,
+                  "pitch": 69,
+                  "velocity": 98,
+                  "startBeat": 9.5,
+                  "lengthBeats": 0.5572916666666666
+                },
+                {
+                  "pitch": 72,
+                  "velocity": 79,
                   "startBeat": 10,
-                  "lengthBeats": 0.5885416666666666
-                },
-                {
-                  "pitch": 67,
-                  "velocity": 104,
-                  "startBeat": 10.5,
-                  "lengthBeats": 0.5885416666666666
-                },
-                {
-                  "pitch": 77,
-                  "velocity": 80,
-                  "startBeat": 11,
-                  "lengthBeats": 0.8541666666666666
-                },
-                {
-                  "pitch": 74,
-                  "velocity": 78,
-                  "startBeat": 12,
-                  "lengthBeats": 1.046875
+                  "lengthBeats": 2.2135416666666665
                 },
                 {
                   "pitch": 70,
-                  "velocity": 98,
-                  "startBeat": 13,
-                  "lengthBeats": 3.4791666666666665
+                  "velocity": 81,
+                  "startBeat": 12,
+                  "lengthBeats": 2.1614583333333335
                 }
               ],
               "gainDb": -3.921875
@@ -855,7 +795,7 @@
             "trackId": "generated-test-2-track-2",
             "name": "B · lead",
             "startBeat": 32,
-            "lengthBeats": 16,
+            "lengthBeats": 12,
             "repeats": 0,
             "layer": 0,
             "muted": false,
@@ -864,172 +804,142 @@
               "kind": "midi",
               "notes": [
                 {
+                  "pitch": 74,
+                  "velocity": 95,
+                  "startBeat": 0,
+                  "lengthBeats": 0.4791666666666667
+                },
+                {
                   "pitch": 70,
                   "velocity": 98,
-                  "startBeat": 0,
-                  "lengthBeats": 0.6927083333333334
+                  "startBeat": 0.375,
+                  "lengthBeats": 0.125
                 },
                 {
-                  "pitch": 72,
-                  "velocity": 94,
+                  "pitch": 74,
+                  "velocity": 97,
                   "startBeat": 0.5,
-                  "lengthBeats": 0.2604166666666667
+                  "lengthBeats": 0.203125
                 },
                 {
-                  "pitch": 72,
-                  "velocity": 86,
+                  "pitch": 70,
+                  "velocity": 101,
                   "startBeat": 0.75,
-                  "lengthBeats": 0.21354166666666666
+                  "lengthBeats": 0.25
                 },
                 {
-                  "pitch": 75,
+                  "pitch": 77,
                   "velocity": 93,
                   "startBeat": 1,
-                  "lengthBeats": 0.5260416666666666
+                  "lengthBeats": 1.109375
                 },
                 {
-                  "pitch": 75,
-                  "velocity": 108,
-                  "startBeat": 1.5,
-                  "lengthBeats": 0.5989583333333334
-                },
-                {
-                  "pitch": 74,
-                  "velocity": 103,
+                  "pitch": 77,
+                  "velocity": 109,
                   "startBeat": 2,
-                  "lengthBeats": 2.09375
+                  "lengthBeats": 2.28125
                 },
                 {
                   "pitch": 72,
-                  "velocity": 97,
+                  "velocity": 87,
                   "startBeat": 4,
-                  "lengthBeats": 0.2604166666666667
-                },
-                {
-                  "pitch": 74,
-                  "velocity": 98,
-                  "startBeat": 4.25,
-                  "lengthBeats": 0.34375
-                },
-                {
-                  "pitch": 77,
-                  "velocity": 104,
-                  "startBeat": 4.5,
-                  "lengthBeats": 0.5260416666666666
-                },
-                {
-                  "pitch": 75,
-                  "velocity": 96,
-                  "startBeat": 5,
-                  "lengthBeats": 0.2604166666666667
-                },
-                {
-                  "pitch": 67,
-                  "velocity": 102,
-                  "startBeat": 5.25,
-                  "lengthBeats": 0.2604166666666667
-                },
-                {
-                  "pitch": 77,
-                  "velocity": 86,
-                  "startBeat": 5.5,
-                  "lengthBeats": 0.4322916666666667
-                },
-                {
-                  "pitch": 75,
-                  "velocity": 82,
-                  "startBeat": 6,
-                  "lengthBeats": 0.6927083333333334
-                },
-                {
-                  "pitch": 70,
-                  "velocity": 102,
-                  "startBeat": 6.5,
-                  "lengthBeats": 1.5729166666666667
-                },
-                {
-                  "pitch": 70,
-                  "velocity": 97,
-                  "startBeat": 8,
-                  "lengthBeats": 0.4322916666666667
-                },
-                {
-                  "pitch": 74,
-                  "velocity": 84,
-                  "startBeat": 8.5,
-                  "lengthBeats": 0.21354166666666666
+                  "lengthBeats": 0.3645833333333333
                 },
                 {
                   "pitch": 72,
-                  "velocity": 88,
-                  "startBeat": 8.75,
-                  "lengthBeats": 0.34375
+                  "velocity": 79,
+                  "startBeat": 4.375,
+                  "lengthBeats": 0.16145833333333334
                 },
                 {
                   "pitch": 77,
-                  "velocity": 94,
-                  "startBeat": 9,
-                  "lengthBeats": 0.6927083333333334
+                  "velocity": 99,
+                  "startBeat": 4.5,
+                  "lengthBeats": 0.25
                 },
                 {
-                  "pitch": 75,
-                  "velocity": 105,
-                  "startBeat": 9.5,
-                  "lengthBeats": 0.6927083333333334
+                  "pitch": 69,
+                  "velocity": 101,
+                  "startBeat": 4.75,
+                  "lengthBeats": 0.25
                 },
                 {
-                  "pitch": 74,
-                  "velocity": 95,
-                  "startBeat": 10,
-                  "lengthBeats": 2.09375
+                  "pitch": 72,
+                  "velocity": 76,
+                  "startBeat": 5,
+                  "lengthBeats": 0.9791666666666666
                 },
                 {
                   "pitch": 70,
-                  "velocity": 98,
-                  "startBeat": 12,
-                  "lengthBeats": 0.34375
+                  "velocity": 87,
+                  "startBeat": 6,
+                  "lengthBeats": 1.8697916666666667
+                },
+                {
+                  "pitch": 75,
+                  "velocity": 95,
+                  "startBeat": 6,
+                  "lengthBeats": 0.4791666666666667
+                },
+                {
+                  "pitch": 72,
+                  "velocity": 96,
+                  "startBeat": 6.375,
+                  "lengthBeats": 0.125
                 },
                 {
                   "pitch": 74,
                   "velocity": 95,
-                  "startBeat": 12.25,
-                  "lengthBeats": 0.296875
+                  "startBeat": 6.5,
+                  "lengthBeats": 0.203125
+                },
+                {
+                  "pitch": 72,
+                  "velocity": 96,
+                  "startBeat": 6.75,
+                  "lengthBeats": 0.203125
+                },
+                {
+                  "pitch": 77,
+                  "velocity": 91,
+                  "startBeat": 7,
+                  "lengthBeats": 1.2864583333333333
+                },
+                {
+                  "pitch": 77,
+                  "velocity": 106,
+                  "startBeat": 8,
+                  "lengthBeats": 3.0104166666666665
+                },
+                {
+                  "pitch": 70,
+                  "velocity": 83,
+                  "startBeat": 10,
+                  "lengthBeats": 0.4791666666666667
+                },
+                {
+                  "pitch": 72,
+                  "velocity": 77,
+                  "startBeat": 10.375,
+                  "lengthBeats": 0.125
                 },
                 {
                   "pitch": 77,
                   "velocity": 101,
-                  "startBeat": 12.5,
-                  "lengthBeats": 0.5260416666666666
+                  "startBeat": 10.5,
+                  "lengthBeats": 0.328125
                 },
                 {
-                  "pitch": 75,
-                  "velocity": 95,
-                  "startBeat": 13,
-                  "lengthBeats": 0.34375
+                  "pitch": 69,
+                  "velocity": 93,
+                  "startBeat": 10.75,
+                  "lengthBeats": 0.28125
                 },
                 {
-                  "pitch": 67,
-                  "velocity": 109,
-                  "startBeat": 13.25,
-                  "lengthBeats": 0.34375
-                },
-                {
-                  "pitch": 77,
-                  "velocity": 89,
-                  "startBeat": 13.5,
-                  "lengthBeats": 0.5989583333333334
-                },
-                {
-                  "pitch": 74,
-                  "velocity": 87,
-                  "startBeat": 14,
-                  "lengthBeats": 0.5989583333333334
-                },
-                {
-                  "pitch": 70,
-                  "velocity": 103,
-                  "startBeat": 14.5,
-                  "lengthBeats": 2.0729166666666665
+                  "pitch": 72,
+                  "velocity": 78,
+                  "startBeat": 11,
+                  "lengthBeats": 0.9791666666666666
                 }
               ],
               "gainDb": -3.1979166666666665
@@ -1039,7 +949,7 @@
             "id": "generated-test-2-segment-2-3",
             "trackId": "generated-test-2-track-2",
             "name": "A3 · lead",
-            "startBeat": 48,
+            "startBeat": 44,
             "lengthBeats": 16,
             "repeats": 0,
             "layer": 0,
@@ -1049,129 +959,105 @@
               "kind": "midi",
               "notes": [
                 {
-                  "pitch": 72,
-                  "velocity": 104,
+                  "pitch": 75,
+                  "velocity": 100,
                   "startBeat": 0,
-                  "lengthBeats": 1.125
+                  "lengthBeats": 0.9635416666666666
                 },
                 {
                   "pitch": 72,
-                  "velocity": 77,
-                  "startBeat": 0.5,
-                  "lengthBeats": 0.4166666666666667
+                  "velocity": 74,
+                  "startBeat": 0.375,
+                  "lengthBeats": 0.3072916666666667
+                },
+                {
+                  "pitch": 72,
+                  "velocity": 92,
+                  "startBeat": 0.75,
+                  "lengthBeats": 0.19791666666666666
                 },
                 {
                   "pitch": 74,
-                  "velocity": 88,
+                  "velocity": 100,
                   "startBeat": 1,
-                  "lengthBeats": 0.4270833333333333
+                  "lengthBeats": 0.6458333333333334
                 },
                 {
                   "pitch": 72,
-                  "velocity": 89,
+                  "velocity": 106,
                   "startBeat": 1.5,
-                  "lengthBeats": 0.6875
+                  "lengthBeats": 0.4010416666666667
                 },
                 {
                   "pitch": 77,
-                  "velocity": 97,
+                  "velocity": 96,
                   "startBeat": 2,
                   "lengthBeats": 0.6979166666666666
                 },
                 {
-                  "pitch": 70,
-                  "velocity": 75,
-                  "startBeat": 2.5,
-                  "lengthBeats": 0.3385416666666667
-                },
-                {
-                  "pitch": 75,
-                  "velocity": 113,
+                  "pitch": 77,
+                  "velocity": 74,
                   "startBeat": 3,
-                  "lengthBeats": 0.6979166666666666
-                },
-                {
-                  "pitch": 69,
-                  "velocity": 86,
-                  "startBeat": 3.5,
-                  "lengthBeats": 0.546875
-                },
-                {
-                  "pitch": 74,
-                  "velocity": 105,
-                  "startBeat": 4,
-                  "lengthBeats": 0.9739583333333334
-                },
-                {
-                  "pitch": 72,
-                  "velocity": 82,
-                  "startBeat": 6,
                   "lengthBeats": 0.3697916666666667
                 },
                 {
+                  "pitch": 77,
+                  "velocity": 108,
+                  "startBeat": 4,
+                  "lengthBeats": 1.125
+                },
+                {
+                  "pitch": 74,
+                  "velocity": 89,
+                  "startBeat": 6,
+                  "lengthBeats": 0.515625
+                },
+                {
                   "pitch": 70,
-                  "velocity": 99,
+                  "velocity": 89,
                   "startBeat": 8,
-                  "lengthBeats": 0.6875
+                  "lengthBeats": 0.5989583333333334
                 },
                 {
-                  "pitch": 74,
-                  "velocity": 104,
-                  "startBeat": 8.5,
-                  "lengthBeats": 0.4270833333333333
-                },
-                {
-                  "pitch": 77,
-                  "velocity": 102,
-                  "startBeat": 9,
-                  "lengthBeats": 0.8541666666666666
-                },
-                {
-                  "pitch": 75,
-                  "velocity": 86,
-                  "startBeat": 9.5,
-                  "lengthBeats": 0.546875
-                },
-                {
-                  "pitch": 75,
-                  "velocity": 94,
-                  "startBeat": 10,
-                  "lengthBeats": 0.5208333333333334
-                },
-                {
-                  "pitch": 77,
-                  "velocity": 105,
-                  "startBeat": 10.5,
-                  "lengthBeats": 0.6875
-                },
-                {
-                  "pitch": 77,
-                  "velocity": 91,
-                  "startBeat": 11,
-                  "lengthBeats": 0.6979166666666666
-                },
-                {
-                  "pitch": 75,
-                  "velocity": 62,
-                  "startBeat": 11.5,
-                  "lengthBeats": 0.4166666666666667
-                },
-                {
-                  "pitch": 74,
-                  "velocity": 90,
-                  "startBeat": 12,
-                  "lengthBeats": 0.6979166666666666
+                  "pitch": 70,
+                  "velocity": 66,
+                  "startBeat": 8.375,
+                  "lengthBeats": 0.40625
                 },
                 {
                   "pitch": 72,
-                  "velocity": 68,
-                  "startBeat": 12.5,
-                  "lengthBeats": 0.46875
+                  "velocity": 85,
+                  "startBeat": 8.75,
+                  "lengthBeats": 0.19791666666666666
+                },
+                {
+                  "pitch": 77,
+                  "velocity": 96,
+                  "startBeat": 9,
+                  "lengthBeats": 0.4895833333333333
+                },
+                {
+                  "pitch": 69,
+                  "velocity": 104,
+                  "startBeat": 9.5,
+                  "lengthBeats": 0.6458333333333334
+                },
+                {
+                  "pitch": 72,
+                  "velocity": 80,
+                  "startBeat": 10,
+                  "lengthBeats": 0.8541666666666666
+                },
+                {
+                  "pitch": 67,
+                  "velocity": 55,
+                  "startBeat": 11,
+                  "lengthBeats": 0.59375
                 },
                 {
                   "pitch": 70,
-                  "velocity": 104,
-                  "startBeat": 13,
+                  "velocity": 92,
+                  "startBeat": 12,
                   "lengthBeats": 0.6979166666666666
                 }
               ],
@@ -1206,8 +1092,8 @@
           {
             "id": "generated-test-2-segment-3-0",
             "trackId": "generated-test-2-track-3",
-            "name": "A3 · countermelody",
-            "startBeat": 48,
+            "name": "A2 · countermelody",
+            "startBeat": 16,
             "lengthBeats": 16,
             "repeats": 0,
             "layer": 0,
@@ -1217,21 +1103,229 @@
               "kind": "midi",
               "notes": [
                 {
-                  "pitch": 77,
-                  "velocity": 99,
-                  "startBeat": 5,
+                  "pitch": 74,
+                  "velocity": 92,
+                  "startBeat": 8,
+                  "lengthBeats": 0.65
+                },
+                {
+                  "pitch": 74,
+                  "velocity": 92,
+                  "startBeat": 9,
+                  "lengthBeats": 0.65
+                },
+                {
+                  "pitch": 82,
+                  "velocity": 87,
+                  "startBeat": 10,
+                  "lengthBeats": 0.65
+                },
+                {
+                  "pitch": 82,
+                  "velocity": 92,
+                  "startBeat": 12,
                   "lengthBeats": 0.65
                 },
                 {
                   "pitch": 77,
+                  "velocity": 80,
+                  "startBeat": 0,
+                  "lengthBeats": 0.65
+                },
+                {
+                  "pitch": 82,
+                  "velocity": 92,
+                  "startBeat": 1,
+                  "lengthBeats": 0.65
+                },
+                {
+                  "pitch": 75,
+                  "velocity": 76,
+                  "startBeat": 2,
+                  "lengthBeats": 0.65
+                },
+                {
+                  "pitch": 77,
+                  "velocity": 84,
+                  "startBeat": 4,
+                  "lengthBeats": 0.65
+                }
+              ],
+              "gainDb": -3.921875
+            }
+          },
+          {
+            "id": "generated-test-2-segment-3-1",
+            "trackId": "generated-test-2-track-3",
+            "name": "B · countermelody",
+            "startBeat": 32,
+            "lengthBeats": 12,
+            "repeats": 0,
+            "layer": 0,
+            "muted": false,
+            "instrumentId": "slow-jazz-aaba-instrument-3",
+            "payload": {
+              "kind": "midi",
+              "notes": [
+                {
+                  "pitch": 74,
+                  "velocity": 96,
+                  "startBeat": 3,
+                  "lengthBeats": 0.3229166666666667
+                },
+                {
+                  "pitch": 74,
+                  "velocity": 96,
+                  "startBeat": 3.5,
+                  "lengthBeats": 0.3229166666666667
+                },
+                {
+                  "pitch": 77,
+                  "velocity": 91,
+                  "startBeat": 4,
+                  "lengthBeats": 0.3229166666666667
+                },
+                {
+                  "pitch": 77,
+                  "velocity": 96,
+                  "startBeat": 5,
+                  "lengthBeats": 0.3229166666666667
+                },
+                {
+                  "pitch": 82,
+                  "velocity": 84,
+                  "startBeat": 1,
+                  "lengthBeats": 0.3229166666666667
+                },
+                {
+                  "pitch": 77,
+                  "velocity": 96,
+                  "startBeat": 1.5,
+                  "lengthBeats": 0.3229166666666667
+                },
+                {
+                  "pitch": 72,
+                  "velocity": 79,
+                  "startBeat": 2,
+                  "lengthBeats": 0.3229166666666667
+                },
+                {
+                  "pitch": 82,
                   "velocity": 88,
-                  "startBeat": 14,
+                  "startBeat": 3,
+                  "lengthBeats": 0.3229166666666667
+                },
+                {
+                  "pitch": 74,
+                  "velocity": 96,
+                  "startBeat": 9,
+                  "lengthBeats": 0.3229166666666667
+                },
+                {
+                  "pitch": 74,
+                  "velocity": 96,
+                  "startBeat": 9.5,
+                  "lengthBeats": 0.3229166666666667
+                },
+                {
+                  "pitch": 77,
+                  "velocity": 91,
+                  "startBeat": 10,
+                  "lengthBeats": 0.3229166666666667
+                },
+                {
+                  "pitch": 77,
+                  "velocity": 96,
+                  "startBeat": 11,
+                  "lengthBeats": 0.3229166666666667
+                },
+                {
+                  "pitch": 82,
+                  "velocity": 84,
+                  "startBeat": 7,
+                  "lengthBeats": 0.3229166666666667
+                },
+                {
+                  "pitch": 77,
+                  "velocity": 96,
+                  "startBeat": 7.5,
+                  "lengthBeats": 0.3229166666666667
+                },
+                {
+                  "pitch": 72,
+                  "velocity": 79,
+                  "startBeat": 8,
+                  "lengthBeats": 0.3229166666666667
+                },
+                {
+                  "pitch": 82,
+                  "velocity": 88,
+                  "startBeat": 9,
+                  "lengthBeats": 0.3229166666666667
+                }
+              ],
+              "gainDb": -3.1979166666666665
+            }
+          },
+          {
+            "id": "generated-test-2-segment-3-2",
+            "trackId": "generated-test-2-track-3",
+            "name": "A3 · countermelody",
+            "startBeat": 44,
+            "lengthBeats": 16,
+            "repeats": 0,
+            "layer": 0,
+            "muted": false,
+            "instrumentId": "slow-jazz-aaba-instrument-3",
+            "payload": {
+              "kind": "midi",
+              "notes": [
+                {
+                  "pitch": 74,
+                  "velocity": 99,
+                  "startBeat": 8,
+                  "lengthBeats": 0.65
+                },
+                {
+                  "pitch": 74,
+                  "velocity": 99,
+                  "startBeat": 9,
+                  "lengthBeats": 0.65
+                },
+                {
+                  "pitch": 82,
+                  "velocity": 94,
+                  "startBeat": 10,
                   "lengthBeats": 0.65
                 },
                 {
                   "pitch": 82,
                   "velocity": 99,
-                  "startBeat": 15,
+                  "startBeat": 12,
+                  "lengthBeats": 0.65
+                },
+                {
+                  "pitch": 77,
+                  "velocity": 87,
+                  "startBeat": 0,
+                  "lengthBeats": 0.65
+                },
+                {
+                  "pitch": 82,
+                  "velocity": 99,
+                  "startBeat": 1,
+                  "lengthBeats": 0.65
+                },
+                {
+                  "pitch": 75,
+                  "velocity": 82,
+                  "startBeat": 2,
+                  "lengthBeats": 0.65
+                },
+                {
+                  "pitch": 77,
+                  "velocity": 91,
+                  "startBeat": 4,
                   "lengthBeats": 0.65
                 }
               ],
@@ -1243,10 +1337,9 @@
         "sends": []
       },
       {
-        "id": "generated-test-2-track-4",
-        "name": "Brush and Ride Kit",
+        "id": "generated-test-2-track-drums",
+        "name": "Jazz Ride and Brush Groove",
         "kind": "midi",
-        "instrumentId": "slow-jazz-aaba-instrument-4",
         "gainDb": 0,
         "pan": 0,
         "mute": false,
@@ -1264,68 +1357,812 @@
         "rowHeight": "normal",
         "segments": [
           {
-            "id": "generated-test-2-segment-4-0",
-            "trackId": "generated-test-2-track-4",
-            "name": "A1 · rhythm",
+            "id": "generated-test-2-segment-drums-0",
+            "trackId": "generated-test-2-track-drums",
+            "name": "A1 · drums",
             "startBeat": 0,
-            "lengthBeats": 16,
+            "lengthBeats": 4,
             "repeats": 3,
             "layer": 0,
             "muted": false,
-            "instrumentId": "slow-jazz-aaba-instrument-4",
             "payload": {
-              "kind": "midi",
-              "notes": [
+              "kind": "drum",
+              "rows": [
                 {
-                  "pitch": 34,
-                  "velocity": 114,
-                  "startBeat": 0,
-                  "lengthBeats": 0.18229166666666666
+                  "id": "b8dc6bb9-b4f3-4774-993f-cb30f8522c38",
+                  "instrumentId": "generated-test-2-drum-instrument-0",
+                  "name": "Kick",
+                  "steps": [
+                    {
+                      "on": true,
+                      "velocity": 127,
+                      "leanPercent": 0
+                    },
+                    false,
+                    false,
+                    false,
+                    false,
+                    false,
+                    {
+                      "on": true,
+                      "velocity": 92,
+                      "leanPercent": 0
+                    },
+                    false,
+                    false,
+                    false,
+                    false,
+                    false,
+                    {
+                      "on": true,
+                      "velocity": 61,
+                      "leanPercent": 0
+                    },
+                    false,
+                    {
+                      "on": true,
+                      "velocity": 107,
+                      "leanPercent": 0
+                    },
+                    false
+                  ]
                 },
                 {
-                  "pitch": 29,
-                  "velocity": 68,
-                  "startBeat": 2,
-                  "lengthBeats": 0.18229166666666666
+                  "id": "5a69132b-ee2e-4552-a6ae-5296c9b60a31",
+                  "instrumentId": "generated-test-2-drum-instrument-1",
+                  "name": "Snare",
+                  "steps": [
+                    false,
+                    false,
+                    false,
+                    false,
+                    {
+                      "on": true,
+                      "velocity": 94,
+                      "leanPercent": 0
+                    },
+                    false,
+                    false,
+                    false,
+                    false,
+                    false,
+                    false,
+                    {
+                      "on": true,
+                      "velocity": 102,
+                      "leanPercent": 0
+                    },
+                    {
+                      "on": true,
+                      "velocity": 40,
+                      "leanPercent": 10
+                    },
+                    false,
+                    false,
+                    false
+                  ]
                 },
                 {
-                  "pitch": 34,
-                  "velocity": 114,
-                  "startBeat": 4,
-                  "lengthBeats": 0.18229166666666666
+                  "id": "3f762c83-7a1b-4770-81c2-8f803e722e6d",
+                  "instrumentId": "generated-test-2-drum-instrument-3",
+                  "name": "Closed Hat",
+                  "steps": [
+                    {
+                      "on": true,
+                      "velocity": 88,
+                      "leanPercent": 0
+                    },
+                    false,
+                    {
+                      "on": true,
+                      "velocity": 30,
+                      "leanPercent": 12
+                    },
+                    false,
+                    {
+                      "on": true,
+                      "velocity": 35,
+                      "leanPercent": 0
+                    },
+                    false,
+                    {
+                      "on": true,
+                      "velocity": 38,
+                      "leanPercent": 12
+                    },
+                    false,
+                    {
+                      "on": true,
+                      "velocity": 32,
+                      "leanPercent": 0
+                    },
+                    false,
+                    {
+                      "on": true,
+                      "velocity": 35,
+                      "leanPercent": 12
+                    },
+                    false,
+                    {
+                      "on": true,
+                      "velocity": 44,
+                      "leanPercent": 0
+                    },
+                    false,
+                    false,
+                    false
+                  ]
                 },
                 {
-                  "pitch": 29,
-                  "velocity": 68,
-                  "startBeat": 6,
-                  "lengthBeats": 0.18229166666666666
+                  "id": "10c46401-6638-41c3-884d-e5bc1f19db96",
+                  "instrumentId": "generated-test-2-drum-instrument-4",
+                  "name": "Open Hat",
+                  "steps": [
+                    false,
+                    {
+                      "on": true,
+                      "velocity": 27,
+                      "leanPercent": -4
+                    },
+                    false,
+                    false,
+                    false,
+                    false,
+                    false,
+                    false,
+                    false,
+                    false,
+                    false,
+                    false,
+                    false,
+                    false,
+                    {
+                      "on": true,
+                      "velocity": 41,
+                      "leanPercent": 0
+                    },
+                    false
+                  ]
                 },
                 {
-                  "pitch": 34,
-                  "velocity": 114,
-                  "startBeat": 8,
-                  "lengthBeats": 0.18229166666666666
+                  "id": "89ce5dea-3be3-45fc-8e12-56f9d9b4a565",
+                  "instrumentId": "generated-test-2-drum-instrument-2",
+                  "name": "Rim",
+                  "steps": [
+                    false,
+                    false,
+                    false,
+                    false,
+                    false,
+                    false,
+                    false,
+                    false,
+                    false,
+                    false,
+                    false,
+                    false,
+                    false,
+                    false,
+                    false,
+                    false
+                  ]
                 },
                 {
-                  "pitch": 29,
-                  "velocity": 68,
-                  "startBeat": 10,
-                  "lengthBeats": 0.18229166666666666
-                },
-                {
-                  "pitch": 34,
-                  "velocity": 114,
-                  "startBeat": 12,
-                  "lengthBeats": 0.18229166666666666
-                },
-                {
-                  "pitch": 29,
-                  "velocity": 68,
-                  "startBeat": 14,
-                  "lengthBeats": 0.18229166666666666
+                  "id": "f1b9d823-31be-42c8-a111-29a688afa4a7",
+                  "instrumentId": "generated-test-2-drum-instrument-5",
+                  "name": "Ride",
+                  "steps": [
+                    false,
+                    false,
+                    false,
+                    false,
+                    {
+                      "on": true,
+                      "velocity": 18,
+                      "leanPercent": -1
+                    },
+                    false,
+                    false,
+                    false,
+                    {
+                      "on": true,
+                      "velocity": 45,
+                      "leanPercent": -4
+                    },
+                    false,
+                    false,
+                    false,
+                    false,
+                    false,
+                    {
+                      "on": true,
+                      "velocity": 31,
+                      "leanPercent": 12
+                    },
+                    false
+                  ]
                 }
               ],
-              "gainDb": -4.401041666666667
+              "stepCount": 16,
+              "speed": 4,
+              "sourceLengthBeats": 16,
+              "swingPercent": 63,
+              "timeSignature": {
+                "num": 4,
+                "denom": 4,
+                "boldBeats": [
+                  1
+                ]
+              }
+            }
+          },
+          {
+            "id": "generated-test-2-segment-drums-1",
+            "trackId": "generated-test-2-track-drums",
+            "name": "A2 · drums",
+            "startBeat": 16,
+            "lengthBeats": 4,
+            "repeats": 3,
+            "layer": 0,
+            "muted": false,
+            "payload": {
+              "kind": "drum",
+              "rows": [
+                {
+                  "id": "cb83d72a-93a2-425b-8ef8-170644bb5a80",
+                  "instrumentId": "generated-test-2-drum-instrument-0",
+                  "name": "Kick",
+                  "steps": [
+                    {
+                      "on": true,
+                      "velocity": 127,
+                      "leanPercent": 0
+                    },
+                    false,
+                    false,
+                    false,
+                    false,
+                    false,
+                    {
+                      "on": true,
+                      "velocity": 98,
+                      "leanPercent": 0
+                    },
+                    false,
+                    false,
+                    false,
+                    {
+                      "on": true,
+                      "velocity": 44,
+                      "leanPercent": 10
+                    },
+                    false,
+                    false,
+                    false,
+                    {
+                      "on": true,
+                      "velocity": 98,
+                      "leanPercent": 0
+                    },
+                    false
+                  ]
+                },
+                {
+                  "id": "d7b3d69a-1be0-49a2-b4a8-603884fb5da4",
+                  "instrumentId": "generated-test-2-drum-instrument-1",
+                  "name": "Snare",
+                  "steps": [
+                    false,
+                    false,
+                    false,
+                    false,
+                    {
+                      "on": true,
+                      "velocity": 88,
+                      "leanPercent": 0
+                    },
+                    false,
+                    false,
+                    {
+                      "on": true,
+                      "velocity": 38,
+                      "leanPercent": 10
+                    },
+                    false,
+                    false,
+                    false,
+                    false,
+                    {
+                      "on": true,
+                      "velocity": 26,
+                      "leanPercent": 10
+                    },
+                    false,
+                    false,
+                    false
+                  ]
+                },
+                {
+                  "id": "ff5a0ea3-a578-45ce-92b4-8ecb69afc0e6",
+                  "instrumentId": "generated-test-2-drum-instrument-3",
+                  "name": "Closed Hat",
+                  "steps": [
+                    {
+                      "on": true,
+                      "velocity": 76,
+                      "leanPercent": 0
+                    },
+                    false,
+                    false,
+                    false,
+                    {
+                      "on": true,
+                      "velocity": 41,
+                      "leanPercent": 0
+                    },
+                    false,
+                    false,
+                    false,
+                    {
+                      "on": true,
+                      "velocity": 41,
+                      "leanPercent": 0
+                    },
+                    false,
+                    {
+                      "on": true,
+                      "velocity": 31,
+                      "leanPercent": 12
+                    },
+                    false,
+                    false,
+                    false,
+                    false,
+                    false
+                  ]
+                },
+                {
+                  "id": "c4ea2cea-622d-4be0-9dcd-c7527eb6b0cc",
+                  "instrumentId": "generated-test-2-drum-instrument-4",
+                  "name": "Open Hat",
+                  "steps": [
+                    false,
+                    false,
+                    false,
+                    false,
+                    false,
+                    false,
+                    false,
+                    false,
+                    false,
+                    {
+                      "on": true,
+                      "velocity": 25,
+                      "leanPercent": 6
+                    },
+                    false,
+                    false,
+                    false,
+                    false,
+                    {
+                      "on": true,
+                      "velocity": 38,
+                      "leanPercent": 0
+                    },
+                    false
+                  ]
+                }
+              ],
+              "stepCount": 16,
+              "speed": 4,
+              "sourceLengthBeats": 16,
+              "swingPercent": 66,
+              "timeSignature": {
+                "num": 4,
+                "denom": 4,
+                "boldBeats": [
+                  1
+                ]
+              }
+            }
+          },
+          {
+            "id": "generated-test-2-segment-drums-2",
+            "trackId": "generated-test-2-track-drums",
+            "name": "B · drums",
+            "startBeat": 32,
+            "lengthBeats": 4,
+            "repeats": 2,
+            "layer": 0,
+            "muted": false,
+            "payload": {
+              "kind": "drum",
+              "rows": [
+                {
+                  "id": "ba3b2e92-ae88-434a-9f1f-e5272260b116",
+                  "instrumentId": "generated-test-2-drum-instrument-0",
+                  "name": "Kick",
+                  "steps": [
+                    {
+                      "on": true,
+                      "velocity": 127,
+                      "leanPercent": 0
+                    },
+                    false,
+                    false,
+                    {
+                      "on": true,
+                      "velocity": 37,
+                      "leanPercent": 10
+                    },
+                    false,
+                    false,
+                    false,
+                    false,
+                    false,
+                    false,
+                    {
+                      "on": true,
+                      "velocity": 41,
+                      "leanPercent": 10
+                    },
+                    false,
+                    false,
+                    false,
+                    {
+                      "on": true,
+                      "velocity": 97,
+                      "leanPercent": 0
+                    },
+                    false
+                  ]
+                },
+                {
+                  "id": "072b8130-0ca0-4a54-b391-dd8d44fe07ea",
+                  "instrumentId": "generated-test-2-drum-instrument-1",
+                  "name": "Snare",
+                  "steps": [
+                    false,
+                    false,
+                    false,
+                    false,
+                    {
+                      "on": true,
+                      "velocity": 96,
+                      "leanPercent": 0
+                    },
+                    false,
+                    false,
+                    false,
+                    false,
+                    false,
+                    false,
+                    false,
+                    {
+                      "on": true,
+                      "velocity": 48,
+                      "leanPercent": 10
+                    },
+                    false,
+                    false,
+                    {
+                      "on": true,
+                      "velocity": 99,
+                      "leanPercent": 0
+                    }
+                  ]
+                },
+                {
+                  "id": "2efc73de-b545-4e54-bf6d-2da7c55de493",
+                  "instrumentId": "generated-test-2-drum-instrument-3",
+                  "name": "Closed Hat",
+                  "steps": [
+                    {
+                      "on": true,
+                      "velocity": 88,
+                      "leanPercent": 0
+                    },
+                    false,
+                    false,
+                    false,
+                    {
+                      "on": true,
+                      "velocity": 32,
+                      "leanPercent": 0
+                    },
+                    false,
+                    {
+                      "on": true,
+                      "velocity": 30,
+                      "leanPercent": 12
+                    },
+                    false,
+                    {
+                      "on": true,
+                      "velocity": 38,
+                      "leanPercent": 0
+                    },
+                    false,
+                    {
+                      "on": true,
+                      "velocity": 29,
+                      "leanPercent": 12
+                    },
+                    false,
+                    {
+                      "on": true,
+                      "velocity": 34,
+                      "leanPercent": 0
+                    },
+                    false,
+                    false,
+                    false
+                  ]
+                },
+                {
+                  "id": "c98c4977-968e-4b95-955e-6d81702027b8",
+                  "instrumentId": "generated-test-2-drum-instrument-4",
+                  "name": "Open Hat",
+                  "steps": [
+                    false,
+                    false,
+                    false,
+                    false,
+                    false,
+                    false,
+                    false,
+                    false,
+                    false,
+                    false,
+                    false,
+                    false,
+                    false,
+                    false,
+                    {
+                      "on": true,
+                      "velocity": 38,
+                      "leanPercent": 0
+                    },
+                    false
+                  ]
+                }
+              ],
+              "stepCount": 16,
+              "speed": 4,
+              "sourceLengthBeats": 16,
+              "swingPercent": 63,
+              "timeSignature": {
+                "num": 4,
+                "denom": 4,
+                "boldBeats": [
+                  1
+                ]
+              }
+            }
+          },
+          {
+            "id": "generated-test-2-segment-drums-3",
+            "trackId": "generated-test-2-track-drums",
+            "name": "A3 · drums",
+            "startBeat": 44,
+            "lengthBeats": 4,
+            "repeats": 3,
+            "layer": 0,
+            "muted": false,
+            "payload": {
+              "kind": "drum",
+              "rows": [
+                {
+                  "id": "95a67eed-f959-45a9-8bf7-98cf345af8db",
+                  "instrumentId": "generated-test-2-drum-instrument-0",
+                  "name": "Kick",
+                  "steps": [
+                    {
+                      "on": true,
+                      "velocity": 127,
+                      "leanPercent": 0
+                    },
+                    false,
+                    false,
+                    {
+                      "on": true,
+                      "velocity": 62,
+                      "leanPercent": 10
+                    },
+                    false,
+                    false,
+                    {
+                      "on": true,
+                      "velocity": 100,
+                      "leanPercent": 0
+                    },
+                    false,
+                    false,
+                    false,
+                    false,
+                    false,
+                    false,
+                    false,
+                    {
+                      "on": true,
+                      "velocity": 107,
+                      "leanPercent": 0
+                    },
+                    false
+                  ]
+                },
+                {
+                  "id": "512f4009-d47a-4cd3-be7f-57d65b2c0156",
+                  "instrumentId": "generated-test-2-drum-instrument-1",
+                  "name": "Snare",
+                  "steps": [
+                    false,
+                    false,
+                    false,
+                    false,
+                    {
+                      "on": true,
+                      "velocity": 88,
+                      "leanPercent": 0
+                    },
+                    false,
+                    false,
+                    false,
+                    false,
+                    false,
+                    false,
+                    {
+                      "on": true,
+                      "velocity": 94,
+                      "leanPercent": 0
+                    },
+                    {
+                      "on": true,
+                      "velocity": 43,
+                      "leanPercent": 10
+                    },
+                    false,
+                    false,
+                    false
+                  ]
+                },
+                {
+                  "id": "0b69e97b-f597-40ec-87de-7ef3f4df2c7e",
+                  "instrumentId": "generated-test-2-drum-instrument-3",
+                  "name": "Closed Hat",
+                  "steps": [
+                    {
+                      "on": true,
+                      "velocity": 88,
+                      "leanPercent": 0
+                    },
+                    false,
+                    {
+                      "on": true,
+                      "velocity": 30,
+                      "leanPercent": 12
+                    },
+                    false,
+                    {
+                      "on": true,
+                      "velocity": 49,
+                      "leanPercent": 0
+                    },
+                    false,
+                    {
+                      "on": true,
+                      "velocity": 23,
+                      "leanPercent": 12
+                    },
+                    false,
+                    {
+                      "on": true,
+                      "velocity": 31,
+                      "leanPercent": 0
+                    },
+                    false,
+                    {
+                      "on": true,
+                      "velocity": 34,
+                      "leanPercent": 12
+                    },
+                    false,
+                    {
+                      "on": true,
+                      "velocity": 41,
+                      "leanPercent": 0
+                    },
+                    false,
+                    {
+                      "on": true,
+                      "velocity": 19,
+                      "leanPercent": 12
+                    },
+                    false
+                  ]
+                },
+                {
+                  "id": "e042c932-450d-46f4-a1bd-f0cb6c81dd76",
+                  "instrumentId": "generated-test-2-drum-instrument-4",
+                  "name": "Open Hat",
+                  "steps": [
+                    false,
+                    false,
+                    false,
+                    {
+                      "on": true,
+                      "velocity": 24,
+                      "leanPercent": -3
+                    },
+                    {
+                      "on": true,
+                      "velocity": 38,
+                      "leanPercent": 5
+                    },
+                    false,
+                    false,
+                    false,
+                    {
+                      "on": true,
+                      "velocity": 33,
+                      "leanPercent": -4
+                    },
+                    false,
+                    false,
+                    false,
+                    false,
+                    false,
+                    {
+                      "on": true,
+                      "velocity": 33,
+                      "leanPercent": 0
+                    },
+                    false
+                  ]
+                },
+                {
+                  "id": "07cd13f1-503c-4a70-865c-4a20df5b5676",
+                  "instrumentId": "generated-test-2-drum-instrument-7",
+                  "name": "Low Tom",
+                  "steps": [
+                    false,
+                    {
+                      "on": true,
+                      "velocity": 20,
+                      "leanPercent": -2
+                    },
+                    false,
+                    false,
+                    false,
+                    false,
+                    false,
+                    false,
+                    false,
+                    {
+                      "on": true,
+                      "velocity": 47,
+                      "leanPercent": 6
+                    },
+                    false,
+                    false,
+                    false,
+                    false,
+                    false,
+                    false
+                  ]
+                }
+              ],
+              "stepCount": 16,
+              "speed": 4,
+              "sourceLengthBeats": 16,
+              "swingPercent": 60,
+              "timeSignature": {
+                "num": 4,
+                "denom": 4,
+                "boldBeats": [
+                  1
+                ]
+              }
             }
           }
         ],
@@ -1362,8 +2199,8 @@
     {
       "id": "slow-jazz-aaba-instrument-0",
       "name": "Generated · Upright Bass",
-      "createdAt": 1785627146366,
-      "updatedAt": 1785627146366,
+      "createdAt": 1785652054168,
+      "updatedAt": 1785652054168,
       "icon": "ph:cube",
       "kind": "wavetable",
       "envelope": {
@@ -1526,8 +2363,8 @@
     {
       "id": "slow-jazz-aaba-instrument-1",
       "name": "Generated · Warm Jazz Keys",
-      "createdAt": 1785627146366,
-      "updatedAt": 1785627146366,
+      "createdAt": 1785652054168,
+      "updatedAt": 1785652054168,
       "icon": "ph:cube",
       "kind": "wavetable",
       "envelope": {
@@ -1690,8 +2527,8 @@
     {
       "id": "slow-jazz-aaba-instrument-2",
       "name": "Generated · Tenor Sax",
-      "createdAt": 1785627146366,
-      "updatedAt": 1785627146366,
+      "createdAt": 1785652054168,
+      "updatedAt": 1785652054168,
       "icon": "ph:cube",
       "kind": "wavetable",
       "envelope": {
@@ -1854,8 +2691,8 @@
     {
       "id": "slow-jazz-aaba-instrument-3",
       "name": "Generated · Vibraphone Countervoice",
-      "createdAt": 1785627146366,
-      "updatedAt": 1785627146366,
+      "createdAt": 1785652054168,
+      "updatedAt": 1785652054168,
       "icon": "ph:cube",
       "kind": "wavetable",
       "envelope": {
@@ -2016,168 +2853,268 @@
       "userCreated": true
     },
     {
-      "id": "slow-jazz-aaba-instrument-4",
-      "name": "Generated · Brush and Ride Kit",
-      "createdAt": 1785627146366,
-      "updatedAt": 1785627146366,
-      "icon": "ph:cube",
-      "kind": "wavetable",
+      "id": "generated-test-2-drum-instrument-0",
+      "name": "Kick",
+      "createdAt": 1785652054168,
+      "updatedAt": 1785652054168,
+      "kind": "sampler",
       "envelope": {
-        "attackMs": 0.9274466715118491,
-        "decayMs": 80,
-        "sustain": 0.14372333575592453,
-        "releaseMs": 59.49803925631522
+        "attackMs": 1,
+        "decayMs": 100,
+        "sustain": 0,
+        "releaseMs": 100
       },
       "knobs": {
-        "cutoff": 0.29163111434123273,
-        "resonance": 0.049769446463270445,
-        "drive": 0.19581555717061636,
-        "color": 0.4395388929265409
+        "cutoff": 0.8,
+        "resonance": 0.1,
+        "drive": 0.05,
+        "color": 0.5
       },
-      "filterType": "lowpass",
-      "waveform": "wavetable",
-      "detuneCents": 0,
-      "octave": 0,
-      "subOscLevel": 0,
-      "glideMs": 0,
-      "maxVoices": 16,
-      "mono": false,
-      "legato": false,
-      "pitchBendRangeSemitones": 2,
-      "ampLevel": 1,
-      "ampPan": 0,
-      "lfoWaveform": "sine",
-      "lfoRateHz": 1.7907778585308178,
-      "lfoDepth": 0.011861667877962268,
-      "lfoSync": false,
-      "lfoSyncedRate": "1/4",
-      "lfoSmoothing": 0,
-      "lfoRandomPhase": 0,
-      "lfoPhase": 0,
-      "lfoRetrigger": true,
-      "lfoOneShot": false,
-      "lfo2Waveform": "triangle",
-      "lfo2RateHz": 0.5,
-      "lfo2Sync": false,
-      "lfo2SyncedRate": "1/2",
-      "lfo2Smoothing": 0,
-      "lfo2RandomPhase": 0,
-      "lfo2Enabled": false,
-      "lfo2Phase": 0,
-      "lfo2Retrigger": true,
-      "lfo2OneShot": false,
-      "lfoPositionBipolar": true,
-      "lfoPitchBipolar": true,
-      "lfoFilterBipolar": true,
-      "lfoToPitch": 0,
-      "lfoToFilter": 0,
-      "envToFilter": 0,
-      "wavetable": {
-        "bank": "aether",
-        "position": 0.31919306262144653,
-        "warp": 0.13930833938981135,
-        "warpMode": "shape",
-        "unison": 1,
-        "detuneCents": 7.976944646327045,
-        "blend": 0.4093083393898113
-      },
-      "aether": {
-        "oscA": {
-          "enabled": false,
-          "level": 0.78,
-          "pan": 0,
-          "waveform": "sine",
-          "octave": 0,
-          "semitone": 0,
-          "fineCents": 0,
-          "phase": 0,
-          "randomPhase": 0.25,
-          "wavetable": {
-            "bank": "aether",
-            "position": 0.31919306262144653,
-            "warp": 0.13930833938981135,
-            "warpMode": "shape",
-            "unison": 1,
-            "detuneCents": 7.976944646327045,
-            "blend": 0.4093083393898113
-          }
-        },
-        "oscB": {
-          "enabled": false,
-          "level": 0.26,
-          "pan": 0.12,
-          "waveform": "wavetable",
-          "octave": 0,
-          "semitone": 7,
-          "fineCents": -4,
-          "phase": 0,
-          "randomPhase": 0.25,
-          "wavetable": {
-            "bank": "glass",
-            "position": 0.2,
-            "warp": 0.13930833938981135,
-            "warpMode": "shape",
-            "unison": 1,
-            "detuneCents": 7.976944646327045,
-            "blend": 0.4093083393898113
-          }
-        },
-        "sub": {
-          "enabled": false,
-          "level": 0.12,
-          "octave": -1,
-          "waveform": "sine"
-        },
-        "noise": {
-          "enabled": true,
-          "level": 0.82,
-          "color": 0.45
-        },
-        "sampleSlot1": {
-          "schemaVersion": 5,
-          "enabled": false,
-          "audioFileId": "",
-          "rootNote": 60,
-          "level": 0.8,
-          "pan": 0,
-          "route": "filter",
-          "startRatio": 0,
-          "endRatio": 1,
-          "loopEnabled": false,
-          "loopStartRatio": 0,
-          "loopEndRatio": 1,
-          "fxSends": [
-            0,
-            0
-          ],
-          "zones": []
-        },
-        "runtimeWarp": 0,
-        "runtimeWarpMode": "shape"
-      },
+      "waveform": "sample",
       "sampleIds": [],
-      "setId": "user-instruments",
-      "taxonomy": {
-        "categoryId": "synth_electronic",
-        "instrumentId": "wavetable_synth"
-      },
+      "sampleUrl": "/samples/tr505/tr505-kick.wav",
       "source": {
-        "kind": "created",
-        "label": "Start from Something test generation",
-        "edited": false
+        "kind": "factory",
+        "label": "Oramics sampled / TR-505",
+        "url": "https://oramics.github.io/sampled/DM/TR-505/",
+        "license": "Public Domain"
       },
       "descriptors": [
-        "rhythm",
-        "percussive",
-        "jazz",
-        "slow",
-        "medium",
-        "generated-song",
-        "generated-instrument",
-        "aether",
-        "wavetable"
+        "drum",
+        "kick"
       ],
-      "userCreated": true
+      "userCreated": false
+    },
+    {
+      "id": "generated-test-2-drum-instrument-1",
+      "name": "Snare",
+      "createdAt": 1785652054168,
+      "updatedAt": 1785652054168,
+      "kind": "sampler",
+      "envelope": {
+        "attackMs": 1,
+        "decayMs": 100,
+        "sustain": 0,
+        "releaseMs": 100
+      },
+      "knobs": {
+        "cutoff": 0.8,
+        "resonance": 0.1,
+        "drive": 0.05,
+        "color": 0.5
+      },
+      "waveform": "sample",
+      "sampleIds": [],
+      "sampleUrl": "/samples/tr505/tr505-snare.wav",
+      "source": {
+        "kind": "factory",
+        "label": "Oramics sampled / TR-505",
+        "url": "https://oramics.github.io/sampled/DM/TR-505/",
+        "license": "Public Domain"
+      },
+      "descriptors": [
+        "drum",
+        "snare"
+      ],
+      "userCreated": false
+    },
+    {
+      "id": "generated-test-2-drum-instrument-2",
+      "name": "Rim",
+      "createdAt": 1785652054168,
+      "updatedAt": 1785652054168,
+      "kind": "sampler",
+      "envelope": {
+        "attackMs": 1,
+        "decayMs": 100,
+        "sustain": 0,
+        "releaseMs": 100
+      },
+      "knobs": {
+        "cutoff": 0.8,
+        "resonance": 0.1,
+        "drive": 0.05,
+        "color": 0.5
+      },
+      "waveform": "sample",
+      "sampleIds": [],
+      "sampleUrl": "/samples/tr505/tr505-rim.wav",
+      "source": {
+        "kind": "factory",
+        "label": "Oramics sampled / TR-505",
+        "url": "https://oramics.github.io/sampled/DM/TR-505/",
+        "license": "Public Domain"
+      },
+      "descriptors": [
+        "drum",
+        "rim"
+      ],
+      "userCreated": false
+    },
+    {
+      "id": "generated-test-2-drum-instrument-3",
+      "name": "Closed Hat",
+      "createdAt": 1785652054168,
+      "updatedAt": 1785652054168,
+      "kind": "sampler",
+      "envelope": {
+        "attackMs": 1,
+        "decayMs": 100,
+        "sustain": 0,
+        "releaseMs": 100
+      },
+      "knobs": {
+        "cutoff": 0.8,
+        "resonance": 0.1,
+        "drive": 0.05,
+        "color": 0.5
+      },
+      "waveform": "sample",
+      "sampleIds": [],
+      "sampleUrl": "/samples/tr505/tr505-hihat-closed.wav",
+      "source": {
+        "kind": "factory",
+        "label": "Oramics sampled / TR-505",
+        "url": "https://oramics.github.io/sampled/DM/TR-505/",
+        "license": "Public Domain"
+      },
+      "descriptors": [
+        "drum",
+        "closed hat"
+      ],
+      "userCreated": false
+    },
+    {
+      "id": "generated-test-2-drum-instrument-4",
+      "name": "Open Hat",
+      "createdAt": 1785652054168,
+      "updatedAt": 1785652054168,
+      "kind": "sampler",
+      "envelope": {
+        "attackMs": 1,
+        "decayMs": 100,
+        "sustain": 0,
+        "releaseMs": 100
+      },
+      "knobs": {
+        "cutoff": 0.8,
+        "resonance": 0.1,
+        "drive": 0.05,
+        "color": 0.5
+      },
+      "waveform": "sample",
+      "sampleIds": [],
+      "sampleUrl": "/samples/tr505/tr505-hihat-open.wav",
+      "source": {
+        "kind": "factory",
+        "label": "Oramics sampled / TR-505",
+        "url": "https://oramics.github.io/sampled/DM/TR-505/",
+        "license": "Public Domain"
+      },
+      "descriptors": [
+        "drum",
+        "open hat"
+      ],
+      "userCreated": false
+    },
+    {
+      "id": "generated-test-2-drum-instrument-5",
+      "name": "Ride",
+      "createdAt": 1785652054168,
+      "updatedAt": 1785652054168,
+      "kind": "sampler",
+      "envelope": {
+        "attackMs": 1,
+        "decayMs": 100,
+        "sustain": 0,
+        "releaseMs": 500
+      },
+      "knobs": {
+        "cutoff": 0.8,
+        "resonance": 0.1,
+        "drive": 0.05,
+        "color": 0.5
+      },
+      "waveform": "sample",
+      "sampleIds": [],
+      "sampleUrl": "/samples/tr505/tr505-ride.wav",
+      "source": {
+        "kind": "factory",
+        "label": "Oramics sampled / TR-505",
+        "url": "https://oramics.github.io/sampled/DM/TR-505/",
+        "license": "Public Domain"
+      },
+      "descriptors": [
+        "drum",
+        "ride"
+      ],
+      "userCreated": false
+    },
+    {
+      "id": "generated-test-2-drum-instrument-6",
+      "name": "Crash",
+      "createdAt": 1785652054168,
+      "updatedAt": 1785652054168,
+      "kind": "sampler",
+      "envelope": {
+        "attackMs": 1,
+        "decayMs": 100,
+        "sustain": 0,
+        "releaseMs": 500
+      },
+      "knobs": {
+        "cutoff": 0.8,
+        "resonance": 0.1,
+        "drive": 0.05,
+        "color": 0.5
+      },
+      "waveform": "sample",
+      "sampleIds": [],
+      "sampleUrl": "/samples/tr505/tr505-crash.wav",
+      "source": {
+        "kind": "factory",
+        "label": "Oramics sampled / TR-505",
+        "url": "https://oramics.github.io/sampled/DM/TR-505/",
+        "license": "Public Domain"
+      },
+      "descriptors": [
+        "drum",
+        "crash"
+      ],
+      "userCreated": false
+    },
+    {
+      "id": "generated-test-2-drum-instrument-7",
+      "name": "Low Tom",
+      "createdAt": 1785652054168,
+      "updatedAt": 1785652054168,
+      "kind": "sampler",
+      "envelope": {
+        "attackMs": 1,
+        "decayMs": 100,
+        "sustain": 0,
+        "releaseMs": 100
+      },
+      "knobs": {
+        "cutoff": 0.8,
+        "resonance": 0.1,
+        "drive": 0.05,
+        "color": 0.5
+      },
+      "waveform": "sample",
+      "sampleIds": [],
+      "sampleUrl": "/samples/tr505/tr505-tom-l.wav",
+      "source": {
+        "kind": "factory",
+        "label": "Oramics sampled / TR-505",
+        "url": "https://oramics.github.io/sampled/DM/TR-505/",
+        "license": "Public Domain"
+      },
+      "descriptors": [
+        "drum",
+        "low tom"
+      ],
+      "userCreated": false
     }
   ],
   "audioFiles": [],

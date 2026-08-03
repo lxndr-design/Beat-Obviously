@@ -7,7 +7,7 @@
   background: var(--color-bg);
   color: var(--color-fg);
   border: var(--border-fg);
-  font-family: var(--font-family-mono);
+  font-family: var(--font-family-base);
   font-size: var(--font-size-ui);
   pointer-events: auto;
 }

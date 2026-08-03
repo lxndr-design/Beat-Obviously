@@ -140,7 +140,7 @@
   background: var(--color-bg);
   color: var(--color-fg);
   border: var(--border-fg);
-  font-family: var(--font-family-mono);
+  font-family: var(--font-family-base);
   font-size: var(--font-size-ui);
   gap: 3px;
   min-width: 0;
@@ -185,6 +185,19 @@
 .field .fieldSelect:focus-visible {
   outline: 0;
   box-shadow: none;
+}
+
+.metadataGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.metadataSummary {
+  margin: 6px 0 0;
+  color: var(--color-fg);
+  font-size: var(--font-size-ui);
+  opacity: 0.7;
 }
 
 /* Framed section block. */
@@ -389,7 +402,7 @@
 }
 
 .sampleZoneHeader span:last-child {
-  font-family: var(--font-family-mono);
+  font-family: var(--font-family-base);
   font-weight: var(--font-weight-regular);
   opacity: 0.65;
 }
@@ -565,14 +578,14 @@
   min-height: 120px;
   padding: 12px;
   color: var(--color-fg);
-  font-family: var(--font-family-mono);
+  font-family: var(--font-family-base);
   font-size: var(--font-size-ui);
   opacity: 0.65;
 }
 
 .samplerSlotVelocity {
   color: var(--color-fg);
-  font-family: var(--font-family-mono);
+  font-family: var(--font-family-base);
   opacity: 0.72;
 }
 
@@ -617,7 +630,7 @@
   min-width: 0;
   overflow: hidden;
   color: var(--color-fg);
-  font-family: var(--font-family-mono);
+  font-family: var(--font-family-base);
   font-size: var(--font-size-ui);
   line-height: 1;
   opacity: 0.55;
@@ -672,7 +685,7 @@
 }
 
 .hint {
-  font-family: var(--font-family-mono);
+  font-family: var(--font-family-base);
   font-size: var(--font-size-ui);
   opacity: 0.7;
 }
@@ -701,7 +714,7 @@
 }
 
 .glideValue {
-  font-family: var(--font-family-mono);
+  font-family: var(--font-family-base);
   letter-spacing: 0;
   text-transform: none;
 }

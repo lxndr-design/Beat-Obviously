@@ -356,7 +356,7 @@ export function TimelineMidiPlayback() {
 
 function drumSegmentSourceLengthBeats(segment: Segment): number {
   if (segment.payload.kind !== "drum") return segment.lengthBeats;
-  return Math.max(0.25, segment.payload.sourceLengthBeats ?? segment.lengthBeats);
+  return Math.max(0.25, segment.payload.sourceLengthBeats ?? segment.payload.stepCount);
 }
 
 function isAetherExpressionInstrument(instrument: Instrument): boolean {

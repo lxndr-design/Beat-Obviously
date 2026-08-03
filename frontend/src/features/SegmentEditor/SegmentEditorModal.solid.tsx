@@ -48,10 +48,10 @@ import {
   TextInput,
   useModalStack,
 } from "../../solid-ui";
-import { updateDrumBeatFeedback } from "../../persistence/dexie";
 import { isNative, send } from "../../ipc/bridge";
 import { createStoreSelector } from "../../solid-utils/store";
 import { selectSegment } from "../../state/selectors";
+import { retimeDrumSegmentLengthBeats } from "../../state/drumSteps";
 import {
   snapshotInstrument,
   useAudioFileStore,
@@ -150,7 +150,6 @@ export function SegmentEditorModal(props: SegmentEditorModalProps) {
   const [midiRemixVariation, setMidiRemixVariation] = createSignal<MidiRemixVariation>("melody-inversion");
   const [midiRemixVariationSelectOpen, setMidiRemixVariationSelectOpen] = createSignal(false);
   const [midiRemixPopover, setMidiRemixPopover] = createSignal<{ x: number; y: number } | null>(null);
-  const [drumTrainingSessionId, setDrumTrainingSessionId] = createSignal<string | null>(null);
   let previewCtx: AudioContext | null = null;
   let midiLiveRaf: number | null = null;
 
@@ -357,13 +356,6 @@ export function SegmentEditorModal(props: SegmentEditorModalProps) {
   function save() {
     const currentDraft = draft();
     if (!currentDraft) return;
-    const sessionId = drumTrainingSessionId();
-    if (sessionId && currentDraft.payload.kind === "drum") {
-      void updateDrumBeatFeedback(sessionId, {
-        acceptedEdit: true,
-        finalBeat: drumPayloadFromSegment(currentDraft),
-      });
-    }
     updateSegment(props.segmentId, prepareSegmentForSave(currentDraft));
     closeEditorOnly();
   }
@@ -723,10 +715,11 @@ export function SegmentEditorModal(props: SegmentEditorModalProps) {
       const nextLength = Math.max(1, Math.min(DRUM_MAX_STEPS, Math.round(lengthBeats)));
       return {
         ...current,
-        lengthBeats: nextLength,
+        lengthBeats: nextLength / Math.max(1, current.payload.speed),
         payload: {
           ...current.payload,
           stepCount: Math.max(1, Math.min(DRUM_MAX_STEPS, Math.round(lengthBeats))),
+          sourceLengthBeats: nextLength,
           rows,
         },
       };
@@ -734,7 +727,16 @@ export function SegmentEditorModal(props: SegmentEditorModalProps) {
   }
 
   function updateDrumSpeed(speed: DrumSpeed) {
-    setDraft((current) => current?.payload.kind === "drum" ? { ...current, payload: { ...current.payload, speed } } : current);
+    setDraft((current) => {
+      if (!current || current.payload.kind !== "drum") return current;
+      return {
+        ...current,
+        // Speed changes retime the arranged clip as well as its audition. This
+        // preserves any existing end trim while removing the manual resize step.
+        lengthBeats: retimeDrumSegmentLengthBeats(current.lengthBeats, current.payload.speed, speed),
+        payload: { ...current.payload, speed },
+      };
+    });
   }
 
   function updateDrumDefaultPitch(defaultPitchHz: number | undefined) {
@@ -754,12 +756,13 @@ export function SegmentEditorModal(props: SegmentEditorModalProps) {
       if (!current || current.payload.kind !== "drum") return current;
       return {
         ...current,
-        lengthBeats: beat.lengthBeats,
+        lengthBeats: beat.lengthBeats / Math.max(1, beat.speed),
         payload: {
           ...current.payload,
           rows: beat.rows,
           stepCount: beat.stepCount,
           speed: beat.speed,
+          sourceLengthBeats: beat.lengthBeats,
           swingPercent: beat.swingPercent,
           defaultPitchHz: beat.defaultPitchHz ?? current.payload.defaultPitchHz,
         },
@@ -1338,7 +1341,7 @@ export function SegmentEditorModal(props: SegmentEditorModalProps) {
               speed={payload().speed ?? 1}
               defaultPitchHz={payload().defaultPitchHz}
               swingPercent={payload().swingPercent ?? 50}
-              lengthBeats={draft()!.lengthBeats}
+              lengthBeats={payload().sourceLengthBeats ?? payload().stepCount}
               bpm={bpm()}
               timeSignature={timeSignature()}
               segmentTimeSignature={payload().timeSignature ?? timeSignature()}
@@ -1348,7 +1351,6 @@ export function SegmentEditorModal(props: SegmentEditorModalProps) {
               onChange={updateDrumRows}
               onResize={resizeDrum}
               onGenerateBeat={applyGeneratedDrumBeat}
-              onTrainingSessionChange={setDrumTrainingSessionId}
               onDefaultPitchChange={updateDrumDefaultPitch}
               onSwingChange={updateDrumSwing}
               onSpeedChange={updateDrumSpeed}
@@ -1447,19 +1449,6 @@ const fallbackInstrument: Instrument = {
 
 function sampleName(filename: string): string {
   return filename.replace(/\.[a-z0-9]+$/i, "").trim() || "Sample";
-}
-
-function drumPayloadFromSegment(segment: Segment): GeneratedDrumBeat | undefined {
-  if (segment.payload.kind !== "drum") return undefined;
-  return {
-    rows: structuredClone(segment.payload.rows),
-    stepCount: segment.payload.stepCount,
-    lengthBeats: segment.lengthBeats,
-    speed: segment.payload.speed,
-    swingPercent: segment.payload.swingPercent ?? 50,
-    defaultPitchHz: segment.payload.defaultPitchHz,
-    source: "local",
-  };
 }
 
 function segmentIcon(kind: Segment["payload"]["kind"]): string {

@@ -42,7 +42,7 @@
   border: var(--border-fg);
   background: var(--color-bg);
   color: var(--color-fg);
-  font-family: var(--font-family-mono);
+  font-family: var(--font-family-base);
   font-size: var(--font-size-ui);
   line-height: 12px;
   text-align: center;
@@ -79,7 +79,7 @@
   border: 0;
   background: var(--color-bg);
   color: var(--color-fg);
-  font-family: var(--font-family-mono);
+  font-family: var(--font-family-base);
   font-size: var(--font-size-ui);
   text-align: center;
   outline: none;
@@ -88,7 +88,7 @@
 .unit {
   padding: 0 var(--space-1);
   color: color-mix(in srgb, var(--color-fg) 68%, var(--color-bg));
-  font-family: var(--font-family-mono);
+  font-family: var(--font-family-base);
   font-size: var(--font-size-ui);
   white-space: nowrap;
 }

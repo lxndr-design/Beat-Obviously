@@ -1,15 +1,20 @@
 import { createEffect, createSignal, onCleanup, type JSX } from "solid-js";
 import { Portal } from "solid-js/web";
 import { Button, FloatingLayer, FloatingSelect, HoverInfo, Icon, NumberInput, RadioGroup, Slider, TextInput } from "../../solid-ui";
-import { ai } from "../../ai/aiService";
-import { DRUM_COMPLEXITY_DEFAULT, DRUM_GENRES, DRUM_MAX_STEPS, type DrumGenre, type GeneratedDrumBeat } from "../../ai/drumBeatGenerator";
-import { createInstrumentBufferSource, noteFrequency, preloadInstrumentSample } from "../../audio/synthPreview";
+import { DRUM_MAX_STEPS, remixDrumBeat, type GeneratedDrumBeat } from "../../ai/drumBeatGenerator";
+import {
+  createInstrumentBufferSource,
+  hasCachedInstrumentSamplesForPlayback,
+  instrumentRequiresSamplePlayback,
+  noteFrequency,
+  preloadInstrumentSample,
+  preloadInstrumentSamplesForPlayback,
+} from "../../audio/synthPreview";
 import { registerGlobalAudioStop, stopAllBrowserAudio } from "../../audio/globalAudioSafety";
 import { pauseTransport } from "../../audio/transportActions";
 import { isNative, send } from "../../ipc/bridge";
 import { useContextualHotkey } from "../../solid-utils/contextualHotkeys.solid";
 import { useTransportStore } from "../../state/store";
-import { listDrumBeatFeedback, saveDrumBeatFeedback } from "../../persistence/dexie";
 import { TimeSignatureControl } from "../Transport/TimeSignatureControl.solid";
 import {
   DEFAULT_DRUM_MIDI_PITCH,
@@ -48,7 +53,6 @@ interface Props {
   onChange: (rows: DrumRow[]) => void;
   onResize: (lengthBeats: number, rows: DrumRow[]) => void;
   onGenerateBeat?: (beat: GeneratedDrumBeat) => void;
-  onTrainingSessionChange?: (id: string | null) => void;
   onDefaultPitchChange?: (frequencyHz: number | undefined) => void;
   onSwingChange?: (swingPercent: number) => void;
   onSpeedChange: (speed: DrumSpeed) => void;
@@ -76,12 +80,6 @@ interface VolumePopoverState extends CellMenuState {
 interface LeanPopoverState extends CellMenuState {
   value: string;
   error: boolean;
-}
-
-interface FeedbackPopoverState {
-  x: number;
-  y: number;
-  value: string;
 }
 
 interface CopiedCell {
@@ -132,15 +130,6 @@ export function DrumSequencer(props: Props) {
   const [playStep, setPlayStep] = createSignal<number | null>(null);
   const [selectedCells, setSelectedCells] = createSignal<Set<string>>(new Set(), { equals: false });
   const [openRowId, setOpenRowId] = createSignal<string | null>(null);
-  const [generateGenre, setGenerateGenre] = createSignal<DrumGenre>("rock");
-  const [generateGenreOpen, setGenerateGenreOpen] = createSignal(false);
-  const [generateComplexity, setGenerateComplexity] = createSignal(DRUM_COMPLEXITY_DEFAULT);
-  const [generating, setGenerating] = createSignal(false);
-  const [lastGeneratedBeat, setLastGeneratedBeat] = createSignal<GeneratedDrumBeat | null>(null);
-  const [feedbackRating, setFeedbackRating] = createSignal<"up" | "down" | null>(null);
-  const [feedbackId, setFeedbackId] = createSignal<string | null>(null);
-  const [feedbackSubmitted, setFeedbackSubmitted] = createSignal<"up" | "down" | null>(null);
-  const [feedbackPopover, setFeedbackPopover] = createSignal<FeedbackPopoverState | null>(null);
   const [cellMenu, setCellMenu] = createSignal<CellMenuState | null>(null);
   const [pitchPopover, setPitchPopover] = createSignal<PitchPopoverState | null>(null);
   const [volumePopover, setVolumePopover] = createSignal<VolumePopoverState | null>(null);
@@ -222,7 +211,6 @@ export function DrumSequencer(props: Props) {
     if (usesNativePreview()) return;
     const ctx = getCtx();
     for (const instrument of props.instruments) {
-      if (!instrument.sampleUrl) continue;
       void preloadInstrumentSample(ctx, instrument).catch(() => {
         // Falling back to synthesized preview keeps playback resilient.
       });
@@ -234,22 +222,18 @@ export function DrumSequencer(props: Props) {
       const target = e.target as Element | null;
       if (target?.closest("[data-floating-layer]")) return;
       setOpenRowId(null);
-      setGenerateGenreOpen(false);
       setCellMenu(null);
       setPitchPopover(null);
       setVolumePopover(null);
       setLeanPopover(null);
-      setFeedbackPopover(null);
     }
     function closeOnEscape(e: globalThis.KeyboardEvent) {
       if (e.key !== "Escape") return;
       setOpenRowId(null);
-      setGenerateGenreOpen(false);
       setCellMenu(null);
       setPitchPopover(null);
       setVolumePopover(null);
       setLeanPopover(null);
-      setFeedbackPopover(null);
     }
     window.addEventListener("mousedown", closeFloating);
     window.addEventListener("keydown", closeOnEscape);
@@ -394,6 +378,26 @@ export function DrumSequencer(props: Props) {
       return;
     }
     const ctx = getCtx();
+    if (instrumentRequiresSamplePlayback(instrument)
+      && !hasCachedInstrumentSamplesForPlayback(instrument, frequencyHz, velocity)) {
+      const requestedStartTime = atTimeS;
+      void preloadInstrumentSamplesForPlayback(ctx, instrument, frequencyHz, velocity)
+        .then(() => {
+          if (!playing() || requestedStartTime < ctx.currentTime - 0.05) return;
+          playInstrument(
+            instrument,
+            frequencyHz,
+            velocity,
+            Math.max(requestedStartTime, ctx.currentTime + 0.001),
+            maxDuration,
+            startBeat,
+            lengthBeats,
+            true,
+          );
+        })
+        .catch(() => undefined);
+      return;
+    }
     const source = createInstrumentBufferSource(ctx, instrument, 0.2, frequencyHz, undefined, velocity, props.bpm);
     const duration = source.buffer
       ? Math.max(0.05, Math.min(1.5, source.buffer.duration / source.playbackRate.value))
@@ -513,97 +517,20 @@ export function DrumSequencer(props: Props) {
     props.onSpeedChange(nextSpeed);
   }
 
-  async function generateBeat() {
-    setGenerating(true);
-    try {
-      const feedback = await listDrumBeatFeedback(24);
-      const generated = await ai.generateDrumBeat({
-        genre: generateGenre(),
-        instruments: props.instruments,
-        stepCount: props.stepCount,
-        lengthBeats: props.lengthBeats,
-        speed: props.speed,
-        timeSignature: props.timeSignature,
-        complexity: generateComplexity(),
-        variationSeed: Date.now() + Math.floor(Math.random() * 100000),
-        feedbackExamples: feedback
-          .filter((entry): entry is typeof entry & { rating: "up" | "down" } => Boolean(entry.rating))
-          .map((entry) => ({
-            genre: entry.genre,
-            rating: entry.rating,
-            beat: entry.finalBeat ?? entry.modelBeat,
-            userFeedback: entry.userFeedback,
-          })),
-      });
-      const nextFeedbackId = crypto.randomUUID();
-      await saveDrumBeatFeedback({
-        id: nextFeedbackId,
-        genre: generateGenre(),
-        modelBeat: generated,
-        prompt: generated.prompt,
-        model: generated.model,
-        source: generated.source,
-        context: {
-          genre: generateGenre(),
-          stepCount: props.stepCount,
-          lengthBeats: props.lengthBeats,
-          speed: props.speed,
-          timeSignature: props.timeSignature,
-          complexity: generateComplexity(),
-          instrumentIds: props.instruments.map((instrument) => instrument.id),
-        },
-        createdAt: Date.now(),
-      });
-      setSelectedCells(new Set<string>());
-      setLastGeneratedBeat(generated);
-      setFeedbackRating(null);
-      setFeedbackSubmitted(null);
-      setFeedbackPopover(null);
-      setFeedbackId(nextFeedbackId);
-      props.onTrainingSessionChange?.(nextFeedbackId);
-      stop();
-      if (props.onGenerateBeat) {
-        props.onGenerateBeat(generated);
-        return;
-      }
-      props.onResize(generated.lengthBeats, generated.rows);
-      props.onChange(generated.rows);
-      props.onSpeedChange(generated.speed);
-      props.onSwingChange?.(generated.swingPercent);
-      props.onDefaultPitchChange?.(generated.defaultPitchHz);
-    } finally {
-      setGenerating(false);
-    }
-  }
-
-  async function rateGeneratedBeat(rating: "up" | "down", userFeedback?: string) {
-    const beat = lastGeneratedBeat();
-    if (!beat || feedbackSubmitted()) return;
-    setFeedbackRating(rating);
-    setFeedbackSubmitted(rating);
-    const id = feedbackId() ?? crypto.randomUUID();
-    const entry = {
-      genre: generateGenre(),
-      rating,
-      userFeedback,
-      modelBeat: beat,
-      prompt: beat.prompt,
-      model: beat.model,
-      source: beat.source,
-      context: {
-        genre: generateGenre(),
-        stepCount: props.stepCount,
-        lengthBeats: props.lengthBeats,
-        speed: props.speed,
-        timeSignature: props.timeSignature,
-        complexity: generateComplexity(),
-        instrumentIds: props.instruments.map((instrument) => instrument.id),
-      },
-      createdAt: Date.now(),
-    };
-    await saveDrumBeatFeedback({ id, ...entry });
-    props.onTrainingSessionChange?.(id);
-    window.setTimeout(() => setLastGeneratedBeat(null), 700);
+  function remixBeat() {
+    const remixed = remixDrumBeat({
+      rows: props.rows,
+      stepCount: props.stepCount,
+      lengthBeats: props.lengthBeats,
+      speed: props.speed,
+      swingPercent: swingPercent(),
+      defaultPitchHz: props.defaultPitchHz,
+      variationSeed: Date.now() + Math.floor(Math.random() * 100000),
+    });
+    setSelectedCells(new Set<string>());
+    stop();
+    if (props.onGenerateBeat) props.onGenerateBeat(remixed);
+    else props.onChange(remixed.rows);
   }
 
   function startCellPointer(e: PointerEvent, rowId: string, step: number) {
@@ -933,75 +860,9 @@ export function DrumSequencer(props: Props) {
             onChange={props.onTimeSignatureChange}
           />
         )}
-        <div class={styles.generateBlock}>
-          <FloatingSelect
-            className={styles.genreSelect}
-            fillHeight
-            label="Genre"
-            layout="inline"
-            value={generateGenre()}
-            ariaLabel="Generated beat genre"
-            options={DRUM_GENRES.map((genre) => ({ value: genre, label: genreLabel(genre) }))}
-            open={generateGenreOpen()}
-            onOpenChange={(open) => {
-              setGenerateGenreOpen(open);
-              if (open) setOpenRowId(null);
-            }}
-            onChange={(value) => setGenerateGenre(value as DrumGenre)}
-          />
-          <Slider
-            className={styles.complexityControl}
-            layout="inline"
-            label="Complexity"
-            min={0}
-            max={100}
-            step={1}
-            value={generateComplexity()}
-            readout={generateComplexity()}
-            ariaLabel="Generated beat complexity"
-            onChange={setGenerateComplexity}
-          />
-          <Button
-            class={styles.generateButton}
-            iconOnly
-            size="xs"
-            onClick={generateBeat}
-            aria-label="Generate beat"
-            disabled={generating()}
-          >
-            <Icon name={generating() ? "ph:spinner" : "ph:sparkle"} size={18} decorative />
-          </Button>
-        </div>
-        {lastGeneratedBeat() && !feedbackSubmitted() && (
-          <div class={styles.feedbackBlock} aria-label="Generated beat feedback">
-            <HoverInfo content="Good generation">
-              <Button
-                iconOnly
-                size="xs"
-                selected={feedbackRating() === "up"}
-                onClick={() => void rateGeneratedBeat("up")}
-                aria-label="Rate generated beat up"
-              >
-                <Icon name="ph:thumbs-up" size={18} decorative />
-              </Button>
-            </HoverInfo>
-            <HoverInfo content="Bad generation">
-              <Button
-                iconOnly
-                size="xs"
-                selected={feedbackRating() === "down"}
-                onClick={(event) => {
-                  const rect = event.currentTarget.getBoundingClientRect();
-                  setFeedbackPopover({ x: rect.left, y: rect.bottom + 2, value: "" });
-                }}
-                aria-label="Rate generated beat down"
-              >
-                <Icon name="ph:thumbs-down" size={18} decorative />
-              </Button>
-            </HoverInfo>
-          </div>
-        )}
-        {feedbackSubmitted() && <span class={styles.feedbackDone}>Thumbs {feedbackSubmitted() === "up" ? "up" : "down"} saved</span>}
+        <Button class={styles.remixButton} size="xs" onClick={remixBeat} aria-label="Remix drum pattern">
+          Remix
+        </Button>
       </div>
       <div class={styles.sequenceShell} style={sequenceStyle}>
         <div class={styles.instrumentColumn}>
@@ -1301,21 +1162,6 @@ export function DrumSequencer(props: Props) {
         />
         );
       })()}
-      {(() => {
-        const currentFeedbackPopover = feedbackPopover();
-        if (!currentFeedbackPopover) return null;
-        return (
-        <FeedbackPopover
-          state={currentFeedbackPopover}
-          onChange={(value: string) => setFeedbackPopover({ ...currentFeedbackPopover, value })}
-          onSubmit={() => {
-            const value = currentFeedbackPopover.value.trim();
-            setFeedbackPopover(null);
-            void rateGeneratedBeat("down", value || undefined);
-          }}
-        />
-        );
-      })()}
     </div>
   );
 }
@@ -1473,37 +1319,6 @@ function VolumePopover({
   );
 }
 
-function FeedbackPopover({
-  state,
-  onChange,
-  onSubmit,
-}: {
-  state: FeedbackPopoverState;
-  onChange: (value: string) => void;
-  onSubmit: () => void;
-}) {
-  return createPortal(
-    <FloatingLayer class={styles.valuePopover} x={state.x} y={state.y}>
-      <TextInput
-        autofocus
-        class={styles.valueField}
-        label="Issue"
-        layout="inline"
-        value={state.value}
-        placeholder="What felt wrong?"
-        onInput={(e) => onChange(e.currentTarget.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") onSubmit();
-        }}
-      />
-      <div class={styles.valueActions}>
-        <Button size="xs" variant="primary" onClick={onSubmit}>Submit</Button>
-      </div>
-    </FloatingLayer>,
-    document.body,
-  );
-}
-
 function cellKey(rowId: string, step: number): string {
   return drumCellKey(rowId, step);
 }
@@ -1555,11 +1370,6 @@ function isStrongBeat(step: number, speed: DrumSpeed, timeSignature: TimeSignatu
 
 function velocityToPercent(velocity: number): number {
   return Math.round((Math.max(0, Math.min(127, velocity)) / 127) * 100);
-}
-
-function genreLabel(genre: DrumGenre): string {
-  if (genre === "dnb") return "DnB";
-  return genre.replace(/^\w/, (letter) => letter.toUpperCase());
 }
 
 const fallbackInstrument: Instrument = {

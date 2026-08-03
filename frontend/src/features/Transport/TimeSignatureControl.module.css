@@ -12,7 +12,7 @@
   height: 33px;
   padding: 0 var(--space-1);
   border: var(--border-fg);
-  font-family: var(--font-family-mono);
+  font-family: var(--font-family-base);
   font-size: var(--font-size-ui);
   line-height: 1;
   white-space: nowrap;
@@ -41,7 +41,7 @@
   justify-content: flex-start;
   height: 24px;
   padding: 0 var(--space-1);
-  font-family: var(--font-family-mono);
+  font-family: var(--font-family-base);
   font-size: var(--font-size-ui);
   line-height: 1;
   text-align: left;

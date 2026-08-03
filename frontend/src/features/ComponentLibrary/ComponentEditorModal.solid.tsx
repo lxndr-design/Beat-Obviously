@@ -6,6 +6,7 @@ import { Button, Icon, Modal, NumberInput, TextInput } from "../../solid-ui";
 import { useComponentStore, type BeatComponent, type DrumComponent, type MidiComponent } from "../../state/components";
 import { useInstrumentStore, useProjectStore, useUiStore } from "../../state/store";
 import type { DrumRow, DrumSpeed, MidiNote, TimeSignature } from "../../state/types";
+import { normalizeLibraryMetadata, parseLibraryTags } from "../../state/libraryMetadata";
 import { createStoreSelector } from "../../solid-utils/store";
 import { DrumSequencer } from "../DrumEditor/DrumSequencer.solid";
 import { PianoRoll } from "../MidiEditor/PianoRoll.solid";
@@ -40,6 +41,19 @@ export function ComponentEditorModal(props: ComponentEditorModalProps) {
   const kind = createMemo(() => draft()?.kind ?? "midi");
   const midi = createMemo(() => (draft()?.kind ?? "midi") === "drum" ? null : draft() as MidiComponent | undefined);
   const drum = createMemo(() => draft()?.kind === "drum" ? draft() as DrumComponent : null);
+  const metadata = createMemo(() => {
+    const current = draft();
+    return normalizeLibraryMetadata(current?.libraryMetadata, {
+      factory: current?.factory,
+      createdAt: current?.createdAt,
+      updatedAt: current?.updatedAt,
+    });
+  });
+
+  function setMetadataPatch(patch: Partial<ReturnType<typeof metadata>>) {
+    const current = draft();
+    if (current) setDraft({ ...current, libraryMetadata: { ...metadata(), ...patch } });
+  }
 
   function close() {
     closeEditor({ kind: "component", componentId: props.componentId });
@@ -59,6 +73,7 @@ export function ComponentEditorModal(props: ComponentEditorModalProps) {
         defaultPitchHz: drumDraft.defaultPitchHz,
         swingPercent: drumDraft.swingPercent,
         timeSignature: drumDraft.timeSignature,
+        libraryMetadata: drumDraft.libraryMetadata,
       });
     } else {
       const midiDraft = currentDraft as MidiComponent;
@@ -66,6 +81,7 @@ export function ComponentEditorModal(props: ComponentEditorModalProps) {
         name: midiDraft.name,
         notes: midiDraft.notes,
         lengthBeats: midiDraft.lengthBeats,
+        libraryMetadata: midiDraft.libraryMetadata,
       });
     }
     close();
@@ -169,6 +185,38 @@ export function ComponentEditorModal(props: ComponentEditorModalProps) {
           </Show>
         </div>
 
+        <div class={styles.componentMetadata}>
+          <TextInput
+            label="Creator"
+            layout="inline"
+            value={metadata().creator.displayName}
+            onInput={(event) => setMetadataPatch({
+              creator: { ...metadata().creator, displayName: event.currentTarget.value },
+            })}
+          />
+          <TextInput
+            label="Tags"
+            layout="inline"
+            value={metadata().tags.join(", ")}
+            onInput={(event) => setMetadataPatch({ tags: parseLibraryTags(event.currentTarget.value) })}
+          />
+          <TextInput
+            label="Description"
+            layout="inline"
+            value={metadata().description ?? ""}
+            onInput={(event) => setMetadataPatch({ description: event.currentTarget.value || undefined })}
+          />
+          <TextInput
+            label="License"
+            layout="inline"
+            value={metadata().license ?? ""}
+            onInput={(event) => setMetadataPatch({ license: event.currentTarget.value || undefined })}
+          />
+          <p class={styles.componentMetadataSummary}>
+            Version {metadata().version} · Created {formatMetadataDate(metadata().createdAt)} · Updated {formatMetadataDate(metadata().updatedAt)} · {metadata().visibility}
+          </p>
+        </div>
+
         <Show when={midi()}>
           {(midiDraft) => (
             <PianoRoll
@@ -222,6 +270,10 @@ export function ComponentEditorModal(props: ComponentEditorModalProps) {
       </Modal>
     </Show>
   );
+}
+
+function formatMetadataDate(value: number): string {
+  return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(value);
 }
 
 const fallbackInstrument = {

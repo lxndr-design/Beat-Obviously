@@ -1,5 +1,41 @@
 import type { AudioFile, Instrument, Project } from "../state/types";
 
+const TRACK_AUDIBILITY_FIELDS = new Set(["mute", "solo"]);
+
+/**
+ * Mute and solo are realtime mixer gestures. They must not take the structural
+ * project path, which rebuilds instruments, clips, and routing in the native
+ * engine. Immer preserves references for every untouched field, so a shallow
+ * walk is enough to distinguish these gestures without serializing a project.
+ */
+export function projectChangeOnlyAffectsTrackAudibility(previous: Project, next: Project): boolean {
+  if (previous === next || previous.tracks.length !== next.tracks.length) return false;
+
+  const previousProject = previous as unknown as Record<string, unknown>;
+  const nextProject = next as unknown as Record<string, unknown>;
+  const projectKeys = new Set([...Object.keys(previousProject), ...Object.keys(nextProject)]);
+  for (const key of projectKeys) {
+    if (key !== "tracks" && previousProject[key] !== nextProject[key]) return false;
+  }
+
+  let audibilityChanged = false;
+  for (let index = 0; index < previous.tracks.length; index += 1) {
+    const previousTrack = previous.tracks[index] as unknown as Record<string, unknown>;
+    const nextTrack = next.tracks[index] as unknown as Record<string, unknown>;
+    if (previousTrack.id !== nextTrack.id) return false;
+
+    const trackKeys = new Set([...Object.keys(previousTrack), ...Object.keys(nextTrack)]);
+    for (const key of trackKeys) {
+      if (TRACK_AUDIBILITY_FIELDS.has(key)) {
+        audibilityChanged ||= previousTrack[key] !== nextTrack[key];
+      } else if (previousTrack[key] !== nextTrack[key]) {
+        return false;
+      }
+    }
+  }
+  return audibilityChanged;
+}
+
 /**
  * The realtime engine needs project-owned clip assets, not the entire global
  * audio-file library. Keeping this payload scoped avoids serializing thousands

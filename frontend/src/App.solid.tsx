@@ -10,7 +10,7 @@ import { StartupSplash, STARTUP_MINIMUM_VISIBLE_MS, type StartupStage } from "./
 import { runProjectExport } from "./features/ExportReview/exportActions";
 import { getTimelineAudioContext, stopTimelineAudio } from "./audio/timelineAudio";
 import { stopAllBrowserAudio } from "./audio/globalAudioSafety";
-import { engineAudioFilesForProject, engineInstrumentsForProject } from "./audio/engineProjectPayload";
+import { engineAudioFilesForProject, engineInstrumentsForProject, projectChangeOnlyAffectsTrackAudibility } from "./audio/engineProjectPayload";
 import { importAudioFiles } from "./audio/audioImport";
 import { preloadInstrumentSample } from "./audio/synthPreview";
 import { installGlobalHotkeys } from "./hotkeys/hotkeys";
@@ -41,6 +41,8 @@ import { createAurumTestInstruments } from "./state/aurumTestBank";
 import { SynthEditor } from "./features/Synth/SynthEditor/SynthEditor.solid";
 import { createGeneratedSongProject } from "./ai/generateSongAction";
 import type { GenerateSongOptions } from "./ai/songGenerator";
+import { beginScoreImport, importJazzStandardsLibrary, scoreImportBusy } from "./scoreImport/scoreImportAction";
+import { ScoreImportReviewModal } from "./features/ScoreImport/ScoreImportReviewModal.solid";
 
 type StartupReadinessKey = "instruments" | "components" | "audio";
 
@@ -616,7 +618,23 @@ export function App() {
       }, 120);
     };
     apply();
-    const unsubProject = useProjectStore.subscribe(() => apply());
+    const unsubProject = useProjectStore.subscribe((state, previous) => {
+      if (projectChangeOnlyAffectsTrackAudibility(previous.project, state.project)) {
+        for (let index = 0; index < state.project.tracks.length; index += 1) {
+          const track = state.project.tracks[index];
+          if (track.mute === previous.project.tracks[index]?.mute) continue;
+          void send({
+            kind: "engine.setParameter",
+            instrumentId: track.id,
+            parameterId: "track.mute",
+            value: track.mute ? 1 : 0,
+            rampSamples: 256,
+          });
+        }
+        return;
+      }
+      apply();
+    });
     const unsubInstruments = useInstrumentStore.subscribe(() => apply());
     const unsubAudioFiles = useAudioFileStore.subscribe(() => apply());
     onCleanup(() => {
@@ -739,6 +757,8 @@ export function App() {
     onNew: () => void createFromHome(),
     onOpen: () => void openFromHome().catch((error) => appAlert(error instanceof Error ? error.message : "Open failed.")),
     onImportAudio: () => void importAudioFromMenu(),
+    onImportScore: () => void importScoreFromMenu(),
+    onImportStandards: () => void importStandardsFromMenu(),
     onSave: () => void saveFromMenu(false),
     onSaveAs: () => void saveFromMenu(true),
     onExport: () => void runProjectExport().catch((error) => appAlert(error instanceof Error ? error.message : "Export failed.")),
@@ -772,6 +792,7 @@ export function App() {
         <LiveMidiExpressionInput />
         <RenderTimingPanel />
         <ExportJobPanel />
+        <ScoreImportReviewModal />
         <div class="app-root" data-beat-surface="editor">
           <TopBar props={topBarProps} />
           <main class="app-main">
@@ -846,6 +867,28 @@ async function importAudioFromMenu() {
     for (const file of files) useAudioFileStore.getState().addFile(file);
   } catch (error) {
     await appAlert(error instanceof Error ? error.message : "Audio import failed.");
+  }
+}
+
+async function importScoreFromMenu() {
+  if (scoreImportBusy()) return;
+  try {
+    await beginScoreImport();
+  } catch (error) {
+    await appAlert(error instanceof Error ? error.message : "Sheet music import failed.", "Import Sheet Music");
+  }
+}
+
+async function importStandardsFromMenu() {
+  try {
+    const result = await importJazzStandardsLibrary();
+    if (!result) return;
+    const imported = result.imported.length;
+    const skipped = result.skipped.length;
+    const detail = skipped > 0 ? ` ${skipped} file${skipped === 1 ? "" : "s"} need review.` : "";
+    await appAlert(`Added ${imported} local jazz structure reference${imported === 1 ? "" : "s"}.${detail}`, "Jazz Standards Library");
+  } catch (error) {
+    await appAlert(error instanceof Error ? error.message : "Standards import failed.", "Jazz Standards Library");
   }
 }
 

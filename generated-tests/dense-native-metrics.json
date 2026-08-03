@@ -1,0 +1,10 @@
+{
+  "sampleRate": 48000,
+  "blockSize": 256,
+  "deadlineMs": 5.333333,
+  "projects": [
+    {"name":"dense_1","bpm":128,"tracks":5,"notes":500,"effects":29,"automationPoints":2620,"latencySamples":0,"medianLoadPercent":120.4258,"p95LoadPercent":142.8008,"p99LoadPercent":175.4633,"peakLoadPercent":175.4633,"peakTotalMs":9.358042,"peakSynthMs":9.305875,"peakFxMs":0.119542,"deadlineOverruns":17,"eventOverflows":0,"callbackSafetyViolations":0,"pendingNoteOffOverflows":0,"realtimeMeetsDeadline":0,"structurallyClean":1,"exportMs":4004.879,"exportRealtimeFactor":0.9364,"exportTimedOut":0,"durationSeconds":3.7500,"fileBytes":1080044,"truePeakDbTP":-37.2107,"integratedLufs":-60.2169,"clippingRatio":0.00000000,"exportValid":1,"benchmarkValid":1},
+    {"name":"dense_2","bpm":300,"tracks":12,"notes":11520,"effects":112,"automationPoints":58320,"latencySamples":0,"medianLoadPercent":527.7617,"p95LoadPercent":527.7617,"p99LoadPercent":527.7617,"peakLoadPercent":527.7617,"peakTotalMs":28.147292,"peakSynthMs":27.736667,"peakFxMs":0.306917,"deadlineOverruns":8,"eventOverflows":291,"callbackSafetyViolations":0,"pendingNoteOffOverflows":291,"realtimeMeetsDeadline":0,"structurallyClean":0,"exportMs":16278.910,"exportRealtimeFactor":0.2949,"exportTimedOut":0,"durationSeconds":4.8000,"fileBytes":1382444,"truePeakDbTP":-20.4283,"integratedLufs":-43.7826,"clippingRatio":0.00000000,"exportValid":1,"benchmarkValid":1},
+    {"name":"dense_3","bpm":300,"tracks":21,"notes":37632,"effects":277,"automationPoints":189924,"latencySamples":2048,"medianLoadPercent":881.5164,"p95LoadPercent":881.5164,"p99LoadPercent":881.5164,"peakLoadPercent":881.5164,"peakTotalMs":47.014208,"peakSynthMs":44.681208,"peakFxMs":0.756542,"deadlineOverruns":8,"eventOverflows":1380,"callbackSafetyViolations":0,"pendingNoteOffOverflows":1380,"realtimeMeetsDeadline":0,"structurallyClean":0,"exportMs":34304.365,"exportRealtimeFactor":0.2434,"exportTimedOut":0,"durationSeconds":8.3500,"fileBytes":2404850,"truePeakDbTP":-22.7551,"integratedLufs":-41.5530,"clippingRatio":0.00000000,"exportValid":1,"benchmarkValid":1}
+  ]
+}

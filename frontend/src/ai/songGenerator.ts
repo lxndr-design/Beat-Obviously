@@ -1,4 +1,6 @@
 import type { MidiNote } from "../state/types";
+import type { DrumGenre } from "./drumBeatGenerator";
+import { selectSongGenerationReference, type StandardGenerationProfile } from "./standardsCorpus";
 
 export type MelodyVariationKind =
   | "statement"
@@ -107,12 +109,18 @@ export interface GeneratedSongPlan {
   motifs: Record<"A" | "B" | "C", MidiNote[]>;
   sections: SongSectionPlan[];
   voices: SongVoicePlan[];
+  percussion?: {
+    name: string;
+    genre: DrumGenre;
+    complexity: number;
+  };
   pitchNicheIssues: string[];
   targetLoudnessLufs: number;
   motifCount: number;
   rhythmShiftCount: number;
   keyShiftCount: number;
   arrangementEvents: Array<{ beat: number; type: "stress" | "release" | "sustain" | "transition" | "key-shift" | "new-motif" | "breakdown" | "rhythm-shift"; label: string }>;
+  referenceStandard?: { id: string; title: string; localOnly: boolean };
 }
 
 const SECTION_BEATS = 16;
@@ -125,7 +133,7 @@ const FORMS: Record<SongFormId, Array<Omit<SongSectionPlan, "id" | "lengthBeats"
     { label: "Verse 1", material: "A", variation: "statement", energy: 0.55 },
     { label: "Pre-Chorus", material: "B", variation: "extrapolation", energy: 0.7 },
     { label: "Chorus", material: "A", variation: "complication", energy: 0.92 },
-    { label: "Verse 2", material: "A", variation: "inversion", energy: 0.62 },
+    { label: "Verse 2", material: "A", variation: "statement", energy: 0.62 },
     { label: "Chorus", material: "A", variation: "complication", energy: 0.95 },
     { label: "Bridge", material: "C", variation: "extrapolation", energy: 0.72 },
     { label: "Final Chorus", material: "A", variation: "complication", energy: 1 },
@@ -162,12 +170,15 @@ export function generateSongPlan(options: GenerateSongOptions): GeneratedSongPla
   const randomness = options.randomness ?? "medium";
   const style = options.style?.trim() || `${speed} ${genre}`;
   const genreDefaults = GENRE_DEFAULTS[genre];
+  const preliminarySeed = options.seed ?? stableHash(`${style}|${speed}|${genre}|${randomness}`);
+  const referenceStandard = selectSongGenerationReference(preliminarySeed, genre);
   const key = options.key?.trim() || keyFromText(style) || genreDefaults.key;
   const seed = options.seed ?? stableHash(`${style}|${key}|${speed}|${genre}|${randomness}`);
-  const form = options.form ?? genreDefaults.form;
-  const bpm = clamp(Math.round(options.bpm ?? bpmForSpeed(genreDefaults.bpm, speed)), 48, 220);
+  const form = options.form ?? (genre === "jazz" ? referenceStandard?.form : undefined) ?? genreDefaults.form;
+  const bpmReference = genre === "jazz" ? referenceStandard?.bpm : undefined;
+  const bpm = clamp(Math.round(options.bpm ?? bpmForSpeed(bpmReference ?? genreDefaults.bpm, speed)), 48, 220);
   const scale = scaleForKey(key);
-  const melody = writeSeedMelody(scale, seed);
+  const melody = writeSeedMelody(scale, seed, referenceStandard);
   const variations: Record<MelodyVariationKind, MidiNote[]> = {
     statement: melody,
     chords: harmonizeMelody(melody, scale),
@@ -177,7 +188,7 @@ export function generateSongPlan(options: GenerateSongOptions): GeneratedSongPla
     complication: complicateMelody(melody, scale),
   };
   const motifs = buildMotifs(melody, scale, seed, randomness);
-  const sections = buildSections(form, randomness);
+  const sections = buildSections(form, randomness, referenceStandard?.phraseLengthsBeats);
   const requirements = instrumentRequirements(genre);
   const voices = requirements.map((requirement, index) => buildVoicePlan(
     requirement,
@@ -187,7 +198,7 @@ export function generateSongPlan(options: GenerateSongOptions): GeneratedSongPla
     speed,
     randomness,
     seed + index * 101,
-  ));
+  )).filter((voice) => voice.segments.some((segment) => segment.notes.length > 0));
   const lengthBeats = sections.reduce((sum, section) => sum + section.lengthBeats, 0);
   const arrangementEvents = buildArrangementEvents(sections);
   return {
@@ -205,12 +216,14 @@ export function generateSongPlan(options: GenerateSongOptions): GeneratedSongPla
     motifs,
     sections,
     voices,
+    percussion: percussionPlan(genre, speed, randomness),
     pitchNicheIssues: validatePitchNiches(voices),
     targetLoudnessLufs: genreDefaults.loudnessLufs,
     motifCount: randomness === "low" ? 1 : randomness === "medium" ? 2 : 3,
     rhythmShiftCount: sections.filter((section) => section.rhythmMultiplier !== 1).length,
     keyShiftCount: sections.filter((section) => section.keyShiftSemitones !== 0).length,
     arrangementEvents,
+    referenceStandard: referenceStandard ? { id: referenceStandard.id, title: referenceStandard.title, localOnly: referenceStandard.localOnly } : undefined,
   };
 }
 
@@ -230,7 +243,7 @@ function buildMotifs(
   return { A: melody, B: motifB, C: motifC };
 }
 
-function buildSections(form: SongFormId, randomness: SongRandomness): SongSectionPlan[] {
+function buildSections(form: SongFormId, randomness: SongRandomness, referencePhraseLengths?: number[]): SongSectionPlan[] {
   const source = FORMS[form];
   return source.map((section, index) => {
     const material = randomness === "low" ? "A" : randomness === "medium" && section.material === "C" ? "B" : section.material;
@@ -253,12 +266,28 @@ function buildSections(form: SongFormId, randomness: SongRandomness): SongSectio
       variation,
       energy,
       id: `${form}-${index + 1}`,
-      lengthBeats: SECTION_BEATS,
+      lengthBeats: referencePhraseLengths?.[index] && referencePhraseLengths[index] >= 4
+        ? roundBeat(referencePhraseLengths[index])
+        : sectionLengthBeats(form, section.label),
       rhythmMultiplier,
       keyShiftSemitones,
       dynamicFunction: dynamicFunctionForSection(section.label, energy),
     };
   });
+}
+
+function sectionLengthBeats(form: SongFormId, label: string) {
+  if (form === "aaba") return label === "B" ? 12 : 16;
+  if (form === "sectional") {
+    if (label === "A′") return 8;
+    if (label === "C") return 12;
+    if (label === "A″") return 24;
+    return 16;
+  }
+  if (/intro|outro|pre/i.test(label)) return 8;
+  if (/bridge/i.test(label)) return 12;
+  if (/final chorus/i.test(label)) return 24;
+  return 16;
 }
 
 function dynamicFunctionForSection(label: string, energy: number): SongSectionPlan["dynamicFunction"] {
@@ -271,33 +300,82 @@ function dynamicFunctionForSection(label: string, energy: number): SongSectionPl
 
 function buildArrangementEvents(sections: SongSectionPlan[]): GeneratedSongPlan["arrangementEvents"] {
   const events: GeneratedSongPlan["arrangementEvents"] = [];
-  sections.forEach((section, index) => {
-    const beat = index * SECTION_BEATS;
+  let beat = 0;
+  sections.forEach((section) => {
     events.push({ beat, type: section.dynamicFunction, label: `${section.label}: ${section.dynamicFunction}` });
     if (section.material !== "A") events.push({ beat, type: "new-motif", label: `${section.label}: motif ${section.material}` });
     if (section.rhythmMultiplier !== 1) events.push({ beat, type: "rhythm-shift", label: `${section.label}: ${section.rhythmMultiplier}× rhythmic rate` });
     if (section.keyShiftSemitones !== 0) events.push({ beat, type: "key-shift", label: `${section.label}: ${section.keyShiftSemitones > 0 ? "+" : ""}${section.keyShiftSemitones} semitones` });
+    beat += section.lengthBeats;
   });
   return events;
 }
 
 /** Two short, related phrases: a presentation and a varied continuation. */
-export function writeSeedMelody(scale: number[], seed: number): MidiNote[] {
+export function writeSeedMelody(
+  scale: number[],
+  seed: number,
+  reference?: Pick<StandardGenerationProfile, "melodicDurationPalette" | "melodicIntervalPalette">,
+): MidiNote[] {
   const rnd = seededRandom(seed);
-  const firstDegrees = [0, 2, 1, 4, 3, 2];
-  const firstDurations = [1, 0.5, 0.5, 1, 1, 4];
-  const secondDegrees = [0, 2, 4, 3, 5, 4, 2, 0];
-  const secondDurations = [0.5, 0.5, 1, 0.5, 0.5, 1, 1, 3];
+  const rhythmCells = [
+    [1, 0.5, 0.5, 1, 1, 4],
+    [0.5, 0.5, 1, 1, 0.5, 0.5, 4],
+    [1.5, 0.5, 1, 0.5, 0.5, 4],
+    [0.75, 0.25, 0.5, 0.5, 2, 4],
+  ];
+  const referenceMoves = [...new Set((reference?.melodicIntervalPalette ?? [])
+    .filter((interval) => Number.isFinite(interval) && Math.abs(interval) >= 1)
+    .map((interval) => Math.sign(interval) * clamp(Math.round(Math.abs(interval) / 2), 1, 3)))];
+  const makeDegrees = (count: number, cadence: number) => {
+    const degrees = [Math.floor(rnd() * 3)];
+    const moves = referenceMoves.length >= 2 ? [...referenceMoves, -1, 1] : [-2, -1, 1, 1, 2, 3];
+    while (degrees.length < count - 2) {
+      const move = moves[Math.floor(rnd() * moves.length)] ?? 1;
+      degrees.push(clamp(degrees[degrees.length - 1] + move, 0, scale.length - 1));
+    }
+    degrees.push(cadence === 0 ? 1 : 4, cadence);
+    return degrees;
+  };
+  const chooseDurations = () => rhythmCellFromReference(reference?.melodicDurationPalette, rnd)
+    ?? rhythmCells[Math.floor(rnd() * rhythmCells.length)];
+  const firstDurations = chooseDurations();
+  const secondDurations = chooseDurations();
+  const firstDegrees = makeDegrees(firstDurations.length, 4);
+  const secondDegrees = makeDegrees(secondDurations.length, 0);
   const phrase = (degrees: number[], durations: number[], offset: number) => {
     let beat = offset;
     return degrees.map((degree, index) => {
       const duration = durations[index] ?? 1;
-      const note = midiNote(scale[degree % scale.length] + (rnd() > 0.84 ? 12 : 0), 82 + Math.round(rnd() * 24), beat, duration * 0.88);
+      const octaveLift = rnd() > 0.9 && index < degrees.length - 2 ? 12 : 0;
+      const note = midiNote(scale[degree % scale.length] + octaveLift, 78 + Math.round(rnd() * 28), beat, duration * (index === degrees.length - 1 ? 0.96 : 0.82));
       beat += duration;
       return note;
     });
   };
   return [...phrase(firstDegrees, firstDurations, 0), ...phrase(secondDegrees, secondDurations, 8)];
+}
+
+function rhythmCellFromReference(palette: number[] | undefined, rnd: () => number): number[] | undefined {
+  const durations = [...new Set((palette ?? [])
+    .filter((duration) => Number.isFinite(duration) && duration >= 0.25 && duration <= 4)
+    .map((duration) => roundBeat(duration)))]
+    .sort((left, right) => left - right);
+  if (durations.length < 2) return undefined;
+
+  const result: number[] = [];
+  let elapsed = 0;
+  const finalSustain = durations.filter((duration) => duration >= 2).at(-1) ?? 2;
+  const activeTarget = 8 - Math.min(4, finalSustain);
+  while (elapsed < activeTarget - 0.001 && result.length < 8) {
+    const remaining = activeTarget - elapsed;
+    const candidates = durations.filter((duration) => duration <= Math.min(2, remaining + 0.001));
+    const duration = candidates[Math.floor(rnd() * candidates.length)] ?? remaining;
+    result.push(duration);
+    elapsed = roundBeat(elapsed + duration);
+  }
+  result.push(roundBeat(8 - elapsed));
+  return result;
 }
 
 export function invertMelody(notes: MidiNote[], axisPitch: number): MidiNote[] {
@@ -369,17 +447,20 @@ function buildVoicePlan(
   randomness: SongRandomness,
   seed: number,
 ): SongVoicePlan {
+  let startBeat = 0;
   const raw = sections.map((section, index): PlannedMidiSegment => {
     const source = notesForRole(instrument.role, section, motifs, scale, speed, randomness, seed + index * 37);
-    return {
+    const segment = {
       name: `${section.label} · ${instrument.role}`,
-      startBeat: index * SECTION_BEATS,
-      lengthBeats: SECTION_BEATS,
+      startBeat,
+      lengthBeats: section.lengthBeats,
       repeats: 0,
       notes: fitNotesToRange(source, instrument.pitchRange),
       sectionIds: [section.id],
       gainDb: roundBeat(-8 + section.energy * 6),
     };
+    startBeat += section.lengthBeats;
+    return segment;
   });
   return {
     role: instrument.role,
@@ -404,19 +485,18 @@ function notesForRole(
   const shifted = reshapeSectionNotes(varied, section, scale);
   if (role === "lead") return applyLeadExpression(shifted, scale, speed, randomness, seed);
   const harmony = reshapeSectionNotes(harmonizeMelody(motif, scale), section, scale);
-  if (role === "harmony") return accompanimentFromHarmony(harmony, speed);
-  if (role === "bass") return bassFromHarmony(harmony, speed);
+  if (role === "harmony") return accompanimentFromHarmony(harmony, speed, section.lengthBeats);
+  if (role === "bass") return bassFromHarmony(harmony, speed, section.lengthBeats);
   if (role === "countermelody") {
     if (section.energy < 0.68) return [];
     const counter = simplifyMelody(invertMelody(motif, motif[0]?.pitch ?? scale[0])).map((note) => ({
       ...note,
-      startBeat: (note.startBeat + 2) % SECTION_BEATS,
+      startBeat: (note.startBeat + Math.max(2, section.lengthBeats / 2)) % section.lengthBeats,
       lengthBeats: Math.min(note.lengthBeats, speed === "passive" ? 2 : 0.65),
     }));
-    return reshapeSectionNotes(counter, section, scale)
-      .filter((note) => !shifted.some((leadNote) => notesOverlap(note, leadNote)));
+    return reshapeSectionNotes(counter, section, scale);
   }
-  return rhythmPulse(scale[0], section.energy, speed, randomness, seed);
+  return [];
 }
 
 function variationForMotif(notes: MidiNote[], variation: MelodyVariationKind, scale: number[]): MidiNote[] {
@@ -434,19 +514,19 @@ function reshapeSectionNotes(notes: MidiNote[], section: SongSectionPlan, scale:
     pitch: nearestScalePitch(note.pitch + section.keyShiftSemitones, scale.map((pitch) => pitch + section.keyShiftSemitones)),
     velocity: clamp(Math.round(note.velocity * (0.72 + section.energy * 0.35)), 1, 127),
   }));
-  if (section.rhythmMultiplier === 1) return shifted;
+  if (section.rhythmMultiplier === 1) return shifted.filter((note) => note.startBeat < section.lengthBeats);
   if (section.rhythmMultiplier < 1) {
     return shifted
       .map((note) => ({ ...note, startBeat: roundBeat(note.startBeat * 2), lengthBeats: roundBeat(note.lengthBeats * 1.7) }))
-      .filter((note) => note.startBeat < SECTION_BEATS);
+      .filter((note) => note.startBeat < section.lengthBeats);
   }
   const compressed = shifted.map((note) => ({
     ...note,
     startBeat: roundBeat(note.startBeat / section.rhythmMultiplier),
     lengthBeats: roundBeat(note.lengthBeats / section.rhythmMultiplier),
   }));
-  return [0, SECTION_BEATS / 2].flatMap((offset) => compressed.map((note) => ({ ...note, startBeat: note.startBeat + offset })))
-    .filter((note) => note.startBeat < SECTION_BEATS);
+  return [0, section.lengthBeats / 2].flatMap((offset) => compressed.map((note) => ({ ...note, startBeat: note.startBeat + offset })))
+    .filter((note) => note.startBeat < section.lengthBeats);
 }
 
 function applySpeedToMelody(notes: MidiNote[], scale: number[], speed: SongSpeed): MidiNote[] {
@@ -490,7 +570,7 @@ function applyLeadExpression(
 }
 
 /** Repeats one articulation cell for every chord instead of inventing a second melody. */
-function accompanimentFromHarmony(chords: MidiNote[], speed: SongSpeed): MidiNote[] {
+function accompanimentFromHarmony(chords: MidiNote[], speed: SongSpeed, sectionLengthBeats = SECTION_BEATS): MidiNote[] {
   const groups = groupNotesByStart(chords);
   const ratios = speed === "passive" || speed === "slow"
     ? [0]
@@ -499,7 +579,7 @@ function accompanimentFromHarmony(chords: MidiNote[], speed: SongSpeed): MidiNot
         : [0, 0.125, 0.25, 0.375, 0.5, 0.625, 0.75, 0.875];
   const durationRatio = speed === "passive" ? 0.92 : speed === "slow" ? 0.8 : speed === "medium" ? 0.34 : speed === "fast" ? 0.17 : 0.075;
   return groups.flatMap((group, index) => {
-    const nextStart = groups[index + 1]?.startBeat ?? SECTION_BEATS;
+    const nextStart = groups[index + 1]?.startBeat ?? sectionLengthBeats;
     const window = Math.max(1 / 16, nextStart - group.startBeat);
     return ratios.flatMap((ratio, articulationIndex) => group.notes.map((note) => ({
       ...note,
@@ -534,12 +614,12 @@ function notesEqual(a: MidiNote[], b: MidiNote[]) {
 }
 
 /** Coalesces repeated chord roots before articulation so repeated attacks remain one harmonic pitch span. */
-export function deriveBassHarmonicSpans(chords: MidiNote[]): BassHarmonicSpan[] {
+export function deriveBassHarmonicSpans(chords: MidiNote[], sectionLengthBeats = SECTION_BEATS): BassHarmonicSpan[] {
   const groups = groupNotesByStart(chords);
   const spans: BassHarmonicSpan[] = [];
   groups.forEach((group, index) => {
     const root = group.notes.reduce((lowest, note) => note.pitch < lowest.pitch ? note : lowest);
-    const endBeat = groups[index + 1]?.startBeat ?? SECTION_BEATS;
+    const endBeat = groups[index + 1]?.startBeat ?? sectionLengthBeats;
     const previous = spans[spans.length - 1];
     if (previous && previous.pitch === root.pitch && Math.abs(previous.startBeat + previous.lengthBeats - group.startBeat) < 1e-6) {
       previous.lengthBeats = roundBeat(endBeat - previous.startBeat);
@@ -551,8 +631,8 @@ export function deriveBassHarmonicSpans(chords: MidiNote[]): BassHarmonicSpan[] 
   return spans;
 }
 
-function bassFromHarmony(chords: MidiNote[], speed: SongSpeed): MidiNote[] {
-  return articulateBassHarmonicSpans(deriveBassHarmonicSpans(chords), speed);
+function bassFromHarmony(chords: MidiNote[], speed: SongSpeed, sectionLengthBeats: number): MidiNote[] {
+  return articulateBassHarmonicSpans(deriveBassHarmonicSpans(chords, sectionLengthBeats), speed);
 }
 
 /** Applies a fixed repeating rhythm without changing the underlying harmonic pitch choice. */
@@ -595,28 +675,6 @@ function groupNotesByStart(notes: MidiNote[]) {
     .map(([startBeat, groupedNotes]) => ({ startBeat, notes: groupedNotes }));
 }
 
-function notesOverlap(a: MidiNote, b: MidiNote) {
-  return a.startBeat < b.startBeat + b.lengthBeats && b.startBeat < a.startBeat + a.lengthBeats;
-}
-
-function rhythmPulse(root: number, energy: number, speed: SongSpeed, randomness: SongRandomness, seed: number): MidiNote[] {
-  if (speed === "passive") return [];
-  const rnd = seededRandom(seed);
-  const step = speed === "hyper" ? 0.125 : speed === "fast" ? 0.25 : speed === "slow" ? 2 : energy > 0.8 ? 0.5 : 1;
-  const notes: MidiNote[] = [];
-  for (let beat = 0; beat < SECTION_BEATS; beat += step) {
-    const stepIndex = Math.round(beat / step);
-    const breakcoreGap = speed === "hyper" && (stepIndex % 13 === 9 || stepIndex % 29 === 18);
-    const randomGap = randomness === "high" && rnd() < 0.16;
-    if (breakcoreGap || randomGap) continue;
-    const downbeat = Math.abs(beat % 4) < 1e-6;
-    const pitchOffset = downbeat ? 0 : speed === "hyper" ? [7, 12, 5, 19][stepIndex % 4] : 7;
-    const velocity = downbeat ? 114 : speed === "hyper" ? 54 + Math.round(rnd() * 46) : 68;
-    notes.push(midiNote(root - 24 + pitchOffset, velocity, beat, Math.min(speed === "hyper" ? 0.08 : 0.18, step * 0.62)));
-  }
-  return notes;
-}
-
 function fitNotesToRange(notes: MidiNote[], range: [number, number]): MidiNote[] {
   return notes.map((note) => {
     let pitch = note.pitch;
@@ -627,14 +685,14 @@ function fitNotesToRange(notes: MidiNote[], range: [number, number]): MidiNote[]
 }
 
 function instrumentRequirements(genre: SongGenre): InstrumentRequirement[] {
-  const identities: Record<SongGenre, { bass: string; harmony: string; lead: string; counter: string; rhythm: string }> = {
-    pop: { bass: "Elastic Pop Bass", harmony: "Wide Pop Keys", lead: "Bright Vocal Lead", counter: "Glass Hook Pluck", rhythm: "Layered Pop Kit" },
-    rap: { bass: "Sliding 808 Bass", harmony: "Dark Rap Keys", lead: "Sparse Rap Lead", counter: "Bell Countermotif", rhythm: "Punch Rap Kit" },
-    dnb: { bass: "Reese Bass", harmony: "Air Pad", lead: "DNB Signal Lead", counter: "Rapid Glass Arp", rhythm: "Chopped Break Engine" },
-    jazz: { bass: "Upright Bass", harmony: "Warm Jazz Keys", lead: "Tenor Sax", counter: "Vibraphone Countervoice", rhythm: "Brush and Ride Kit" },
-    reggae: { bass: "Deep Reggae Bass", harmony: "Bubble Organ", lead: "Reggae Horn Lead", counter: "Skank Guitar", rhythm: "One Drop Kit" },
-    classical: { bass: "Cello Bass Voice", harmony: "String Ensemble", lead: "Solo Violin", counter: "Pizzicato Countervoice", rhythm: "Concert Percussion" },
-    electronic: { bass: "Electronic Sub Bass", harmony: "Motion Pad", lead: "Aether Synth Lead", counter: "Sequenced Pluck", rhythm: "Electronic Drum Engine" },
+  const identities: Record<SongGenre, { bass: string; harmony: string; lead: string; counter: string }> = {
+    pop: { bass: "Elastic Pop Bass", harmony: "Wide Pop Keys", lead: "Bright Vocal Lead", counter: "Glass Hook Pluck" },
+    rap: { bass: "Sliding 808 Bass", harmony: "Dark Rap Keys", lead: "Sparse Rap Lead", counter: "Bell Countermotif" },
+    dnb: { bass: "Reese Bass", harmony: "Air Pad", lead: "DNB Signal Lead", counter: "Rapid Glass Arp" },
+    jazz: { bass: "Upright Bass", harmony: "Warm Jazz Keys", lead: "Tenor Sax", counter: "Vibraphone Countervoice" },
+    reggae: { bass: "Deep Reggae Bass", harmony: "Bubble Organ", lead: "Reggae Horn Lead", counter: "Skank Guitar" },
+    classical: { bass: "Cello Bass Voice", harmony: "String Ensemble", lead: "Solo Violin", counter: "Pizzicato Countervoice" },
+    electronic: { bass: "Electronic Sub Bass", harmony: "Motion Pad", lead: "Aether Synth Lead", counter: "Sequenced Pluck" },
   };
   const names = identities[genre];
   const acoustic = genre === "jazz" || genre === "classical";
@@ -660,12 +718,24 @@ function instrumentRequirements(genre: SongGenre): InstrumentRequirement[] {
       libraryQueries: [names.counter, "pluck", "mallet", "pizzicato"],
       fallback: { waveform: "triangle", attackMs: 2, releaseMs: genre === "classical" ? 180 : 115, cutoff: 0.68, resonance: 0.22, drive: 0.04 },
     },
-    {
-      role: "rhythm", preferredName: names.rhythm, texture: "percussive", pitchRange: [24, 35],
-      libraryQueries: [names.rhythm, "drum", "percussion", "pulse"],
-      fallback: { waveform: "noise", attackMs: 1, releaseMs: genre === "classical" ? 180 : 65, cutoff: 0.34, resonance: 0.08, drive: genre === "dnb" ? 0.35 : 0.18 },
-    },
   ];
+}
+
+function percussionPlan(genre: SongGenre, speed: SongSpeed, randomness: SongRandomness): GeneratedSongPlan["percussion"] {
+  if (speed === "passive" || genre === "classical") return undefined;
+  const mapping: Record<Exclude<SongGenre, "classical">, NonNullable<GeneratedSongPlan["percussion"]>["genre"]> = {
+    pop: "pop",
+    rap: "rap",
+    dnb: "dnb",
+    jazz: "jazz",
+    reggae: "reggae",
+    electronic: "house",
+  };
+  return {
+    name: genre === "jazz" ? "Jazz Ride and Brush Groove" : genre === "dnb" ? "Chopped Break Groove" : `${genre[0].toUpperCase()}${genre.slice(1)} Drum Groove`,
+    genre: mapping[genre as Exclude<SongGenre, "classical">],
+    complexity: randomness === "low" ? 34 : randomness === "medium" ? 52 : 72,
+  };
 }
 
 function scaleForKey(key: string) {

@@ -18,6 +18,7 @@ import { basicPitchNotesToBeatNotes } from "./audioToMidiMapping";
 import { compactFullyRepeatedMidi } from "./midiLoopDetection";
 import { fusePianoTranscriptions, type PianoTranscriptionFusion } from "./pianoTranscriptionFusion";
 import { SALAMANDER_COMPACT_GRAND_NAME } from "../state/factoryPiano";
+import { drumLaneDescription, findDrumInstrument } from "./drumInstrumentMapping";
 
 export { basicPitchNotesToBeatNotes } from "./audioToMidiMapping";
 
@@ -116,9 +117,9 @@ function installMidiTrack(segmentId: Id, result: AudioTranscriptionJobStatus, pr
   return {
     trackId,
     midiSegmentId,
-    noteCount: notes.length,
-    detectedNoteCount: detectedNotes.length,
     loopPlays: compaction ? compaction.repeats + 1 : 1,
+    pitchRange: [Math.min(...notes.map((note) => note.pitch)), Math.max(...notes.map((note) => note.pitch))] as [number, number],
+    activeSpanBeats: Math.max(...notes.map((note) => note.startBeat + note.lengthBeats)) - Math.min(...notes.map((note) => note.startBeat)),
   };
 }
 
@@ -167,27 +168,6 @@ function findInstrumentForGroup(group: string, instruments: Instrument[]) {
   }) ?? instruments.find((instrument) => instrument.name.toLowerCase() === "lead saw");
 }
 
-function drumLaneDescription(pitch: number) {
-  if (pitch === 35 || pitch === 36) return { name: "Kick", terms: ["kick", "bass drum"] };
-  if (pitch === 37) return { name: "Rim", terms: ["rim", "side stick"] };
-  if (pitch === 38 || pitch === 40) return { name: "Snare", terms: ["snare"] };
-  if (pitch === 39) return { name: "Clap", terms: ["clap"] };
-  if (pitch === 42 || pitch === 44) return { name: "Closed Hat", terms: ["closed hat", "hihat closed"] };
-  if (pitch === 46) return { name: "Open Hat", terms: ["open hat", "hihat open"] };
-  if (pitch === 49 || pitch === 55 || pitch === 57) return { name: "Crash", terms: ["crash"] };
-  if (pitch === 51 || pitch === 53 || pitch === 59) return { name: "Ride", terms: ["ride"] };
-  if (pitch >= 41 && pitch <= 50) return { name: "Tom", terms: ["tom"] };
-  return { name: `Percussion ${pitch}`, terms: ["perc", "triangle"] };
-}
-
-function findDrumInstrument(pitch: number, instruments: Instrument[]) {
-  const descriptor = drumLaneDescription(pitch);
-  return instruments.find((instrument) => {
-    const haystack = [instrument.name, ...(instrument.descriptors ?? [])].join(" ").toLowerCase();
-    return descriptor.terms.some((term) => haystack.includes(term));
-  });
-}
-
 function installMultiInstrumentTracks(segmentId: Id, result: AudioTranscriptionJobStatus) {
   const projectStore = useProjectStore.getState();
   const source = currentSegment(segmentId);
@@ -206,7 +186,6 @@ function installMultiInstrumentTracks(segmentId: Id, result: AudioTranscriptionJ
   const editGroupId = `transcription_${crypto.randomUUID()}`;
   const createdTrackIds: Id[] = [];
   const createdSegmentIds: Id[] = [];
-  let noteCount = 0;
 
   runProjectHistoryGroup(() => {
     const orderedBefore = projectStore.project.tracks.map((track) => track.id);
@@ -274,7 +253,6 @@ function installMultiInstrumentTracks(segmentId: Id, result: AudioTranscriptionJ
       });
       createdTrackIds.push(trackId);
       createdSegmentIds.push(createdSegmentId);
-      noteCount += mapped.length;
     }
 
     const orderedAfter = useProjectStore.getState().project.tracks
@@ -286,7 +264,7 @@ function installMultiInstrumentTracks(segmentId: Id, result: AudioTranscriptionJ
 
   useUiStore.getState().setSelectedSegments(createdSegmentIds);
   useUiStore.getState().setSelectedTracks(createdTrackIds);
-  return { trackCount: createdTrackIds.length, noteCount };
+  return { trackCount: createdTrackIds.length, segmentCount: createdSegmentIds.length };
 }
 
 export async function convertStemToMidi(segmentId: Id) {
@@ -364,7 +342,7 @@ async function convertAudioSegmentToMidi(segmentId: Id, profile: AudioTranscript
     if (multiInstalled) {
       await appAlert(
         `Created ${multiInstalled.trackCount} linked instrument lane${multiInstalled.trackCount === 1 ? "" : "s"}`
-          + ` with ${multiInstalled.noteCount} source-dynamic MIDI note${multiInstalled.noteCount === 1 ? "" : "s"}.`
+          + " with source-derived dynamics and percussion mapped to drumpads."
           + " The source audio was kept unchanged.",
         "Multi-Instrument MIDI Complete",
       );
@@ -378,12 +356,12 @@ async function convertAudioSegmentToMidi(segmentId: Id, profile: AudioTranscript
       return;
     }
     await appAlert(
-      `Created an aligned MIDI lane with ${installed.noteCount} note${installed.noteCount === 1 ? "" : "s"}`
+      `Created an aligned MIDI lane spanning ${installed.activeSpanBeats.toFixed(1)} beats in the playable range ${pitchName(installed.pitchRange[0])}–${pitchName(installed.pitchRange[1])}`
         + (fusion
-          ? ` (${fusion.primaryCount} Transkun notes + ${fusion.recoveredCount} conservative Basic Pitch recoveries)`
+          ? " using Transkun attacks with conservative Basic Pitch recovery consensus"
           : "")
         + (installed.loopPlays > 1
-          ? ` in a detected ${installed.loopPlays}-play loop (${installed.detectedNoteCount} transcribed events before compaction)`
+          ? ` in a detected ${installed.loopPlays}-play loop`
           : "")
         + ". The source audio was kept unchanged.",
       "Audio-to-MIDI Complete",
@@ -393,6 +371,11 @@ async function convertAudioSegmentToMidi(segmentId: Id, profile: AudioTranscript
   } finally {
     setAudioToMidiState(null);
   }
+}
+
+function pitchName(pitch: number) {
+  const names = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+  return `${names[((pitch % 12) + 12) % 12]}${Math.floor(pitch / 12) - 1}`;
 }
 
 async function runTranscriptionJob(

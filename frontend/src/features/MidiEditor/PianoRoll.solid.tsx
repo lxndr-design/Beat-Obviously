@@ -116,8 +116,8 @@ const ZOOM_STEP = 8;
 const PX_PER_PITCH = 16;
 const VIEW_HEIGHT = 520;
 const ENABLE_AETHER_NOTE_AUTOMATION_PANEL = false;
-const TOP_PITCH = 96;     // C7
-const BOTTOM_PITCH = 36;  // C2
+const TOP_PITCH = 127;    // G9 — expose the complete MIDI note range by default.
+const BOTTOM_PITCH = 0;   // C-1 — bass/sub notes must remain visible and editable.
 const KEY_LABEL_WIDTH = 48;
 const DEFAULT_NOTE_LENGTH_BEATS = 0.25;
 const MIN_NOTE_LENGTH_BEATS = 1 / 64;
@@ -493,9 +493,21 @@ export function PianoRoll(props: PianoRollProps) {
   createCompatEffect(() => {
     const scroll = timeScrollRef.current;
     if (!scroll) return;
-    const centerPitch = clamp(60, bottomPitch, topPitch);
-    const c4Center = (topPitch - centerPitch) * PX_PER_PITCH + PX_PER_PITCH / 2;
-    scroll.scrollTop = Math.max(0, c4Center - VIEW_HEIGHT / 2);
+    const pitches = notes
+      .map((note) => note.pitch)
+      .filter((pitch) => Number.isFinite(pitch) && pitch >= bottomPitch && pitch <= topPitch)
+      .sort((a, b) => a - b);
+    const visiblePitchCount = VIEW_HEIGHT / PX_PER_PITCH;
+    const lowestPitch = pitches[0];
+    const highestPitch = pitches[pitches.length - 1];
+    const centerPitch = pitches.length === 0
+      ? clamp(60, bottomPitch, topPitch)
+      : highestPitch - lowestPitch + 1 <= visiblePitchCount
+        ? (lowestPitch + highestPitch) / 2
+        : pitches[Math.floor(pitches.length / 2)];
+    const noteCenter = (topPitch - centerPitch) * PX_PER_PITCH + PX_PER_PITCH / 2;
+    const maxScrollTop = Math.max(0, height - VIEW_HEIGHT);
+    scroll.scrollTop = clamp(noteCenter - VIEW_HEIGHT / 2, 0, maxScrollTop);
     syncKeyScroll();
   }, []);
 

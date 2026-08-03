@@ -14,6 +14,7 @@ import { INSTRUMENT_TAXONOMY_OPTIONS, taxonomyAssignmentForInstrumentId } from "
 import { characterizeInstrument, defaultAetherSynthConfig, defaultWavetableConfig, snapshotInstrument, useAudioFileStore, useInstrumentStore, useUiStore } from "../../state/store";
 import { INSTRUMENT_ICON_OPTIONS, instrumentIcon, instrumentIconLabel } from "../../state/instrumentIcons";
 import { normalizeSampleMap, sampleZoneDisplayName, sampleZoneStableId } from "../../state/sampleZones";
+import { normalizeLibraryMetadata, parseLibraryTags } from "../../state/libraryMetadata";
 import type { AudioFile, Instrument, InstrumentSampleZone, InstrumentSnapshot, WavetableWarpMode } from "../../state/types";
 import { createStoreSelector } from "../../solid-utils/store";
 import { WaveformPicker } from "./WaveformPicker.solid";
@@ -238,6 +239,21 @@ export function InstrumentEditorModal(props: Props) {
   }
 
   const currentDraft = () => draft()!;
+  const libraryMetadata = () => normalizeLibraryMetadata(currentDraft().libraryMetadata, {
+    factory: !currentDraft().userCreated,
+    createdAt: currentDraft().createdAt,
+    updatedAt: currentDraft().updatedAt,
+    license: currentDraft().source?.license,
+    provenance: currentDraft().source?.label,
+    tags: currentDraft().descriptors,
+  });
+
+  function updateLibraryMetadata(patch: Partial<ReturnType<typeof libraryMetadata>>) {
+    setDraft({
+      ...currentDraft(),
+      libraryMetadata: { ...libraryMetadata(), ...patch },
+    });
+  }
 
   return (
     <Show when={draft()}>
@@ -765,9 +781,40 @@ export function InstrumentEditorModal(props: Props) {
           )}
         </Show>
 
-        <Show when={currentDraft().source}>
-          <section class={`${styles.section} ${styles.spanFull}`}>
-            <h3 class={styles.sectionHeading}>Source</h3>
+        <section class={`${styles.section} ${styles.spanFull}`}>
+            <h3 class={styles.sectionHeading}>Library metadata</h3>
+            <div class={styles.metadataGrid}>
+              <TextInput
+                label="Creator"
+                layout="inline"
+                value={libraryMetadata().creator.displayName}
+                onInput={(event) => updateLibraryMetadata({
+                  creator: { ...libraryMetadata().creator, displayName: event.currentTarget.value },
+                })}
+              />
+              <TextInput
+                label="Tags"
+                layout="inline"
+                value={libraryMetadata().tags.join(", ")}
+                onInput={(event) => updateLibraryMetadata({ tags: parseLibraryTags(event.currentTarget.value) })}
+              />
+              <TextInput
+                label="Description"
+                layout="inline"
+                value={libraryMetadata().description ?? ""}
+                onInput={(event) => updateLibraryMetadata({ description: event.currentTarget.value || undefined })}
+              />
+              <TextInput
+                label="License"
+                layout="inline"
+                value={libraryMetadata().license ?? ""}
+                onInput={(event) => updateLibraryMetadata({ license: event.currentTarget.value || undefined })}
+              />
+            </div>
+            <p class={styles.metadataSummary}>
+              Version {libraryMetadata().version} · Created {formatLibraryDate(libraryMetadata().createdAt)} · Updated {formatLibraryDate(libraryMetadata().updatedAt)} · {libraryMetadata().visibility}
+            </p>
+            <Show when={currentDraft().source}>
             <div class={styles.sourceRow}>
               <div class={styles.sourceText}>
                 <span>{sourceLabel(currentDraft(), sourceEdited())}</span>
@@ -788,12 +835,16 @@ export function InstrumentEditorModal(props: Props) {
                 </Button>
               </Show>
             </div>
+            </Show>
           </section>
-        </Show>
       </div>
     </Modal>
     </Show>
   );
+}
+
+function formatLibraryDate(value: number): string {
+  return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(value);
 }
 
 function SamplerZoneEditor(props: {

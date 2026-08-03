@@ -1,5 +1,5 @@
 .empty {
-  font-family: var(--font-family-mono);
+  font-family: var(--font-family-base);
   font-size: var(--font-size-1);
   opacity: 0.6;
   padding: var(--space-1) 0;
@@ -47,7 +47,7 @@
 }
 
 .optionKind {
-  font-family: var(--font-family-mono);
+  font-family: var(--font-family-base);
   font-size: var(--font-size-ui);
   text-transform: none;
   letter-spacing: 0;

@@ -418,6 +418,7 @@ export function TrackList() {
                       trackId={trackId}
                       expandedEffectIds={expandedEffectIds()}
                       onToggleEffect={toggleEffectRows}
+                      scrollLeft={horizontalScrollLeft()}
                     />
                   </div>
                 )}

@@ -7,14 +7,7 @@ if (!container) {
   throw new Error("Missing #root element");
 }
 
-function shouldInstallBeatDevHooks() {
-  if (import.meta.env.DEV) return true;
-  if (typeof window === "undefined") return false;
-  const isLocalPreview = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1" || window.location.hostname === "::1";
-  return isLocalPreview && new URLSearchParams(window.location.search).has("beatDevFixture");
-}
-
-if (shouldInstallBeatDevHooks()) {
+if (import.meta.env.DEV) {
   void import("./testing/devHooks")
     .then(({ installBeatDevHooks }) => installBeatDevHooks())
     .catch((error) => {

@@ -79,8 +79,8 @@
 .valueLabel,
 .timeLabel {
   fill: color-mix(in srgb, var(--color-fg) 62%, transparent);
-  font-family: var(--font-family-mono);
-  font-size: 11px;
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-ui);
   pointer-events: none;
 }
 
@@ -150,7 +150,7 @@
 
 .graphHint {
   color: color-mix(in srgb, var(--color-fg) 58%, transparent);
-  font-family: var(--font-family-mono);
+  font-family: var(--font-family-base);
   font-size: var(--font-size-hint);
 }
 
@@ -164,7 +164,7 @@
 
 .pointInspector {
   display: grid;
-  grid-template-columns: minmax(180px, 0.7fr) minmax(105px, 0.25fr) minmax(135px, 0.3fr) minmax(280px, 1fr) auto;
+  grid-template-columns: minmax(180px, 0.7fr) minmax(105px, 0.25fr) minmax(135px, 0.3fr) minmax(279px, 1fr) auto;
   align-items: center;
   gap: 9px;
 }
@@ -182,7 +182,7 @@
 .pointSummary span {
   min-width: 0;
   color: color-mix(in srgb, var(--color-fg) 64%, transparent);
-  font-family: var(--font-family-mono);
+  font-family: var(--font-family-base);
   font-size: var(--font-size-hint);
   overflow: hidden;
   text-overflow: ellipsis;

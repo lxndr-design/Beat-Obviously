@@ -18,7 +18,7 @@ import type { Id, MidiAutomationLane, Track } from "../../state/types";
 import styles from "./TrackAutomationRows.module.css";
 
 const GROUP_ROW_HEIGHT = 27;
-const VALUE_ROW_HEIGHT = 44;
+const VALUE_ROW_HEIGHT = 45;
 
 interface TrackAutomationRowsProps {
   trackId: Id;

@@ -69,6 +69,12 @@ export function drumPlaybackDurationBeats(lengthBeats: number, speed = 1): numbe
   return drumPatternDurationBeats(lengthBeats) / Math.max(0.25, Number.isFinite(speed) ? speed : 1);
 }
 
+export function retimeDrumSegmentLengthBeats(lengthBeats: number, previousSpeed: number, nextSpeed: number): number {
+  const safePreviousSpeed = Math.max(0.25, Number.isFinite(previousSpeed) ? previousSpeed : 1);
+  const safeNextSpeed = Math.max(0.25, Number.isFinite(nextSpeed) ? nextSpeed : 1);
+  return Math.max(0.25, drumPatternDurationBeats(lengthBeats) * safePreviousSpeed / safeNextSpeed);
+}
+
 export function drumPlaybackStepLengthBeats(lengthBeats: number, stepCount: number, speed = 1): number {
   return drumPlaybackDurationBeats(lengthBeats, speed) / Math.max(1, stepCount);
 }

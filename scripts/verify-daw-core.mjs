@@ -145,6 +145,29 @@ try {
   const curves = await import(pathToFileURL(join(outDir, "curves.js")));
   const exportStore = await import(pathToFileURL(join(outDir, "exportStore.js")));
   const assetReferenceGraph = await import(pathToFileURL(join(outDir, "assetReferenceGraph.js")));
+  assert.equal(store.useDocumentStore.getState().recentProjectsLoading, true, "recent projects should expose an initial loading state");
+  store.useDocumentStore.getState().setRecentProjectsLoading(false);
+  assert.equal(store.useDocumentStore.getState().recentProjectsLoading, false, "recent project loading state should settle after hydration");
+  const recentStore = store.useDocumentStore.getState();
+  recentStore.addRecentProject({ path: "/tmp/recent-older.beat", name: "Older", openedAt: 1710000000000 });
+  recentStore.addRecentProject({ path: "/tmp/recent-newest.beat", name: "Newest", openedAt: 1730000000000 });
+  recentStore.addRecentProject({ path: "/tmp/recent-middle.beat", name: "Middle", openedAt: 1720000000000 });
+  recentStore.addRecentProject({ path: "/tmp/recent-unknown.beat", name: "Unknown", openedAt: 0 });
+  assert.deepEqual(
+    store.useDocumentStore.getState().recentProjects.map((project) => project.path),
+    [
+      "/tmp/recent-newest.beat",
+      "/tmp/recent-middle.beat",
+      "/tmp/recent-older.beat",
+      "/tmp/recent-unknown.beat",
+    ],
+    "recent projects should default to latest-opened first and keep unknown timestamps last",
+  );
+  assert.deepEqual(
+    store.useDocumentStore.getState().recentFilePaths,
+    store.useDocumentStore.getState().recentProjects.map((project) => project.path),
+    "recent project metadata and legacy path ordering should remain aligned",
+  );
   const loopOccurrences = selectors.expandTrackSegments({
     segments: [{ id: "loop", startBeat: 4, lengthBeats: 4, repeats: 3 }],
   }, 32);
@@ -221,6 +244,22 @@ try {
   const projectStore = store.useProjectStore.getState();
   projectStore.loadProject(store.createEmptyProject());
   const mixerTrackId = store.useProjectStore.getState().project.tracks[0].id;
+  const audibilityPrevious = store.useProjectStore.getState().project;
+  store.useProjectStore.getState().setTrackMute(mixerTrackId, true);
+  const audibilityNext = store.useProjectStore.getState().project;
+  assert.equal(
+    engineProjectPayload.projectChangeOnlyAffectsTrackAudibility(audibilityPrevious, audibilityNext),
+    true,
+    "real store mute gestures should use the realtime audibility path",
+  );
+  store.useProjectStore.getState().setTrackMute(mixerTrackId, false);
+  const structuralPrevious = store.useProjectStore.getState().project;
+  store.useProjectStore.getState().updateTrack(mixerTrackId, { name: "Structural edit" });
+  assert.equal(
+    engineProjectPayload.projectChangeOnlyAffectsTrackAudibility(structuralPrevious, store.useProjectStore.getState().project),
+    false,
+    "structural track edits should still rebuild the engine project",
+  );
   const trackEffectA = store.useProjectStore.getState().addTrackEffect(mixerTrackId, "reverb");
   const trackEffectB = store.useProjectStore.getState().addTrackEffect(mixerTrackId, "delay");
   store.useProjectStore.getState().updateTrackEffect(mixerTrackId, trackEffectA, { bypassed: true });
@@ -490,7 +529,10 @@ try {
   const lumenTestSet = store.useInstrumentStore.getState().instrumentSets.find(
     (set) => set.id === store.LUMEN_TEST_INSTRUMENT_SET_ID,
   );
-  assert.deepEqual(lumenTestSet, { id: "lumus-test", name: "Lumen Test", factory: true });
+  assert.equal(lumenTestSet?.id, "lumus-test");
+  assert.equal(lumenTestSet?.name, "Lumen Test");
+  assert.equal(lumenTestSet?.factory, true);
+  assert.equal(lumenTestSet?.libraryMetadata?.creator.id, "beat.factory");
   const expectedLumenTestNames = [
     "Lumen_SubBass_02",
     "Lumen_ArpPluck_02",
@@ -688,6 +730,8 @@ try {
   assert.equal(drumSteps.drumPlaybackDurationBeats(16, 4), 4, "drum playback duration should match arranged segment length");
   assert.equal(drumSteps.drumPlaybackStepLengthBeats(16, 16, 4), 0.25, "sixteen-step speed-4 drums should place hits on sixteenth notes");
   assert.equal(drumSteps.drumPlaybackDurationSeconds(16, 120, 4, 2), 1, "drum playback duration should combine grid speed and preview speed");
+  assert.equal(drumSteps.retimeDrumSegmentLengthBeats(4, 4, 6), 8 / 3, "raising drum speed should shrink the arranged segment proportionally");
+  assert.equal(drumSteps.retimeDrumSegmentLengthBeats(4, 4, 2), 8, "lowering drum speed should expand the arranged segment proportionally");
 
   const onSteps = (loopName, rowName, occurrence = 0) => {
     const loop = factoryLoops.find((component) => component.name === loopName);
@@ -775,6 +819,38 @@ try {
   assert.equal(resized.startBeat, 0, "resize should clamp negative starts");
   assert.equal(resized.lengthBeats, project.lengthBeats, "resize should clamp to project length");
 
+  const drumTrimId = projectStore.addSegment(trackB, {
+    name: "Fixed-time drum trim",
+    startBeat: 8,
+    lengthBeats: 4,
+    payload: {
+      kind: "drum",
+      stepCount: 16,
+      speed: 4,
+      rows: [{ id: "trim-kick", name: "Kick", steps: Array.from({ length: 16 }, (_, index) => index % 4 === 0) }],
+    },
+  });
+  const drumTrimOrigin = store.useProjectStore.getState().project.tracks[1].segments.find((segment) => segment.id === drumTrimId);
+  assert.ok(drumTrimOrigin, "drum trim fixture should exist");
+  store.useProjectStore.getState().applySegmentEditCommand({
+    kind: "resize",
+    segmentId: drumTrimId,
+    startBeat: 9,
+    lengthBeats: 3,
+    originStartBeat: drumTrimOrigin.startBeat,
+    originLengthBeats: drumTrimOrigin.lengthBeats,
+    originSourceStartBeat: drumTrimOrigin.sourceStartBeat,
+    originPayload: structuredClone(drumTrimOrigin.payload),
+  });
+  project = store.useProjectStore.getState().project;
+  const drumTrimmed = project.tracks[1].segments.find((segment) => segment.id === drumTrimId);
+  assert.ok(drumTrimmed?.payload.kind === "drum", "resized drum segment should retain its payload");
+  assert.equal(drumTrimmed.startBeat, 8, "shortening a drum from the left handle should still trim only its end");
+  assert.equal(drumTrimmed.lengthBeats, 3, "drum shortening should change only the arranged clip length");
+  assert.equal(drumTrimmed.sourceStartBeat ?? 0, 0, "drum shortening should preserve the source opening");
+  assert.equal(drumTrimmed.payload.sourceLengthBeats, 16, "legacy drum shortening must recover and preserve fixed source-grid timing");
+  assert.equal(drumTrimmed.payload.stepCount, 16, "drum shortening must not compress or resample the grid");
+
   const duplicateIds = store.useProjectStore.getState().applySegmentEditCommand({
     kind: "duplicate",
     segments: [resized],
@@ -815,7 +891,7 @@ try {
 
   store.useProjectStore.getState().applySegmentEditCommand({
     kind: "delete",
-    segmentIds: [first, second, duplicate.id],
+    segmentIds: [first, second, duplicate.id, drumTrimId],
   });
   project = store.useProjectStore.getState().project;
   assert.equal(
@@ -1363,6 +1439,21 @@ try {
     trackEffects.effectAutomationBeatFromDrag(1, 500, 300, 40, 64),
     0,
     "effect-point dragging should clamp before the project start",
+  );
+  assert.equal(
+    trackEffects.effectAutomationPointDisplayLeft(2, 40, 600, 1),
+    680,
+    "a lone effect point should retain its 80px viewport position while the timeline scrolls",
+  );
+  assert.equal(
+    trackEffects.effectAutomationPointDisplayLeft(2, 40, 600, 2),
+    80,
+    "multiple effect points should remain aligned to their timeline beats",
+  );
+  assert.equal(
+    trackEffects.effectAutomationPopoverDisplayLeft(610, 600),
+    646,
+    "the effect value editor should stay clear of the sticky track-header edge",
   );
   assert.equal(
     trackEffects.formatEffectParamValue(1234.4, trackEffects.EFFECT_META.delay.params[0]),

@@ -530,7 +530,7 @@ function analysisEvidence(input: {
   ];
   if (input.kind === "bassline") return [`Median pitch MIDI ${Math.round(input.medianPitch)}`, input.polyphonicRatio < 0.2 ? "Mostly single-note" : "Layered bass voice"];
   if (input.kind === "chord-progression") return [`${Math.round(input.polyphonicRatio * 100)}% polyphonic onsets`, "Harmonic changes tracked by onset"];
-  if (input.kind === "melodic-loop") return [input.motif?.repeated ? "Repeated interval and rhythm pattern" : "Short melodic phrase", `${input.motif?.noteCount ?? 0}-note core`];
+  if (input.kind === "melodic-loop") return [input.motif?.repeated ? "Repeated interval and rhythm pattern" : "Short melodic phrase", "Compact phrase identity"];
   return [
     input.motif?.repeated ? "Repeated motif found" : "Primary phrase boundary found",
     `Phrase aligned against ${formatBeat(input.measureBeats)}-beat measures`,

@@ -450,8 +450,9 @@ function summarizeMidiBatch(category, patterns) {
   const eventDistance = avgPairwise(eventSets, jaccardSetDistance);
   const pitchDistance = avgPairwise(pitchSets, jaccardSetDistance);
   const rhythmDistance = avgPairwise(rhythmSets, jaccardSetDistance);
-  const noteCounts = patterns.map((notes) => notes.length);
   const pitchSpans = patterns.map((notes) => notes.length ? Math.max(...notes.map((note) => note.pitch)) - Math.min(...notes.map((note) => note.pitch)) : 0);
+  const activeSpans = patterns.map((notes) => notes.length ? Math.max(...notes.map((note) => note.startBeat + note.lengthBeats)) - Math.min(...notes.map((note) => note.startBeat)) : 0);
+  const durationVariety = patterns.map((notes) => new Set(notes.map((note) => round(note.lengthBeats))).size);
   const flags = [];
   if (new Set(fingerprints).size < Math.ceil(patterns.length * 0.8)) flags.push("low exact uniqueness");
   if (eventDistance < 0.5) flags.push("event pattern converges");
@@ -463,8 +464,9 @@ function summarizeMidiBatch(category, patterns) {
     eventDistance: round(eventDistance),
     pitchDistance: round(pitchDistance),
     rhythmDistance: round(rhythmDistance),
-    noteCount: range(noteCounts),
     pitchSpan: range(pitchSpans),
+    activeSpan: range(activeSpans),
+    durationVariety: range(durationVariety),
     examples: patterns.slice(0, 3).map((notes) => notes.map((note) => ({
       pitch: note.pitch,
       startBeat: note.startBeat,
@@ -623,8 +625,9 @@ function renderMidiResult(result) {
 - Event pairwise distance: ${result.eventDistance}
 - Pitch pairwise distance: ${result.pitchDistance}
 - Rhythm pairwise distance: ${result.rhythmDistance}
-- Note count: ${jsonInline(result.noteCount)}
 - Pitch span: ${jsonInline(result.pitchSpan)}
+- Active phrase span: ${jsonInline(result.activeSpan)}
+- Duration-shape variety: ${jsonInline(result.durationVariety)}
 - Flags: ${result.flags.length ? result.flags.join(", ") : "none"}
 - Examples: ${jsonInline(result.examples)}
 `;

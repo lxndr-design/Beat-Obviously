@@ -9,6 +9,7 @@ export interface TimepointHandleProps {
   selected?: boolean;
   dragging?: boolean;
   ghost?: boolean;
+  pinned?: boolean;
   onSelect?: (additive: boolean) => void;
   onStartDrag?: (pointerId: number, clientX: number) => void;
   onOpenEditor?: () => void;
@@ -29,6 +30,7 @@ export function TimepointHandle(props: TimepointHandleProps) {
       aria-hidden={props.ghost ? "true" : undefined}
       data-track-timepoint-selection-key={props.selectionKey}
       data-track-effect-automation-point-key={props.selectionKey}
+      data-pinned-single-point={props.pinned ? "true" : undefined}
       onContextMenu={(event) => {
         if (!interactive()) return;
         event.stopPropagation();

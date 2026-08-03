@@ -534,6 +534,9 @@ namespace beat
             float inputTrimDb { 0.0f };
             bool mute { false };
             bool audible { true };
+            float audibilityGain { 1.0f };
+            float audibilityTargetGain { 1.0f };
+            int audibilityRampSamplesRemaining { 0 };
             bool midiPreviewTailActive { false };
             std::unique_ptr<juce::Synthesiser> synth;
             static constexpr size_t maxRetiringSynths = 2;
@@ -808,6 +811,10 @@ namespace beat
                                            int numSamples,
                                            int64_t* routeEffectTicks,
                                            RouteEffectWorkStats* routeEffectWork) noexcept;
+        void applyRouteAudibilityRampLocked(InstrumentRenderState& route,
+                                            juce::AudioBuffer<float>& buffer,
+                                            int startSample,
+                                            int numSamples) noexcept;
         void processEffectGraphTransitionLocked(InstrumentRenderState& route,
                                                 juce::AudioBuffer<float>& buffer,
                                                 int startSample,

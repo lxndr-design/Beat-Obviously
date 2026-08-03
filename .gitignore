@@ -4,6 +4,7 @@ build-native/
 build-native-*/
 cmake-build-*/
 out/
+release/
 *.o
 *.obj
 *.exe
@@ -27,6 +28,10 @@ frontend/src/**/*.js
 .venv-transcription/
 .venv-transkun/
 .venv-muscriptor/
+.venv-jazzmus/
+.venv-homr/
+.local-jazzmus/
+tmp/pdfs/
 
 # Generated
 *.log

@@ -17,13 +17,37 @@ export function AppDialogHost() {
   function cancel() {
     const current = dialog();
     if (!current) return;
-    completeDialog(current.id, current.kind === "confirm" ? false : current.kind === "prompt" ? null : undefined);
+    completeDialog(
+      current.id,
+      current.kind === "confirm"
+        ? false
+        : current.kind === "prompt"
+          ? null
+          : current.kind === "save-confirm"
+            ? "cancel"
+            : undefined,
+    );
   }
 
   function accept() {
     const current = dialog();
     if (!current) return;
-    completeDialog(current.id, current.kind === "confirm" ? true : current.kind === "prompt" ? promptValue() : undefined);
+    completeDialog(
+      current.id,
+      current.kind === "confirm"
+        ? true
+        : current.kind === "prompt"
+          ? promptValue()
+          : current.kind === "save-confirm"
+            ? "save"
+            : undefined,
+    );
+  }
+
+  function dontSave() {
+    const current = dialog();
+    if (!current || current.kind !== "save-confirm") return;
+    completeDialog(current.id, "dont-save");
   }
 
   return (
@@ -42,8 +66,13 @@ export function AppDialogHost() {
                 Cancel
               </Button>
             </Show>
+            <Show when={dialog()?.kind === "save-confirm"}>
+              <Button variant="default" onClick={dontSave}>
+                Don't save
+              </Button>
+            </Show>
             <Button variant="primary" onClick={accept}>
-              {dialog()?.kind === "prompt" ? "Done" : "OK"}
+              {dialog()?.kind === "prompt" ? "Done" : dialog()?.kind === "save-confirm" ? "Save" : "OK"}
             </Button>
           </>
         )}

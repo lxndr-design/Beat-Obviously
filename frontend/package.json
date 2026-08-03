@@ -1,8 +1,13 @@
 {
   "name": "beat-frontend",
   "private": true,
-  "version": "0.3.1",
+  "version": "0.3.2",
   "type": "module",
+  "packageManager": "npm@11.12.1",
+  "engines": {
+    "node": ">=22.12.0 <27",
+    "npm": ">=11.0.0 <12"
+  },
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
@@ -13,6 +18,7 @@
     "verify:audio-bus": "node ../scripts/verify-audio-bus.mjs",
     "verify:documents": "node ../scripts/verify-document-roundtrip.mjs",
     "verify:instrument-repository": "node ../scripts/verify-instrument-song-repository.mjs",
+    "verify:collaboration": "node ../scripts/verify-collaboration-foundation.mjs",
     "verify:midi-remix": "node ../scripts/verify-midi-remix.mjs",
     "verify:native-doc": "node ../scripts/verify-native-document-registration.mjs",
     "verify:native-toolchain": "node ../scripts/verify-native-toolchain.mjs",
@@ -32,31 +38,40 @@
     "verify:track-interactions": "node ../scripts/verify-track-interactions.mjs",
     "verify:drums": "node ../scripts/verify-drum-generation.mjs",
     "verify:audio-to-midi": "node ../scripts/verify-audio-to-midi.mjs",
+    "verify:score-import": "node ../scripts/verify-score-import.mjs",
     "verify:interactions": "node ../scripts/verify-frontend-interactions.mjs && node ../scripts/verify-stable-control-rows.mjs && npm run verify:midi-remix",
     "verify:stable-controls": "node ../scripts/verify-stable-control-rows.mjs",
+    "verify:beta": "node ../scripts/verify-beta-readiness.mjs --scope=source",
+    "verify:beta:all": "node ../scripts/verify-beta-readiness.mjs --scope=all",
+    "package:beta": "../scripts/package-beta-release.sh",
     "verify:non-native": "npm run verify:version && npm run verify:design-system && npm run verify:audio-boundary && npm run verify:sampler-zones && npm run typecheck && npm run verify:synth && npm run verify:aurum && npm run verify:lumen && npm run verify:benchmark-instruments && npm run audit:generation && npm run verify:daw && npm run verify:documents && npm run verify:instrument-repository && npm run verify:track-interactions && npm run verify:interactions && npm run verify:node-instrument && npm run verify:drums && npm run build",
     "visualize:codebase": "node ../scripts/generate-codebase-visualizer.mjs",
     "generate:icons": "node ../scripts/generate-icon-subset.mjs",
     "audit:aether-presets": "node ../scripts/audit-aether-presets.mjs",
+    "audit:dependencies": "node ../scripts/check-dependency-freshness.mjs",
     "benchmark:aether-serum": "node ../scripts/benchmark-aether-serum.mjs",
     "audit:generation": "node ../scripts/audit-generation-diversity.mjs",
-    "benchmark:midi-stress": "node ../scripts/benchmark-dense-midi.mjs"
+    "benchmark:midi-stress": "node ../scripts/benchmark-dense-midi.mjs",
+    "generate:dense-stress": "node ../scripts/create-dense-stress-projects.mjs",
+    "benchmark:dense-operations": "node --expose-gc ../scripts/benchmark-dense-project-operations.mjs"
   },
   "dependencies": {
-    "@iconify/core": "^4.1.0",
-    "dexie": "^4.0.10",
+    "@iconify/core": "^4.1.1",
+    "dexie": "^4.4.4",
+    "fast-xml-parser": "^5.10.1",
+    "fflate": "^0.8.3",
     "immer": "^10.1.1",
-    "nanoid": "^5.0.9",
-    "solid-js": "^1.9.13",
+    "nanoid": "^5.1.16",
+    "solid-js": "^1.9.14",
     "three": "^0.170.0",
-    "zustand": "^5.0.2"
+    "zustand": "^5.0.14"
   },
   "devDependencies": {
     "@iconify-json/ph": "^1.2.2",
     "@types/three": "^0.170.0",
     "esbuild": "^0.28.1",
     "typescript": "^5.7.2",
-    "vite": "^8.0.16",
-    "vite-plugin-solid": "^2.11.12"
+    "vite": "^8.2.0",
+    "vite-plugin-solid": "^2.11.14"
   }
 }

@@ -6,6 +6,8 @@ import {
   EFFECT_META,
   clampEffectParamValue,
   effectAutomationBeatFromDrag,
+  effectAutomationPointDisplayLeft,
+  effectAutomationPopoverDisplayLeft,
   effectAutomationSelectionKey,
   effectValueToLaneY,
   formatEffectParamValue,
@@ -33,6 +35,7 @@ interface EffectRowsProps {
   trackId: Id;
   expandedEffectIds: Set<Id>;
   onToggleEffect: (effectId: Id) => void;
+  scrollLeft?: number;
 }
 
 export function TrackEffectHeaderRows(props: EffectRowsProps) {
@@ -77,6 +80,7 @@ export function TrackEffectLaneRows(props: EffectRowsProps) {
                 lengthBeats={lengthBeats()}
                 bpm={bpm()}
                 beatsToPx={beatsToPx()}
+                scrollLeft={props.scrollLeft ?? 0}
               />
             )}
           </Show>
@@ -175,6 +179,7 @@ function EffectRowGroupLane(props: {
   lengthBeats: number;
   bpm: number;
   beatsToPx: number;
+  scrollLeft: number;
 }) {
   const meta = createMemo(() => effectMeta(props.effect));
   const ghostPoints = createMemo(() => meta().params.flatMap((param) =>
@@ -201,6 +206,7 @@ function EffectRowGroupLane(props: {
               lengthBeats={props.lengthBeats}
               bpm={props.bpm}
               beatsToPx={props.beatsToPx}
+              scrollLeft={props.scrollLeft}
             />
           )}
         </For>
@@ -262,6 +268,7 @@ function TrackEffectValueLaneRow(props: {
   lengthBeats: number;
   bpm: number;
   beatsToPx: number;
+  scrollLeft: number;
 }) {
   const [editor, setEditor] = createSignal<{ pointId?: Id; beat: number; value: string; left: number; top: number } | null>(null, { equals: false });
   const [draggingPointId, setDraggingPointId] = createSignal<Id | null>(null);
@@ -310,6 +317,15 @@ function TrackEffectValueLaneRow(props: {
       left: beat * props.beatsToPx,
       top: TIMEPOINT_HANDLE_Y,
     });
+  }
+
+  function pointDisplayLeft(point: TrackEffectAutomationPoint) {
+    return effectAutomationPointDisplayLeft(point.beat, props.beatsToPx, props.scrollLeft, points().length);
+  }
+
+  function editorDisplayLeft(current: { pointId?: Id; left: number }) {
+    const point = current.pointId ? points().find((candidate) => candidate.id === current.pointId) : undefined;
+    return effectAutomationPopoverDisplayLeft(point ? pointDisplayLeft(point) : current.left, props.scrollLeft);
   }
 
   function commitEditor() {
@@ -467,6 +483,8 @@ function TrackEffectValueLaneRow(props: {
               selected={selectedPointKeys().includes(pointKey())}
               dragging={draggingPointId() === pointId}
               beatsToPx={props.beatsToPx}
+              displayLeft={pointDisplayLeft(point())}
+              pinned={points().length === 1}
               onSelect={(additive) => useUiStore.getState().selectTrackEffectAutomationPoint(pointKey(), additive)}
               onStartDrag={(pointerId, clientX) => {
                 setEditor(null);
@@ -480,7 +498,7 @@ function TrackEffectValueLaneRow(props: {
       <Show when={editor()}>
         {(current) => (
           <TimepointValuePopover
-            left={current().left}
+            left={editorDisplayLeft(current())}
             top={current().top}
             label={`${props.param.label} automation`}
             value={current().value}
@@ -505,6 +523,8 @@ function AutomationPointDiamond(props: {
   selected: boolean;
   dragging: boolean;
   beatsToPx: number;
+  displayLeft: number;
+  pinned: boolean;
   onSelect: (additive: boolean) => void;
   onStartDrag: (pointerId: number, clientX: number) => void;
   onOpenEditor: () => void;
@@ -539,11 +559,12 @@ function AutomationPointDiamond(props: {
       <TimepointHandle
         title={`${props.param.label} ${formatEffectParamValue(props.point.value, props.param)} · ${automationCurveLabel(props.point.curve ?? "linear")}`}
         displayValue={formatEffectParamValue(props.point.value, props.param)}
-        left={props.point.beat * props.beatsToPx}
+        left={props.displayLeft}
         top={TIMEPOINT_HANDLE_Y}
         selectionKey={props.pointKey}
         selected={props.selected}
         dragging={props.dragging}
+        pinned={props.pinned}
         onContextMenu={(event) => {
           useUiStore.getState().selectTrackEffectAutomationPoint(props.pointKey, false);
           menu.onContextMenu(event);

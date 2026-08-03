@@ -4009,7 +4009,7 @@ function decentSamplerFixtureImage() {
       <rect x="34" y="228" width="318" height="110"/>
       <path d="M34 277h318M140 228v110M246 228v110"/>
     </g>
-    <g fill="#fff" font-family="Helvetica,Arial,sans-serif" font-weight="700">
+    <g fill="#fff" font-family="Almarai,Arial,sans-serif" font-weight="700">
       <text x="46" y="60" font-size="22">LORENZO'S DRUMS V1</text>
       <text x="474" y="54" font-size="12">KICK</text>
       <text x="536" y="54" font-size="12">SNARE</text>

@@ -1,4 +1,4 @@
-import { DEFAULT_DRUM_VELOCITY } from "../state/drumSteps";
+import { DEFAULT_DRUM_VELOCITY, normalizeDrumCell } from "../state/drumSteps";
 import type { DrumRow, DrumSpeed, DrumStep, Instrument, TimeSignature } from "../state/types";
 
 export const DRUM_GENRES = [
@@ -12,6 +12,8 @@ export const DRUM_GENRES = [
   "house",
   "reggae",
   "funk",
+  "jazz",
+  "orchestral",
 ] as const;
 
 export type DrumGenre = typeof DRUM_GENRES[number];
@@ -205,6 +207,40 @@ export const DRUM_GENRE_GUIDELINES: Record<DrumGenre, DrumGenreGuideline> = {
     special: "Groove comes from ghost notes and kick placement.",
     references: ["Pocket funk", "Syncopated funk"],
   },
+  jazz: {
+    bpm: "80-260; swing feel may be half-time at faster tempos",
+    timeSignature: "4/4, 3/4, and compound meters",
+    instruments: ["Ride cymbal", "Hi-hat pedal", "Brush or light snare", "Feathered kick", "Toms"],
+    kick: "Feathered quarter-note pulse with selective conversational accents",
+    snareClap: "Light comping and ghost notes rather than a fixed loud backbeat",
+    hatsPerc: "Spang-a-lang ride pattern; hi-hat foot commonly marks 2 and 4",
+    hatDensity: "Swing eighths with skip-beat motion",
+    swing: "Medium to high; triplet-derived ride feel",
+    humanization: "High; dynamic comping and deliberate push-pull",
+    kickComplexity: "medium",
+    fillRate: "medium",
+    characteristics: "Ride-led swing, feathered bass drum, hi-hat on 2 and 4, conversational snare",
+    coreBeat: "Ride on the quarter pulse with skip notes after beats 2 and 4; light kick underneath and hi-hat foot on 2 and 4.",
+    special: "Avoid converting jazz into funk: the ride cymbal carries time while snare and kick respond around it.",
+    references: ["Jazz ride ostinato", "Swing comping", "Brush groove"],
+  },
+  orchestral: {
+    bpm: "Tempo follows the score",
+    timeSignature: "Any notated meter",
+    instruments: ["Concert bass drum", "Snare", "Suspended cymbal", "Toms", "Tambourine"],
+    kick: "Structural downbeats and climactic accents, not constant drum-kit timekeeping",
+    snareClap: "Soft ostinati, rolls, pickups, and rhythm reinforcement",
+    hatsPerc: "Cymbal swells and sparse color at phrase boundaries",
+    hatDensity: "Sparse",
+    swing: "Low unless the source material itself is swung",
+    humanization: "High dynamic range with restrained timing variation",
+    kickComplexity: "low",
+    fillRate: "low",
+    characteristics: "Phrase hierarchy, crescendos, color, and selective reinforcement",
+    coreBeat: "Use low percussion for important structural beats, quieter snare/tom motion for propulsion, and cymbal for arrivals.",
+    special: "Do not imitate a basic rock kit; percussion should articulate the score's phrase shape and changes in energy.",
+    references: ["Orchestral phrase accents", "Percussion ostinato", "Crescendo reinforcement"],
+  },
 };
 
 export const DRUM_COMPLEXITY_DEFAULT = 50;
@@ -234,6 +270,16 @@ export interface GenerateDrumBeatOptions {
   complexity?: number;
   variationSeed?: number;
   feedbackExamples?: DrumBeatFeedbackExample[];
+}
+
+export interface RemixDrumBeatOptions {
+  rows: DrumRow[];
+  stepCount: number;
+  lengthBeats: number;
+  speed: DrumSpeed;
+  swingPercent: number;
+  defaultPitchHz?: number;
+  variationSeed?: number;
 }
 
 export interface DrumBeatFeedbackExample {
@@ -283,6 +329,8 @@ const GENRE_DEFAULTS: Record<DrumGenre, { speed: DrumSpeed; swing: number }> = {
   house: { speed: 4, swing: 54 },
   reggae: { speed: 4, swing: 58 },
   funk: { speed: 4, swing: 60 },
+  jazz: { speed: 4, swing: 62 },
+  orchestral: { speed: 4, swing: 52 },
 };
 
 const DRUM_SPEEDS: DrumSpeed[] = [1, 2, 3, 4, 5, 6];
@@ -450,17 +498,17 @@ export function generateLocalDrumBeat({
   switch (genre) {
     case "house":
       return beat(defaults, targetStepCount, targetLength, [
-        row(roles.kick, "Kick", repeatPattern([1, 5, 9, 13], 16, targetStepCount, 122)),
-        row(houseBackbeat, houseBackbeat?.name ?? "Clap", repeatPattern([5, 13], 16, targetStepCount, 114)),
-        row(roles.openHat, "Open Hat", repeatPattern([3, 7, 11, 15], 16, targetStepCount, 92, 8)),
-        row(houseTexture, houseTexture?.name ?? "Closed Hat", repeatPattern([1, 3, 5, 7, 9, 11, 13, 15], 16, targetStepCount, 54, 5)),
+        row(roles.kick, "Kick", repeatScaledPattern([1, 5, 9, 13], 16, fourFourBarSteps, targetStepCount, 122)),
+        row(houseBackbeat, houseBackbeat?.name ?? "Clap", repeatScaledPattern([5, 13], 16, fourFourBarSteps, targetStepCount, 114)),
+        row(roles.openHat, "Open Hat", repeatScaledPattern([3, 7, 11, 15], 16, fourFourBarSteps, targetStepCount, 92, 8)),
+        row(houseTexture, houseTexture?.name ?? "Closed Hat", repeatScaledPattern([1, 3, 5, 7, 9, 11, 13, 15], 16, fourFourBarSteps, targetStepCount, 54, 5)),
       ]);
     case "reggae":
       return beat(defaults, targetStepCount, targetLength, [
-        row(roles.kick, "Kick", repeatPattern([9], 16, targetStepCount, 116, 6)),
-        row(roles.rim ?? roles.snare, "Rim", repeatPattern([9], 16, targetStepCount, 104, 10)),
-        row(roles.closedHat, "Hat", repeatPattern([3, 7, 11, 15], 16, targetStepCount, 68, 12)),
-        row(reggaeTexture, reggaeTexture?.name ?? "Skank", repeatPattern([5, 13], 16, targetStepCount, 54, 14)),
+        row(roles.kick, "Kick", repeatScaledPattern([9], 16, fourFourBarSteps, targetStepCount, 116, 6)),
+        row(roles.rim ?? roles.snare, "Rim", repeatScaledPattern([9], 16, fourFourBarSteps, targetStepCount, 104, 10)),
+        row(roles.closedHat, "Hat", repeatScaledPattern([3, 7, 11, 15], 16, fourFourBarSteps, targetStepCount, 68, 12)),
+        row(reggaeTexture, reggaeTexture?.name ?? "Skank", repeatScaledPattern([5, 13], 16, fourFourBarSteps, targetStepCount, 54, 14)),
       ]);
     case "trap":
       return beat(defaults, targetStepCount, targetLength, [
@@ -491,31 +539,62 @@ export function generateLocalDrumBeat({
       ]);
     case "rap":
       return beat(defaults, targetStepCount, targetLength, [
-        row(roles.kick, "Kick", repeatPattern([1, 4, 7, 11, 15], 16, targetStepCount, 112)),
-        row(roles.snare ?? roles.clap, "Snare", repeatPattern([5, 13], 16, targetStepCount, 120)),
-        row(roles.closedHat, "Hat", repeatPattern([1, 3, 5, 7, 9, 11, 13, 15], 16, targetStepCount, 62, 9)),
-        row(rapTexture, rapTexture?.name ?? "Vinyl Perc", repeatPattern([11, 15], 16, targetStepCount, 58, 10)),
+        row(roles.kick, "Kick", repeatScaledPattern([1, 4, 7, 11, 15], 16, fourFourBarSteps, targetStepCount, 112)),
+        row(roles.snare ?? roles.clap, "Snare", repeatScaledPattern([5, 13], 16, fourFourBarSteps, targetStepCount, 120)),
+        row(roles.closedHat, "Hat", repeatScaledPattern([1, 3, 5, 7, 9, 11, 13, 15], 16, fourFourBarSteps, targetStepCount, 62, 9)),
+        row(rapTexture, rapTexture?.name ?? "Vinyl Perc", repeatScaledPattern([11, 15], 16, fourFourBarSteps, targetStepCount, 58, 10)),
       ]);
     case "pop":
       return beat(defaults, targetStepCount, targetLength, [
-        row(roles.kick, "Kick", repeatPattern([1, 7, 9, 15], 16, targetStepCount, 116)),
-        row(roles.clap ?? roles.snare, "Clap", repeatPattern([5, 13], 16, targetStepCount, 112)),
-        row(roles.closedHat, "Hat", repeatPattern([1, 3, 5, 7, 9, 11, 13, 15], 16, targetStepCount, 66, 4)),
-        row(roles.shaker ?? roles.tambourine ?? roles.crash, "Shaker", repeatPattern([3, 7, 11, 15], 16, targetStepCount, 58, 5)),
+        row(roles.kick, "Kick", repeatScaledPattern([1, 7, 9, 15], 16, fourFourBarSteps, targetStepCount, 116)),
+        row(roles.clap ?? roles.snare, "Clap", repeatScaledPattern([5, 13], 16, fourFourBarSteps, targetStepCount, 112)),
+        row(roles.closedHat, "Hat", repeatScaledPattern([1, 3, 5, 7, 9, 11, 13, 15], 16, fourFourBarSteps, targetStepCount, 66, 4)),
+        row(roles.shaker ?? roles.tambourine ?? roles.crash, "Shaker", repeatScaledPattern([3, 7, 11, 15], 16, fourFourBarSteps, targetStepCount, 58, 5)),
       ]);
     case "funk":
       return beat(defaults, targetStepCount, targetLength, [
-        row(roles.kick, "Kick", repeatPattern([1, 4, 7, 11, 15], 16, targetStepCount, 104).map(ghostSome)),
-        row(roles.snare, "Snare", repeatPattern([5, 8, 12, 13, 16], 16, targetStepCount, 92).map(ghostSome)),
-        row(roles.closedHat, "Hat", repeatPattern([1, 3, 5, 7, 9, 11, 13, 15], 16, targetStepCount, 64, 12)),
-        row(roles.openHat, "Open Hat", repeatPattern([15], 16, targetStepCount, 58, 14)),
+        row(roles.kick, "Kick", repeatScaledPattern([1, 4, 7, 11, 15], 16, fourFourBarSteps, targetStepCount, 104).map(ghostSome)),
+        row(roles.snare, "Snare", repeatScaledPattern([5, 8, 12, 13, 16], 16, fourFourBarSteps, targetStepCount, 92).map(ghostSome)),
+        row(roles.closedHat, "Hat", repeatScaledPattern([1, 3, 5, 7, 9, 11, 13, 15], 16, fourFourBarSteps, targetStepCount, 64, 12)),
+        row(roles.openHat, "Open Hat", repeatScaledPattern([15], 16, fourFourBarSteps, targetStepCount, 58, 14)),
       ]);
+    case "jazz":
+      return beat(defaults, targetStepCount, targetLength, [
+        row(roles.ride ?? roles.closedHat, "Jazz Ride", repeatScaledPattern([1, 5, 7, 9, 13, 15], 16, fourFourBarSteps, targetStepCount, 82, 10)),
+        row(roles.kick, "Feathered Kick", repeatScaledPattern([1, 5, 9, 13], 16, fourFourBarSteps, targetStepCount, 54, 4)),
+        row(roles.closedHat ?? roles.openHat, "Hi-Hat Foot", repeatScaledPattern([5, 13], 16, fourFourBarSteps, targetStepCount, 68, 8)),
+        row(roles.snare ?? roles.rim, "Brush Comp", repeatScaledPattern([5, 8, 12, 13, 16], 16, fourFourBarSteps, targetStepCount, 74, 12).map(ghostSome)),
+      ]);
+    case "orchestral": {
+      const structuralBass = downbeats
+        .filter((_, index) => index % 2 === 0)
+        .map((step, index) => hit(step, Math.min(122, 76 + index * 7)));
+      const snareMotion = Array.from(meter.fillerSteps)
+        .filter((step) => step % Math.max(1, meter.beatUnitSteps) === Math.max(1, Math.floor(meter.beatUnitSteps / 2)))
+        .filter((_, index) => index % 2 === 0)
+        .map((step, index) => hit(step + 1, 38 + (index % 4) * 8, index % 2 ? 8 : -5));
+      const tomResponse = downbeats
+        .filter((_, index) => index % 2 === 1)
+        .map((step, index) => hit(Math.min(targetStepCount, step + Math.max(1, Math.floor(meter.beatUnitSteps / 2))), 48 + index * 5, 6));
+      if (tomResponse.length === 0 && targetStepCount > meter.beatUnitSteps) {
+        tomResponse.push(hit(
+          Math.max(2, targetStepCount - Math.max(1, Math.floor(meter.beatUnitSteps / 2))),
+          58,
+          6,
+        ));
+      }
+      return beat(defaults, targetStepCount, targetLength, [
+        row(roles.kick, "Concert Bass Drum", structuralBass),
+        row(roles.snare, "Soft Snare Ostinato", snareMotion),
+        row(roles.midTom ?? roles.lowTom ?? roles.highTom, "Tom Response", tomResponse),
+      ]);
+    }
     case "rock":
     default:
       return beat(defaults, targetStepCount, targetLength, [
-        row(roles.kick, "Kick", withDownbeatAccents(repeatPattern([1, 9], 16, targetStepCount, 112), downbeats)),
-        row(roles.snare, "Snare", repeatPattern([5, 13], 16, targetStepCount, 124)),
-        row(rockHat, rockHat?.name ?? "Hat", repeatPattern([1, 3, 5, 7, 9, 11, 13, 15], 16, targetStepCount, 70, 3)),
+        row(roles.kick, "Kick", withDownbeatAccents(repeatScaledPattern([1, 9], 16, fourFourBarSteps, targetStepCount, 112), downbeats)),
+        row(roles.snare, "Snare", repeatScaledPattern([5, 13], 16, fourFourBarSteps, targetStepCount, 124)),
+        row(rockHat, rockHat?.name ?? "Hat", repeatScaledPattern([1, 3, 5, 7, 9, 11, 13, 15], 16, fourFourBarSteps, targetStepCount, 70, 3)),
         row(rockAccent, rockAccent?.name ?? "Crash", phraseCrashes.map((step) => hit(step, 108))),
       ]);
   }
@@ -537,13 +616,13 @@ export function generateLocalDrumBeat({
       rnd,
       arrangement,
     });
-    const polishedRows = shapeLikeDrummer(
+    const polishedRows = enforceAudibleVelocityFloor(shapeLikeDrummer(
       humanizeRows(enrichedRows.filter((candidate) => candidate.instrumentId || candidate.steps.some(Boolean)), nextStepCount, meter, rnd),
       nextStepCount,
       meter,
       genre,
       rnd,
-    );
+    ), meter, genre);
     return {
       rows: spaceRowsLikeDrummer(
         polishedRows,
@@ -562,6 +641,117 @@ export function generateLocalDrumBeat({
   }
 }
 
+function enforceAudibleVelocityFloor(rows: DrumRow[], meter: MeterProfile, genre: DrumGenre): DrumRow[] {
+  return rows.map((row) => {
+    const lower = row.name.toLowerCase();
+    const isKick = isKickRowName(lower);
+    const isBackbeat = lower.includes("snare") || lower.includes("rim");
+    const isTom = lower.includes("tom");
+    const baseFloor = genre === "orchestral"
+      ? (isKick ? 52 : isBackbeat ? 48 : isTom ? 46 : 42)
+      : (isKick ? 50 : isBackbeat ? 46 : 42);
+    return {
+      ...row,
+      steps: row.steps.map((step, index) => {
+        if (!step || typeof step !== "object") return step;
+        const accentFloor = meter.strongSteps.has(index)
+          ? (isKick ? 88 : 72)
+          : meter.secondarySteps.has(index)
+            ? (isKick ? 66 : 58)
+            : baseFloor;
+        return {
+          ...step,
+          velocity: Math.max(accentFloor, step.velocity ?? DEFAULT_DRUM_VELOCITY),
+        };
+      }),
+    };
+  });
+}
+
+/**
+ * Makes a restrained local variation of the pattern already in the editor.
+ * Instrument assignments and the number of rows stay intact; only timing and
+ * expression change. This keeps Remix useful without turning it into a second
+ * genre/generation workflow.
+ */
+export function remixDrumBeat({
+  rows,
+  stepCount,
+  lengthBeats,
+  speed,
+  swingPercent,
+  defaultPitchHz,
+  variationSeed,
+}: RemixDrumBeatOptions): GeneratedDrumBeat {
+  const count = Math.max(1, Math.min(DRUM_MAX_STEPS, Math.round(stepCount)));
+  const rnd = seededRandom((variationSeed ?? Date.now()) + count * 97 + rows.length * 31);
+  const remixedRows = rows.map((sourceRow) => {
+    const cells = Array.from({ length: count }, (_, index) => normalizeDrumCell(sourceRow.steps[index]));
+    const hitIndices = cells.flatMap((cell, index) => cell.on ? [index] : []);
+    if (hitIndices.length === 0) return { ...sourceRow, steps: cells };
+
+    const name = sourceRow.name.toLowerCase();
+    const isCymbalAccent = /crash|cymbal/.test(name);
+    const isTexture = /hat|ride|shaker|tamb|brush|perc|tom|break/.test(name);
+    const isBackbone = /kick|bass drum|snare|clap|rim/.test(name);
+
+    if (isCymbalAccent) {
+      // A repeated segment must not announce every loop with a cymbal crash.
+      if (cells[0]?.on) {
+        const opening = cells[0];
+        cells[0] = { ...opening, on: false };
+        const destination = Math.max(1, count - Math.max(1, Math.round(speed / 2)));
+        if (!cells[destination]?.on)
+          cells[destination] = { ...opening, on: true, velocity: Math.min(104, opening.velocity ?? 88) };
+      }
+    } else if (isTexture && count > 2) {
+      const offset = rnd() > 0.5 ? 1 : -1;
+      const rotated = cells.map((cell) => ({ ...cell, on: false }));
+      for (const index of hitIndices) {
+        const destination = (index + offset + count) % count;
+        rotated[destination] = {
+          ...cells[index],
+          on: true,
+          velocity: varyVelocity(cells[index].velocity, rnd, 10),
+          leanPercent: varyLean(cells[index].leanPercent, rnd, 8),
+        };
+      }
+      return { ...sourceRow, steps: rotated };
+    } else {
+      const mutable = hitIndices.filter((index) => index !== 0);
+      const chosen = mutable[Math.floor(rnd() * mutable.length)] ?? hitIndices[0];
+      const cell = cells[chosen];
+      cells[chosen] = {
+        ...cell,
+        velocity: varyVelocity(cell.velocity, rnd, isBackbone ? 8 : 12),
+        leanPercent: varyLean(cell.leanPercent, rnd, isBackbone ? 5 : 9),
+      };
+    }
+
+    return { ...sourceRow, steps: cells };
+  });
+
+  return {
+    rows: remixedRows,
+    stepCount: count,
+    lengthBeats,
+    speed,
+    swingPercent,
+    defaultPitchHz,
+    source: "local",
+  };
+}
+
+function varyVelocity(value: number | undefined, rnd: () => number, range: number): number {
+  const base = value ?? DEFAULT_DRUM_VELOCITY;
+  return Math.max(1, Math.min(127, Math.round(base + (rnd() - 0.5) * range * 2)));
+}
+
+function varyLean(value: number | undefined, rnd: () => number, range: number): number {
+  const base = value ?? 0;
+  return Math.max(-50, Math.min(50, Math.round(base + (rnd() - 0.5) * range * 2)));
+}
+
 function varyDrumSpeed(genre: DrumGenre, speed: DrumSpeed, norm: number, phraseBeats: number, rnd: () => number): DrumSpeed {
   if (norm < 0.55) return speed;
   const phraseCap = speedCapForPhrase(phraseBeats);
@@ -578,7 +768,7 @@ function varyDrumSpeed(genre: DrumGenre, speed: DrumSpeed, norm: number, phraseB
 }
 
 function dynamicSwing(base: number, genre: DrumGenre, arrangement: DrumArrangementProfile, rnd: () => number): number {
-  const genreWindow = genre === "trap" || genre === "house" ? 4 : genre === "rock" || genre === "pop" ? 6 : genre === "breakcore" ? 10 : 14;
+  const genreWindow = genre === "orchestral" ? 2 : genre === "trap" || genre === "house" ? 4 : genre === "rock" || genre === "pop" ? 6 : genre === "breakcore" ? 10 : 14;
   const texturePush = arrangement.texture === "tight" ? -2 : arrangement.texture === "busy" || arrangement.texture === "broken" ? 3 : arrangement.texture === "wide" ? 2 : -1;
   const syncPush = Math.round((arrangement.syncopation - 0.5) * 8);
   return Math.max(0, Math.min(100, Math.round(base + texturePush + syncPush + (rnd() - 0.5) * genreWindow)));
@@ -747,13 +937,13 @@ function indexInstruments(instruments: Instrument[]): Record<DrumRole, Instrumen
   };
   return {
     breakLoop: pick(/\bamen\b/i, /\bthink\b/i, /\bbreakbeat\b/i, /\bbreak\b/i, /\bloop\b/i),
-    kick: pick(/\bkick\b/i),
+    kick: pick(/\bkick\b/i, /\bbass drum\b/i),
     subKick: pick(/\bsub kick\b/i, /\b808\b/i),
     snare: pick(/\bsnare\b/i),
     clap: pick(/\bclap\b/i),
     rim: pick(/\brim\b/i),
-    closedHat: pick(/\bclosed hat\b/i, /\bhat\b/i),
-    openHat: pick(/\bopen hat\b/i),
+    closedHat: pick(/\bclosed (?:hi[- ]?)?hat\b/i, /\bhat\b/i),
+    openHat: pick(/\bopen (?:hi[- ]?)?hat\b/i),
     ride: pick(/\bride\b/i),
     crash: pick(/\bcrash\b/i),
     lowTom: pick(/\blow tom\b/i, /\btom-l\b/i),
@@ -839,7 +1029,7 @@ function addArrangementRows(rows: DrumRow[], opts: FitRowsOptions): DrumRow[] {
   };
 
   const phraseEnd = Math.max(1, opts.stepCount - Math.max(1, Math.round(opts.meter.beatUnitSteps / 2)));
-  if (!hasNamed(/crash/i)) {
+  if (opts.genre !== "orchestral" && !hasNamed(/crash/i)) {
     maybeAdd(opts.roles.crash, "Crash", [hit(1, 96), hit(phraseEnd, 72)], opts.arrangement.texture === "wide" ? 0.72 : 0.28 + opts.arrangement.fillRate * 0.32);
   }
   if (!hasNamed(/shaker|tamb/i)) {
@@ -894,19 +1084,28 @@ function addArrangementRows(rows: DrumRow[], opts: FitRowsOptions): DrumRow[] {
   }
   while (next.length < opts.targetRows) {
     const usedNames = new Set(next.map((candidate) => candidate.name.toLowerCase()));
-    const fallback = [
-      opts.roles.shaker,
-      opts.roles.tambourine,
-      opts.roles.rim,
-      opts.roles.openHat,
-      opts.roles.ride,
-      opts.roles.crash,
-      opts.roles.lowTom,
-      opts.roles.midTom,
-      opts.roles.highTom,
-      opts.roles.cowbell,
-      opts.roles.percussion,
-    ].find((instrument) => instrument && !usedNames.has(instrument.name.toLowerCase()));
+    const fallbackCandidates = opts.genre === "orchestral"
+      ? [
+          opts.roles.lowTom,
+          opts.roles.midTom,
+          opts.roles.highTom,
+          opts.roles.rim,
+          opts.roles.percussion,
+        ]
+      : [
+          opts.roles.shaker,
+          opts.roles.tambourine,
+          opts.roles.rim,
+          opts.roles.openHat,
+          opts.roles.ride,
+          opts.roles.crash,
+          opts.roles.lowTom,
+          opts.roles.midTom,
+          opts.roles.highTom,
+          opts.roles.cowbell,
+          opts.roles.percussion,
+        ];
+    const fallback = fallbackCandidates.find((instrument) => instrument && !usedNames.has(instrument.name.toLowerCase()));
     const name = fallback?.name ?? `Texture ${next.length + 1}`;
     next.push(row(fallback, name, sparseTextureHits(opts.stepCount, opts.meter, opts.rnd)));
   }
@@ -916,7 +1115,7 @@ function addArrangementRows(rows: DrumRow[], opts: FitRowsOptions): DrumRow[] {
 function mutateRowPattern(row: DrumRow, stepCount: number, meter: MeterProfile, arrangement: DrumArrangementProfile, rnd: () => number): DrumStep[] {
   const lower = row.name.toLowerCase();
   const steps = normalizeSteps(row.steps, stepCount);
-  const isKick = lower.includes("kick");
+  const isKick = isKickRowName(lower);
   const isBackbeat = lower.includes("snare") || lower.includes("clap") || lower.includes("rim");
   const isHat = lower.includes("hat") || lower.includes("ride") || lower.includes("shaker") || lower.includes("tambourine");
   const isFill = lower.includes("tom") || lower.includes("crash") || lower.includes("perc") || lower.includes("cowbell") || lower.includes("guiro");
@@ -983,7 +1182,7 @@ function sparseTextureHits(stepCount: number, meter: MeterProfile, rnd: () => nu
 function tuneRowDensity(row: DrumRow, stepCount: number, density: number, meter: MeterProfile, rnd: () => number): DrumStep[] {
   const lower = row.name.toLowerCase();
   const steps = normalizeSteps(row.steps, stepCount);
-  const isKick = lower.includes("kick");
+  const isKick = isKickRowName(lower);
   const isBackbeat = lower.includes("snare") || lower.includes("clap") || lower.includes("rim");
   const isHat = lower.includes("hat") || lower.includes("ride") || lower.includes("tambourine");
   const isTexture = lower.includes("tom") || lower.includes("cowbell") || lower.includes("guiro") || lower.includes("crash");
@@ -1028,7 +1227,7 @@ function limitRows(rows: DrumRow[], targetRows: number): DrumRow[] {
 
 function rowPriority(row: DrumRow): number {
   const lower = row.name.toLowerCase();
-  if (lower.includes("kick")) return 100;
+  if (isKickRowName(lower)) return 100;
   if (lower.includes("snare") || lower.includes("clap") || lower.includes("rim")) return 92;
   if (lower.includes("hat")) return 82;
   if (lower.includes("ride")) return 66;
@@ -1054,7 +1253,7 @@ function humanizeRows(rows: DrumRow[], stepCount: number, meter: MeterProfile, r
       };
     });
 
-    const chance = lower.includes("kick") ? 0.22 : lower.includes("snare") || lower.includes("rim") ? 0.12 : lower.includes("hat") ? 0.18 : 0.06;
+    const chance = isKickRowName(lower) ? 0.22 : lower.includes("snare") || lower.includes("rim") ? 0.12 : lower.includes("hat") ? 0.18 : 0.06;
     const additions = Math.max(1, Math.floor(stepCount / 16));
     for (let i = 0; i < additions; i++) {
       if (rnd() > chance) continue;
@@ -1075,13 +1274,13 @@ function shapeLikeDrummer(rows: DrumRow[], stepCount: number, meter: MeterProfil
   return rows.map((row) => {
     const lower = row.name.toLowerCase();
     const steps = normalizeSteps(row.steps, stepCount);
-    const isKick = lower.includes("kick");
+    const isKick = isKickRowName(lower);
     const isBackbeat = lower.includes("snare") || lower.includes("clap") || lower.includes("rim");
     const isHat = lower.includes("hat") || lower.includes("ride") || lower.includes("tambourine");
     const isTexture = lower.includes("tom") || lower.includes("cowbell") || lower.includes("guiro");
 
     meter.strongSteps.forEach((index) => {
-      if (isKick && genre !== "reggae" && !steps[index] && rnd() > 0.25) {
+      if (isKick && genre !== "reggae" && genre !== "orchestral" && !steps[index] && rnd() > 0.25) {
         steps[index] = { on: true, velocity: 112 + Math.round(rnd() * 12) };
       } else if (steps[index] && typeof steps[index] === "object") {
         steps[index] = { ...steps[index], velocity: Math.min(127, (steps[index].velocity ?? DEFAULT_DRUM_VELOCITY) + 10) };
@@ -1164,36 +1363,43 @@ function isProtectedRowAnchor(row: DrumRow, index: number, meter: MeterProfile):
   const beat2 = meter.beatUnitSteps;
   const beat3 = meter.beatUnitSteps * 2;
   const beat4 = meter.beatUnitSteps * 3;
-  if (lower.includes("kick")) return inBar === 0 || inBar === beat3;
+  if (isKickRowName(lower)) return inBar === 0 || inBar === beat3;
   if (lower.includes("snare") || lower.includes("clap") || lower.includes("rim")) {
     return inBar === beat2 || inBar === beat3 || inBar === beat4;
   }
-  if (lower.includes("open hat")) {
+  if (/open (?:hi[- ]?)?hat/.test(lower)) {
     return inBar === Math.floor(meter.beatUnitSteps / 2)
       || inBar === beat2 + Math.floor(meter.beatUnitSteps / 2)
       || inBar === beat3 + Math.floor(meter.beatUnitSteps / 2)
       || inBar === beat4 + Math.floor(meter.beatUnitSteps / 2);
   }
+  if (/closed (?:hi[- ]?)?hat/.test(lower)) return inBar === beat2 || inBar === beat4;
   return false;
 }
 
 function rowHitCap(row: DrumRow, stepCount: number, density: number): number {
   const lower = row.name.toLowerCase();
   const scale = Math.max(0, Math.min(1, (density - 0.55) / 1.2));
-  const ratio = lower.includes("kick")
+  const ratio = isKickRowName(lower)
     ? 0.26 + scale * 0.04
     : lower.includes("snare") || lower.includes("clap") || lower.includes("rim")
       ? 0.16 + scale * 0.04
       : lower.includes("hat")
         ? 0.48 + scale * 0.12
-        : lower.includes("ride") || lower.includes("tambourine")
-          ? 0.14 + scale * 0.12
-          : lower.includes("tom")
-            ? 0.08 + scale * 0.10
-            : lower.includes("crash")
-              ? 0.04 + scale * 0.05
-              : 0.08 + scale * 0.08;
+        : lower.includes("ride")
+          ? 0.38 + scale * 0.12
+          : lower.includes("tambourine")
+            ? 0.14 + scale * 0.12
+            : lower.includes("tom")
+              ? 0.08 + scale * 0.10
+              : lower.includes("crash")
+                ? 0.04 + scale * 0.05
+                : 0.08 + scale * 0.08;
   return Math.max(1, Math.min(stepCount, Math.round(stepCount * ratio)));
+}
+
+function isKickRowName(lowerName: string): boolean {
+  return lowerName.includes("kick") || lowerName.includes("bass drum");
 }
 
 function removalScore(row: DrumRow, index: number, meter: MeterProfile, rnd: () => number): number {

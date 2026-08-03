@@ -1,0 +1,30 @@
+# Generated from Beat's verified macOS Python 3.11 homr environment.
+# Both OpenCV distributions are kept on the same supported 4.14 build because
+# homr requires the headless distribution while rapidocr currently declares
+# the full distribution. This avoids loading unsupported OpenCV 5 code.
+antlr4-python3-runtime==4.9.3
+certifi==2026.7.22
+charset-normalizer==3.4.9
+colorlog==6.12.0
+flatbuffers==25.12.19
+homr==0.7.0
+idna==3.18
+musicxml==1.4
+numpy==2.4.6
+omegaconf==2.3.1
+onnxruntime==1.28.0
+opencv-python==4.14.0.94
+opencv-python-headless==4.14.0.94
+packaging==26.2
+pillow==12.3.0
+protobuf==7.35.1
+pyclipper==1.4.0
+PyYAML==6.0.3
+rapidocr==3.9.2
+requests==2.34.2
+shapely==2.1.2
+six==1.17.0
+tqdm==4.70.0
+types-Pillow==10.2.0.20240822
+typing-extensions==4.16.0
+urllib3==2.7.0

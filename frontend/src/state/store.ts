@@ -14,8 +14,17 @@ import {
 } from "./instrumentSongAssociations";
 import { createAurumTestInstruments } from "./aurumTestBank";
 import { createSalamanderCompactGrand } from "./factoryPiano";
+import { createFactoryScoreSamplerBank } from "./factoryScoreSamplers";
 import { FACTORY_SYNTH_PRESETS, synthDraftToInstrumentPatch } from "./synthStore";
 import { audioBusExists, canSetAudioBusOutput, canSetAudioBusSend } from "./audioBusRouting";
+import {
+  createSegmentEditOperation,
+  hasAppliedProjectOperation,
+  markProjectOperationApplied,
+  publishProjectOperation,
+  type SegmentEditProjectOperation,
+} from "../collaboration/projectOperations";
+import { normalizeLibraryMetadata, touchLibraryMetadata } from "./libraryMetadata";
 import { AUDIO_BUS_SCHEMA_VERSION } from "./types";
 import type { BeatProjectAsset, BeatProjectIntegrityReport, ProjectSidecarCleanupReport, RecentProjectEntry } from "../ipc/schema";
 import type {
@@ -97,7 +106,7 @@ interface ProjectSlice {
   removeSegment: (segmentId: Id) => void;
   moveSegment: (segmentId: Id, toTrackId: Id, toStartBeat: Beats) => void;
   updateSegment: (segmentId: Id, patch: Partial<Segment>) => void;
-  applySegmentEditCommand: (command: SegmentEditCommand) => Id[];
+  applySegmentEditCommand: (command: SegmentEditCommand, operation?: SegmentEditProjectOperation) => Id[];
   /** Set repeat count; rest of track is filled until next segment. */
   setSegmentRepeats: (segmentId: Id, repeats: number) => void;
 
@@ -133,12 +142,14 @@ export type SegmentEditCommand =
       segments: Array<Segment & { name?: string }>;
       offsetBeats?: Beats;
       targetTrackId?: Id;
+      createdSegmentIds?: Id[];
     }
   | {
       kind: "paste";
       segments: Array<Segment & { name?: string }>;
       startBeat?: Beats;
       targetTrackId?: Id;
+      createdSegmentIds?: Id[];
     }
   | {
       kind: "delete";
@@ -175,6 +186,7 @@ export type SegmentEditCommand =
       kind: "split";
       segmentId: Id;
       splitBeat: Beats;
+      createdSegmentId?: Id;
     }
   | {
       kind: "trim";
@@ -203,7 +215,7 @@ export type MemoryCachePreset = "conservative" | "balanced" | "performance";
 export type StartupProjectBehavior = "home" | "restore-last" | "new-project";
 export type AudioLatencyMode = "reported" | "low" | "balanced" | "safe";
 export type ThemeContrastLevel = "low" | "normal" | "high";
-export type ThemeMode = "dark" | "light";
+export type ThemeMode = "dark" | "light" | "mellow";
 
 interface SettingsSnapshot {
   resizeSnapSeconds: number;
@@ -337,7 +349,7 @@ function normalizeThemeContrastLevel(value: ThemeContrastLevel | undefined): The
 }
 
 function normalizeThemeMode(value: ThemeMode | undefined): ThemeMode {
-  return value === "light" || value === "dark" ? value : DEFAULT_SETTINGS.themeMode;
+  return value === "light" || value === "dark" || value === "mellow" ? value : DEFAULT_SETTINGS.themeMode;
 }
 
 function normalizeSampleRate(value: number | undefined): number {
@@ -423,7 +435,7 @@ let soloAutoMutedTrackIds = new Set<Id>();
 
 export const useProjectStore = create<ProjectSlice>()(
   temporal(
-    immer((set) => ({
+    immer((set, get) => ({
       project: createEmptyProject(),
 
       addTrack: (patch) => {
@@ -829,16 +841,17 @@ export const useProjectStore = create<ProjectSlice>()(
           }
         }),
 
-      applySegmentEditCommand: (command) => {
+      applySegmentEditCommand: (requestedCommand, suppliedOperation) => {
+        const operation = suppliedOperation ?? createSegmentEditOperation(get().project.id, requestedCommand);
+        if (hasAppliedProjectOperation(operation.operationId)) return [];
+        const command = operation.payload.command;
         const createdIds: Id[] = [];
         if (command.kind === "duplicate" || command.kind === "paste") {
-          for (let index = 0; index < command.segments.length; index++) {
-            createdIds.push(nanoid());
-          }
-        } else if (command.kind === "group" && !command.groupId) {
-          createdIds.push(nanoid());
+          createdIds.push(...(command.createdSegmentIds ?? []));
+        } else if (command.kind === "group" && command.groupId) {
+          createdIds.push(command.groupId);
         } else if (command.kind === "split") {
-          createdIds.push(nanoid());
+          if (command.createdSegmentId) createdIds.push(command.createdSegmentId);
         }
 
         set((s) => {
@@ -1098,6 +1111,9 @@ export const useProjectStore = create<ProjectSlice>()(
           }
         });
 
+        markProjectOperationApplied(operation);
+        if (!suppliedOperation) publishProjectOperation(operation);
+
         return createdIds;
       },
 
@@ -1271,8 +1287,13 @@ function applySegmentWindow(
   const oldStartBeat = origin?.startBeat ?? segment.startBeat;
   const oldLengthBeats = origin?.lengthBeats ?? segment.lengthBeats;
   const oldSourceStartBeat = origin?.sourceStartBeat ?? segment.sourceStartBeat ?? 0;
-  const newStartBeat = Math.max(0, nextStartBeat);
+  const requestedStartBeat = Math.max(0, nextStartBeat);
   const newLengthBeats = Math.max(MIN_SEGMENT_LENGTH_BEATS, nextLengthBeats);
+  // Drum grids are fixed-time sources. Shortening either edge is an end trim,
+  // never a time stretch or a request to discard the opening of the groove.
+  const newStartBeat = segment.payload.kind === "drum" && newLengthBeats < oldLengthBeats
+    ? oldStartBeat
+    : requestedStartBeat;
   const localStart = Math.max(0, newStartBeat - oldStartBeat);
   if (origin?.payload) segment.payload = cloneProjectData(origin.payload);
   if (segment.payload.kind === "midi" || segment.payload.kind === "mixed")
@@ -1280,7 +1301,7 @@ function applySegmentWindow(
   else if (segment.payload.kind === "drumpad")
     segment.payload.hits = clipMidiNotesToWindow(segment.payload.hits, localStart, newLengthBeats);
   if (segment.payload.kind === "drum" && segment.payload.sourceLengthBeats == null) {
-    segment.payload.sourceLengthBeats = oldLengthBeats;
+    segment.payload.sourceLengthBeats = Math.max(1, segment.payload.stepCount);
   }
   segment.startBeat = newStartBeat;
   segment.lengthBeats = newLengthBeats;
@@ -1676,9 +1697,9 @@ function createRecentProject(project: Partial<RecentProjectEntry> & { path: stri
 
 function normalizeTimestampMs(value: unknown): number {
   const timestamp = typeof value === "number" ? value : Number(value);
-  if (!Number.isFinite(timestamp) || timestamp <= 0) return Date.now();
+  if (!Number.isFinite(timestamp) || timestamp <= 0) return 0;
   const timestampMs = timestamp < 100_000_000_000 ? timestamp * 1000 : timestamp;
-  return timestampMs >= Date.UTC(2024, 0, 1) ? timestampMs : Date.now();
+  return timestampMs >= Date.UTC(2024, 0, 1) ? timestampMs : 0;
 }
 
 function normalizeRecentProjects(projects: unknown[]): RecentProjectEntry[] {
@@ -1690,7 +1711,10 @@ function normalizeRecentProjects(projects: unknown[]): RecentProjectEntry[] {
     const normalized = createRecentProject(candidate as Partial<RecentProjectEntry> & { path: string });
     if (!unique.some((existing) => existing.path === normalized.path)) unique.push(normalized);
   }
-  return unique;
+  return unique.sort((left, right) => (
+    right.openedAt - left.openedAt
+    || left.path.localeCompare(right.path, undefined, { sensitivity: "base" })
+  ));
 }
 
 function normalizeRecentFilePaths(paths: unknown[]): string[] {
@@ -1832,7 +1856,7 @@ export const usePluginStore = create<PluginLibrarySlice>()(
         id: PLUGIN_BRIDGE_ID,
         name: "Aether Bridge Host",
         vendor: "Beat",
-        version: "0.3.1",
+        version: "0.3.2",
         kind: "synth",
         format: "bridge",
         status: "available",
@@ -2252,6 +2276,8 @@ function withOriginal(instrument: Instrument): Instrument {
 
 function normalizeInstrument(instrument: Instrument): Instrument {
   const source = instrument.source ?? inferInstrumentSource(instrument);
+  const createdAt = instrument.createdAt ?? source.importedAt ?? Date.now();
+  const updatedAt = Math.max(createdAt, instrument.updatedAt ?? createdAt);
   const sampleMap = normalizeSampleMap(instrument.sampleMap);
   const setId = isDecentSamplerInstancedInstrument(instrument, source)
     && (!instrument.setId || instrument.setId === USER_INSTRUMENT_SET_ID)
@@ -2259,6 +2285,16 @@ function normalizeInstrument(instrument: Instrument): Instrument {
     : instrument.setId ?? (instrument.userCreated ? USER_INSTRUMENT_SET_ID : FACTORY_SYNTH_SET_ID);
   return {
     ...instrument,
+    createdAt,
+    updatedAt,
+    libraryMetadata: normalizeLibraryMetadata(instrument.libraryMetadata, {
+      factory: !instrument.userCreated,
+      createdAt,
+      updatedAt,
+      tags: instrument.descriptors,
+      license: source.license,
+      provenance: source.label,
+    }),
     pitchBendRangeSemitones: clampNumber(instrument.pitchBendRangeSemitones, 0, 24, 2),
     sampleMap,
     setId,
@@ -2438,18 +2474,28 @@ function inferInstrumentSource(instrument: Instrument): NonNullable<Instrument["
 
 function normalizeInstrumentSets(sets?: InstrumentSet[]): InstrumentSet[] {
   const defaults = defaultInstrumentSets();
-  if (!sets || sets.length === 0) return defaults;
+  if (!sets || sets.length === 0) {
+    return defaults.map((set) => ({
+      ...set,
+      libraryMetadata: normalizeLibraryMetadata(undefined, { factory: set.factory }),
+    }));
+  }
   const byId = new Map(defaults.map((set) => [set.id, set]));
   for (const set of sets) {
     const defaultSet = byId.get(set.id);
-    byId.set(
-      set.id,
+    const next =
       defaultSet?.factory
         ? { ...set, name: set.name.trim() || defaultSet.name, factory: true }
-        : set,
+        : set;
+    byId.set(
+      set.id,
+      { ...next, libraryMetadata: normalizeLibraryMetadata(next.libraryMetadata, { factory: next.factory }) },
     );
   }
-  return Array.from(byId.values());
+  return Array.from(byId.values()).map((set) => ({
+    ...set,
+    libraryMetadata: normalizeLibraryMetadata(set.libraryMetadata, { factory: set.factory }),
+  }));
 }
 
 export const useInstrumentStore = create<InstrumentLibrarySlice>()(
@@ -2510,6 +2556,13 @@ export const useInstrumentStore = create<InstrumentLibrarySlice>()(
           }
           Object.assign(i, nextPatch);
           i.updatedAt = Date.now();
+          i.libraryMetadata = touchLibraryMetadata(i.libraryMetadata, {
+            factory: !i.userCreated,
+            createdAt: i.createdAt,
+            tags: i.descriptors,
+            license: i.source?.license,
+            provenance: i.source?.label,
+          });
           i.descriptors = characterizeInstrument(i);
         }
       }),
@@ -2528,6 +2581,14 @@ export const useInstrumentStore = create<InstrumentLibrarySlice>()(
         original: snapshotInstrument(src),
         parentIds: [src.id],
         descriptors: characterizeInstrument(src),
+        libraryMetadata: normalizeLibraryMetadata(undefined, {
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          forkedFromId: src.id,
+          provenance: `Derived from ${src.name}`,
+          tags: src.descriptors,
+          license: src.source?.license,
+        }),
       };
       set((s) => {
         s.instruments.push(copy);
@@ -2589,7 +2650,11 @@ export const useInstrumentStore = create<InstrumentLibrarySlice>()(
       const id = nanoid();
       set((s) => {
         const num = s.instrumentSets.filter((set) => !set.factory).length + 1;
-        s.instrumentSets.push({ id, name: name?.trim() || `Set ${num}` });
+        s.instrumentSets.push({
+          id,
+          name: name?.trim() || `Set ${num}`,
+          libraryMetadata: normalizeLibraryMetadata(undefined),
+        });
       });
       return id;
     },
@@ -2599,6 +2664,7 @@ export const useInstrumentStore = create<InstrumentLibrarySlice>()(
         const nextName = name.trim();
         if (!target || !nextName) return;
         target.name = nextName.slice(0, 48);
+        target.libraryMetadata = touchLibraryMetadata(target.libraryMetadata, { factory: target.factory });
       }),
     ungroupInstrumentSet: (id, targetSetId = USER_INSTRUMENT_SET_ID) =>
       set((s) => {
@@ -2706,6 +2772,7 @@ export const useInstrumentStore = create<InstrumentLibrarySlice>()(
 
       const seeds: Instrument[] = [
         withOriginal(createSalamanderCompactGrand(FACTORY_KEYS_SET_ID)),
+        ...createFactoryScoreSamplerBank(ORCHESTRA_SET_ID).map(withOriginal),
         withOriginal({
           id: nanoid(),
           name: "Basic Kick",
@@ -2975,6 +3042,13 @@ export const useInstrumentStore = create<InstrumentLibrarySlice>()(
         source: { kind: "derived", label: `Merged from ${a.name} and ${b.name}` },
         parentIds: [a.id, b.id],
         userCreated: true,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        libraryMetadata: normalizeLibraryMetadata(undefined, {
+          forkedFromId: a.id,
+          provenance: `Merged from ${a.name} and ${b.name}`,
+          tags: Array.from(new Set([...(a.descriptors ?? []), ...(b.descriptors ?? [])])),
+        }),
       };
       merged.original = snapshotInstrument(merged);
       set((s) => {

@@ -1,5 +1,5 @@
 import { stopTimelineAudio } from "../audio/timelineAudio";
-import { appAlert, appConfirm } from "../solid-ui";
+import { appAlert, appConfirm, appSaveConfirm } from "../solid-ui";
 import type { BeatProjectAsset, BeatProjectDocument, ProjectBackupEntry } from "../ipc/schema";
 import { isNative, send } from "../ipc/bridge";
 import { createEmptyProject, useDocumentStore, useInstrumentStore, useProjectStore, useTransportStore } from "../state/store";
@@ -186,8 +186,17 @@ export async function createNewDocument(): Promise<boolean> {
 
 export async function closeCurrentDocumentForHome(): Promise<boolean> {
   if (hasUnsavedOpenDocument()) {
-    const shouldClose = await appConfirm("Close the current project and go Home? Unsaved changes may be lost.");
-    if (!shouldClose) return false;
+    const projectName = useProjectStore.getState().project.name.trim() || "Untitled";
+    const choice = await appSaveConfirm(`Save changes to “${projectName}” before going Home?`);
+    if (choice === "cancel") return false;
+    if (choice === "save") {
+      try {
+        if (await saveCurrentDocument() !== "saved") return false;
+      } catch (error) {
+        await appAlert(error instanceof Error ? error.message : "The project could not be saved.", "Save Failed");
+        return false;
+      }
+    }
   }
   stopPlaybackForDocumentSwitch();
   useProjectStore.getState().loadProject(createEmptyProject());

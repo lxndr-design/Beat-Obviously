@@ -10,6 +10,7 @@ import {
   type MemoryCachePreset,
   type StartupProjectBehavior,
   type ThemeContrastLevel,
+  type ThemeMode,
 } from "../../state/store";
 import { createStoreSelector } from "../../solid-utils/store";
 import styles from "./PreferencesModal.module.css";
@@ -446,12 +447,13 @@ function ThemePreferences(props: ThemePreferencesProps) {
       <section class={styles.section}>
         <h3 class={styles.sectionTitle}>Theme</h3>
         <div class={styles.settingsGrid}>
-          <Toggle
-            className={styles.inlineToggle}
-            labelClassName={styles.gridToggleLabel}
-            label="Light mode"
-            checked={props.settings.themeMode === "light"}
-            onChange={(enabled) => props.settings.setThemeMode(enabled ? "light" : "dark")}
+          <RadioGroup
+            className={styles.themeRadio}
+            label="Color"
+            ariaLabel="Application color theme"
+            value={props.settings.themeMode}
+            options={THEME_MODE_OPTIONS}
+            onChange={props.settings.setThemeMode}
           />
           <FloatingSelect
             className={styles.fieldSelect}
@@ -466,7 +468,7 @@ function ThemePreferences(props: ThemePreferencesProps) {
           />
         </div>
         <p class={styles.hint}>
-          Normal keeps the current UI balance. Low pushes faint lines and surfaces closer to white. High restores more separation between subtle and strong UI states.
+          Dark always uses a black workspace, Light always uses off-white, and Mellow always uses graphite gray. Contrast changes only text, borders, grids, selections, and interaction states.
         </p>
       </section>
 
@@ -587,6 +589,11 @@ const CONTRAST_LEVEL_OPTIONS: Array<{ value: ThemeContrastLevel; label: string }
   { value: "low", label: "Low" },
   { value: "normal", label: "Normal" },
   { value: "high", label: "High" },
+];
+const THEME_MODE_OPTIONS: Array<{ value: ThemeMode; label: string }> = [
+  { value: "dark", label: "Dark" },
+  { value: "light", label: "Light" },
+  { value: "mellow", label: "Mellow" },
 ];
 const SAMPLE_RATE_OPTIONS = [8000, 11025, 16000, 22050, 32000, 44100, 48000, 88200, 96000, 192000].map((value) => ({
   value: String(value),

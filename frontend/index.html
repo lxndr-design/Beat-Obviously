@@ -1,11 +1,19 @@
 <!doctype html>
-<html lang="en" style="background: #000000;">
+<html lang="en" style="background: var(--beat-boot-bg, #000000);">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Beat</title>
+    <script>
+      try {
+        const storedTheme = JSON.parse(localStorage.getItem("beat.settings.v1") || "{}").themeMode;
+        document.documentElement.dataset.theme = storedTheme === "light" || storedTheme === "mellow" ? storedTheme : "dark";
+      } catch {
+        document.documentElement.dataset.theme = "dark";
+      }
+    </script>
   </head>
-  <body style="background: #000000;">
+  <body style="background: var(--beat-boot-bg, #000000);">
     <div
       id="beat-boot-splash"
       role="status"
@@ -17,9 +25,9 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        background: #000000;
-        color: #ffffff;
-        font-family: Arial, Helvetica, sans-serif;
+        background: var(--beat-boot-bg, #000000);
+        color: var(--beat-boot-fg, #ffffff);
+        font-family: Almarai, Arial, Helvetica, sans-serif;
       "
     >
       <div
@@ -32,8 +40,8 @@
           width: min(320px, calc(100vw - 32px));
           padding: 8px;
           box-sizing: border-box;
-          border: 1px solid rgba(255, 255, 255, 0.72);
-          background: #000000;
+          border: 1px solid var(--beat-boot-border, rgba(255, 255, 255, 0.72));
+          background: var(--beat-boot-bg, #000000);
         "
       >
         <div
@@ -46,8 +54,8 @@
             width: 32px;
             height: 32px;
             box-sizing: border-box;
-            border: 1px solid rgba(255, 255, 255, 0.72);
-            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid var(--beat-boot-border, rgba(255, 255, 255, 0.72));
+            background: var(--beat-boot-surface, rgba(255, 255, 255, 0.1));
             font-size: 18px;
             line-height: 1;
           "
@@ -73,14 +81,14 @@
             grid-area: bar;
             height: 2px;
             overflow: hidden;
-            background: rgba(255, 255, 255, 0.18);
+            background: var(--beat-boot-track, rgba(255, 255, 255, 0.18));
           "
         >
           <div
             style="
               width: 38%;
               height: 100%;
-              background: #ffffff;
+              background: var(--beat-boot-fg, #ffffff);
               animation: beat-boot-splash-slide 900ms ease-in-out infinite alternate;
             "
           ></div>
@@ -88,12 +96,47 @@
       </div>
     </div>
     <style>
+      @font-face {
+        font-family: "Almarai";
+        src: url("/assets/fonts/almarai-regular.ttf") format("truetype");
+        font-weight: 400;
+        font-style: normal;
+        font-display: swap;
+      }
+      @font-face {
+        font-family: "Almarai";
+        src: url("/assets/fonts/almarai-bold.ttf") format("truetype");
+        font-weight: 700;
+        font-style: normal;
+        font-display: swap;
+      }
+      :root {
+        --beat-boot-bg: #000000;
+        --beat-boot-fg: #ffffff;
+        --beat-boot-border: rgba(255, 255, 255, 0.72);
+        --beat-boot-surface: rgba(255, 255, 255, 0.1);
+        --beat-boot-track: rgba(255, 255, 255, 0.18);
+      }
+      html[data-theme="light"] {
+        --beat-boot-bg: #ffffff;
+        --beat-boot-fg: #000000;
+        --beat-boot-border: rgba(0, 0, 0, 0.72);
+        --beat-boot-surface: rgba(0, 0, 0, 0.08);
+        --beat-boot-track: rgba(0, 0, 0, 0.16);
+      }
+      html[data-theme="mellow"] {
+        --beat-boot-bg: #4a4a4a;
+        --beat-boot-fg: #f0f0f0;
+        --beat-boot-border: rgba(255, 255, 255, 0.62);
+        --beat-boot-surface: rgba(255, 255, 255, 0.08);
+        --beat-boot-track: rgba(255, 255, 255, 0.14);
+      }
       @keyframes beat-boot-splash-slide {
         from { transform: translateX(-75%); }
         to { transform: translateX(185%); }
       }
     </style>
-    <div id="root" style="background: #000000;"></div>
+    <div id="root" style="background: var(--beat-boot-bg, #000000);"></div>
     <script type="module" src="/src/main.solid.tsx"></script>
   </body>
 </html>

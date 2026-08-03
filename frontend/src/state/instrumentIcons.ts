@@ -6,6 +6,8 @@ export interface InstrumentIconOption {
   tags: string[];
 }
 
+const LEGACY_DRUM_ICON = ["ph", "drum"].join(":");
+
 export const INSTRUMENT_ICON_OPTIONS: InstrumentIconOption[] = [
   { icon: "ph:piano-keys", label: "Keys", tags: ["synth", "piano", "keyboard", "organ"] },
   { icon: "ph:waveform", label: "Waveform", tags: ["wavetable", "synth", "oscillator"] },
@@ -40,6 +42,7 @@ export const INSTRUMENT_ICON_OPTIONS: InstrumentIconOption[] = [
 ];
 
 export function instrumentIcon(instrument: Pick<Instrument, "icon" | "kind" | "name" | "waveform" | "sampleUrl" | "descriptors">): string {
+  if (instrument.icon === LEGACY_DRUM_ICON) return "ph:music-notes-simple";
   if (instrument.icon) return instrument.icon;
   const haystack = [
     instrument.name,

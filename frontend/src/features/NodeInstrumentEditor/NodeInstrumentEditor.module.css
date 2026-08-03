@@ -131,7 +131,7 @@
 
 .outputWaveform span {
   color: color-mix(in srgb, var(--color-fg) 58%, var(--color-bg));
-  font-family: var(--font-family-mono);
+  font-family: var(--font-family-base);
   font-size: var(--font-size-hint);
   line-height: 1;
 }

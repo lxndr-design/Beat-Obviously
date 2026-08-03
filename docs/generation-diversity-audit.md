@@ -76,46 +76,46 @@ Goal: measure divergence. Higher uniqueness and distance are better when the use
 ### rock
 
 - Unique fingerprints: 20
-- Rhythm pairwise distance: 0.717
+- Rhythm pairwise distance: 0.748
 - Rows: `{"min":3,"max":7,"avg":4.75}`
-- Hits: `{"min":7,"max":23,"avg":15.55}`
+- Hits: `{"min":10,"max":23,"avg":16.95}`
 - Speed: `{"min":3,"max":4,"avg":3.75}`
-- Swing: `{"min":45,"max":55,"avg":50.35}`
-- Velocity span: `{"min":74,"max":109,"avg":101.9}`
+- Swing: `{"min":45,"max":56,"avg":50.45}`
+- Velocity span: `{"min":85,"max":85,"avg":85}`
 - Unique row sets: 17
 - Most common row sets: `[{"value":"Crash Cymbal, Mid Tom, Open Hat, Punchy Kick, Snappy Snare","count":2},{"value":"Closed Hat, Crash Cymbal, Mid Tom, Punchy Kick, Snappy Snare","count":2},{"value":"Closed Hat, Crash Cymbal, Punchy Kick, Snappy Snare","count":2}]`
 - Flags: none
-- Examples: `[{"rows":[{"name":"Punchy Kick","hits":[1,5,8,9]},{"name":"Snappy Snare","hits":[5,7,13]},{"name":"Open Hat","hits":[1,3,5,7,8,9,11,13,15]},{"name":"Crash Cymbal","hits":[1]},{"name":"Mid Tom","hits":[1,3]}],"speed":4,"swingPercent":50},{"rows":[{"name":"Punchy Kick","hits":[1,9,16]},{"name":"Snappy Snare","hits":[5,9,13]},{"name":"Open Hat","hits":[1,3,5,7,8,9,11,13,15]},{"name":"Mid Tom","hits":[1,13]}],"speed":4,"swingPercent":53},{"rows":[{"name":"Punchy Kick","hits":[1,5,9]},{"name":"Snappy Snare","hits":[5,9,13]},{"name":"Closed Hat","hits":[1,3,5,7,9,11,13,15]},{"name":"Crash Cymbal","hits":[1,9]},{"name":"Mid Tom","hits":[11,16]}],"speed":4,"swingPercent":52}]`
+- Examples: `[{"rows":[{"name":"Punchy Kick","hits":[1,5,8,9]},{"name":"Snappy Snare","hits":[5,7,13]},{"name":"Open Hat","hits":[1,3,5,7,8,9,11,13,15]},{"name":"Crash Cymbal","hits":[1]},{"name":"Mid Tom","hits":[1,3]}],"speed":4,"swingPercent":50},{"rows":[{"name":"Punchy Kick","hits":[1,9,16]},{"name":"Snappy Snare","hits":[5,9,13]},{"name":"Open Hat","hits":[1,3,5,7,8,9,11,13,15]},{"name":"Mid Tom","hits":[1,13]}],"speed":4,"swingPercent":53},{"rows":[{"name":"Punchy Kick","hits":[1,5,9]},{"name":"Snappy Snare","hits":[5,9,13]},{"name":"Closed Hat","hits":[1,3,5,7,9,11,13,15]},{"name":"Crash Cymbal","hits":[1,9]},{"name":"Mid Tom","hits":[11,16]}],"speed":4,"swingPercent":50}]`
 
 
 ### pop
 
 - Unique fingerprints: 20
-- Rhythm pairwise distance: 0.552
+- Rhythm pairwise distance: 0.642
 - Rows: `{"min":3,"max":6,"avg":4.9}`
-- Hits: `{"min":12,"max":29,"avg":18.7}`
+- Hits: `{"min":14,"max":28,"avg":19.05}`
 - Speed: `{"min":3,"max":5,"avg":3.95}`
-- Swing: `{"min":45,"max":55,"avg":50.95}`
-- Velocity span: `{"min":95,"max":110,"avg":104.5}`
+- Swing: `{"min":45,"max":55,"avg":51.2}`
+- Velocity span: `{"min":85,"max":85,"avg":85}`
 - Unique row sets: 13
 - Most common row sets: `[{"value":"Analog Clap, Closed Hat, Crash Cymbal, Punchy Kick, Uploaded Pop Shaker","count":3},{"value":"Analog Clap, Closed Hat, Punchy Kick, Tambourine, Uploaded Pop Shaker","count":3},{"value":"Analog Clap, Closed Hat, Crash Cymbal, Mid Tom, Punchy Kick","count":2}]`
 - Flags: none
-- Examples: `[{"rows":[{"name":"Punchy Kick","hits":[1,7,9,15,17,18]},{"name":"Analog Clap","hits":[5,11,13]},{"name":"Closed Hat","hits":[1,3,5,7,9,11,13,15,17,19]},{"name":"Mid Tom","hits":[12,14]}],"speed":5,"swingPercent":49},{"rows":[{"name":"Punchy Kick","hits":[1,7,9,15,16]},{"name":"Analog Clap","hits":[5,9,13]},{"name":"Closed Hat","hits":[1,2,3,5,7,9,11,13,15]},{"name":"Uploaded Pop Shaker","hits":[13,15]},{"name":"Crash Cymbal","hits":[1]},{"name":"Mid Tom","hits":[11,14,16]}],"speed":4,"swingPercent":55},{"rows":[{"name":"Punchy Kick","hits":[1,7,9,15]},{"name":"Analog Clap","hits":[5,9,13]},{"name":"Closed Hat","hits":[1,3,5,7,9,11,13,15]},{"name":"Crash Cymbal","hits":[1]},{"name":"Mid Tom","hits":[8,14]}],"speed":4,"swingPercent":50}]`
+- Examples: `[{"rows":[{"name":"Punchy Kick","hits":[1,9,11,16,17,19]},{"name":"Analog Clap","hits":[6,11,16]},{"name":"Closed Hat","hits":[1,4,6,9,11,14,16,17,19,20]},{"name":"Mid Tom","hits":[9,17]}],"speed":5,"swingPercent":48},{"rows":[{"name":"Punchy Kick","hits":[1,7,9,15,16]},{"name":"Analog Clap","hits":[5,9,13]},{"name":"Closed Hat","hits":[1,3,5,7,9,11,13,14,15]},{"name":"Uploaded Pop Shaker","hits":[7,13]},{"name":"Crash Cymbal","hits":[1]},{"name":"Mid Tom","hits":[10,11,16]}],"speed":4,"swingPercent":52},{"rows":[{"name":"Punchy Kick","hits":[1,6,7,9]},{"name":"Analog Clap","hits":[5,9,13]},{"name":"Closed Hat","hits":[1,3,5,7,9,11,13,15]},{"name":"Crash Cymbal","hits":[1]},{"name":"Mid Tom","hits":[7,14]}],"speed":4,"swingPercent":49}]`
 
 
 ### rap
 
 - Unique fingerprints: 20
-- Rhythm pairwise distance: 0.603
+- Rhythm pairwise distance: 0.689
 - Rows: `{"min":3,"max":6,"avg":4.9}`
-- Hits: `{"min":10,"max":31,"avg":19.05}`
+- Hits: `{"min":9,"max":31,"avg":19.7}`
 - Speed: `{"min":3,"max":5,"avg":4}`
-- Swing: `{"min":53,"max":71,"avg":62.75}`
-- Velocity span: `{"min":81,"max":109,"avg":104}`
+- Swing: `{"min":58,"max":69,"avg":63.25}`
+- Velocity span: `{"min":81,"max":85,"avg":84.8}`
 - Unique row sets: 14
 - Most common row sets: `[{"value":"Closed Hat, Punchy Kick, Rim Click, Snappy Snare","count":3},{"value":"Closed Hat, Crash Cymbal, Punchy Kick, Rim Click, Snappy Snare","count":3},{"value":"Closed Hat, Punchy Kick, Rim Click, Snappy Snare, Uploaded Pop Shaker","count":2}]`
 - Flags: none
-- Examples: `[{"rows":[{"name":"Punchy Kick","hits":[1,7,11,14,15,17]},{"name":"Snappy Snare","hits":[5,11,13]},{"name":"Closed Hat","hits":[1,3,5,7,9,11,13,15,17,19]},{"name":"Rim Click","hits":[11,15]}],"speed":5,"swingPercent":66},{"rows":[{"name":"Punchy Kick","hits":[1,4,7,11,15]},{"name":"Snappy Snare","hits":[5,9,13]},{"name":"Closed Hat","hits":[1,3,5,7,9,10,11,13,15]},{"name":"Rim Click","hits":[9,11,15]},{"name":"Crash Cymbal","hits":[1]},{"name":"Mid Tom","hits":[7,8,14]}],"speed":4,"swingPercent":67},{"rows":[{"name":"Punchy Kick","hits":[1,9,11,12]},{"name":"Snappy Snare","hits":[5,9,13]},{"name":"Closed Hat","hits":[1,3,5,9,11,13,15]},{"name":"Rim Click","hits":[9,11,15]},{"name":"Crash Cymbal","hits":[1]}],"speed":4,"swingPercent":53}]`
+- Examples: `[{"rows":[{"name":"Punchy Kick","hits":[1,5,8,9,13,19]},{"name":"Snappy Snare","hits":[6,11,16]},{"name":"Closed Hat","hits":[1,4,6,9,10,11,12,14,15,16]},{"name":"Rim Click","hits":[11,14,17,19]}],"speed":5,"swingPercent":60},{"rows":[{"name":"Punchy Kick","hits":[1,2,11,14,15]},{"name":"Snappy Snare","hits":[5,9,13]},{"name":"Closed Hat","hits":[1,3,5,7,9,11,13,14,15]},{"name":"Rim Click","hits":[8,9,11]},{"name":"Crash Cymbal","hits":[1]},{"name":"Mid Tom","hits":[7,10,11]}],"speed":4,"swingPercent":60},{"rows":[{"name":"Punchy Kick","hits":[1,3,9,12]},{"name":"Snappy Snare","hits":[5,9,13]},{"name":"Closed Hat","hits":[1,3,5,7,9,13,15]},{"name":"Rim Click","hits":[9,11,15]},{"name":"Crash Cymbal","hits":[1]}],"speed":4,"swingPercent":60}]`
 
 
 ### trap
@@ -125,8 +125,8 @@ Goal: measure divergence. Higher uniqueness and distance are better when the use
 - Rows: `{"min":3,"max":7,"avg":4.75}`
 - Hits: `{"min":6,"max":25,"avg":13.95}`
 - Speed: `{"min":3,"max":5,"avg":4.5}`
-- Swing: `{"min":47,"max":55,"avg":51.85}`
-- Velocity span: `{"min":31,"max":109,"avg":92.35}`
+- Swing: `{"min":47,"max":55,"avg":51.75}`
+- Velocity span: `{"min":31,"max":85,"avg":77.65}`
 - Unique row sets: 17
 - Most common row sets: `[{"value":"Closed Hat, Punchy Kick, Rim Click, Snappy Snare","count":3},{"value":"Analog Clap, Punchy Kick, Snappy Snare","count":2},{"value":"Crash Cymbal, Punchy Kick, Rim Click, Snappy Snare, Uploaded Pop Shaker","count":1}]`
 - Flags: none
@@ -136,16 +136,16 @@ Goal: measure divergence. Higher uniqueness and distance are better when the use
 ### drill
 
 - Unique fingerprints: 20
-- Rhythm pairwise distance: 0.789
+- Rhythm pairwise distance: 0.784
 - Rows: `{"min":3,"max":6,"avg":4.45}`
-- Hits: `{"min":10,"max":32,"avg":18.6}`
+- Hits: `{"min":10,"max":32,"avg":18.65}`
 - Speed: `{"min":3,"max":5,"avg":4.45}`
-- Swing: `{"min":51,"max":64,"avg":57.8}`
-- Velocity span: `{"min":103,"max":113,"avg":108.05}`
+- Swing: `{"min":53,"max":64,"avg":58.4}`
+- Velocity span: `{"min":85,"max":85,"avg":85}`
 - Unique row sets: 12
 - Most common row sets: `[{"value":"Closed Hat, Low Tom, Punchy Kick, Snappy Snare","count":4},{"value":"Low Tom, Open Hat, Punchy Kick, Snappy Snare","count":3},{"value":"Crash Cymbal, Low Tom, Open Hat, Punchy Kick, Snappy Snare","count":2}]`
 - Flags: none
-- Examples: `[{"rows":[{"name":"Punchy Kick","hits":[1,7,9]},{"name":"Snappy Snare","hits":[7]},{"name":"Open Hat","hits":[1,2,7,8,9,11]},{"name":"Low Tom","hits":[9]},{"name":"Crash Cymbal","hits":[1]}],"speed":3,"swingPercent":63},{"rows":[{"name":"Punchy Kick","hits":[1,8,9,15]},{"name":"Snappy Snare","hits":[9]},{"name":"Closed Hat","hits":[1,3,5,6,7,9,10,13,15]},{"name":"Open Hat","hits":[4,8,12]},{"name":"Uploaded Pop Shaker","hits":[5,8]}],"speed":4,"swingPercent":62},{"rows":[{"name":"Punchy Kick","hits":[1,3,7,10,14,19]},{"name":"Snappy Snare","hits":[11]},{"name":"Closed Hat","hits":[1,3,5,7,9,11,12,14,15,16,19]},{"name":"Open Hat","hits":[2,5,12,14,15]},{"name":"Crash Cymbal","hits":[1]},{"name":"Uploaded Pop Shaker","hits":[11,19]}],"speed":5,"swingPercent":58}]`
+- Examples: `[{"rows":[{"name":"Punchy Kick","hits":[1,7,9]},{"name":"Snappy Snare","hits":[7]},{"name":"Open Hat","hits":[1,2,7,8,9,11]},{"name":"Low Tom","hits":[9]},{"name":"Crash Cymbal","hits":[1]}],"speed":3,"swingPercent":63},{"rows":[{"name":"Punchy Kick","hits":[1,3,9,10]},{"name":"Snappy Snare","hits":[9]},{"name":"Closed Hat","hits":[1,3,5,7,8,9,12,13,15]},{"name":"Open Hat","hits":[4,8,12]},{"name":"Uploaded Pop Shaker","hits":[5,11]}],"speed":4,"swingPercent":62},{"rows":[{"name":"Punchy Kick","hits":[1,3,7,12,18,19]},{"name":"Snappy Snare","hits":[11]},{"name":"Closed Hat","hits":[1,3,5,7,9,11,14,15,16,18,19]},{"name":"Open Hat","hits":[2,5,12,14,15]},{"name":"Crash Cymbal","hits":[1]},{"name":"Uploaded Pop Shaker","hits":[11,19]}],"speed":5,"swingPercent":64}]`
 
 
 ### breakcore
@@ -156,7 +156,7 @@ Goal: measure divergence. Higher uniqueness and distance are better when the use
 - Hits: `{"min":13,"max":24,"avg":18.4}`
 - Speed: `{"min":4,"max":6,"avg":5.35}`
 - Swing: `{"min":51,"max":60,"avg":55.4}`
-- Velocity span: `{"min":92,"max":110,"avg":103.1}`
+- Velocity span: `{"min":79,"max":85,"avg":84.25}`
 - Unique row sets: 11
 - Most common row sets: `[{"value":"Foley Percussion, Punchy Kick, Snappy Snare, Tambourine, Uploaded Amen Break, Uploaded Pop Shaker","count":4},{"value":"Foley Percussion, Punchy Kick, Snappy Snare, Uploaded Amen Break, Uploaded Pop Shaker","count":3},{"value":"Cowbell, Crash Cymbal, Punchy Kick, Snappy Snare, Uploaded Amen Break","count":3}]`
 - Flags: none
@@ -166,61 +166,91 @@ Goal: measure divergence. Higher uniqueness and distance are better when the use
 ### dnb
 
 - Unique fingerprints: 20
-- Rhythm pairwise distance: 0.706
+- Rhythm pairwise distance: 0.686
 - Rows: `{"min":4,"max":7,"avg":5.55}`
-- Hits: `{"min":19,"max":37,"avg":28.25}`
+- Hits: `{"min":21,"max":39,"avg":30.75}`
 - Speed: `{"min":4,"max":6,"avg":5.3}`
-- Swing: `{"min":47,"max":62,"avg":53.55}`
-- Velocity span: `{"min":107,"max":114,"avg":109.3}`
+- Swing: `{"min":47,"max":63,"avg":52.9}`
+- Velocity span: `{"min":85,"max":85,"avg":85}`
 - Unique row sets: 11
 - Most common row sets: `[{"value":"Closed Hat, Crash Cymbal, Punchy Kick, Ride Cymbal, Snappy Snare","count":6},{"value":"Closed Hat, Crash Cymbal, Punchy Kick, Ride Cymbal, Snappy Snare, Uploaded Pop Shaker","count":3},{"value":"Closed Hat, Punchy Kick, Ride Cymbal, Snappy Snare, Tambourine, Uploaded Pop Shaker","count":2}]`
 - Flags: none
-- Examples: `[{"rows":[{"name":"Punchy Kick","hits":[1,8,9,11,12,13,18]},{"name":"Snappy Snare","hits":[7,13,19,22]},{"name":"Closed Hat","hits":[1,3,6,7,9,10,12,13,15,18,19,21,22]},{"name":"Ride Cymbal","hits":[4,5,10,18]},{"name":"Crash Cymbal","hits":[1]}],"speed":6,"swingPercent":52},{"rows":[{"name":"Punchy Kick","hits":[1,7,11,15]},{"name":"Snappy Snare","hits":[6,11,16,17]},{"name":"Closed Hat","hits":[1,5,7,9,11,12,15,16,17,18,19]},{"name":"Ride Cymbal","hits":[3,9,13,14]},{"name":"Crash Cymbal","hits":[1]},{"name":"Uploaded Pop Shaker","hits":[11,15,19]},{"name":"Mid Tom","hits":[5,9,10]}],"speed":5,"swingPercent":50},{"rows":[{"name":"Punchy Kick","hits":[1,4,7,8,9,13,18]},{"name":"Snappy Snare","hits":[7,13,19,22]},{"name":"Closed Hat","hits":[1,3,7,9,11,13,14,15,16,18,21,22,24]},{"name":"Ride Cymbal","hits":[8,10,19,21,22]},{"name":"Crash Cymbal","hits":[1,21]}],"speed":6,"swingPercent":48}]`
+- Examples: `[{"rows":[{"name":"Punchy Kick","hits":[1,8,9,11,12,13,18]},{"name":"Snappy Snare","hits":[7,13,19,22]},{"name":"Closed Hat","hits":[1,3,4,7,9,10,12,13,15,16,19,21,23]},{"name":"Ride Cymbal","hits":[10,16,18,22]},{"name":"Crash Cymbal","hits":[1]}],"speed":6,"swingPercent":51},{"rows":[{"name":"Punchy Kick","hits":[1,7,11,15]},{"name":"Snappy Snare","hits":[6,9,11,16]},{"name":"Closed Hat","hits":[1,2,5,6,7,9,11,15,16,17,19]},{"name":"Ride Cymbal","hits":[3,4,9,13,14,18,19]},{"name":"Crash Cymbal","hits":[1]},{"name":"Uploaded Pop Shaker","hits":[3,11,18]},{"name":"Mid Tom","hits":[5,9,12]}],"speed":5,"swingPercent":52},{"rows":[{"name":"Punchy Kick","hits":[1,4,7,8,9,13,18]},{"name":"Snappy Snare","hits":[7,13,19,24]},{"name":"Closed Hat","hits":[1,3,7,9,11,12,13,15,16,18,19,20,24]},{"name":"Ride Cymbal","hits":[4,8,10,16,19,21,22]},{"name":"Crash Cymbal","hits":[1,21]}],"speed":6,"swingPercent":47}]`
 
 
 ### house
 
 - Unique fingerprints: 20
-- Rhythm pairwise distance: 0.583
+- Rhythm pairwise distance: 0.725
 - Rows: `{"min":3,"max":6,"avg":4.25}`
-- Hits: `{"min":10,"max":28,"avg":16.75}`
+- Hits: `{"min":10,"max":27,"avg":16.7}`
 - Speed: `{"min":3,"max":5,"avg":4}`
-- Swing: `{"min":50,"max":58,"avg":54.4}`
-- Velocity span: `{"min":83,"max":109,"avg":103.95}`
+- Swing: `{"min":50,"max":57,"avg":54.1}`
+- Velocity span: `{"min":80,"max":85,"avg":84.75}`
 - Unique row sets: 10
 - Most common row sets: `[{"value":"Analog Clap, Closed Hat, Open Hat, Punchy Kick","count":4},{"value":"Analog Clap, Open Hat, Punchy Kick, Uploaded Pop Shaker","count":4},{"value":"Analog Clap, Closed Hat, Crash Cymbal, Open Hat, Punchy Kick","count":3}]`
 - Flags: none
-- Examples: `[{"rows":[{"name":"Punchy Kick","hits":[1,5,9]},{"name":"Snappy Snare","hits":[5,7]},{"name":"Open Hat","hits":[5,7,11,12]},{"name":"Uploaded Pop Shaker","hits":[1,7]},{"name":"Crash Cymbal","hits":[1,7]},{"name":"Cowbell","hits":[]}],"speed":3,"swingPercent":54},{"rows":[{"name":"Punchy Kick","hits":[1,5,9,13]},{"name":"Analog Clap","hits":[5,13]},{"name":"Open Hat","hits":[3,6,7,10,11,12,13,15,16]},{"name":"Closed Hat","hits":[1,3,4,5,8,9,11,13,15]}],"speed":4,"swingPercent":58},{"rows":[{"name":"Punchy Kick","hits":[1,5,9,11,13,17]},{"name":"Analog Clap","hits":[5,11,13]},{"name":"Open Hat","hits":[3,7,11,15,18,19,20]},{"name":"Closed Hat","hits":[1,3,5,7,9,11,13,15,16,17,19]},{"name":"Crash Cymbal","hits":[1]}],"speed":5,"swingPercent":54}]`
+- Examples: `[{"rows":[{"name":"Punchy Kick","hits":[1,4,7]},{"name":"Snappy Snare","hits":[4,10]},{"name":"Open Hat","hits":[3,5,6,9,11,12]},{"name":"Uploaded Pop Shaker","hits":[1,7]},{"name":"Crash Cymbal","hits":[1]},{"name":"Cowbell","hits":[3]}],"speed":3,"swingPercent":56},{"rows":[{"name":"Punchy Kick","hits":[1,5,9,13]},{"name":"Analog Clap","hits":[5,13]},{"name":"Open Hat","hits":[3,6,7,10,11,12,13,15,16]},{"name":"Closed Hat","hits":[1,3,4,5,7,9,11,13,15]}],"speed":4,"swingPercent":57},{"rows":[{"name":"Punchy Kick","hits":[1,6,11,15,16]},{"name":"Analog Clap","hits":[6,11,16]},{"name":"Open Hat","hits":[4,9,14,15,17,19,20]},{"name":"Closed Hat","hits":[1,3,6,9,11,12,14,15,16,18,19]},{"name":"Crash Cymbal","hits":[1]}],"speed":5,"swingPercent":54}]`
 
 
 ### reggae
 
 - Unique fingerprints: 20
-- Rhythm pairwise distance: 0.691
+- Rhythm pairwise distance: 0.783
 - Rows: `{"min":3,"max":6,"avg":4.65}`
 - Hits: `{"min":6,"max":20,"avg":12.9}`
 - Speed: `{"min":3,"max":5,"avg":3.9}`
-- Swing: `{"min":50,"max":67,"avg":59.95}`
-- Velocity span: `{"min":88,"max":109,"avg":101.55}`
+- Swing: `{"min":50,"max":66,"avg":57.85}`
+- Velocity span: `{"min":85,"max":85,"avg":85}`
 - Unique row sets: 10
 - Most common row sets: `[{"value":"Closed Hat, Crash Cymbal, Punchy Kick, Rim Click","count":4},{"value":"Closed Hat, Crash Cymbal, Low Conga, Punchy Kick, Rim Click","count":3},{"value":"Closed Hat, Foley Percussion, Punchy Kick, Rim Click, Tambourine, Uploaded Pop Shaker","count":2}]`
 - Flags: none
-- Examples: `[{"rows":[{"name":"Punchy Kick","hits":[7,9]},{"name":"Rim Click","hits":[9]},{"name":"Closed Hat","hits":[2,3,7,11,12,13,15]},{"name":"Foley Percussion","hits":[5,13]},{"name":"Uploaded Pop Shaker","hits":[7,12]},{"name":"Tambourine","hits":[5,6,7,12]}],"speed":4,"swingPercent":66},{"rows":[{"name":"Punchy Kick","hits":[9,10]},{"name":"Rim Click","hits":[9,13]},{"name":"Closed Hat","hits":[7,9,10,11,12,13,15]},{"name":"Crash Cymbal","hits":[1]}],"speed":4,"swingPercent":62},{"rows":[{"name":"Punchy Kick","hits":[9]},{"name":"Rim Click","hits":[3,4,9]},{"name":"Closed Hat","hits":[1,3,5,7,10,11,15]},{"name":"Foley Percussion","hits":[5,13]},{"name":"Uploaded Pop Shaker","hits":[9,11]}],"speed":4,"swingPercent":60}]`
+- Examples: `[{"rows":[{"name":"Punchy Kick","hits":[7,9]},{"name":"Rim Click","hits":[9]},{"name":"Closed Hat","hits":[2,3,7,11,12,13,15]},{"name":"Foley Percussion","hits":[5,13]},{"name":"Uploaded Pop Shaker","hits":[3,12]},{"name":"Tambourine","hits":[4,5,7,8]}],"speed":4,"swingPercent":63},{"rows":[{"name":"Punchy Kick","hits":[9,10]},{"name":"Rim Click","hits":[9,13]},{"name":"Closed Hat","hits":[7,9,10,11,12,13,15]},{"name":"Crash Cymbal","hits":[1]}],"speed":4,"swingPercent":54},{"rows":[{"name":"Punchy Kick","hits":[9]},{"name":"Rim Click","hits":[3,4,9]},{"name":"Closed Hat","hits":[1,3,5,7,10,11,15]},{"name":"Foley Percussion","hits":[5,13]},{"name":"Uploaded Pop Shaker","hits":[9,15]}],"speed":4,"swingPercent":62}]`
 
 
 ### funk
 
 - Unique fingerprints: 20
-- Rhythm pairwise distance: 0.577
+- Rhythm pairwise distance: 0.588
 - Rows: `{"min":5,"max":7,"avg":5.7}`
-- Hits: `{"min":13,"max":30,"avg":21.55}`
+- Hits: `{"min":14,"max":30,"avg":21.85}`
 - Speed: `{"min":3,"max":4,"avg":3.9}`
-- Swing: `{"min":53,"max":72,"avg":60.65}`
-- Velocity span: `{"min":104,"max":114,"avg":108.9}`
+- Swing: `{"min":56,"max":71,"avg":63.55}`
+- Velocity span: `{"min":85,"max":85,"avg":85}`
 - Unique row sets: 14
 - Most common row sets: `[{"value":"Closed Hat, Open Hat, Punchy Kick, Snappy Snare, Uploaded Pop Shaker","count":4},{"value":"Closed Hat, Low Conga, Open Hat, Punchy Kick, Snappy Snare, Uploaded Pop Shaker","count":2},{"value":"Closed Hat, Low Conga, Open Hat, Punchy Kick, Snappy Snare","count":2}]`
 - Flags: none
-- Examples: `[{"rows":[{"name":"Punchy Kick","hits":[1,9,11,12,15]},{"name":"Snappy Snare","hits":[5,9,13]},{"name":"Closed Hat","hits":[1,3,5,6,7,9,11,13,15]},{"name":"Open Hat","hits":[5,11,12,15]},{"name":"Crash Cymbal","hits":[1]},{"name":"Uploaded Pop Shaker","hits":[6,11]},{"name":"Low Conga","hits":[6,13]}],"speed":4,"swingPercent":61},{"rows":[{"name":"Punchy Kick","hits":[1,7,9,11,14]},{"name":"Snappy Snare","hits":[5,12,13]},{"name":"Closed Hat","hits":[1,3,5,7,9,11,12,13,15]},{"name":"Open Hat","hits":[6,15]},{"name":"Uploaded Pop Shaker","hits":[7,15]},{"name":"Cowbell","hits":[10,13]}],"speed":4,"swingPercent":68},{"rows":[{"name":"Punchy Kick","hits":[1,5,9,11]},{"name":"Snappy Snare","hits":[5,9,13]},{"name":"Closed Hat","hits":[1,3,5,7,9,11,13,15]},{"name":"Open Hat","hits":[7,11,15]},{"name":"Crash Cymbal","hits":[1]},{"name":"Mid Tom","hits":[8,16]}],"speed":4,"swingPercent":61}]`
+- Examples: `[{"rows":[{"name":"Punchy Kick","hits":[1,7,9,12,15]},{"name":"Snappy Snare","hits":[5,9,13]},{"name":"Closed Hat","hits":[1,3,5,6,7,9,11,13,15]},{"name":"Open Hat","hits":[5,11,12,15]},{"name":"Crash Cymbal","hits":[1]},{"name":"Uploaded Pop Shaker","hits":[3,8]},{"name":"Low Conga","hits":[11,13]}],"speed":4,"swingPercent":71},{"rows":[{"name":"Punchy Kick","hits":[1,4,9,11,15]},{"name":"Snappy Snare","hits":[5,13,16]},{"name":"Closed Hat","hits":[1,3,5,7,9,10,11,13,15]},{"name":"Open Hat","hits":[4,6,15]},{"name":"Uploaded Pop Shaker","hits":[7,15]},{"name":"Cowbell","hits":[12,13]}],"speed":4,"swingPercent":64},{"rows":[{"name":"Punchy Kick","hits":[1,5,9,15]},{"name":"Snappy Snare","hits":[5,9,13]},{"name":"Closed Hat","hits":[1,3,5,7,9,11,13,15]},{"name":"Open Hat","hits":[7,11,15,16]},{"name":"Crash Cymbal","hits":[1]},{"name":"Mid Tom","hits":[15,16]}],"speed":4,"swingPercent":69}]`
+
+
+### jazz
+
+- Unique fingerprints: 20
+- Rhythm pairwise distance: 0.528
+- Rows: `{"min":3,"max":7,"avg":4.75}`
+- Hits: `{"min":9,"max":27,"avg":19.25}`
+- Speed: `{"min":3,"max":4,"avg":3.9}`
+- Swing: `{"min":52,"max":69,"avg":60.6}`
+- Velocity span: `{"min":52,"max":85,"avg":68.25}`
+- Unique row sets: 8
+- Most common row sets: `[{"value":"Closed Hat, Punchy Kick, Ride Cymbal, Snappy Snare","count":7},{"value":"Closed Hat, Crash Cymbal, Punchy Kick, Ride Cymbal, Snappy Snare","count":4},{"value":"Closed Hat, Mid Tom, Punchy Kick, Ride Cymbal, Snappy Snare","count":2}]`
+- Flags: instrumentation converges
+- Examples: `[{"rows":[{"name":"Ride Cymbal","hits":[1,4,5,7,9,13,15]},{"name":"Punchy Kick","hits":[1,5,9,10,13]},{"name":"Closed Hat","hits":[3,4,5,6,7,13,14]},{"name":"Snappy Snare","hits":[5,9,13]},{"name":"Crash Cymbal","hits":[1]}],"speed":4,"swingPercent":64},{"rows":[{"name":"Ride Cymbal","hits":[1,2,3,5,7,9,13,15]},{"name":"Punchy Kick","hits":[1,5,6,9,13]},{"name":"Closed Hat","hits":[5,12,13,14,16]},{"name":"Snappy Snare","hits":[5,9,13]}],"speed":4,"swingPercent":65},{"rows":[{"name":"Ride Cymbal","hits":[1,4,5,7,9,13,15]},{"name":"Punchy Kick","hits":[1,5,9,13]},{"name":"Closed Hat","hits":[3,5,12,13]},{"name":"Snappy Snare","hits":[5,9,13]},{"name":"Crash Cymbal","hits":[1]}],"speed":4,"swingPercent":69}]`
+
+
+### orchestral
+
+- Unique fingerprints: 20
+- Rhythm pairwise distance: 0.782
+- Rows: `{"min":3,"max":7,"avg":5.1}`
+- Hits: `{"min":5,"max":21,"avg":11.3}`
+- Speed: `{"min":3,"max":5,"avg":3.9}`
+- Swing: `{"min":49,"max":56,"avg":52.45}`
+- Velocity span: `{"min":57,"max":76,"avg":68.45}`
+- Unique row sets: 10
+- Most common row sets: `[{"value":"Mid Tom, Punchy Kick, Snappy Snare, Uploaded Pop Shaker","count":4},{"value":"Low Tom, Mid Tom, Punchy Kick, Snappy Snare","count":3},{"value":"Cowbell, High Tom, Low Tom, Mid Tom, Punchy Kick, Snappy Snare, Uploaded Pop Shaker","count":3}]`
+- Flags: none
+- Examples: `[{"rows":[{"name":"Punchy Kick","hits":[1,7]},{"name":"Snappy Snare","hits":[7,8]},{"name":"Mid Tom","hits":[11]},{"name":"Low Tom","hits":[]}],"speed":3,"swingPercent":52},{"rows":[{"name":"Punchy Kick","hits":[1]},{"name":"Snappy Snare","hits":[3,11]},{"name":"Mid Tom","hits":[12,14]}],"speed":4,"swingPercent":51},{"rows":[{"name":"Punchy Kick","hits":[1,9,15,16]},{"name":"Snappy Snare","hits":[3,9,11]},{"name":"Mid Tom","hits":[6]},{"name":"Uploaded Pop Shaker","hits":[3,7]}],"speed":4,"swingPercent":51}]`
 
 
 ## MIDI Generation
@@ -231,8 +261,9 @@ Goal: measure divergence. Higher uniqueness and distance are better when the use
 - Event pairwise distance: 0.998
 - Pitch pairwise distance: 0.785
 - Rhythm pairwise distance: 0.996
-- Note count: `{"min":3,"max":18,"avg":9.5}`
 - Pitch span: `{"min":5,"max":20,"avg":13.75}`
+- Active phrase span: `{"min":4.735,"max":8,"avg":7.503}`
+- Duration-shape variety: `{"min":2,"max":5,"avg":3.9}`
 - Flags: none
 - Examples: `[[{"pitch":60,"startBeat":0,"lengthBeats":0.453,"velocity":95},{"pitch":60,"startBeat":0.75,"lengthBeats":0.151,"velocity":77},{"pitch":65,"startBeat":1.25,"lengthBeats":0.302,"velocity":81},{"pitch":60,"startBeat":2.125,"lengthBeats":0.226,"velocity":108},{"pitch":60,"startBeat":2.5,"lengthBeats":0.226,"velocity":78},{"pitch":60,"startBeat":2.875,"lengthBeats":0.226,"velocity":67},{"pitch":63,"startBeat":3.25,"lengthBeats":0.226,"velocity":109},{"pitch":60,"startBeat":3.625,"lengthBeats":0.151,"velocity":85},{"pitch":70,"startBeat":3.875,"lengthBeats":0.226,"velocity":78},{"pitch":68,"startBeat":4.25,"lengthBeats":0.226,"velocity":92},{"pitch":62,"startBeat":4.625,"lengthBeats":0.302,"velocity":77},{"pitch":77,"startBeat":5.125,"lengthBeats":0.453,"velocity":111},{"pitch":63,"startBeat":5.875,"lengthBeats":0.302,"velocity":87},{"pitch":65,"startBeat":6.375,"lengthBeats":0.151,"velocity":83},{"pitch":65,"startBeat":6.625,"lengthBeats":0.151,"velocity":107},{"pitch":77,"startBeat":6.875,"lengthBeats":0.151,"velocity":101},{"pitch":65,"startBeat":7.125,"lengthBeats":0.302,"velocity":102},{"pitch":77,"startBeat":7.875,"lengthBeats":0.125,"velocity":83}],[{"pitch":75,"startBeat":0,"lengthBeats":1.157,"velocity":93},{"pitch":80,"startBeat":2,"lengthBeats":0.578,"velocity":66},{"pitch":79,"startBeat":3,"lengthBeats":1.735,"velocity":107}],[{"pitch":62,"startBeat":0,"lengthBeats":0.981,"velocity":105},{"pitch":68,"startBeat":6.5,"lengthBeats":0.49,"velocity":75},{"pitch":75,"startBeat":7.5,"lengthBeats":0.49,"velocity":93}]]`
 
@@ -243,8 +274,9 @@ Goal: measure divergence. Higher uniqueness and distance are better when the use
 - Event pairwise distance: 0.967
 - Pitch pairwise distance: 0.577
 - Rhythm pairwise distance: 0.998
-- Note count: `{"min":6,"max":14,"avg":9.7}`
 - Pitch span: `{"min":8,"max":22,"avg":17.9}`
+- Active phrase span: `{"min":7.297,"max":7.963,"avg":7.726}`
+- Duration-shape variety: `{"min":2,"max":2,"avg":2}`
 - Flags: none
 - Examples: `[[{"pitch":36,"startBeat":0,"lengthBeats":1.369,"velocity":94},{"pitch":41,"startBeat":2,"lengthBeats":1.369,"velocity":106},{"pitch":41,"startBeat":2.75,"lengthBeats":0.538,"velocity":77},{"pitch":44,"startBeat":4,"lengthBeats":1.369,"velocity":90},{"pitch":44,"startBeat":4.75,"lengthBeats":0.538,"velocity":81},{"pitch":43,"startBeat":6,"lengthBeats":1.369,"velocity":112}],[{"pitch":41,"startBeat":0,"lengthBeats":1.568,"velocity":91},{"pitch":44,"startBeat":0.5,"lengthBeats":0.463,"velocity":94},{"pitch":44,"startBeat":1.5,"lengthBeats":0.463,"velocity":95},{"pitch":44,"startBeat":2,"lengthBeats":1.568,"velocity":91},{"pitch":36,"startBeat":3,"lengthBeats":0.463,"velocity":83},{"pitch":48,"startBeat":4,"lengthBeats":1.568,"velocity":91},{"pitch":36,"startBeat":4.5,"lengthBeats":0.463,"velocity":95},{"pitch":50,"startBeat":5,"lengthBeats":0.463,"velocity":94},{"pitch":43,"startBeat":5.5,"lengthBeats":0.463,"velocity":88},{"pitch":43,"startBeat":6,"lengthBeats":1.568,"velocity":96},{"pitch":46,"startBeat":6.5,"lengthBeats":0.463,"velocity":70},{"pitch":55,"startBeat":7,"lengthBeats":0.463,"velocity":96},{"pitch":46,"startBeat":7.5,"lengthBeats":0.463,"velocity":95}],[{"pitch":36,"startBeat":0,"lengthBeats":1.316,"velocity":92},{"pitch":44,"startBeat":2,"lengthBeats":1.316,"velocity":110},{"pitch":46,"startBeat":3,"lengthBeats":0.663,"velocity":76},{"pitch":41,"startBeat":4,"lengthBeats":1.316,"velocity":94},{"pitch":55,"startBeat":5,"lengthBeats":0.663,"velocity":94},{"pitch":43,"startBeat":6,"lengthBeats":1.316,"velocity":116},{"pitch":43,"startBeat":7,"lengthBeats":0.663,"velocity":64}]]`
 
@@ -255,8 +287,9 @@ Goal: measure divergence. Higher uniqueness and distance are better when the use
 - Event pairwise distance: 0.971
 - Pitch pairwise distance: 0.436
 - Rhythm pairwise distance: 0.995
-- Note count: `{"min":12,"max":21,"avg":14.55}`
 - Pitch span: `{"min":19,"max":35,"avg":27.3}`
+- Active phrase span: `{"min":6.972,"max":7.851,"avg":7.384}`
+- Duration-shape variety: `{"min":1,"max":3,"avg":1.3}`
 - Flags: none
 - Examples: `[[{"pitch":94,"startBeat":0,"lengthBeats":1.308,"velocity":62},{"pitch":74,"startBeat":0,"lengthBeats":1.308,"velocity":81},{"pitch":65,"startBeat":0,"lengthBeats":1.308,"velocity":79},{"pitch":86,"startBeat":2,"lengthBeats":1.308,"velocity":73},{"pitch":65,"startBeat":2,"lengthBeats":1.308,"velocity":62},{"pitch":69,"startBeat":2,"lengthBeats":1.308,"velocity":82},{"pitch":77,"startBeat":4,"lengthBeats":1.308,"velocity":67},{"pitch":69,"startBeat":4,"lengthBeats":1.308,"velocity":74},{"pitch":72,"startBeat":4,"lengthBeats":1.308,"velocity":82},{"pitch":96,"startBeat":6,"lengthBeats":1.308,"velocity":68},{"pitch":76,"startBeat":6,"lengthBeats":1.308,"velocity":72},{"pitch":67,"startBeat":6,"lengthBeats":1.308,"velocity":66}],[{"pitch":77,"startBeat":0,"lengthBeats":1.77,"velocity":69},{"pitch":81,"startBeat":0,"lengthBeats":1.77,"velocity":64},{"pitch":72,"startBeat":0,"lengthBeats":1.77,"velocity":64},{"pitch":82,"startBeat":2,"lengthBeats":1.77,"velocity":76},{"pitch":86,"startBeat":2,"lengthBeats":1.77,"velocity":74},{"pitch":65,"startBeat":2,"lengthBeats":1.77,"velocity":61},{"pitch":81,"startBeat":2,"lengthBeats":1.77,"velocity":78},{"pitch":98,"startBeat":4,"lengthBeats":1.77,"velocity":71},{"pitch":77,"startBeat":4,"lengthBeats":1.77,"velocity":65},{"pitch":69,"startBeat":4,"lengthBeats":1.77,"velocity":60},{"pitch":74,"startBeat":4,"lengthBeats":1.77,"velocity":78},{"pitch":84,"startBeat":6,"lengthBeats":1.77,"velocity":70},{"pitch":100,"startBeat":6,"lengthBeats":1.77,"velocity":74},{"pitch":67,"startBeat":6,"lengthBeats":1.77,"velocity":73}],[{"pitch":77,"startBeat":0,"lengthBeats":1.722,"velocity":76},{"pitch":81,"startBeat":0,"lengthBeats":1.722,"velocity":73},{"pitch":72,"startBeat":0,"lengthBeats":1.722,"velocity":68},{"pitch":82,"startBeat":2,"lengthBeats":1.722,"velocity":66},{"pitch":86,"startBeat":2,"lengthBeats":1.722,"velocity":84},{"pitch":77,"startBeat":2,"lengthBeats":1.722,"velocity":65},{"pitch":86,"startBeat":4,"lengthBeats":1.722,"velocity":77},{"pitch":89,"startBeat":4,"lengthBeats":1.722,"velocity":61},{"pitch":81,"startBeat":4,"lengthBeats":1.722,"velocity":80},{"pitch":96,"startBeat":6,"lengthBeats":1.722,"velocity":58},{"pitch":88,"startBeat":6,"lengthBeats":1.722,"velocity":74},{"pitch":67,"startBeat":6,"lengthBeats":1.722,"velocity":72},{"pitch":72,"startBeat":6,"lengthBeats":1.722,"velocity":84}]]`
 
@@ -267,8 +300,9 @@ Goal: measure divergence. Higher uniqueness and distance are better when the use
 - Event pairwise distance: 0.992
 - Pitch pairwise distance: 0.51
 - Rhythm pairwise distance: 0.995
-- Note count: `{"min":14,"max":32,"avg":21.15}`
 - Pitch span: `{"min":19,"max":34,"avg":27.05}`
+- Active phrase span: `{"min":7.301,"max":7.973,"avg":7.824}`
+- Duration-shape variety: `{"min":1,"max":1,"avg":1}`
 - Flags: none
 - Examples: `[[{"pitch":77,"startBeat":0,"lengthBeats":0.202,"velocity":93},{"pitch":74,"startBeat":0.25,"lengthBeats":0.202,"velocity":67},{"pitch":86,"startBeat":0.5,"lengthBeats":0.202,"velocity":64},{"pitch":82,"startBeat":0.75,"lengthBeats":0.202,"velocity":55},{"pitch":94,"startBeat":1,"lengthBeats":0.202,"velocity":59},{"pitch":77,"startBeat":1.25,"lengthBeats":0.202,"velocity":82},{"pitch":74,"startBeat":1.5,"lengthBeats":0.202,"velocity":89},{"pitch":82,"startBeat":1.75,"lengthBeats":0.202,"velocity":82},{"pitch":77,"startBeat":2,"lengthBeats":0.202,"velocity":74},{"pitch":60,"startBeat":2.25,"lengthBeats":0.202,"velocity":54},{"pitch":89,"startBeat":2.5,"lengthBeats":0.202,"velocity":88},{"pitch":77,"startBeat":2.75,"lengthBeats":0.202,"velocity":82},{"pitch":89,"startBeat":3,"lengthBeats":0.202,"velocity":72},{"pitch":72,"startBeat":3.25,"lengthBeats":0.202,"velocity":88},{"pitch":80,"startBeat":3.5,"lengthBeats":0.202,"velocity":84},{"pitch":77,"startBeat":3.75,"lengthBeats":0.202,"velocity":89},{"pitch":82,"startBeat":4,"lengthBeats":0.202,"velocity":64},{"pitch":79,"startBeat":4.25,"lengthBeats":0.202,"velocity":68},{"pitch":91,"startBeat":4.5,"lengthBeats":0.202,"velocity":68},{"pitch":75,"startBeat":4.75,"lengthBeats":0.202,"velocity":78},{"pitch":75,"startBeat":5,"lengthBeats":0.202,"velocity":62},{"pitch":79,"startBeat":5.25,"lengthBeats":0.202,"velocity":92},{"pitch":79,"startBeat":5.5,"lengthBeats":0.202,"velocity":70},{"pitch":63,"startBeat":5.75,"lengthBeats":0.202,"velocity":85},{"pitch":79,"startBeat":6,"lengthBeats":0.202,"velocity":63},{"pitch":74,"startBeat":6.25,"lengthBeats":0.202,"velocity":83},{"pitch":82,"startBeat":6.5,"lengthBeats":0.202,"velocity":80},{"pitch":91,"startBeat":6.75,"lengthBeats":0.202,"velocity":93},{"pitch":91,"startBeat":7,"lengthBeats":0.202,"velocity":67},{"pitch":74,"startBeat":7.25,"lengthBeats":0.202,"velocity":84},{"pitch":79,"startBeat":7.5,"lengthBeats":0.202,"velocity":74},{"pitch":79,"startBeat":7.75,"lengthBeats":0.202,"velocity":79}],[{"pitch":68,"startBeat":0,"lengthBeats":0.163,"velocity":91},{"pitch":92,"startBeat":0.25,"lengthBeats":0.163,"velocity":56},{"pitch":77,"startBeat":0.5,"lengthBeats":0.163,"velocity":55},{"pitch":77,"startBeat":0.75,"lengthBeats":0.163,"velocity":69},{"pitch":80,"startBeat":1,"lengthBeats":0.163,"velocity":87},{"pitch":80,"startBeat":1.25,"lengthBeats":0.163,"velocity":72},{"pitch":74,"startBeat":1.5,"lengthBeats":0.163,"velocity":65},{"pitch":89,"startBeat":1.75,"lengthBeats":0.163,"velocity":57},{"pitch":77,"startBeat":2,"lengthBeats":0.163,"velocity":82},{"pitch":91,"startBeat":2.25,"lengthBeats":0.163,"velocity":67},{"pitch":84,"startBeat":2.5,"lengthBeats":0.163,"velocity":91},{"pitch":75,"startBeat":2.75,"lengthBeats":0.163,"velocity":61},{"pitch":89,"startBeat":3,"lengthBeats":0.163,"velocity":75},{"pitch":72,"startBeat":3.25,"lengthBeats":0.163,"velocity":86},{"pitch":84,"startBeat":3.5,"lengthBeats":0.163,"velocity":59},{"pitch":87,"startBeat":3.75,"lengthBeats":0.163,"velocity":86},{"pitch":82,"startBeat":4,"lengthBeats":0.163,"velocity":83},{"pitch":72,"startBeat":4.25,"lengthBeats":0.163,"velocity":87},{"pitch":89,"startBeat":4.5,"lengthBeats":0.163,"velocity":61},{"pitch":70,"startBeat":4.75,"lengthBeats":0.163,"velocity":70},{"pitch":82,"startBeat":5,"lengthBeats":0.163,"velocity":85},{"pitch":72,"startBeat":5.25,"lengthBeats":0.163,"velocity":93},{"pitch":77,"startBeat":5.5,"lengthBeats":0.163,"velocity":77},{"pitch":70,"startBeat":5.75,"lengthBeats":0.163,"velocity":81},{"pitch":87,"startBeat":6,"lengthBeats":0.163,"velocity":86},{"pitch":70,"startBeat":6.25,"lengthBeats":0.163,"velocity":52},{"pitch":74,"startBeat":6.75,"lengthBeats":0.163,"velocity":68},{"pitch":75,"startBeat":7,"lengthBeats":0.163,"velocity":77},{"pitch":89,"startBeat":7.25,"lengthBeats":0.163,"velocity":66},{"pitch":82,"startBeat":7.5,"lengthBeats":0.163,"velocity":80},{"pitch":87,"startBeat":7.75,"lengthBeats":0.163,"velocity":67}],[{"pitch":80,"startBeat":0,"lengthBeats":0.254,"velocity":84},{"pitch":92,"startBeat":0.5,"lengthBeats":0.254,"velocity":86},{"pitch":74,"startBeat":1,"lengthBeats":0.254,"velocity":60},{"pitch":86,"startBeat":1.5,"lengthBeats":0.254,"velocity":69},{"pitch":72,"startBeat":2,"lengthBeats":0.254,"velocity":83},{"pitch":91,"startBeat":2.5,"lengthBeats":0.254,"velocity":86},{"pitch":75,"startBeat":3,"lengthBeats":0.254,"velocity":77},{"pitch":72,"startBeat":3.5,"lengthBeats":0.254,"velocity":94},{"pitch":77,"startBeat":4,"lengthBeats":0.254,"velocity":86},{"pitch":77,"startBeat":4.5,"lengthBeats":0.254,"velocity":73},{"pitch":82,"startBeat":5,"lengthBeats":0.254,"velocity":82},{"pitch":82,"startBeat":5.5,"lengthBeats":0.254,"velocity":69},{"pitch":80,"startBeat":6,"lengthBeats":0.254,"velocity":53},{"pitch":75,"startBeat":6.5,"lengthBeats":0.254,"velocity":76},{"pitch":72,"startBeat":7,"lengthBeats":0.254,"velocity":64},{"pitch":80,"startBeat":7.5,"lengthBeats":0.254,"velocity":67}]]`
 
@@ -279,8 +313,9 @@ Goal: measure divergence. Higher uniqueness and distance are better when the use
 - Event pairwise distance: 0.999
 - Pitch pairwise distance: 0.717
 - Rhythm pairwise distance: 0.997
-- Note count: `{"min":4,"max":17,"avg":8.45}`
 - Pitch span: `{"min":5,"max":22,"avg":17.1}`
+- Active phrase span: `{"min":3.063,"max":8,"avg":7.036}`
+- Duration-shape variety: `{"min":2,"max":5,"avg":3.75}`
 - Flags: none
 - Examples: `[[{"pitch":86,"startBeat":2.25,"lengthBeats":0.944,"velocity":71},{"pitch":94,"startBeat":3.375,"lengthBeats":0.629,"velocity":102},{"pitch":84,"startBeat":4.875,"lengthBeats":0.629,"velocity":91},{"pitch":72,"startBeat":5.625,"lengthBeats":0.629,"velocity":100},{"pitch":89,"startBeat":6.375,"lengthBeats":0.629,"velocity":82}],[{"pitch":79,"startBeat":0.75,"lengthBeats":0.194,"velocity":95},{"pitch":80,"startBeat":1,"lengthBeats":0.388,"velocity":70},{"pitch":80,"startBeat":1.5,"lengthBeats":0.388,"velocity":92},{"pitch":94,"startBeat":3,"lengthBeats":0.388,"velocity":93},{"pitch":77,"startBeat":4,"lengthBeats":0.194,"velocity":84},{"pitch":75,"startBeat":5,"lengthBeats":0.582,"velocity":83},{"pitch":82,"startBeat":5.75,"lengthBeats":0.582,"velocity":73},{"pitch":94,"startBeat":7,"lengthBeats":0.194,"velocity":108},{"pitch":84,"startBeat":7.25,"lengthBeats":0.291,"velocity":99},{"pitch":74,"startBeat":7.625,"lengthBeats":0.375,"velocity":78}],[{"pitch":80,"startBeat":0,"lengthBeats":0.188,"velocity":80},{"pitch":80,"startBeat":0.25,"lengthBeats":0.376,"velocity":87},{"pitch":79,"startBeat":0.75,"lengthBeats":0.188,"velocity":83},{"pitch":94,"startBeat":1,"lengthBeats":0.188,"velocity":80},{"pitch":82,"startBeat":1.25,"lengthBeats":0.188,"velocity":93},{"pitch":79,"startBeat":1.5,"lengthBeats":0.188,"velocity":104},{"pitch":82,"startBeat":1.75,"lengthBeats":0.188,"velocity":96},{"pitch":74,"startBeat":2,"lengthBeats":0.376,"velocity":106},{"pitch":80,"startBeat":2.5,"lengthBeats":0.282,"velocity":89},{"pitch":79,"startBeat":2.875,"lengthBeats":0.564,"velocity":78},{"pitch":77,"startBeat":4.125,"lengthBeats":0.564,"velocity":75},{"pitch":94,"startBeat":4.875,"lengthBeats":0.282,"velocity":69},{"pitch":75,"startBeat":5.25,"lengthBeats":0.376,"velocity":75},{"pitch":74,"startBeat":5.75,"lengthBeats":0.376,"velocity":75},{"pitch":77,"startBeat":7,"lengthBeats":0.564,"velocity":111}]]`
 

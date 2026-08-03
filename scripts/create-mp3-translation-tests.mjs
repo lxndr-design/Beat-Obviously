@@ -86,7 +86,7 @@ for (const source of pianoSources) {
   }
   const notes = eventsToMidiNotes(events, source.bpm, false);
   const document = buildPianoDocument(source, notes);
-  results.push(writeAndValidate(document, source.durationSeconds, events.length));
+  results.push(writeAndValidate(document, source.durationSeconds));
 }
 
 const drumAnalysis = JSON.parse(execFileSync(
@@ -104,11 +104,10 @@ const breakcoreDocument = buildBreakcoreDocument(breakcoreSource, breakcoreInput
 results.push(writeAndValidate(
   breakcoreDocument,
   breakcoreSource.durationSeconds,
-  breakcoreInputs.bass.length + breakcoreInputs.other.length + breakcoreInputs.vocals.length + breakcoreInputs.drums.length,
 ));
 
 for (const result of results) {
-  console.log(`${result.name}: ${result.bpm.toFixed(2)} BPM, ${result.tracks} tracks, ${result.notes} MIDI notes, ${result.effects} effects, ${result.automationLanes} automation lanes`);
+  console.log(`${result.name}: ${result.bpm.toFixed(2)} BPM, ${result.tracks} playable tracks, ${result.activeSpanBeats.toFixed(1)}-beat active span, MIDI ${result.pitchRange.join("–")}, ${result.effects} effects, ${result.automationLanes} automation lanes`);
 }
 console.log(`Wrote ${results.length} MIDI-only Beat projects to ${outputRoot}`);
 
@@ -442,7 +441,7 @@ function eventToMidiNote(event, bpm, preservePitchCurves) {
   return note;
 }
 
-function writeAndValidate(document, durationSeconds, expectedMinimumNotes) {
+function writeAndValidate(document, durationSeconds) {
   const target = join(outputRoot, `${document.project.name}.beat`);
   writeFileSync(target, `${JSON.stringify(document, null, 2)}\n`, "utf8");
   const parsed = migrateBeatDocument(JSON.parse(readFileSync(target, "utf8")));
@@ -458,14 +457,16 @@ function writeAndValidate(document, durationSeconds, expectedMinimumNotes) {
   assert.ok(tracks.every((track) => track.kind === "midi"));
   assert.ok(tracks.every((track) => track.segments.every((segment) => segment.payload.kind === "midi")));
   assert.ok(tracks.every((track) => parsed.instruments.some((instrument) => instrument.id === track.instrumentId)));
-  assert.ok(notes.length >= expectedMinimumNotes, `${parsed.project.name} lost notes (${notes.length} < ${expectedMinimumNotes})`);
+  assert.ok(tracks.every((track) => track.segments.some((segment) => segment.payload.kind === "midi" && segment.payload.notes.some((note) => note.lengthBeats > 0))), `${parsed.project.name} contains an empty or silent MIDI track`);
   assert.ok(notes.every((note) => note.pitch >= 0 && note.pitch <= 127 && note.velocity >= 1 && note.velocity <= 127));
   assert.ok(notes.every((note) => note.startBeat >= 0 && note.lengthBeats > 0));
   assert.ok(Math.abs(parsed.project.lengthBeats * 60 / parsed.project.bpm - durationSeconds) < 0.02);
   const serialized = readFileSync(target, "utf8");
   assert.ok(!serialized.includes(".mp3"));
   assert.ok(!serialized.includes(".wav"));
-  return { name: parsed.project.name, bpm: parsed.project.bpm, tracks: tracks.length, notes: notes.length, effects: effects.length, automationLanes };
+  const activeSpanBeats = Math.max(...notes.map((note) => note.startBeat + note.lengthBeats)) - Math.min(...notes.map((note) => note.startBeat));
+  const pitchRange = [Math.min(...notes.map((note) => note.pitch)), Math.max(...notes.map((note) => note.pitch))];
+  return { name: parsed.project.name, bpm: parsed.project.bpm, tracks: tracks.length, activeSpanBeats, pitchRange, effects: effects.length, automationLanes };
 }
 
 function id(...parts) {

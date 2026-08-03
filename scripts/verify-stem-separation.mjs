@@ -14,6 +14,7 @@ const bridge = read("backend/Source/Ipc/MessageBridge.cpp");
 const action = read("frontend/src/audio/stemSeparation.ts");
 const segment = read("frontend/src/features/Tracks/Segment.solid.tsx");
 const setup = read("scripts/setup-stem-separation.sh");
+const lock = read("scripts/requirements/stem-separation-macos-py313.lock");
 
 for (const kind of ["audio.stemsStart", "audio.stemsStatus", "audio.stemsCancel"])
   assert(frontendSchema.includes(kind), `frontend IPC is missing ${kind}`);
@@ -31,7 +32,8 @@ assert(action.includes("projectStore.updateSegment(source.id, { muted: true })")
 assert(action.includes("setSelectedSegments([segment.id])"), "unlinking must leave only the chosen stem selected for independent movement");
 assert(segment.includes('label: "Separate into Stems…"'), "audio clip context menu must expose separation");
 assert(segment.includes('"Unlink Stems"'), "linked stems must expose unlinking");
-assert(setup.includes('demucs-onnx==0.3.4'), "runtime setup must pin the verified separator release");
+assert(setup.includes("stem-separation-macos-py313.lock"), "runtime setup must install the complete reviewed separator lock");
+assert(lock.includes("demucs-onnx==0.3.4"), "separator lock must pin the verified release");
 assert((statSync(join(repoRoot, "scripts/setup-stem-separation.sh")).mode & 0o111) !== 0, "runtime setup script must be executable");
 
 const behavioralCheck = await build({

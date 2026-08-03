@@ -1,0 +1,4 @@
+Bear Sax by Karoryfer Samples
+Pinned source: https://github.com/sfzinstruments/karoryfer.bear-sax/tree/7abb3c652525a15dfac80e1b5dfbba9964ee568f
+License: CC0 1.0 Universal
+Beat packages ten recorded roots with soft and forte sustain layers.

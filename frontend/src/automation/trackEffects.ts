@@ -182,6 +182,25 @@ export function effectAutomationBeatFromDrag(
   return Math.max(0, Math.min(Math.max(0, lengthBeats), beat));
 }
 
+/**
+ * A lone point represents a static lane value, so it remains at the same
+ * viewport position while the timeline scrolls. Once another point exists,
+ * every point resumes its normal beat-aligned timeline position.
+ */
+export function effectAutomationPointDisplayLeft(
+  beat: number,
+  beatsToPx: number,
+  scrollLeft: number,
+  pointCount: number,
+): number {
+  return Math.max(0, beat * beatsToPx + (pointCount === 1 ? Math.max(0, scrollLeft) : 0));
+}
+
+/** Keep the compact value editor fully clear of the sticky track header. */
+export function effectAutomationPopoverDisplayLeft(anchorLeft: number, scrollLeft: number, insetPx = 46): number {
+  return Math.max(anchorLeft, Math.max(0, scrollLeft) + Math.max(0, insetPx));
+}
+
 export function effectValueToLaneY(value: number, param: EffectParamMeta): number {
   const normalized = normalizeEffectParamValue(value, param);
   return 18 - normalized * 14;

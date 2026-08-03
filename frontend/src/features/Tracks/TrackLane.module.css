@@ -27,6 +27,7 @@
 }
 
 .segmentLandingGhost {
+  --segment-color: var(--color-fg);
   position: absolute;
   top: 3px;
   bottom: 3px;
@@ -51,7 +52,7 @@
 .segmentLandingGhost span {
   display: block;
   max-width: 100%;
-  padding: 3px 4px;
+  padding: 3px 6px;
   background: color-mix(in srgb, var(--color-bg) 78%, transparent);
   font-size: var(--font-size-ui);
   line-height: 1;

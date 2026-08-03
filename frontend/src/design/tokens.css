@@ -5,41 +5,33 @@
  */
 
 @font-face {
-  font-family: "Akzidenz Grotesk Next";
-  src: url("/assets/fonts/akzidenz-grotesk-next-light.otf") format("opentype");
+  font-family: "Almarai";
+  src: url("/assets/fonts/almarai-light.ttf") format("truetype");
   font-weight: 300;
   font-style: normal;
   font-display: swap;
 }
 
 @font-face {
-  font-family: "Akzidenz Grotesk Next";
-  src: url("/assets/fonts/akzidenz-grotesk-next-regular.otf") format("opentype");
+  font-family: "Almarai";
+  src: url("/assets/fonts/almarai-regular.ttf") format("truetype");
   font-weight: 400;
   font-style: normal;
   font-display: swap;
 }
 
 @font-face {
-  font-family: "Akzidenz Grotesk Next";
-  src: url("/assets/fonts/akzidenz-grotesk-next-italic.otf") format("opentype");
-  font-weight: 400;
-  font-style: italic;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "Akzidenz Grotesk Next";
-  src: url("/assets/fonts/akzidenz-grotesk-next-medium.otf") format("opentype");
-  font-weight: 500;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "Akzidenz Grotesk Next";
-  src: url("/assets/fonts/akzidenz-grotesk-next-bold.otf") format("opentype");
+  font-family: "Almarai";
+  src: url("/assets/fonts/almarai-bold.ttf") format("truetype");
   font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Almarai";
+  src: url("/assets/fonts/almarai-extra-bold.ttf") format("truetype");
+  font-weight: 800;
   font-style: normal;
   font-display: swap;
 }
@@ -51,17 +43,21 @@
    * (tracks, segments, timeline). They MUST NOT appear on buttons, borders,
    * text, or any standalone surface unless routed through the shared tokens.
    */
-  --color-bg: #000000;
-  --color-fg: #ffffff;
-  --color-bg-inverse: #ffffff;
-  --color-fg-inverse: #000000;
+  /* Theme mode owns these two anchors. Contrast must never change them. */
+  --theme-core-bg: #000000;
+  --theme-core-fg: #ffffff;
+  --contrast-fg-strength: 88%;
+  --color-bg: var(--theme-core-bg);
+  --color-fg: color-mix(in srgb, var(--theme-core-fg) var(--contrast-fg-strength), var(--theme-core-bg));
+  --color-bg-inverse: var(--color-fg);
+  --color-fg-inverse: var(--theme-core-bg);
 
   /* Modal/overlay scrim — only legitimate semi-transparent value */
   --color-scrim: rgba(0, 0, 0, 0.6);
 
   /* Text selection stays monochrome. No chromatic UI exceptions. */
-  --color-highlight: #ffffff;
-  --color-highlight-fg: #000000;
+  --color-highlight: var(--color-fg);
+  --color-highlight-fg: var(--theme-core-bg);
 
   /* Monochrome state tokens. Do not introduce hue here. */
   --aether-bridge-tone-strong: color-mix(in srgb, var(--color-fg) 72%, transparent);
@@ -75,7 +71,7 @@
 
   /* Off-white for foreground-active surfaces and high-contrast controls.
    * List rows use --surface-hover so scanning does not flash full white. */
-  --color-fg-hover: rgba(230, 230, 230, 0.8);
+  --color-fg-hover: color-mix(in srgb, var(--color-fg) 86%, var(--color-bg));
 
   /* Inside-object gridline opacities — never use outside their context */
   --grid-line-faint: rgba(255, 255, 255, 0.08);
@@ -96,22 +92,25 @@
   /* Low-opacity mesh tints. These replace flat white hover fills while keeping
    * the monochrome base intact. Components can opt into a variant by assigning
    * --interaction-mesh-current. */
+  --interaction-mesh-strong: color-mix(in srgb, var(--color-fg) 18%, transparent);
+  --interaction-mesh-mid: color-mix(in srgb, var(--color-fg) 10%, transparent);
+  --interaction-mesh-soft: color-mix(in srgb, var(--color-fg) 5%, transparent);
   --interaction-mesh-a:
-    radial-gradient(circle at 18% 12%, rgba(255, 255, 255, 0.18), transparent 30%),
-    radial-gradient(circle at 86% 80%, rgba(255, 255, 255, 0.10), transparent 36%),
-    linear-gradient(135deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.12));
+    radial-gradient(circle at 18% 12%, var(--interaction-mesh-strong), transparent 30%),
+    radial-gradient(circle at 86% 80%, var(--interaction-mesh-mid), transparent 36%),
+    linear-gradient(135deg, var(--interaction-mesh-soft), var(--interaction-mesh-mid));
   --interaction-mesh-b:
-    radial-gradient(circle at 78% 20%, rgba(255, 255, 255, 0.16), transparent 34%),
-    radial-gradient(circle at 16% 88%, rgba(255, 255, 255, 0.08), transparent 38%),
-    linear-gradient(45deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.11));
+    radial-gradient(circle at 78% 20%, var(--interaction-mesh-strong), transparent 34%),
+    radial-gradient(circle at 16% 88%, var(--interaction-mesh-mid), transparent 38%),
+    linear-gradient(45deg, var(--interaction-mesh-soft), var(--interaction-mesh-mid));
   --interaction-mesh-c:
-    radial-gradient(circle at 52% 10%, rgba(255, 255, 255, 0.13), transparent 28%),
-    radial-gradient(circle at 10% 62%, rgba(255, 255, 255, 0.09), transparent 42%),
-    linear-gradient(160deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.115));
+    radial-gradient(circle at 52% 10%, var(--interaction-mesh-strong), transparent 28%),
+    radial-gradient(circle at 10% 62%, var(--interaction-mesh-mid), transparent 42%),
+    linear-gradient(160deg, var(--interaction-mesh-soft), var(--interaction-mesh-mid));
   --interaction-mesh-d:
-    radial-gradient(circle at 8% 22%, rgba(255, 255, 255, 0.12), transparent 32%),
-    radial-gradient(circle at 92% 52%, rgba(255, 255, 255, 0.11), transparent 34%),
-    linear-gradient(100deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.105));
+    radial-gradient(circle at 8% 22%, var(--interaction-mesh-strong), transparent 32%),
+    radial-gradient(circle at 92% 52%, var(--interaction-mesh-mid), transparent 34%),
+    linear-gradient(100deg, var(--interaction-mesh-soft), var(--interaction-mesh-mid));
   --interaction-mesh-current: var(--interaction-mesh-a);
 
   /* Unified interaction states. Hover is always a tint, press is a slightly
@@ -119,13 +118,13 @@
   --interaction-hover-bg: var(--interaction-mesh-current);
   --interaction-pressed-bg:
     var(--interaction-mesh-current),
-    linear-gradient(rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.08));
+    linear-gradient(var(--surface-hover), var(--surface-hover));
   --interaction-selected-bg:
     var(--interaction-mesh-current),
-    linear-gradient(rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.18));
+    linear-gradient(var(--surface-selected), var(--surface-selected));
   --interaction-selected-hover-bg:
     var(--interaction-mesh-current),
-    linear-gradient(rgba(255, 255, 255, 0.25), rgba(255, 255, 255, 0.25));
+    linear-gradient(var(--surface-selected-strong), var(--surface-selected-strong));
   --interaction-active-bg: var(--color-fg);
   --interaction-active-hover-bg: var(--color-fg-hover);
   --interaction-active-fg: var(--color-fg-inverse);
@@ -163,24 +162,18 @@
 
   /* === Typography ===================================================== */
   --font-family-base:
-    "Akzidenz Grotesk Next",
+    "Almarai",
     "Helvetica Neue",
     "HelveticaNeue",
     "Helvetica",
     "Arial",
     system-ui,
     sans-serif;
-  --font-family-mono:
-    "Berkeley Mono",
-    "JetBrains Mono",
-    "SF Mono",
-    "Menlo",
-    "Consolas",
-    monospace;
 
   /* Compact DAW UI sizes. Use these for dense controls, rows, hints, and
    * editor surfaces. 11px is the default dense interactive size; 10px is
    * reserved for faint non-interactive tick/hint annotations only. */
+  --font-size-nano: 6px;
   --font-size-hint: 10px;
   --font-size-ui: 11px;
   --font-size-field-label: 12px;
@@ -298,71 +291,63 @@
 
 html[data-theme="light"] {
   color-scheme: light;
-  --color-bg: #ffffff;
-  --color-fg: #000000;
-  --color-bg-inverse: #000000;
-  --color-fg-inverse: #ffffff;
+  --theme-core-bg: #f5f5f5;
+  --theme-core-fg: #000000;
   --color-scrim: rgba(0, 0, 0, 0.34);
-  --color-highlight: #000000;
-  --color-highlight-fg: #ffffff;
-  --color-fg-hover: rgba(24, 24, 24, 0.82);
   --grid-line-faint: rgba(0, 0, 0, 0.08);
   --grid-line-soft: rgba(0, 0, 0, 0.12);
   --grid-line-mid: rgba(0, 0, 0, 0.16);
   --grid-line-bold: rgba(0, 0, 0, 0.45);
-  --interaction-mesh-a:
-    radial-gradient(circle at 18% 12%, rgba(0, 0, 0, 0.14), transparent 30%),
-    radial-gradient(circle at 86% 80%, rgba(0, 0, 0, 0.07), transparent 36%),
-    linear-gradient(135deg, rgba(0, 0, 0, 0.035), rgba(0, 0, 0, 0.09));
-  --interaction-mesh-b:
-    radial-gradient(circle at 78% 20%, rgba(0, 0, 0, 0.12), transparent 34%),
-    radial-gradient(circle at 16% 88%, rgba(0, 0, 0, 0.06), transparent 38%),
-    linear-gradient(45deg, rgba(0, 0, 0, 0.03), rgba(0, 0, 0, 0.08));
-  --interaction-mesh-c:
-    radial-gradient(circle at 52% 10%, rgba(0, 0, 0, 0.10), transparent 28%),
-    radial-gradient(circle at 10% 62%, rgba(0, 0, 0, 0.06), transparent 42%),
-    linear-gradient(160deg, rgba(0, 0, 0, 0.03), rgba(0, 0, 0, 0.085));
-  --interaction-mesh-d:
-    radial-gradient(circle at 8% 22%, rgba(0, 0, 0, 0.09), transparent 32%),
-    radial-gradient(circle at 92% 52%, rgba(0, 0, 0, 0.08), transparent 34%),
-    linear-gradient(100deg, rgba(0, 0, 0, 0.03), rgba(0, 0, 0, 0.08));
-  --interaction-pressed-bg:
-    var(--interaction-mesh-current),
-    linear-gradient(rgba(0, 0, 0, 0.06), rgba(0, 0, 0, 0.06));
-  --interaction-selected-bg:
-    var(--interaction-mesh-current),
-    linear-gradient(rgba(0, 0, 0, 0.14), rgba(0, 0, 0, 0.14));
-  --interaction-selected-hover-bg:
-    var(--interaction-mesh-current),
-    linear-gradient(rgba(0, 0, 0, 0.20), rgba(0, 0, 0, 0.20));
+}
+
+html[data-theme="mellow"] {
+  color-scheme: dark;
+  --theme-core-bg: #4a4a4a;
+  --color-bg: #4a4a4a;
+  --theme-core-fg: #f4f4f4;
+  --color-scrim: rgba(24, 24, 24, 0.58);
+  --grid-line-faint: rgba(255, 255, 255, 0.07);
+  --grid-line-soft: rgba(255, 255, 255, 0.11);
+  --grid-line-mid: rgba(255, 255, 255, 0.16);
+  --grid-line-bold: rgba(255, 255, 255, 0.40);
 }
 
 html[data-theme-contrast="low"] {
-  --color-fg-hover: color-mix(in srgb, var(--color-fg) 92%, transparent);
-  --grid-line-faint: color-mix(in srgb, var(--color-fg) 14%, transparent);
-  --grid-line-soft: color-mix(in srgb, var(--color-fg) 18%, transparent);
-  --grid-line-mid: color-mix(in srgb, var(--color-fg) 24%, transparent);
-  --grid-line-bold: color-mix(in srgb, var(--color-fg) 58%, transparent);
-  --surface-subtle: color-mix(in srgb, var(--color-fg) 14%, var(--color-bg));
-  --surface-hover: color-mix(in srgb, var(--color-fg) 20%, var(--color-bg));
-  --surface-selected: color-mix(in srgb, var(--color-fg) 42%, var(--color-bg));
-  --surface-selected-strong: color-mix(in srgb, var(--color-fg) 58%, var(--color-bg));
-  --border-fg-color: color-mix(in srgb, var(--color-fg) 82%, transparent);
-  --border-soft: 1px solid color-mix(in srgb, var(--color-fg) 48%, transparent);
+  --contrast-fg-strength: 66%;
+  --color-fg-hover: color-mix(in srgb, var(--color-fg) 76%, var(--color-bg));
+  --grid-line-faint: color-mix(in srgb, var(--color-fg) 4%, transparent);
+  --grid-line-soft: color-mix(in srgb, var(--color-fg) 7%, transparent);
+  --grid-line-mid: color-mix(in srgb, var(--color-fg) 10%, transparent);
+  --grid-line-bold: color-mix(in srgb, var(--color-fg) 28%, transparent);
+  --surface-subtle: color-mix(in srgb, var(--color-fg) 4%, var(--color-bg));
+  --surface-hover: color-mix(in srgb, var(--color-fg) 8%, var(--color-bg));
+  --surface-selected: color-mix(in srgb, var(--color-fg) 18%, var(--color-bg));
+  --surface-selected-strong: color-mix(in srgb, var(--color-fg) 28%, var(--color-bg));
+  --border-fg-color: color-mix(in srgb, var(--color-fg) 42%, transparent);
+  --border-structural-color: color-mix(in srgb, var(--color-fg) 32%, transparent);
+  --border-soft: 1px solid color-mix(in srgb, var(--color-fg) 22%, transparent);
+  --interaction-mesh-strong: color-mix(in srgb, var(--color-fg) 8%, transparent);
+  --interaction-mesh-mid: color-mix(in srgb, var(--color-fg) 5%, transparent);
+  --interaction-mesh-soft: color-mix(in srgb, var(--color-fg) 2%, transparent);
 }
 
 html[data-theme-contrast="high"] {
-  --color-fg-hover: color-mix(in srgb, var(--color-fg) 72%, transparent);
-  --grid-line-faint: color-mix(in srgb, var(--color-fg) 5%, transparent);
-  --grid-line-soft: color-mix(in srgb, var(--color-fg) 9%, transparent);
-  --grid-line-mid: color-mix(in srgb, var(--color-fg) 14%, transparent);
-  --grid-line-bold: color-mix(in srgb, var(--color-fg) 52%, transparent);
-  --surface-subtle: color-mix(in srgb, var(--color-fg) 5%, var(--color-bg));
-  --surface-hover: color-mix(in srgb, var(--color-fg) 11%, var(--color-bg));
-  --surface-selected: color-mix(in srgb, var(--color-fg) 30%, var(--color-bg));
-  --surface-selected-strong: color-mix(in srgb, var(--color-fg) 54%, var(--color-bg));
-  --border-fg-color: color-mix(in srgb, var(--color-fg) 64%, transparent);
-  --border-soft: 1px solid color-mix(in srgb, var(--color-fg) 28%, transparent);
+  --contrast-fg-strength: 100%;
+  --color-fg-hover: color-mix(in srgb, var(--color-fg) 94%, var(--color-bg));
+  --grid-line-faint: color-mix(in srgb, var(--color-fg) 12%, transparent);
+  --grid-line-soft: color-mix(in srgb, var(--color-fg) 18%, transparent);
+  --grid-line-mid: color-mix(in srgb, var(--color-fg) 26%, transparent);
+  --grid-line-bold: color-mix(in srgb, var(--color-fg) 68%, transparent);
+  --surface-subtle: color-mix(in srgb, var(--color-fg) 12%, var(--color-bg));
+  --surface-hover: color-mix(in srgb, var(--color-fg) 20%, var(--color-bg));
+  --surface-selected: color-mix(in srgb, var(--color-fg) 48%, var(--color-bg));
+  --surface-selected-strong: color-mix(in srgb, var(--color-fg) 66%, var(--color-bg));
+  --border-fg-color: color-mix(in srgb, var(--color-fg) 100%, transparent);
+  --border-structural-color: color-mix(in srgb, var(--color-fg) 76%, transparent);
+  --border-soft: 1px solid color-mix(in srgb, var(--color-fg) 58%, transparent);
+  --interaction-mesh-strong: color-mix(in srgb, var(--color-fg) 24%, transparent);
+  --interaction-mesh-mid: color-mix(in srgb, var(--color-fg) 14%, transparent);
+  --interaction-mesh-soft: color-mix(in srgb, var(--color-fg) 7%, transparent);
 }
 
 /* Theme inversion utility — for the few surfaces that need a white base.

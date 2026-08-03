@@ -10,6 +10,28 @@ export type Id = string;
 export type Beats = number; // floating-point position/length in beats
 export type DrumSpeed = 1 | 2 | 3 | 4 | 5 | 6;
 
+export interface LibraryCreator {
+  id: Id;
+  displayName: string;
+  kind: "user" | "organization" | "factory";
+}
+
+/** Common ownership and provenance record for anything reusable in Beat's library. */
+export interface LibraryItemMetadata {
+  schemaVersion: 1;
+  creator: LibraryCreator;
+  createdAt: number;
+  updatedAt: number;
+  version: number;
+  description?: string;
+  tags: string[];
+  license?: string;
+  provenance?: string;
+  visibility: "private" | "unlisted" | "public";
+  publishedAt?: number;
+  forkedFromId?: Id;
+}
+
 export type TrackKind = "audio" | "midi" | "mixed" | "group";
 export type AudioStemKind = "drums" | "bass" | "vocals" | "other";
 
@@ -76,6 +98,8 @@ export interface MidiArpeggiation {
 }
 
 export interface MidiNote {
+  /** Stable identity for collaboration, selection, and future note-level comments. */
+  id?: Id;
   pitch: number; // MIDI note number 0..127
   /** Optional exact oscillator frequency. Used by drum cells that store Hz. */
   frequencyHz?: number;
@@ -347,6 +371,8 @@ export interface AdsrEnvelope {
 export interface Instrument {
   id: Id;
   name: string;
+  /** Normalized library ownership, versioning, and publishing metadata. */
+  libraryMetadata?: LibraryItemMetadata;
   /** Creation timestamp used by library ordering. Older factory instruments may omit it. */
   createdAt?: number;
   /** Most recent user edit timestamp used by library ordering. */
@@ -1095,6 +1121,7 @@ export interface InstrumentSet {
   name: string;
   collapsed?: boolean;
   factory?: boolean;
+  libraryMetadata?: LibraryItemMetadata;
 }
 
 export interface AudioFile {

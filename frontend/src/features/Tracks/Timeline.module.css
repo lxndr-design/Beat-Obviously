@@ -42,7 +42,7 @@
 .label {
   position: absolute;
   left: 3px;
-  font-family: var(--font-family-mono);
+  font-family: var(--font-family-base);
   font-size: var(--font-size-ui);
   color: var(--color-fg);
   opacity: 0.7;

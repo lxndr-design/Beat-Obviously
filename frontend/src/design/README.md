@@ -44,9 +44,10 @@ plugin marks, node cables, and generated assets must also stay grayscale.
 
 ### Typography
 
-Use `--font-family-base` for UI and `--font-family-mono` for technical readouts.
-The base UI face is Akzidenz Grotesk Next, bundled from `public/assets/fonts/`
-with light, regular, italic, medium, and bold faces.
+Use `--font-family-base` for every text surface, including technical readouts
+and dense numeric/editor controls. Beat has no separate technical typeface
+path. The locally bundled Almarai family provides Light, Regular, Bold, and
+ExtraBold faces from `public/assets/fonts/`.
 
 Compact DAW UI tokens:
 
@@ -58,7 +59,7 @@ Compact DAW UI tokens:
 
 `LibrarySearch` is the full-width filtering row placed directly below library section ribbons.
 
-App themes are selected with `html[data-theme="dark|light"]`. Dark is the default token set; light mode overrides palette and interaction tokens without changing component CSS.
+App themes are selected with `html[data-theme="dark|light|mellow"]`. Dark is the default token set; Light reverses the monochrome palette, and Mellow uses a softer graphite-gray base. Theme variants override palette and interaction tokens without changing component CSS.
 - `--font-size-ui-lg`: 14px, larger dense controls.
 - `--font-size-section`: 16px, section labels and standard readable text.
 - `--font-size-title`: 18px, compact modal and panel titles.

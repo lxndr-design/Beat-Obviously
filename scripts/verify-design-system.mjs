@@ -37,6 +37,8 @@ const modulationMatrixCssPath = join(frontendSrc, "features", "Synth", "Modulati
 const timeSignatureControlPath = join(frontendSrc, "features", "Transport", "TimeSignatureControl.solid.tsx");
 const timeSignatureControlCssPath = join(frontendSrc, "features", "Transport", "TimeSignatureControl.module.css");
 const timeSignatureModalCssPath = join(frontendSrc, "features", "Transport", "TimeSignatureModal.module.css");
+const assetPageShellCssPath = join(frontendSrc, "features", "HomeHub", "AssetPageShell.module.css");
+const audioFilesPageCssPath = join(frontendSrc, "features", "HomeHub", "AudioFilesPage.module.css");
 
 const failures = [];
 const usedPhIconNames = new Map();
@@ -310,6 +312,40 @@ if (tokenSource.includes("--transition-invert")) {
 if (tokenSource.includes("--font-size-7") || tokenSource.includes("--font-size-8")) {
   fail("Unused display font sizes 7 and 8 must stay removed from frontend/src/design/tokens.css.");
 }
+const themeBlock = (selector) => tokenSource.match(new RegExp(`${selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*\\{([^}]+)\\}`))?.[1] ?? "";
+const lightThemeBlock = themeBlock('html[data-theme="light"]');
+const mellowThemeBlock = themeBlock('html[data-theme="mellow"]');
+const lowContrastBlock = themeBlock('html[data-theme-contrast="low"]');
+const highContrastBlock = themeBlock('html[data-theme-contrast="high"]');
+if (!tokenSource.includes("--theme-core-bg: #000000;")) {
+  fail("Dark theme must retain an immutable black core background.");
+}
+if (!lightThemeBlock.includes("--theme-core-bg: #f5f5f5;")) {
+  fail("Light theme must retain its immutable off-white core background.");
+}
+if (!mellowThemeBlock.includes("--theme-core-bg: #4a4a4a;")) {
+  fail("Mellow theme must retain its immutable graphite core background.");
+}
+for (const [name, block] of [["low", lowContrastBlock], ["high", highContrastBlock]]) {
+  if (/--(?:theme-core-bg|color-bg)\s*:/.test(block)) {
+    fail(`${name} contrast must not change a theme's core background.`);
+  }
+}
+if (!lowContrastBlock.includes("--contrast-fg-strength: 66%;") || !highContrastBlock.includes("--contrast-fg-strength: 100%;")) {
+  fail("Theme contrast must increase foreground separation monotonically from low to high.");
+}
+const assetPageShellCss = readFileSync(assetPageShellCssPath, "utf8");
+const audioFilesPageCss = readFileSync(audioFilesPageCssPath, "utf8");
+if (!assetPageShellCss.includes("grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);")
+    || !assetPageShellCss.includes("@media (max-width: 660px)")) {
+  fail("Asset pages must retain both panes at normal Mac window widths and stack only on compact windows.");
+}
+if (!assetPageShellCss.includes("width: 100%;") || !assetPageShellCss.includes("max-width: 100%;") || !assetPageShellCss.includes("overflow: hidden;")) {
+  fail("Asset page shells must contain intrinsic browser width instead of pushing previews off-screen.");
+}
+if (!audioFilesPageCss.includes("grid-template-rows: repeat(2, 33px);") || !audioFilesPageCss.includes("grid-template-rows: 66px minmax(0, 1fr);")) {
+  fail("Audio library controls must remain a compact two-row toolbar inside the browser pane.");
+}
 for (const token of ["xs", "sm", "md", "lg"]) {
   if (!tokenSource.includes(`--button-square-${token}: 30px;`)) {
     fail(`Icon-only Button ${token} footprint must stay 30px for an 18px glyph with 6px padding.`);
@@ -497,6 +533,10 @@ if (/\.dropItem:hover\b|\.button:hover\b/.test(timeSignatureControlCssSource)) {
 // and piano-roll internals that are domain geometry rather than standalone UI.
 const featureRawColorAllowlist = [
   {
+    file: "frontend/src/features/SegmentEditor/segmentColors.ts",
+    line: /#[0-9a-fA-F]{6}/,
+  },
+  {
     file: "frontend/src/features/InstrumentEditor/InstrumentWaveformPreview.solid.tsx",
     value: "#fff",
     line: /getPropertyValue\("--color-fg"\).*"#fff"/,
@@ -580,15 +620,17 @@ const featureUnknownTokenAllowlist = [
 // whose behavior is not represented by a shared UI primitive.
 const rawFeatureButtonAllowlist = new Map([
   ["frontend/src/features/DrumEditor/DrumSequencer.solid.tsx", ["styles.stepCell"]],
+  ["frontend/src/features/InstrumentEditor/TimelineJumpingSamplerEditor.solid.tsx", ["styles.waveform"]],
   ["frontend/src/features/SegmentEditor/AudioSegmentTransport.solid.tsx", ["styles.waveform"]],
   ["frontend/src/features/DrumpadEditor/DrumpadEditorModal.solid.tsx", ["styles.key", "styles.lanePlug"]],
   ["frontend/src/features/MidiEditor/PianoRoll.solid.tsx", ["styles.automationPointHandle", "styles.curveHandle"]],
   ["frontend/src/features/NodeInstrumentEditor/NodeCanvas.solid.tsx", ["data-node-port"]],
   ["frontend/src/features/PluginLibrary/PluginHostModal.solid.tsx", ["styles.decentSkinHotspot"]],
-  ["frontend/src/features/SegmentEditor/SegmentEditorModal.solid.tsx", ["data-aether-segment-automation-handle"]],
+  ["frontend/src/features/SegmentEditor/SegmentEditorModal.solid.tsx", ["data-aether-segment-automation-handle", "styles.segmentColorButton", "styles.segmentColorChoice"]],
   ["frontend/src/features/Synth/SynthEditor/SynthEditor.solid.tsx", ["styles.fxDragHandle", "styles.envelopeHandle"]],
   ["frontend/src/features/TrackDetails/TrackDetailsModal.solid.tsx", ["data-aether-track-automation-handle"]],
   ["frontend/src/features/Tracks/Segment.solid.tsx", ["data-segment-fade-handle"]],
+  ["frontend/src/features/Tracks/TrackAutomationRows.solid.tsx", ["styles.disclosure", "styles.groupTitle", "styles.valueHeaderTitle", "styles.point"]],
   ["frontend/src/features/Tracks/Timeline.solid.tsx", ["styles.loopClamp"]],
   ["frontend/src/features/Tracks/TrackHeader.solid.tsx", ["styles.name"]],
 ]);

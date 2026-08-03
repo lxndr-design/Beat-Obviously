@@ -113,6 +113,9 @@ async function mockResponse<R extends OutboundRequest>(
       return { ok: true } as unknown as ResponseFor<R>;
     case "project.revealFile":
       return { ok: false, missing: true, error: "View in Folder is only available in the native app." } as unknown as ResponseFor<R>;
+    case "score.revealArtifacts":
+    case "score.openOcrReview":
+      return { ok: false, error: "Score OCR review is only available in the native app." } as unknown as ResponseFor<R>;
     case "project.inspectDocument":
       return {
         path: "",

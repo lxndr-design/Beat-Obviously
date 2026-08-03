@@ -1,29 +1,29 @@
 @font-face {
-  font-family: "Akzidenz Grotesk Next";
+  font-family: "Almarai";
   src:
-    url("/assets/fonts/akzidenz-grotesk-next-regular.otf") format("opentype"),
-    url("../frontend/public/assets/fonts/akzidenz-grotesk-next-regular.otf") format("opentype");
+    url("/assets/fonts/almarai-regular.ttf") format("truetype"),
+    url("../frontend/public/assets/fonts/almarai-regular.ttf") format("truetype");
   font-weight: 400;
   font-style: normal;
   font-display: swap;
 }
 
 @font-face {
-  font-family: "Akzidenz Grotesk Next";
+  font-family: "Almarai";
   src:
-    url("/assets/fonts/akzidenz-grotesk-next-medium.otf") format("opentype"),
-    url("../frontend/public/assets/fonts/akzidenz-grotesk-next-medium.otf") format("opentype");
-  font-weight: 500;
+    url("/assets/fonts/almarai-bold.ttf") format("truetype"),
+    url("../frontend/public/assets/fonts/almarai-bold.ttf") format("truetype");
+  font-weight: 700;
   font-style: normal;
   font-display: swap;
 }
 
 @font-face {
-  font-family: "Akzidenz Grotesk Next";
+  font-family: "Almarai";
   src:
-    url("/assets/fonts/akzidenz-grotesk-next-bold.otf") format("opentype"),
-    url("../frontend/public/assets/fonts/akzidenz-grotesk-next-bold.otf") format("opentype");
-  font-weight: 700;
+    url("/assets/fonts/almarai-extra-bold.ttf") format("truetype"),
+    url("../frontend/public/assets/fonts/almarai-extra-bold.ttf") format("truetype");
+  font-weight: 800;
   font-style: normal;
   font-display: swap;
 }
@@ -46,8 +46,7 @@
   --space-1: 8px;
   --space-2: 16px;
   --space-3: 24px;
-  --font-base: "Akzidenz Grotesk Next", "Helvetica Neue", Arial, sans-serif;
-  --font-mono: "Berkeley Mono", "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+  --font-base: "Almarai", "Helvetica Neue", Arial, sans-serif;
 }
 
 * {
@@ -222,7 +221,7 @@ code {
   border-radius: 3px;
   background: color-mix(in srgb, var(--fg) 12%, var(--bg));
   color: var(--fg);
-  font-family: var(--font-mono);
+  font-family: var(--font-base);
   font-size: 10px;
 }
 

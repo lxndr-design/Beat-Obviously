@@ -16,6 +16,7 @@ import {
   useViewStore,
 } from "../../state/store";
 import { pauseTransport } from "../../audio/transportActions";
+import { drumPlaybackDurationBeats } from "../../state/drumSteps";
 import { useComponentStore } from "../../state/components";
 import { clipboardStore } from "../../state/clipboard";
 import { expandTrackSegments } from "../../state/selectors";
@@ -124,15 +125,17 @@ export function TrackLane(props: Props) {
         label: "Drum Sequencer",
         icon: "ph:squares-four",
         onSelect: () => {
+          const sourceLengthBeats = 16;
+          const speed = 4;
           addEditableSegment({
             name: nextSegmentName(tracks(), "drum"),
             startBeat: lastClickBeat,
-            lengthBeats: 16,
+            lengthBeats: drumPlaybackDurationBeats(sourceLengthBeats, speed),
             payload: {
               kind: "drum",
-              stepCount: 16,
-              speed: 4,
-              sourceLengthBeats: 16,
+              stepCount: sourceLengthBeats,
+              speed,
+              sourceLengthBeats,
               defaultPitchHz: 261.63,
               swingPercent: 50,
               rows: makeDefaultDrumRows(instruments()),
@@ -259,10 +262,11 @@ export function TrackLane(props: Props) {
       const component = useComponentStore.getState().components.find((candidate) => candidate.id === componentId);
       if (!component) return;
       if (component.kind === "drum") {
+        const arrangedLengthBeats = drumPlaybackDurationBeats(component.lengthBeats, component.speed);
         projectStore.addSegment(props.trackId, {
           name: component.name || nextSegmentName(tracks(), "drum"),
           startBeat,
-          lengthBeats: component.lengthBeats,
+          lengthBeats: arrangedLengthBeats,
           payload: {
             kind: "drum",
             rows: structuredClone(component.rows),
@@ -282,7 +286,9 @@ export function TrackLane(props: Props) {
           payload: { kind: "midi", notes: structuredClone(component.notes) },
         });
       }
-      viewStore.setLastSegmentLength(component.lengthBeats);
+      viewStore.setLastSegmentLength(component.kind === "drum"
+        ? drumPlaybackDurationBeats(component.lengthBeats, component.speed)
+        : component.lengthBeats);
       return;
     }
 

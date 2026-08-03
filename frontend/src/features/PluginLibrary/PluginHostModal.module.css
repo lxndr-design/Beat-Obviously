@@ -462,7 +462,7 @@
 }
 
 .decentBadge span {
-  font-family: var(--font-family-mono);
+  font-family: var(--font-family-base);
   font-size: var(--font-size-ui);
   line-height: 1;
   opacity: 0.65;

@@ -464,6 +464,7 @@ export function AudioFilesPage() {
       browser={
         <>
         <div class={styles.browserControls}>
+          <div class={styles.searchControls}>
           <span class={styles.searchField}>
             <Icon name="ph:magnifying-glass" size={18} decorative />
             <LibrarySearch
@@ -484,6 +485,7 @@ export function AudioFilesPage() {
             onChange={(value) => setStatusFilter(value as AudioStatusFilter)}
           />
           <span class={styles.searchCount}>{sortedFiles().length}/{files().length}</span>
+          </div>
           <div class={styles.actions}>
             <Show when={selectMode()}>
               <span class={styles.selectionCount}>{selectedCount()} selected</span>

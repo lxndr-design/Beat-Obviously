@@ -55,7 +55,7 @@
 
 .subtitle {
   font-size: var(--font-size-ui);
-  font-family: var(--font-family-mono);
+  font-family: var(--font-family-base);
   opacity: 0.6; /* deliberate exception — meta text, never on actionable controls */
 }
 

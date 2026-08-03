@@ -1,6 +1,7 @@
 #include "MessageBridge.h"
 #include "../DiagnosticLog.h"
 #include "Schema.h"
+#include "../Score/PdfPageRenderer.h"
 #include "../Audio/Analysis/AudioFileAnalyzer.h"
 #include "../Audio/Effects/TrackEffectDefaults.h"
 #include "../Audio/Parameters/SynthPatchContract.h"
@@ -33,6 +34,539 @@ namespace beat
         constexpr const char* decentImportWildcard = "*.dspreset;*.zip";
         constexpr const char* sfzImportWildcard = "*.sfz";
         constexpr const char* granularImportWildcard = "*.wav;*.aif;*.aiff;*.flac";
+        constexpr const char* scoreImportWildcard = "*.musicxml;*.mxl;*.xml;*.pdf;*.png;*.jpg;*.jpeg;*.tif;*.tiff;*.bmp";
+
+        struct AudiverisLaunch
+        {
+            juce::File executable;
+            juce::StringArray arguments;
+        };
+
+        struct HomrLaunch
+        {
+            juce::File executable;
+            juce::StringArray arguments;
+        };
+
+        AudiverisLaunch headlessAudiverisLaunch(const juce::File& appLauncher)
+        {
+            const auto contents = appLauncher.getParentDirectory().getParentDirectory();
+            const auto java = contents.getChildFile("runtime/Contents/Home/bin/java");
+            const auto appDirectory = contents.getChildFile("app");
+            if (! java.existsAsFile() || ! appDirectory.getChildFile("audiveris.jar").existsAsFile())
+                return {};
+
+            juce::StringArray arguments;
+            arguments.add(java.getFullPathName());
+            arguments.add("-Djava.awt.headless=true");
+            arguments.add("--add-exports=java.desktop/sun.awt.image=ALL-UNNAMED");
+            arguments.add("--enable-native-access=ALL-UNNAMED");
+            arguments.add("-Dfile.encoding=UTF-8");
+            arguments.add("-Xms512m");
+            arguments.add("-Xmx8G");
+            arguments.add("-cp");
+            arguments.add(appDirectory.getChildFile("*").getFullPathName());
+            arguments.add("Audiveris");
+            return { java, arguments };
+        }
+
+        AudiverisLaunch audiverisLaunchFor(const juce::File& executable)
+        {
+            if (executable.getFullPathName().containsIgnoreCase(".app/Contents/MacOS/Audiveris"))
+            {
+                const auto headless = headlessAudiverisLaunch(executable);
+                if (headless.executable.existsAsFile())
+                    return headless;
+            }
+            juce::StringArray arguments;
+            arguments.add(executable.getFullPathName());
+            return { executable, arguments };
+        }
+
+        AudiverisLaunch findAudiverisLaunch()
+        {
+            const auto overridePath = juce::SystemStats::getEnvironmentVariable("BEAT_AUDIVERIS", {});
+            if (overridePath.isNotEmpty())
+            {
+                const juce::File overrideFile(overridePath);
+                if (overrideFile.existsAsFile())
+                    return audiverisLaunchFor(overrideFile);
+            }
+            for (const auto& path : {
+                "/Applications/Audiveris.app/Contents/MacOS/Audiveris",
+                "/Applications/Audiveris.app/Contents/MacOS/audiveris",
+                "/opt/homebrew/bin/audiveris",
+                "/usr/local/bin/audiveris"
+            })
+            {
+                const juce::File candidate(path);
+                if (candidate.existsAsFile())
+                    return audiverisLaunchFor(candidate);
+            }
+            return {};
+        }
+
+        HomrLaunch findHomrLaunch()
+        {
+            const auto overridePath = juce::SystemStats::getEnvironmentVariable("BEAT_HOMR", {});
+            juce::Array<juce::File> candidates;
+            if (overridePath.isNotEmpty()) candidates.add(juce::File(overridePath));
+            candidates.add(juce::File::getCurrentWorkingDirectory().getChildFile(".venv-homr/bin/homr"));
+            auto executableAncestor = juce::File::getSpecialLocation(juce::File::currentExecutableFile).getParentDirectory();
+            for (int depth = 0; depth < 8 && executableAncestor != executableAncestor.getParentDirectory(); ++depth)
+            {
+                candidates.add(executableAncestor.getChildFile(".venv-homr/bin/homr"));
+                executableAncestor = executableAncestor.getParentDirectory();
+            }
+            candidates.add(juce::File("/opt/homebrew/bin/homr"));
+            candidates.add(juce::File("/usr/local/bin/homr"));
+            candidates.add(juce::File::getSpecialLocation(juce::File::userHomeDirectory).getChildFile(".local/bin/homr"));
+            for (const auto& candidate : candidates)
+            {
+                if (! candidate.existsAsFile()) continue;
+                juce::StringArray arguments;
+                arguments.add(candidate.getFullPathName());
+                return { candidate, arguments };
+            }
+            return {};
+        }
+
+        juce::File findHomrCompatibilityRunner()
+        {
+            const auto executable = juce::File::getSpecialLocation(juce::File::currentExecutableFile);
+            const juce::Array<juce::File> candidates {
+                juce::File::getCurrentWorkingDirectory().getChildFile("scripts/run-homr-for-beat.py"),
+                executable.getParentDirectory().getParentDirectory().getChildFile("Resources/run-homr-for-beat.py"),
+            };
+            for (const auto& candidate : candidates)
+                if (candidate.existsAsFile()) return candidate;
+            return {};
+        }
+
+        juce::File homrPythonInterpreter(const juce::File& homrExecutable)
+        {
+            juce::FileInputStream input(homrExecutable);
+            if (! input.openedOk()) return {};
+            const auto firstLine = input.readNextLine().trim();
+            if (! firstLine.startsWith("#!")) return {};
+            const auto interpreter = juce::File(firstLine.substring(2).trim());
+            return interpreter.existsAsFile() ? interpreter : juce::File();
+        }
+
+        juce::File findExportedMusicXml(const juce::File& outputDirectory)
+        {
+            for (const auto& file : juce::RangedDirectoryIterator(outputDirectory, true, "*.mxl;*.musicxml;*.xml", juce::File::findFiles))
+            {
+                if (! file.getFile().getFullPathName().contains("META-INF"))
+                    return file.getFile();
+            }
+            return {};
+        }
+
+        juce::File findScoreOcrArtifact(const juce::File& outputDirectory, const juce::String& wildcard)
+        {
+            for (const auto& file : juce::RangedDirectoryIterator(outputDirectory, true, wildcard, juce::File::findFiles))
+                return file.getFile();
+            return {};
+        }
+
+        juce::File scoreOcrLibraryDirectory()
+        {
+            return juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory)
+                .getChildFile("Beat")
+                .getChildFile("Score OCR");
+        }
+
+        juce::File createScoreOcrArtifactDirectory(const juce::File& source)
+        {
+            auto root = scoreOcrLibraryDirectory();
+            root.createDirectory();
+            auto stem = juce::File::createLegalFileName(source.getFileNameWithoutExtension()).trim();
+            if (stem.isEmpty()) stem = "Score";
+            auto directory = root.getChildFile(stem + "-" + juce::Uuid().toString().substring(0, 8));
+            return directory.createDirectory().wasOk() ? directory : juce::File();
+        }
+
+        int countAudiverisOutputLines(const juce::String& output, const juce::String& token)
+        {
+            int count = 0;
+            juce::StringArray lines;
+            lines.addLines(output);
+            for (const auto& line : lines)
+                if (line.containsIgnoreCase(token)) ++count;
+            return count;
+        }
+
+        bool scoreArtifactPathIsManaged(const juce::File& file)
+        {
+            auto root = scoreOcrLibraryDirectory().getFullPathName().replaceCharacter('\\', '/');
+            auto path = file.getFullPathName().replaceCharacter('\\', '/');
+            if (! root.endsWithChar('/')) root += "/";
+            return path.startsWithIgnoreCase(root);
+        }
+
+        void addScoreOcrArtifactProperties(juce::DynamicObject& response,
+                                           const juce::File& directory,
+                                           const juce::File& scoreFile,
+                                           const juce::String& output,
+                                           const juce::String& logFileName = "audiveris.log")
+        {
+            if (! directory.isDirectory()) return;
+            const auto logFile = directory.getChildFile(logFileName);
+            logFile.replaceWithText(output);
+            const auto omrFile = findScoreOcrArtifact(directory, "*.omr");
+            response.setProperty("artifactDirectoryPath", directory.getFullPathName());
+            response.setProperty("ocrLogPath", logFile.getFullPathName());
+            if (omrFile.existsAsFile()) response.setProperty("omrPath", omrFile.getFullPathName());
+            if (scoreFile.existsAsFile()) response.setProperty("musicXmlPath", scoreFile.getFullPathName());
+            response.setProperty("ocrWarningCount", countAudiverisOutputLines(output, "WARN"));
+            response.setProperty("ocrErrorCount", countAudiverisOutputLines(output, "ERROR"));
+            response.setProperty("ocrExceptionCount", countAudiverisOutputLines(output, "Exception"));
+        }
+
+        struct AudiverisRunResult
+        {
+            bool started = false;
+            bool timedOut = false;
+            int exitCode = -1;
+            juce::String output;
+            juce::File scoreFile;
+        };
+
+        AudiverisRunResult runAudiveris(const AudiverisLaunch& audiveris,
+                                        const juce::File& source,
+                                        const juce::File& outputDirectory,
+                                        int firstSheet = 0,
+                                        int lastSheet = 0)
+        {
+            AudiverisRunResult result;
+            outputDirectory.createDirectory();
+            auto arguments = audiveris.arguments;
+            arguments.add("-batch");
+            arguments.add("-transcribe");
+            arguments.add("-export");
+            if (firstSheet > 0)
+            {
+                arguments.add("-swap");
+                arguments.add("-sheets");
+                arguments.add(firstSheet == lastSheet ? juce::String(firstSheet)
+                                                       : juce::String(firstSheet) + "-" + juce::String(lastSheet));
+            }
+            arguments.add("-output");
+            arguments.add(outputDirectory.getFullPathName());
+            arguments.add("--");
+            arguments.add(source.getFullPathName());
+            juce::ChildProcess process;
+            result.started = process.start(arguments, juce::ChildProcess::wantStdOut | juce::ChildProcess::wantStdErr);
+            if (! result.started) return result;
+
+            juce::String capturedOutput;
+            std::thread outputReader([&process, &capturedOutput]
+            {
+                capturedOutput = process.readAllProcessOutput();
+            });
+            if (! process.waitForProcessToFinish(10 * 60 * 1000))
+            {
+                process.kill();
+                process.waitForProcessToFinish(5000);
+                result.timedOut = true;
+            }
+            outputReader.join();
+            result.output = capturedOutput.trim();
+            result.exitCode = process.getExitCode();
+            result.scoreFile = findExportedMusicXml(outputDirectory);
+            return result;
+        }
+
+        struct HomrRunResult
+        {
+            bool started = false;
+            bool timedOut = false;
+            int exitCode = -1;
+            juce::String output;
+            juce::File scoreFile;
+        };
+
+        HomrRunResult runHomr(const HomrLaunch& homr,
+                              const juce::File& sourceImage,
+                              const juce::File& outputDirectory)
+        {
+            HomrRunResult result;
+            if (! homr.executable.existsAsFile()) return result;
+            if (outputDirectory.createDirectory().failed()) return result;
+
+            auto extension = sourceImage.getFileExtension().toLowerCase();
+            if (extension != ".png" && extension != ".jpg" && extension != ".jpeg") return result;
+            auto workingImage = outputDirectory.getChildFile("source" + extension);
+            if (sourceImage.getFullPathName() != workingImage.getFullPathName()
+                && ! sourceImage.copyFileTo(workingImage))
+                return result;
+            if (! workingImage.existsAsFile()) workingImage = sourceImage;
+
+            auto arguments = homr.arguments;
+            const auto compatibilityRunner = findHomrCompatibilityRunner();
+            const auto python = homrPythonInterpreter(homr.executable);
+            if (compatibilityRunner.existsAsFile() && python.existsAsFile())
+            {
+                arguments.clear();
+                arguments.add(python.getFullPathName());
+                arguments.add(compatibilityRunner.getFullPathName());
+            }
+            arguments.add(workingImage.getFullPathName());
+            juce::ChildProcess process;
+            result.started = process.start(arguments, juce::ChildProcess::wantStdOut | juce::ChildProcess::wantStdErr);
+            if (! result.started) return result;
+
+            juce::String capturedOutput;
+            std::thread outputReader([&process, &capturedOutput]
+            {
+                capturedOutput = process.readAllProcessOutput();
+            });
+            if (! process.waitForProcessToFinish(10 * 60 * 1000))
+            {
+                process.kill();
+                process.waitForProcessToFinish(5000);
+                result.timedOut = true;
+            }
+            outputReader.join();
+            result.output = capturedOutput.trim();
+            result.exitCode = process.getExitCode();
+            result.scoreFile = workingImage.withFileExtension(".musicxml");
+            return result;
+        }
+
+        juce::var encodedPageScore(const juce::File& scoreFile,
+                                   int firstPage,
+                                   int lastPage,
+                                   const juce::String& engine = "audiveris")
+        {
+            juce::MemoryBlock data;
+            if (! scoreFile.loadFileAsData(data) || data.getSize() == 0) return {};
+            juce::DynamicObject::Ptr score = new juce::DynamicObject();
+            score->setProperty("name", scoreFile.getFileName());
+            score->setProperty("dataBase64", juce::Base64::toBase64(data.getData(), data.getSize()));
+            score->setProperty("firstPage", firstPage);
+            score->setProperty("lastPage", lastPage);
+            score->setProperty("ocrEngine", engine);
+            return juce::var(score.get());
+        }
+
+        bool recoverPdfRange(const AudiverisLaunch& audiveris,
+                             const HomrLaunch& homr,
+                             const juce::File& source,
+                             const juce::File& artifactDirectory,
+                             int firstPage,
+                             int lastPage,
+                             juce::Array<juce::var>& pageScores,
+                             juce::String& aggregateLog)
+        {
+            const auto rangeName = "pages-" + juce::String(firstPage).paddedLeft('0', 4)
+                + "-" + juce::String(lastPage).paddedLeft('0', 4);
+            const auto rangeDirectory = artifactDirectory.getChildFile("page-recovery").getChildFile(rangeName);
+            AudiverisRunResult range;
+            if (audiveris.executable.existsAsFile())
+                range = runAudiveris(audiveris, source, rangeDirectory, firstPage, lastPage);
+            aggregateLog += juce::newLine + juce::newLine + "--- Audiveris recovery " + rangeName + " ---" + juce::newLine
+                + (audiveris.executable.existsAsFile() ? range.output : juce::String("Audiveris is unavailable."));
+            if (range.exitCode == 0 && range.scoreFile.existsAsFile())
+            {
+                const auto encoded = encodedPageScore(range.scoreFile, firstPage, lastPage);
+                if (! encoded.isVoid()) pageScores.add(encoded);
+                return ! encoded.isVoid();
+            }
+
+            if (firstPage < lastPage)
+            {
+                const auto midpoint = firstPage + (lastPage - firstPage) / 2;
+                const auto left = recoverPdfRange(audiveris, homr, source, artifactDirectory, firstPage, midpoint, pageScores, aggregateLog);
+                const auto right = recoverPdfRange(audiveris, homr, source, artifactDirectory, midpoint + 1, lastPage, pageScores, aggregateLog);
+                return left || right;
+            }
+
+            const auto renderedDirectory = artifactDirectory.getChildFile("page-recovery").getChildFile("rendered");
+            const auto renderedPage = renderedDirectory.getChildFile("page-" + juce::String(firstPage).paddedLeft('0', 4) + ".png");
+            const auto rendered = renderPdfPageToPng(source, firstPage, renderedPage, 400.0);
+            if (! rendered.file.existsAsFile())
+            {
+                aggregateLog += juce::newLine + "Adaptive-resolution retry unavailable: " + rendered.error;
+                return false;
+            }
+            const auto refinedPage = renderedDirectory.getChildFile("page-" + juce::String(firstPage).paddedLeft('0', 4) + "-refined.png");
+            const auto refinement = refineScorePageForOcr(rendered.file, refinedPage);
+            aggregateLog += juce::newLine + "Adaptive page analysis: interline=" + juce::String(refinement.detectedInterlinePixels, 2)
+                + "px, scale=" + juce::String(refinement.appliedScale, 3)
+                + ", crop=" + refinement.sourceCrop.toString()
+                + (refinement.error.isNotEmpty() ? ", warning=" + refinement.error : juce::String());
+
+            const auto adaptiveDirectory = artifactDirectory.getChildFile("page-recovery")
+                .getChildFile("adaptive-" + juce::String(firstPage).paddedLeft('0', 4));
+            AudiverisRunResult adaptive;
+            if (audiveris.executable.existsAsFile())
+                adaptive = runAudiveris(audiveris, rendered.file, adaptiveDirectory);
+            aggregateLog += juce::newLine + juce::newLine + "--- Audiveris 400 DPI page " + juce::String(firstPage) + " ---" + juce::newLine
+                + (audiveris.executable.existsAsFile() ? adaptive.output : juce::String("Audiveris is unavailable."));
+            if (adaptive.exitCode == 0 && adaptive.scoreFile.existsAsFile())
+            {
+                const auto encoded = encodedPageScore(adaptive.scoreFile, firstPage, firstPage);
+                if (! encoded.isVoid()) pageScores.add(encoded);
+                return ! encoded.isVoid();
+            }
+
+            AudiverisRunResult refinedAudiveris;
+            if (audiveris.executable.existsAsFile() && refinement.file.existsAsFile())
+                refinedAudiveris = runAudiveris(audiveris, refinement.file, adaptiveDirectory.getChildFile("refined"));
+            aggregateLog += juce::newLine + juce::newLine + "--- Audiveris refined page " + juce::String(firstPage) + " ---" + juce::newLine
+                + (refinement.file.existsAsFile() ? refinedAudiveris.output : juce::String("No refined page was available."));
+            if (refinedAudiveris.exitCode == 0 && refinedAudiveris.scoreFile.existsAsFile())
+            {
+                const auto encoded = encodedPageScore(refinedAudiveris.scoreFile, firstPage, firstPage);
+                if (! encoded.isVoid()) pageScores.add(encoded);
+                return ! encoded.isVoid();
+            }
+
+            const auto homrDirectory = artifactDirectory.getChildFile("page-recovery")
+                .getChildFile("homr-" + juce::String(firstPage).paddedLeft('0', 4));
+            const auto homrInput = refinement.file.existsAsFile() ? refinement.file : rendered.file;
+            const auto homrResult = runHomr(homr, homrInput, homrDirectory);
+            aggregateLog += juce::newLine + juce::newLine + "--- homr page " + juce::String(firstPage) + " ---" + juce::newLine
+                + (homr.executable.existsAsFile() ? homrResult.output : juce::String("homr is unavailable."));
+            if (homrResult.exitCode != 0 || ! homrResult.scoreFile.existsAsFile()) return false;
+            const auto encoded = encodedPageScore(homrResult.scoreFile, firstPage, firstPage, "homr");
+            if (! encoded.isVoid()) pageScores.add(encoded);
+            return ! encoded.isVoid();
+        }
+
+        juce::Array<juce::var> recoverPdfPages(const AudiverisLaunch& audiveris,
+                                               const HomrLaunch& homr,
+                                               const juce::File& source,
+                                               const juce::File& artifactDirectory,
+                                               juce::String& aggregateLog)
+        {
+            juce::Array<juce::var> recovered;
+            const auto pages = pdfPageCount(source);
+            if (pages <= 0 || pages > 300)
+            {
+                aggregateLog += juce::newLine + "Adaptive page recovery unavailable: PDF page count is invalid or exceeds 300 pages.";
+                return recovered;
+            }
+            constexpr int initialChunkSize = 8;
+            for (int first = 1; first <= pages; first += initialChunkSize)
+                recoverPdfRange(audiveris, homr, source, artifactDirectory, first, juce::jmin(pages, first + initialChunkSize - 1), recovered, aggregateLog);
+            std::sort(recovered.begin(), recovered.end(), [](const juce::var& left, const juce::var& right)
+            {
+                return (int) left.getProperty("firstPage", 0) < (int) right.getProperty("firstPage", 0);
+            });
+            return recovered;
+        }
+
+        juce::String recoveredOcrEngine(const juce::Array<juce::var>& recovered)
+        {
+            bool hasAudiveris = false;
+            bool hasHomr = false;
+            for (const auto& page : recovered)
+            {
+                const auto engine = page.getProperty("ocrEngine", "audiveris").toString();
+                hasHomr = hasHomr || engine == "homr";
+                hasAudiveris = hasAudiveris || engine != "homr";
+            }
+            if (hasHomr && hasAudiveris) return "hybrid";
+            return hasHomr ? "homr" : "audiveris";
+        }
+
+        juce::var scoreImportResponse(const juce::File& source)
+        {
+            juce::DynamicObject::Ptr response = new juce::DynamicObject();
+            if (! source.existsAsFile())
+            {
+                response->setProperty("error", "The selected score file is missing.");
+                return juce::var(response.get());
+            }
+
+            const auto extension = source.getFileExtension().toLowerCase();
+            auto scoreFile = source;
+            juce::File temporaryDirectory;
+            if (extension != ".musicxml" && extension != ".mxl" && extension != ".xml")
+            {
+                scoreFile = juce::File();
+                const auto audiveris = findAudiverisLaunch();
+                const auto homr = findHomrLaunch();
+                if (! audiveris.executable.existsAsFile() && ! homr.executable.existsAsFile())
+                {
+                    response->setProperty("error", "PDF/image score import needs an OMR engine. Install Audiveris or homr, set BEAT_AUDIVERIS or BEAT_HOMR if needed, or import MusicXML/MXL directly.");
+                    return juce::var(response.get());
+                }
+                temporaryDirectory = createScoreOcrArtifactDirectory(source);
+                if (! temporaryDirectory.isDirectory())
+                {
+                    response->setProperty("error", "Beat could not create a retained Score OCR review folder.");
+                    return juce::var(response.get());
+                }
+                temporaryDirectory.getChildFile("source-path.txt").replaceWithText(source.getFullPathName() + juce::newLine);
+                AudiverisRunResult primary;
+                if (audiveris.executable.existsAsFile())
+                    primary = runAudiveris(audiveris, source, temporaryDirectory);
+                auto output = primary.started ? primary.output : juce::String("Audiveris is unavailable or could not be launched.");
+                if (primary.timedOut)
+                    output += juce::newLine + "Whole-book Audiveris OCR exceeded ten minutes; starting secondary page recovery.";
+
+                if (primary.started && ! primary.timedOut
+                    && primary.exitCode == 0 && primary.scoreFile.existsAsFile())
+                {
+                    scoreFile = primary.scoreFile;
+                    // A successful Audiveris transcribe/export also stores its editable .omr
+                    // book in the output folder. Do not add the documented -save flag here:
+                    // Audiveris 5.11 can collide with its own open ZIP filesystem when that
+                    // flag is combined with -transcribe, turning valid exports into failures.
+                    addScoreOcrArtifactProperties(*response, temporaryDirectory, scoreFile, output);
+                    response->setProperty("ocrEngine", "audiveris");
+                }
+                else if (extension == ".pdf")
+                {
+                    auto recovered = recoverPdfPages(audiveris, homr, source, temporaryDirectory, output);
+                    if (! recovered.isEmpty())
+                    {
+                        response->setProperty("pageScores", recovered);
+                        response->setProperty("ocrEngine", recoveredOcrEngine(recovered));
+                        response->setProperty("adaptiveRecovery", true);
+                        addScoreOcrArtifactProperties(*response, temporaryDirectory, {}, output, "score-ocr.log");
+                        return juce::var(response.get());
+                    }
+                    addScoreOcrArtifactProperties(*response, temporaryDirectory, {}, output, "score-ocr.log");
+                    response->setProperty("error", "The installed score-recognition engines could not recognize this PDF."
+                        + (output.isNotEmpty() ? juce::String(" ") + output.substring(juce::jmax(0, output.length() - 800)) : juce::String()));
+                    return juce::var(response.get());
+                }
+                else if (! scoreFile.existsAsFile())
+                {
+                    const auto homrResult = runHomr(homr, source, temporaryDirectory.getChildFile("homr"));
+                    output += juce::newLine + juce::newLine + "--- homr image fallback ---" + juce::newLine
+                        + (homr.executable.existsAsFile() ? homrResult.output : juce::String("homr is unavailable."));
+                    if (homrResult.exitCode == 0 && homrResult.scoreFile.existsAsFile())
+                    {
+                        scoreFile = homrResult.scoreFile;
+                        addScoreOcrArtifactProperties(*response, temporaryDirectory, scoreFile, output, "score-ocr.log");
+                        response->setProperty("ocrEngine", "homr");
+                    }
+                    else
+                    {
+                        addScoreOcrArtifactProperties(*response, temporaryDirectory, {}, output, "score-ocr.log");
+                        response->setProperty("error", "The installed score-recognition engines could not recognize this image."
+                            + (output.isNotEmpty() ? juce::String(" ") + output.substring(juce::jmax(0, output.length() - 800)) : juce::String()));
+                        return juce::var(response.get());
+                    }
+                }
+            }
+
+            juce::MemoryBlock data;
+            if (! scoreFile.loadFileAsData(data) || data.getSize() == 0)
+            {
+                response->setProperty("error", "Beat could not read the converted MusicXML score.");
+                return juce::var(response.get());
+            }
+            response->setProperty("name", scoreFile.getFileName());
+            response->setProperty("dataBase64", juce::Base64::toBase64(data.getData(), data.getSize()));
+            return juce::var(response.get());
+        }
 
         void setFiniteProperty(juce::DynamicObject& object, const juce::Identifier& name, double value)
         {
@@ -1942,7 +2476,10 @@ namespace beat
                                 {
                                     const int stepCount = juce::jmax(1, (int) payload.getProperty("stepCount", 16));
                                     const double speed = juce::jmax(0.1, (double) payload.getProperty("speed", 4.0));
-                                    const double effectiveLengthBeats = s.lengthBeats / speed;
+                                    const double sourceLengthBeats = juce::jmax(
+                                        0.25,
+                                        (double) payload.getProperty("sourceLengthBeats", stepCount));
+                                    const double effectiveLengthBeats = sourceLengthBeats / speed;
                                     const double stepLengthBeats = effectiveLengthBeats / (double) stepCount;
                                     const double swingPercent = (double) payload.getProperty("swingPercent", 50.0);
                                     const auto defaultPitchHz = (double) payload.getProperty("defaultPitchHz", 0.0);
@@ -4810,6 +5347,66 @@ namespace beat
             return juce::var(response.get());
         }
 
+        if (kind == SCORE_IMPORT)
+        {
+            auto pathHint = payload.getProperty("pathHint", {}).toString();
+            auto start = pathHint.isNotEmpty() ? juce::File(pathHint) : juce::File();
+            if (start.existsAsFile()) start = start.getParentDirectory();
+            juce::FileChooser chooser("Import sheet music", start, scoreImportWildcard, true);
+            if (! chooser.browseForFileToOpen())
+                return juce::var(new juce::DynamicObject());
+            return scoreImportResponse(chooser.getResult());
+        }
+
+        if (kind == SCORE_IMPORT_LIBRARY)
+        {
+            auto pathHint = payload.getProperty("pathHint", {}).toString();
+            auto start = pathHint.isNotEmpty() ? juce::File(pathHint) : juce::File();
+            if (start.existsAsFile()) start = start.getParentDirectory();
+            juce::FileChooser chooser("Import jazz standards library", start, scoreImportWildcard, true);
+            juce::Array<juce::File> results;
+            if (chooser.browseForMultipleFilesToOpen())
+                results = chooser.getResults();
+
+            juce::Array<juce::var> scores;
+            for (const auto& file : results)
+                scores.add(scoreImportResponse(file));
+            juce::DynamicObject::Ptr response = new juce::DynamicObject();
+            response->setProperty("scores", scores);
+            return juce::var(response.get());
+        }
+
+        if (kind == SCORE_REVEAL_ARTIFACTS || kind == SCORE_OPEN_OCR_REVIEW)
+        {
+            juce::DynamicObject::Ptr response = new juce::DynamicObject();
+            const juce::File artifact(payload.getProperty("path", {}).toString());
+            if (! artifact.exists() || ! scoreArtifactPathIsManaged(artifact))
+            {
+                response->setProperty("ok", false);
+                response->setProperty("error", "This retained Score OCR artifact is no longer available.");
+                return juce::var(response.get());
+            }
+
+            if (kind == SCORE_OPEN_OCR_REVIEW)
+            {
+                if (! artifact.existsAsFile() || artifact.getFileExtension().toLowerCase() != ".omr")
+                {
+                    response->setProperty("ok", false);
+                    response->setProperty("error", "No editable Audiveris OMR project was produced for this import.");
+                    return juce::var(response.get());
+                }
+                const auto opened = artifact.startAsProcess();
+                response->setProperty("ok", opened);
+                if (! opened)
+                    response->setProperty("error", "Beat could not open this OMR project in Audiveris.");
+                return juce::var(response.get());
+            }
+
+            (artifact.isDirectory() ? artifact : artifact.getParentDirectory()).revealToUser();
+            response->setProperty("ok", true);
+            return juce::var(response.get());
+        }
+
         if (kind == AUDIO_STEMS_START)
         {
             const auto status = stemSeparation.start(juce::File(payload.getProperty("path", {}).toString()));
@@ -5397,7 +5994,7 @@ namespace beat
         {
             juce::DynamicObject::Ptr o = new juce::DynamicObject();
             o->setProperty("pong", true);
-            o->setProperty("backendVersion", "0.3.1");
+            o->setProperty("backendVersion", "0.3.2");
             return juce::var(o.get());
         }
 

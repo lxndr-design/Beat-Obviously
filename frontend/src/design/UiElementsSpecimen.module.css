@@ -126,7 +126,7 @@
 
 .typeToken,
 .tokenDesc {
-  font-family: var(--font-family-mono);
+  font-family: var(--font-family-base);
 }
 
 .tokenSample {

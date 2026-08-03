@@ -139,6 +139,15 @@
   justify-content: flex-start;
 }
 
+.themeRadio {
+  grid-column: span 2;
+  justify-self: start;
+}
+
+.themeRadio button {
+  width: 63px;
+}
+
 .readout {
   display: grid;
   grid-template-columns: minmax(93px, max-content) minmax(0, 1fr);
@@ -169,7 +178,7 @@
   align-items: center;
   border-left: var(--border-fg);
   padding: 0 6px;
-  font-family: var(--font-family-mono);
+  font-family: var(--font-family-base);
   font-size: var(--font-size-ui);
   line-height: 1;
   overflow: hidden;

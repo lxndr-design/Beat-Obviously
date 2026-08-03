@@ -18,6 +18,7 @@ try {
       join(repoRoot, "frontend/src/testing/interactionRunner.ts"),
       join(repoRoot, "frontend/src/features/MidiEditor/pianoRollInteraction.ts"),
       join(repoRoot, "frontend/src/features/MidiEditor/midiNoteRounding.ts"),
+      join(repoRoot, "frontend/src/features/MidiEditor/midiPreviewScheduling.ts"),
       join(repoRoot, "frontend/src/state/midiNoteGroups.ts"),
       join(repoRoot, "frontend/src/features/SegmentEditor/midiLiveRecording.ts"),
       join(repoRoot, "frontend/src/features/DrumEditor/drumGridSelection.ts"),
@@ -27,6 +28,7 @@ try {
       join(repoRoot, "frontend/src/state/components.ts"),
       join(repoRoot, "frontend/src/features/NodeInstrumentEditor/nodeGraph.ts"),
       join(repoRoot, "frontend/src/solid-ui/FloatingSelect/floatingSelectKeyboard.ts"),
+      join(repoRoot, "frontend/src/solid-ui/AppDialog/state.ts"),
       "--bundle",
       "--format=esm",
       "--platform=node",
@@ -38,6 +40,7 @@ try {
   const runner = await import(pathToFileURL(join(outDir, "testing/interactionRunner.js")));
   const midiInteraction = await import(pathToFileURL(join(outDir, "features/MidiEditor/pianoRollInteraction.js")));
   const midiNoteRounding = await import(pathToFileURL(join(outDir, "features/MidiEditor/midiNoteRounding.js")));
+  const midiPreviewScheduling = await import(pathToFileURL(join(outDir, "features/MidiEditor/midiPreviewScheduling.js")));
   const midiNoteGroups = await import(pathToFileURL(join(outDir, "state/midiNoteGroups.js")));
   const midiLiveRecording = await import(pathToFileURL(join(outDir, "features/SegmentEditor/midiLiveRecording.js")));
   const drumGridSelection = await import(pathToFileURL(join(outDir, "features/DrumEditor/drumGridSelection.js")));
@@ -47,6 +50,7 @@ try {
   const componentState = await import(pathToFileURL(join(outDir, "state/components.js")));
   const nodeGraph = await import(pathToFileURL(join(outDir, "features/NodeInstrumentEditor/nodeGraph.js")));
   const floatingSelectKeyboard = await import(pathToFileURL(join(outDir, "solid-ui/FloatingSelect/floatingSelectKeyboard.js")));
+  const appDialogState = await import(pathToFileURL(join(outDir, "solid-ui/AppDialog/state.js")));
   const pianoRollSource = readFileSync(join(repoRoot, "frontend/src/features/MidiEditor/PianoRoll.solid.tsx"), "utf8");
   const pianoRollCss = readFileSync(join(repoRoot, "frontend/src/features/MidiEditor/PianoRoll.module.css"), "utf8");
   const midiTransportSource = readFileSync(join(repoRoot, "frontend/src/features/MidiEditor/MidiTransport.solid.tsx"), "utf8");
@@ -62,6 +66,8 @@ try {
   const drumpadEditorSource = readFileSync(join(repoRoot, "frontend/src/features/DrumpadEditor/DrumpadEditorModal.solid.tsx"), "utf8");
   const drumpadEditorCss = readFileSync(join(repoRoot, "frontend/src/features/DrumpadEditor/DrumpadEditorModal.module.css"), "utf8");
   const preferencesSource = readFileSync(join(repoRoot, "frontend/src/features/Preferences/PreferencesModal.solid.tsx"), "utf8");
+  const themeTokensSource = readFileSync(join(repoRoot, "frontend/src/design/tokens.css"), "utf8");
+  const frontendIndexSource = readFileSync(join(repoRoot, "frontend/index.html"), "utf8");
   const ipcSchemaSource = readFileSync(join(repoRoot, "frontend/src/ipc/schema.ts"), "utf8");
   const ipcBridgeSource = readFileSync(join(repoRoot, "frontend/src/ipc/bridge.ts"), "utf8");
   const ipcBackendSchemaSource = readFileSync(join(repoRoot, "backend/Source/Ipc/Schema.h"), "utf8");
@@ -80,6 +86,7 @@ try {
   const audioFilesSource = readFileSync(join(repoRoot, "frontend/src/features/HomeHub/AudioFilesPage.solid.tsx"), "utf8");
   const assetReferenceGraphSource = readFileSync(join(repoRoot, "frontend/src/persistence/assetReferenceGraph.ts"), "utf8");
   const documentActionsSource = readFileSync(join(repoRoot, "frontend/src/persistence/documentActions.ts"), "utf8");
+  const appDialogSource = readFileSync(join(repoRoot, "frontend/src/solid-ui/AppDialog/AppDialog.solid.tsx"), "utf8");
   const beatDocumentSource = readFileSync(join(repoRoot, "frontend/src/persistence/beatDocument.ts"), "utf8");
   const effectStateSource = readFileSync(join(repoRoot, "frontend/src/state/effects.ts"), "utf8");
   const trackEffectRowsSource = readFileSync(join(repoRoot, "frontend/src/features/Tracks/TrackEffectRows.solid.tsx"), "utf8");
@@ -561,6 +568,14 @@ try {
     "piano roll selection should expose accessible state, scoped select-all, additive marquee, and selection-preserving context-click behavior",
   );
   assert.ok(
+    pianoRollSource.includes("const TOP_PITCH = 127")
+      && pianoRollSource.includes("const BOTTOM_PITCH = 0")
+      && pianoRollSource.includes("highestPitch - lowestPitch + 1 <= visiblePitchCount")
+      && pianoRollSource.includes("pitches[Math.floor(pitches.length / 2)]")
+      && pianoRollSource.includes("scroll.scrollTop = clamp(noteCenter - VIEW_HEIGHT / 2, 0, maxScrollTop)"),
+    "the default piano roll should expose all 128 MIDI pitches and initially center the segment's actual note range",
+  );
+  assert.ok(
     pianoRollSource.includes('"b",')
       && pianoRollSource.includes('aria-label="Draw notes tool, B"')
       && pianoRollSource.includes('"v",')
@@ -602,7 +617,7 @@ try {
       && pianoRollCss.includes(".noteArpeggiationBadge")
       && pianoRollCss.includes("border: 1px dotted")
       && pianoRollCss.includes("justify-content: flex-start")
-      && pianoRollCss.includes("min-height: 23px")
+      && pianoRollCss.includes("min-height: 24px")
       && pianoRollCss.includes("padding: 0 6px"),
     "piano roll note menus should expose pitch-safe timed arpeggiation, note-anchored popovers, compact left-aligned items, and faint linked-group outlines",
   );
@@ -737,6 +752,21 @@ try {
       && midiTransportSource.includes("stopPreviewAudio();\n        startMs = now"),
     "MIDI editor playback should be exclusive, transpose once, retain duplicate notes, and clean voices at loop boundaries",
   );
+  assert.equal(
+    midiPreviewScheduling.midiPreviewDelaySeconds(0, 0.01, 0.25, 2),
+    0,
+    "a beat-zero note should still audition when the first animation frame starts slightly late",
+  );
+  assert.equal(
+    midiPreviewScheduling.midiPreviewDelaySeconds(0, 0.2, 0.25, 2),
+    null,
+    "the MIDI preview tolerance should not retrigger genuinely old notes",
+  );
+  assert.equal(
+    midiPreviewScheduling.midiPreviewDelaySeconds(0.25, 0, 0.25, 2),
+    0.125,
+    "notes ahead of the playhead should preserve their exact preview delay",
+  );
   assert.ok(
     drumSequencerSource.includes("usesNativePreview()")
       && drumSequencerSource.includes('kind: "engine.previewMidiNote"')
@@ -860,6 +890,27 @@ try {
       && audioEngineSource.includes("setup.outputDeviceName = outputDeviceName")
       && audioEngineSource.includes("setup.useDefaultOutputChannels = true"),
     "preferences output device selection should call native IPC and channel counts should be labeled as channels",
+  );
+  assert.ok(
+    storeSource.includes('export type ThemeMode = "dark" | "light" | "mellow";')
+      && storeSource.includes('value === "light" || value === "dark" || value === "mellow"')
+      && preferencesSource.includes('ariaLabel="Application color theme"')
+      && preferencesSource.includes('{ value: "dark", label: "Dark" }')
+      && preferencesSource.includes('{ value: "light", label: "Light" }')
+      && preferencesSource.includes('{ value: "mellow", label: "Mellow" }')
+      && themeTokensSource.includes('html[data-theme="light"]')
+      && themeTokensSource.includes('html[data-theme="mellow"]')
+      && themeTokensSource.includes('--color-bg: #4a4a4a;')
+      && themeTokensSource.includes('font-family: "Almarai";')
+      && themeTokensSource.includes('url("/assets/fonts/almarai-light.ttf")')
+      && themeTokensSource.includes('url("/assets/fonts/almarai-regular.ttf")')
+      && themeTokensSource.includes('url("/assets/fonts/almarai-bold.ttf")')
+      && themeTokensSource.includes('url("/assets/fonts/almarai-extra-bold.ttf")')
+      && !themeTokensSource.includes('"Akzidenz Grotesk Next"')
+      && frontendIndexSource.includes('storedTheme === "light" || storedTheme === "mellow"')
+      && frontendIndexSource.includes('font-family: Almarai, Arial, Helvetica, sans-serif;')
+      && !pianoRollCss.includes("background: #000"),
+    "theme preferences should persist Dark, Light, and Mellow Gray, apply them before render, and use Almarai for all UI text",
   );
   {
     const sourceNotes = [
@@ -1060,6 +1111,22 @@ try {
     "beat editor drum samples should be allowed to ring instead of being clipped to the step preview length",
   );
   assert.ok(
+    segmentEditorSource.includes("lengthBeats={payload().sourceLengthBeats ?? payload().stepCount}")
+      && segmentEditorSource.includes("sourceLengthBeats: nextLength")
+      && segmentSource.includes('liveSeg()?.payload.kind === "drum" && newLen < currentDrag.startLen')
+      && timelineMidiPlaybackSource.includes("segment.payload.sourceLengthBeats ?? segment.payload.stepCount")
+      && ipcBackendBridgeSource.includes('payload.getProperty("sourceLengthBeats", stepCount)'),
+    "drum audition and native playback should preserve source-grid timing while either trim handle clips only the segment end",
+  );
+  assert.ok(
+    drumSequencerSource.includes('aria-label="Remix drum pattern"')
+      && drumSequencerSource.includes("remixDrumBeat")
+      && !drumSequencerSource.includes('ariaLabel="Generated beat complexity"')
+      && !drumSequencerSource.includes('ariaLabel="Generated beat genre"')
+      && !drumSequencerSource.includes('aria-label="Rate generated beat'),
+    "drum editing should expose one local Remix action without AI generation controls or rating UI",
+  );
+  assert.ok(
     !instrumentsPageSource.includes('label: "External"')
       && !instrumentsPageSource.includes('label: "Internal"')
       && !instrumentsPageSource.includes("External Sample Reference")
@@ -1141,6 +1208,11 @@ try {
   assert.ok(
     !homeHubSource.includes("ProjectAssetsPage") && !homeHubSource.includes("Project Assets"),
     "Home hub should not expose the removed Project Assets one-off page",
+  );
+  assert.ok(
+    homeHubSource.includes('hour: "numeric"')
+      && homeHubSource.includes('minute: "2-digit"'),
+    "recent project cards should show the actual local last-open date and time",
   );
   assert.ok(
     /\.recentCard\s*\{[^}]*position:\s*relative;/s.test(homeHubCss)
@@ -1248,6 +1320,22 @@ try {
       && documentActionsSource.includes("unresolved.push(asset)")
       && documentActionsSource.includes("replaceBeatDocumentAssetPath(nextDocument, asset.path, result.path)"),
     "document open/recent/restore flows should offer sequential missing-asset relink and preserve unresolved missing assets",
+  );
+  for (const choice of ["save", "dont-save", "cancel"]) {
+    const decision = appDialogState.appSaveConfirm("Save before going Home?");
+    const activeDialog = appDialogState.getActiveAppDialog();
+    assert.equal(activeDialog?.kind, "save-confirm", "Home save decisions should use the dedicated three-way dialog");
+    appDialogState.completeDialog(activeDialog.id, choice);
+    assert.equal(await decision, choice, `the Home save dialog should resolve the ${choice} choice`);
+  }
+  assert.ok(
+    documentActionsSource.includes("await appSaveConfirm")
+      && documentActionsSource.includes("await saveCurrentDocument() !== \"saved\"")
+      && documentActionsSource.includes('if (choice === "cancel") return false')
+      && documentActionsSource.includes('if (choice === "save")')
+      && appDialogSource.includes("Don't save")
+      && appDialogSource.includes('? "Save"'),
+    "Home should offer Save, Don't save, and Cancel and only close after a successful save",
   );
   assert.ok(
     appSource.includes('case "native.openProjectFile":')
@@ -2013,7 +2101,7 @@ try {
       && trackAutomationRowsSource.includes("data-track-automation-lane={props.target}")
       && trackAutomationRowsSource.includes("data-track-automation-point")
       && trackAutomationRowsCss.includes("height: 27px")
-      && trackAutomationRowsCss.includes("height: 44px")
+      && trackAutomationRowsCss.includes("height: 45px")
       && !trackLaneSource.includes("automationPreview")
       && !trackLaneSource.includes("Add ${preview().label} arrangement automation point"),
     "instrument automation should expand into paired multi-parameter timeline rows without the redundant single-lane miniature editor",

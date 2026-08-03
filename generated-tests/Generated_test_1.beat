@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "savedAt": 1785627146366,
+  "savedAt": 1785652054168,
   "project": {
     "id": "generated-test-1-project",
     "name": "Generated_test_1",
@@ -12,7 +12,7 @@
         1
       ]
     },
-    "lengthBeats": 80,
+    "lengthBeats": 76,
     "tracks": [
       {
         "id": "generated-test-1-track-0",
@@ -41,7 +41,7 @@
             "name": "A · bass",
             "startBeat": 0,
             "lengthBeats": 16,
-            "repeats": 4,
+            "repeats": 0,
             "layer": 0,
             "muted": false,
             "instrumentId": "passive-electronic-sectional-instrument-0",
@@ -52,7 +52,171 @@
                   "pitch": 45,
                   "velocity": 82,
                   "startBeat": 0,
-                  "lengthBeats": 15.041666666666666
+                  "lengthBeats": 3.7604166666666665
+                },
+                {
+                  "pitch": 48,
+                  "velocity": 82,
+                  "startBeat": 4,
+                  "lengthBeats": 3.7604166666666665
+                },
+                {
+                  "pitch": 47,
+                  "velocity": 82,
+                  "startBeat": 8,
+                  "lengthBeats": 3.7604166666666665
+                },
+                {
+                  "pitch": 45,
+                  "velocity": 82,
+                  "startBeat": 12,
+                  "lengthBeats": 3.7604166666666665
+                }
+              ],
+              "gainDb": -4.161458333333333
+            }
+          },
+          {
+            "id": "generated-test-1-segment-0-1",
+            "trackId": "generated-test-1-track-0",
+            "name": "A′ · bass",
+            "startBeat": 16,
+            "lengthBeats": 8,
+            "repeats": 0,
+            "layer": 0,
+            "muted": false,
+            "instrumentId": "passive-electronic-sectional-instrument-0",
+            "payload": {
+              "kind": "midi",
+              "notes": [
+                {
+                  "pitch": 45,
+                  "velocity": 82,
+                  "startBeat": 0,
+                  "lengthBeats": 3.7604166666666665
+                },
+                {
+                  "pitch": 48,
+                  "velocity": 82,
+                  "startBeat": 4,
+                  "lengthBeats": 3.7604166666666665
+                }
+              ],
+              "gainDb": -4.161458333333333
+            }
+          },
+          {
+            "id": "generated-test-1-segment-0-2",
+            "trackId": "generated-test-1-track-0",
+            "name": "B · bass",
+            "startBeat": 24,
+            "lengthBeats": 16,
+            "repeats": 0,
+            "layer": 0,
+            "muted": false,
+            "instrumentId": "passive-electronic-sectional-instrument-0",
+            "payload": {
+              "kind": "midi",
+              "notes": [
+                {
+                  "pitch": 45,
+                  "velocity": 82,
+                  "startBeat": 0,
+                  "lengthBeats": 3.7604166666666665
+                },
+                {
+                  "pitch": 48,
+                  "velocity": 82,
+                  "startBeat": 4,
+                  "lengthBeats": 3.7604166666666665
+                },
+                {
+                  "pitch": 47,
+                  "velocity": 82,
+                  "startBeat": 8,
+                  "lengthBeats": 3.7604166666666665
+                },
+                {
+                  "pitch": 45,
+                  "velocity": 82,
+                  "startBeat": 12,
+                  "lengthBeats": 3.7604166666666665
+                }
+              ],
+              "gainDb": -4.161458333333333
+            }
+          },
+          {
+            "id": "generated-test-1-segment-0-3",
+            "trackId": "generated-test-1-track-0",
+            "name": "C · bass",
+            "startBeat": 40,
+            "lengthBeats": 12,
+            "repeats": 0,
+            "layer": 0,
+            "muted": false,
+            "instrumentId": "passive-electronic-sectional-instrument-0",
+            "payload": {
+              "kind": "midi",
+              "notes": [
+                {
+                  "pitch": 45,
+                  "velocity": 82,
+                  "startBeat": 0,
+                  "lengthBeats": 3.7604166666666665
+                },
+                {
+                  "pitch": 48,
+                  "velocity": 82,
+                  "startBeat": 4,
+                  "lengthBeats": 3.7604166666666665
+                },
+                {
+                  "pitch": 47,
+                  "velocity": 82,
+                  "startBeat": 8,
+                  "lengthBeats": 3.7604166666666665
+                }
+              ],
+              "gainDb": -4.161458333333333
+            }
+          },
+          {
+            "id": "generated-test-1-segment-0-4",
+            "trackId": "generated-test-1-track-0",
+            "name": "A″ · bass",
+            "startBeat": 52,
+            "lengthBeats": 24,
+            "repeats": 0,
+            "layer": 0,
+            "muted": false,
+            "instrumentId": "passive-electronic-sectional-instrument-0",
+            "payload": {
+              "kind": "midi",
+              "notes": [
+                {
+                  "pitch": 45,
+                  "velocity": 82,
+                  "startBeat": 0,
+                  "lengthBeats": 3.7604166666666665
+                },
+                {
+                  "pitch": 48,
+                  "velocity": 82,
+                  "startBeat": 4,
+                  "lengthBeats": 3.7604166666666665
+                },
+                {
+                  "pitch": 47,
+                  "velocity": 82,
+                  "startBeat": 8,
+                  "lengthBeats": 3.7604166666666665
+                },
+                {
+                  "pitch": 45,
+                  "velocity": 82,
+                  "startBeat": 12,
+                  "lengthBeats": 11.28125
                 }
               ],
               "gainDb": -4.161458333333333
@@ -89,7 +253,7 @@
             "name": "A · harmony",
             "startBeat": 0,
             "lengthBeats": 16,
-            "repeats": 4,
+            "repeats": 0,
             "layer": 0,
             "muted": false,
             "instrumentId": "passive-electronic-sectional-instrument-1",
@@ -115,58 +279,360 @@
                   "lengthBeats": 3.6822916666666665
                 },
                 {
-                  "pitch": 57,
+                  "pitch": 60,
                   "velocity": 63,
                   "startBeat": 4,
                   "lengthBeats": 3.6822916666666665
                 },
                 {
-                  "pitch": 60,
+                  "pitch": 64,
                   "velocity": 68,
                   "startBeat": 4,
                   "lengthBeats": 3.6822916666666665
                 },
                 {
-                  "pitch": 64,
+                  "pitch": 55,
                   "velocity": 74,
                   "startBeat": 4,
+                  "lengthBeats": 3.6822916666666665
+                },
+                {
+                  "pitch": 55,
+                  "velocity": 63,
+                  "startBeat": 8,
+                  "lengthBeats": 3.6822916666666665
+                },
+                {
+                  "pitch": 59,
+                  "velocity": 68,
+                  "startBeat": 8,
+                  "lengthBeats": 3.6822916666666665
+                },
+                {
+                  "pitch": 62,
+                  "velocity": 74,
+                  "startBeat": 8,
                   "lengthBeats": 3.6822916666666665
                 },
                 {
                   "pitch": 65,
                   "velocity": 63,
-                  "startBeat": 8,
+                  "startBeat": 12,
                   "lengthBeats": 3.6822916666666665
                 },
                 {
                   "pitch": 57,
                   "velocity": 68,
-                  "startBeat": 8,
+                  "startBeat": 12,
                   "lengthBeats": 3.6822916666666665
                 },
                 {
                   "pitch": 60,
                   "velocity": 74,
-                  "startBeat": 8,
+                  "startBeat": 12,
+                  "lengthBeats": 3.6822916666666665
+                }
+              ],
+              "gainDb": -4.161458333333333
+            }
+          },
+          {
+            "id": "generated-test-1-segment-1-1",
+            "trackId": "generated-test-1-track-1",
+            "name": "A′ · harmony",
+            "startBeat": 16,
+            "lengthBeats": 8,
+            "repeats": 0,
+            "layer": 0,
+            "muted": false,
+            "instrumentId": "passive-electronic-sectional-instrument-1",
+            "payload": {
+              "kind": "midi",
+              "notes": [
+                {
+                  "pitch": 65,
+                  "velocity": 63,
+                  "startBeat": 0,
                   "lengthBeats": 3.6822916666666665
                 },
                 {
                   "pitch": 57,
+                  "velocity": 68,
+                  "startBeat": 0,
+                  "lengthBeats": 3.6822916666666665
+                },
+                {
+                  "pitch": 60,
+                  "velocity": 74,
+                  "startBeat": 0,
+                  "lengthBeats": 3.6822916666666665
+                },
+                {
+                  "pitch": 60,
+                  "velocity": 63,
+                  "startBeat": 4,
+                  "lengthBeats": 3.6822916666666665
+                },
+                {
+                  "pitch": 64,
+                  "velocity": 68,
+                  "startBeat": 4,
+                  "lengthBeats": 3.6822916666666665
+                },
+                {
+                  "pitch": 55,
+                  "velocity": 74,
+                  "startBeat": 4,
+                  "lengthBeats": 3.6822916666666665
+                }
+              ],
+              "gainDb": -4.161458333333333
+            }
+          },
+          {
+            "id": "generated-test-1-segment-1-2",
+            "trackId": "generated-test-1-track-1",
+            "name": "B · harmony",
+            "startBeat": 24,
+            "lengthBeats": 16,
+            "repeats": 0,
+            "layer": 0,
+            "muted": false,
+            "instrumentId": "passive-electronic-sectional-instrument-1",
+            "payload": {
+              "kind": "midi",
+              "notes": [
+                {
+                  "pitch": 65,
+                  "velocity": 63,
+                  "startBeat": 0,
+                  "lengthBeats": 3.6822916666666665
+                },
+                {
+                  "pitch": 57,
+                  "velocity": 68,
+                  "startBeat": 0,
+                  "lengthBeats": 3.6822916666666665
+                },
+                {
+                  "pitch": 60,
+                  "velocity": 74,
+                  "startBeat": 0,
+                  "lengthBeats": 3.6822916666666665
+                },
+                {
+                  "pitch": 60,
+                  "velocity": 63,
+                  "startBeat": 4,
+                  "lengthBeats": 3.6822916666666665
+                },
+                {
+                  "pitch": 64,
+                  "velocity": 68,
+                  "startBeat": 4,
+                  "lengthBeats": 3.6822916666666665
+                },
+                {
+                  "pitch": 55,
+                  "velocity": 74,
+                  "startBeat": 4,
+                  "lengthBeats": 3.6822916666666665
+                },
+                {
+                  "pitch": 55,
+                  "velocity": 63,
+                  "startBeat": 8,
+                  "lengthBeats": 3.6822916666666665
+                },
+                {
+                  "pitch": 59,
+                  "velocity": 68,
+                  "startBeat": 8,
+                  "lengthBeats": 3.6822916666666665
+                },
+                {
+                  "pitch": 62,
+                  "velocity": 74,
+                  "startBeat": 8,
+                  "lengthBeats": 3.6822916666666665
+                },
+                {
+                  "pitch": 65,
                   "velocity": 63,
                   "startBeat": 12,
                   "lengthBeats": 3.6822916666666665
                 },
                 {
-                  "pitch": 60,
+                  "pitch": 57,
                   "velocity": 68,
                   "startBeat": 12,
                   "lengthBeats": 3.6822916666666665
                 },
                 {
-                  "pitch": 64,
+                  "pitch": 60,
                   "velocity": 74,
                   "startBeat": 12,
                   "lengthBeats": 3.6822916666666665
+                }
+              ],
+              "gainDb": -4.161458333333333
+            }
+          },
+          {
+            "id": "generated-test-1-segment-1-3",
+            "trackId": "generated-test-1-track-1",
+            "name": "C · harmony",
+            "startBeat": 40,
+            "lengthBeats": 12,
+            "repeats": 0,
+            "layer": 0,
+            "muted": false,
+            "instrumentId": "passive-electronic-sectional-instrument-1",
+            "payload": {
+              "kind": "midi",
+              "notes": [
+                {
+                  "pitch": 65,
+                  "velocity": 63,
+                  "startBeat": 0,
+                  "lengthBeats": 3.6822916666666665
+                },
+                {
+                  "pitch": 57,
+                  "velocity": 68,
+                  "startBeat": 0,
+                  "lengthBeats": 3.6822916666666665
+                },
+                {
+                  "pitch": 60,
+                  "velocity": 74,
+                  "startBeat": 0,
+                  "lengthBeats": 3.6822916666666665
+                },
+                {
+                  "pitch": 60,
+                  "velocity": 63,
+                  "startBeat": 4,
+                  "lengthBeats": 3.6822916666666665
+                },
+                {
+                  "pitch": 64,
+                  "velocity": 68,
+                  "startBeat": 4,
+                  "lengthBeats": 3.6822916666666665
+                },
+                {
+                  "pitch": 55,
+                  "velocity": 74,
+                  "startBeat": 4,
+                  "lengthBeats": 3.6822916666666665
+                },
+                {
+                  "pitch": 55,
+                  "velocity": 63,
+                  "startBeat": 8,
+                  "lengthBeats": 3.6822916666666665
+                },
+                {
+                  "pitch": 59,
+                  "velocity": 68,
+                  "startBeat": 8,
+                  "lengthBeats": 3.6822916666666665
+                },
+                {
+                  "pitch": 62,
+                  "velocity": 74,
+                  "startBeat": 8,
+                  "lengthBeats": 3.6822916666666665
+                }
+              ],
+              "gainDb": -4.161458333333333
+            }
+          },
+          {
+            "id": "generated-test-1-segment-1-4",
+            "trackId": "generated-test-1-track-1",
+            "name": "A″ · harmony",
+            "startBeat": 52,
+            "lengthBeats": 24,
+            "repeats": 0,
+            "layer": 0,
+            "muted": false,
+            "instrumentId": "passive-electronic-sectional-instrument-1",
+            "payload": {
+              "kind": "midi",
+              "notes": [
+                {
+                  "pitch": 65,
+                  "velocity": 63,
+                  "startBeat": 0,
+                  "lengthBeats": 3.6822916666666665
+                },
+                {
+                  "pitch": 57,
+                  "velocity": 68,
+                  "startBeat": 0,
+                  "lengthBeats": 3.6822916666666665
+                },
+                {
+                  "pitch": 60,
+                  "velocity": 74,
+                  "startBeat": 0,
+                  "lengthBeats": 3.6822916666666665
+                },
+                {
+                  "pitch": 60,
+                  "velocity": 63,
+                  "startBeat": 4,
+                  "lengthBeats": 3.6822916666666665
+                },
+                {
+                  "pitch": 64,
+                  "velocity": 68,
+                  "startBeat": 4,
+                  "lengthBeats": 3.6822916666666665
+                },
+                {
+                  "pitch": 55,
+                  "velocity": 74,
+                  "startBeat": 4,
+                  "lengthBeats": 3.6822916666666665
+                },
+                {
+                  "pitch": 55,
+                  "velocity": 63,
+                  "startBeat": 8,
+                  "lengthBeats": 3.6822916666666665
+                },
+                {
+                  "pitch": 59,
+                  "velocity": 68,
+                  "startBeat": 8,
+                  "lengthBeats": 3.6822916666666665
+                },
+                {
+                  "pitch": 62,
+                  "velocity": 74,
+                  "startBeat": 8,
+                  "lengthBeats": 3.6822916666666665
+                },
+                {
+                  "pitch": 65,
+                  "velocity": 63,
+                  "startBeat": 12,
+                  "lengthBeats": 11.041666666666666
+                },
+                {
+                  "pitch": 57,
+                  "velocity": 68,
+                  "startBeat": 12,
+                  "lengthBeats": 11.041666666666666
+                },
+                {
+                  "pitch": 60,
+                  "velocity": 74,
+                  "startBeat": 12,
+                  "lengthBeats": 11.041666666666666
                 }
               ],
               "gainDb": -4.161458333333333
@@ -203,7 +669,7 @@
             "name": "A · lead",
             "startBeat": 0,
             "lengthBeats": 16,
-            "repeats": 4,
+            "repeats": 0,
             "layer": 0,
             "muted": false,
             "instrumentId": "passive-electronic-sectional-instrument-2",
@@ -212,123 +678,293 @@
               "notes": [
                 {
                   "pitch": 69,
-                  "velocity": 93,
+                  "velocity": 77,
                   "startBeat": 0,
-                  "lengthBeats": 1.9364583333333336
+                  "lengthBeats": 1.6500000000000001
                 },
                 {
                   "pitch": 72,
-                  "velocity": 87,
+                  "velocity": 79,
                   "startBeat": 1,
                   "lengthBeats": 1.6500000000000001
                 },
                 {
                   "pitch": 76,
-                  "velocity": 79,
+                  "velocity": 87,
                   "startBeat": 2,
-                  "lengthBeats": 1.9364583333333336
+                  "lengthBeats": 3.6093750000000004
                 },
                 {
-                  "pitch": 74,
-                  "velocity": 83,
-                  "startBeat": 3,
-                  "lengthBeats": 1.9364583333333336
-                },
-                {
-                  "pitch": 72,
-                  "velocity": 80,
+                  "pitch": 76,
+                  "velocity": 88,
                   "startBeat": 4,
                   "lengthBeats": 6
                 },
                 {
-                  "pitch": 69,
-                  "velocity": 93,
+                  "pitch": 71,
+                  "velocity": 88,
                   "startBeat": 8,
-                  "lengthBeats": 1.6500000000000001
+                  "lengthBeats": 2.704166666666667
                 },
                 {
-                  "pitch": 76,
-                  "velocity": 96,
-                  "startBeat": 9,
-                  "lengthBeats": 1.9364583333333336
-                },
-                {
-                  "pitch": 74,
-                  "velocity": 89,
+                  "pitch": 71,
+                  "velocity": 95,
                   "startBeat": 10,
+                  "lengthBeats": 1.7989583333333337
+                },
+                {
+                  "pitch": 69,
+                  "velocity": 85,
+                  "startBeat": 11,
                   "lengthBeats": 1.6500000000000001
                 },
                 {
-                  "pitch": 76,
-                  "velocity": 90,
-                  "startBeat": 11,
-                  "lengthBeats": 1.9364583333333336
+                  "pitch": 69,
+                  "velocity": 96,
+                  "startBeat": 12,
+                  "lengthBeats": 6
+                }
+              ],
+              "gainDb": -4.161458333333333
+            }
+          },
+          {
+            "id": "generated-test-1-segment-2-1",
+            "trackId": "generated-test-1-track-2",
+            "name": "A′ · lead",
+            "startBeat": 16,
+            "lengthBeats": 8,
+            "repeats": 0,
+            "layer": 0,
+            "muted": false,
+            "instrumentId": "passive-electronic-sectional-instrument-2",
+            "payload": {
+              "kind": "midi",
+              "notes": [
+                {
+                  "pitch": 69,
+                  "velocity": 77,
+                  "startBeat": 0,
+                  "lengthBeats": 1.6500000000000001
                 },
                 {
                   "pitch": 72,
-                  "velocity": 80,
-                  "startBeat": 12,
-                  "lengthBeats": 1.9364583333333336
+                  "velocity": 79,
+                  "startBeat": 1,
+                  "lengthBeats": 1.6500000000000001
+                },
+                {
+                  "pitch": 76,
+                  "velocity": 87,
+                  "startBeat": 2,
+                  "lengthBeats": 3.6093750000000004
+                },
+                {
+                  "pitch": 76,
+                  "velocity": 88,
+                  "startBeat": 4,
+                  "lengthBeats": 6
+                }
+              ],
+              "gainDb": -4.161458333333333
+            }
+          },
+          {
+            "id": "generated-test-1-segment-2-2",
+            "trackId": "generated-test-1-track-2",
+            "name": "B · lead",
+            "startBeat": 24,
+            "lengthBeats": 16,
+            "repeats": 0,
+            "layer": 0,
+            "muted": false,
+            "instrumentId": "passive-electronic-sectional-instrument-2",
+            "payload": {
+              "kind": "midi",
+              "notes": [
+                {
+                  "pitch": 69,
+                  "velocity": 77,
+                  "startBeat": 0,
+                  "lengthBeats": 1.6500000000000001
+                },
+                {
+                  "pitch": 72,
+                  "velocity": 79,
+                  "startBeat": 1,
+                  "lengthBeats": 1.6500000000000001
+                },
+                {
+                  "pitch": 76,
+                  "velocity": 87,
+                  "startBeat": 2,
+                  "lengthBeats": 3.6093750000000004
+                },
+                {
+                  "pitch": 76,
+                  "velocity": 88,
+                  "startBeat": 4,
+                  "lengthBeats": 6
+                },
+                {
+                  "pitch": 71,
+                  "velocity": 88,
+                  "startBeat": 8,
+                  "lengthBeats": 2.704166666666667
+                },
+                {
+                  "pitch": 71,
+                  "velocity": 95,
+                  "startBeat": 10,
+                  "lengthBeats": 1.7989583333333337
+                },
+                {
+                  "pitch": 69,
+                  "velocity": 85,
+                  "startBeat": 11,
+                  "lengthBeats": 1.6500000000000001
                 },
                 {
                   "pitch": 69,
                   "velocity": 96,
-                  "startBeat": 13,
-                  "lengthBeats": 5.809375
+                  "startBeat": 12,
+                  "lengthBeats": 6
+                }
+              ],
+              "gainDb": -4.161458333333333
+            }
+          },
+          {
+            "id": "generated-test-1-segment-2-3",
+            "trackId": "generated-test-1-track-2",
+            "name": "C · lead",
+            "startBeat": 40,
+            "lengthBeats": 12,
+            "repeats": 0,
+            "layer": 0,
+            "muted": false,
+            "instrumentId": "passive-electronic-sectional-instrument-2",
+            "payload": {
+              "kind": "midi",
+              "notes": [
+                {
+                  "pitch": 69,
+                  "velocity": 77,
+                  "startBeat": 0,
+                  "lengthBeats": 1.6500000000000001
+                },
+                {
+                  "pitch": 72,
+                  "velocity": 79,
+                  "startBeat": 1,
+                  "lengthBeats": 1.6500000000000001
+                },
+                {
+                  "pitch": 76,
+                  "velocity": 87,
+                  "startBeat": 2,
+                  "lengthBeats": 3.6093750000000004
+                },
+                {
+                  "pitch": 76,
+                  "velocity": 88,
+                  "startBeat": 4,
+                  "lengthBeats": 6
+                },
+                {
+                  "pitch": 71,
+                  "velocity": 88,
+                  "startBeat": 8,
+                  "lengthBeats": 2.704166666666667
+                },
+                {
+                  "pitch": 71,
+                  "velocity": 95,
+                  "startBeat": 10,
+                  "lengthBeats": 1.7989583333333337
+                },
+                {
+                  "pitch": 69,
+                  "velocity": 85,
+                  "startBeat": 11,
+                  "lengthBeats": 1.6500000000000001
+                },
+                {
+                  "pitch": 71,
+                  "velocity": 91,
+                  "startBeat": 11.5,
+                  "lengthBeats": 1.6500000000000001
+                }
+              ],
+              "gainDb": -4.161458333333333
+            }
+          },
+          {
+            "id": "generated-test-1-segment-2-4",
+            "trackId": "generated-test-1-track-2",
+            "name": "A″ · lead",
+            "startBeat": 52,
+            "lengthBeats": 24,
+            "repeats": 0,
+            "layer": 0,
+            "muted": false,
+            "instrumentId": "passive-electronic-sectional-instrument-2",
+            "payload": {
+              "kind": "midi",
+              "notes": [
+                {
+                  "pitch": 69,
+                  "velocity": 77,
+                  "startBeat": 0,
+                  "lengthBeats": 1.6500000000000001
+                },
+                {
+                  "pitch": 72,
+                  "velocity": 79,
+                  "startBeat": 1,
+                  "lengthBeats": 1.6500000000000001
+                },
+                {
+                  "pitch": 76,
+                  "velocity": 87,
+                  "startBeat": 2,
+                  "lengthBeats": 3.6093750000000004
+                },
+                {
+                  "pitch": 76,
+                  "velocity": 88,
+                  "startBeat": 4,
+                  "lengthBeats": 6
+                },
+                {
+                  "pitch": 71,
+                  "velocity": 88,
+                  "startBeat": 8,
+                  "lengthBeats": 2.704166666666667
+                },
+                {
+                  "pitch": 71,
+                  "velocity": 95,
+                  "startBeat": 10,
+                  "lengthBeats": 1.7989583333333337
+                },
+                {
+                  "pitch": 69,
+                  "velocity": 85,
+                  "startBeat": 11,
+                  "lengthBeats": 1.6500000000000001
+                },
+                {
+                  "pitch": 69,
+                  "velocity": 96,
+                  "startBeat": 12,
+                  "lengthBeats": 6
                 }
               ],
               "gainDb": -4.161458333333333
             }
           }
         ],
-        "parentTrackId": "",
-        "sends": []
-      },
-      {
-        "id": "generated-test-1-track-3",
-        "name": "Sequenced Pluck",
-        "kind": "midi",
-        "instrumentId": "passive-electronic-sectional-instrument-3",
-        "gainDb": 0,
-        "pan": 0,
-        "mute": false,
-        "solo": false,
-        "recordArmed": false,
-        "inputMonitoring": false,
-        "inputDeviceId": "",
-        "inputChannelStart": 0,
-        "inputChannelCount": 2,
-        "recordGainDb": 0,
-        "outputEnabled": true,
-        "effects": {
-          "filters": []
-        },
-        "rowHeight": "normal",
-        "segments": [],
-        "parentTrackId": "",
-        "sends": []
-      },
-      {
-        "id": "generated-test-1-track-4",
-        "name": "Electronic Drum Engine",
-        "kind": "midi",
-        "instrumentId": "passive-electronic-sectional-instrument-4",
-        "gainDb": 0,
-        "pan": 0,
-        "mute": false,
-        "solo": false,
-        "recordArmed": false,
-        "inputMonitoring": false,
-        "inputDeviceId": "",
-        "inputChannelStart": 0,
-        "inputChannelCount": 2,
-        "recordGainDb": 0,
-        "outputEnabled": true,
-        "effects": {
-          "filters": []
-        },
-        "rowHeight": "normal",
-        "segments": [],
         "parentTrackId": "",
         "sends": []
       }
@@ -362,8 +998,8 @@
     {
       "id": "passive-electronic-sectional-instrument-0",
       "name": "Generated · Electronic Sub Bass",
-      "createdAt": 1785627146366,
-      "updatedAt": 1785627146366,
+      "createdAt": 1785652054168,
+      "updatedAt": 1785652054168,
       "icon": "ph:cube",
       "kind": "wavetable",
       "envelope": {
@@ -526,8 +1162,8 @@
     {
       "id": "passive-electronic-sectional-instrument-1",
       "name": "Generated · Motion Pad",
-      "createdAt": 1785627146366,
-      "updatedAt": 1785627146366,
+      "createdAt": 1785652054168,
+      "updatedAt": 1785652054168,
       "icon": "ph:cube",
       "kind": "wavetable",
       "envelope": {
@@ -690,8 +1326,8 @@
     {
       "id": "passive-electronic-sectional-instrument-2",
       "name": "Generated · Aether Synth Lead",
-      "createdAt": 1785627146366,
-      "updatedAt": 1785627146366,
+      "createdAt": 1785652054168,
+      "updatedAt": 1785652054168,
       "icon": "ph:cube",
       "kind": "wavetable",
       "envelope": {
@@ -841,334 +1477,6 @@
       "descriptors": [
         "lead",
         "reed",
-        "electronic",
-        "passive",
-        "low",
-        "generated-song",
-        "generated-instrument",
-        "aether",
-        "wavetable"
-      ],
-      "userCreated": true
-    },
-    {
-      "id": "passive-electronic-sectional-instrument-3",
-      "name": "Generated · Sequenced Pluck",
-      "createdAt": 1785627146366,
-      "updatedAt": 1785627146366,
-      "icon": "ph:cube",
-      "kind": "wavetable",
-      "envelope": {
-        "attackMs": 1.7991054193394038,
-        "decayMs": 80,
-        "sustain": 0.6546645322522765,
-        "releaseMs": 101.523321880685
-      },
-      "knobs": {
-        "cutoff": 0.6130351397798013,
-        "resonance": 0.1781469623623758,
-        "drive": 0.04651756988990064,
-        "color": 0.33629392472475156
-      },
-      "filterType": "lowpass",
-      "waveform": "wavetable",
-      "detuneCents": 0,
-      "octave": 0,
-      "subOscLevel": 0,
-      "glideMs": 0,
-      "maxVoices": 16,
-      "mono": false,
-      "legato": false,
-      "pitchBendRangeSemitones": 2,
-      "ampLevel": 1,
-      "ampPan": 0,
-      "lfoWaveform": "triangle",
-      "lfoRateHz": 0.1044408870871274,
-      "lfoDepth": 0.004888177417425479,
-      "lfoSync": false,
-      "lfoSyncedRate": "1/4",
-      "lfoSmoothing": 0,
-      "lfoRandomPhase": 0,
-      "lfoPhase": 0,
-      "lfoRetrigger": true,
-      "lfoOneShot": false,
-      "lfo2Waveform": "triangle",
-      "lfo2RateHz": 0.5,
-      "lfo2Sync": false,
-      "lfo2SyncedRate": "1/2",
-      "lfo2Smoothing": 0,
-      "lfo2RandomPhase": 0,
-      "lfo2Enabled": false,
-      "lfo2Phase": 0,
-      "lfo2Retrigger": true,
-      "lfo2OneShot": false,
-      "lfoPositionBipolar": true,
-      "lfoPitchBipolar": true,
-      "lfoFilterBipolar": true,
-      "lfoToPitch": 0,
-      "lfoToFilter": 0,
-      "envToFilter": 0,
-      "wavetable": {
-        "bank": "aether",
-        "position": 0.27851436826831527,
-        "warp": 0.1044408870871274,
-        "warpMode": "shape",
-        "unison": 1,
-        "detuneCents": 6.81469623623758,
-        "blend": 0.37444088708712736
-      },
-      "aether": {
-        "oscA": {
-          "enabled": true,
-          "level": 0.78,
-          "pan": 0,
-          "waveform": "triangle",
-          "octave": 0,
-          "semitone": 0,
-          "fineCents": 0,
-          "phase": 0,
-          "randomPhase": 0.25,
-          "wavetable": {
-            "bank": "aether",
-            "position": 0.27851436826831527,
-            "warp": 0.1044408870871274,
-            "warpMode": "shape",
-            "unison": 1,
-            "detuneCents": 6.81469623623758,
-            "blend": 0.37444088708712736
-          }
-        },
-        "oscB": {
-          "enabled": false,
-          "level": 0.26,
-          "pan": 0.12,
-          "waveform": "wavetable",
-          "octave": 0,
-          "semitone": 7,
-          "fineCents": -4,
-          "phase": 0,
-          "randomPhase": 0.25,
-          "wavetable": {
-            "bank": "glass",
-            "position": 0.2,
-            "warp": 0.1044408870871274,
-            "warpMode": "shape",
-            "unison": 1,
-            "detuneCents": 6.81469623623758,
-            "blend": 0.37444088708712736
-          }
-        },
-        "sub": {
-          "enabled": false,
-          "level": 0.12,
-          "octave": -1,
-          "waveform": "sine"
-        },
-        "noise": {
-          "enabled": false,
-          "level": 0.05,
-          "color": 0.45
-        },
-        "sampleSlot1": {
-          "schemaVersion": 5,
-          "enabled": false,
-          "audioFileId": "",
-          "rootNote": 60,
-          "level": 0.8,
-          "pan": 0,
-          "route": "filter",
-          "startRatio": 0,
-          "endRatio": 1,
-          "loopEnabled": false,
-          "loopStartRatio": 0,
-          "loopEndRatio": 1,
-          "fxSends": [
-            0,
-            0
-          ],
-          "zones": []
-        },
-        "runtimeWarp": 0,
-        "runtimeWarpMode": "shape"
-      },
-      "sampleIds": [],
-      "setId": "user-instruments",
-      "taxonomy": {
-        "categoryId": "synth_electronic",
-        "instrumentId": "wavetable_synth"
-      },
-      "source": {
-        "kind": "created",
-        "label": "Start from Something test generation",
-        "edited": false
-      },
-      "descriptors": [
-        "countermelody",
-        "plucked",
-        "electronic",
-        "passive",
-        "low",
-        "generated-song",
-        "generated-instrument",
-        "aether",
-        "wavetable"
-      ],
-      "userCreated": true
-    },
-    {
-      "id": "passive-electronic-sectional-instrument-4",
-      "name": "Generated · Electronic Drum Engine",
-      "createdAt": 1785627146366,
-      "updatedAt": 1785627146366,
-      "icon": "ph:cube",
-      "kind": "wavetable",
-      "envelope": {
-        "attackMs": 0.9519955586809654,
-        "decayMs": 80,
-        "sustain": 0.15599777934048273,
-        "releaseMs": 61.35966319997322
-      },
-      "knobs": {
-        "cutoff": 0.3079970391206437,
-        "resonance": 0.05999814945040228,
-        "drive": 0.2039985195603218,
-        "color": 0.45999629890080457
-      },
-      "filterType": "lowpass",
-      "waveform": "wavetable",
-      "detuneCents": 0,
-      "octave": 0,
-      "subOscLevel": 0,
-      "glideMs": 0,
-      "maxVoices": 16,
-      "mono": false,
-      "legato": false,
-      "pitchBendRangeSemitones": 2,
-      "ampLevel": 1,
-      "ampPan": 0,
-      "lfoWaveform": "sine",
-      "lfoRateHz": 0.16999444835120683,
-      "lfoDepth": 0.017998889670241366,
-      "lfoSync": false,
-      "lfoSyncedRate": "1/4",
-      "lfoSmoothing": 0,
-      "lfoRandomPhase": 0,
-      "lfoPhase": 0,
-      "lfoRetrigger": true,
-      "lfoOneShot": false,
-      "lfo2Waveform": "triangle",
-      "lfo2RateHz": 0.5,
-      "lfo2Sync": false,
-      "lfo2SyncedRate": "1/2",
-      "lfo2Smoothing": 0,
-      "lfo2RandomPhase": 0,
-      "lfo2Enabled": false,
-      "lfo2Phase": 0,
-      "lfo2Retrigger": true,
-      "lfo2OneShot": false,
-      "lfoPositionBipolar": true,
-      "lfoPitchBipolar": true,
-      "lfoFilterBipolar": true,
-      "lfoToPitch": 0,
-      "lfoToFilter": 0,
-      "envToFilter": 0,
-      "wavetable": {
-        "bank": "aether",
-        "position": 0.35499352307640797,
-        "warp": 0.16999444835120683,
-        "warpMode": "shape",
-        "unison": 1,
-        "detuneCents": 8.999814945040228,
-        "blend": 0.4399944483512068
-      },
-      "aether": {
-        "oscA": {
-          "enabled": false,
-          "level": 0.78,
-          "pan": 0,
-          "waveform": "sine",
-          "octave": 0,
-          "semitone": 0,
-          "fineCents": 0,
-          "phase": 0,
-          "randomPhase": 0.25,
-          "wavetable": {
-            "bank": "aether",
-            "position": 0.35499352307640797,
-            "warp": 0.16999444835120683,
-            "warpMode": "shape",
-            "unison": 1,
-            "detuneCents": 8.999814945040228,
-            "blend": 0.4399944483512068
-          }
-        },
-        "oscB": {
-          "enabled": false,
-          "level": 0.26,
-          "pan": 0.12,
-          "waveform": "wavetable",
-          "octave": 0,
-          "semitone": 7,
-          "fineCents": -4,
-          "phase": 0,
-          "randomPhase": 0.25,
-          "wavetable": {
-            "bank": "glass",
-            "position": 0.2,
-            "warp": 0.16999444835120683,
-            "warpMode": "shape",
-            "unison": 1,
-            "detuneCents": 8.999814945040228,
-            "blend": 0.4399944483512068
-          }
-        },
-        "sub": {
-          "enabled": false,
-          "level": 0.12,
-          "octave": -1,
-          "waveform": "sine"
-        },
-        "noise": {
-          "enabled": true,
-          "level": 0.82,
-          "color": 0.45
-        },
-        "sampleSlot1": {
-          "schemaVersion": 5,
-          "enabled": false,
-          "audioFileId": "",
-          "rootNote": 60,
-          "level": 0.8,
-          "pan": 0,
-          "route": "filter",
-          "startRatio": 0,
-          "endRatio": 1,
-          "loopEnabled": false,
-          "loopStartRatio": 0,
-          "loopEndRatio": 1,
-          "fxSends": [
-            0,
-            0
-          ],
-          "zones": []
-        },
-        "runtimeWarp": 0,
-        "runtimeWarpMode": "shape"
-      },
-      "sampleIds": [],
-      "setId": "user-instruments",
-      "taxonomy": {
-        "categoryId": "synth_electronic",
-        "instrumentId": "wavetable_synth"
-      },
-      "source": {
-        "kind": "created",
-        "label": "Start from Something test generation",
-        "edited": false
-      },
-      "descriptors": [
-        "rhythm",
-        "percussive",
         "electronic",
         "passive",
         "low",

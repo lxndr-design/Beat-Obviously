@@ -106,7 +106,7 @@
   min-width: 45px;
   padding: 6px;
   border: var(--border-fg);
-  font-family: var(--font-family-mono);
+  font-family: var(--font-family-base);
   font-size: var(--font-size-ui);
   font-weight: var(--font-weight-medium);
   text-align: right;
@@ -221,7 +221,7 @@
   height: 21px;
   border: var(--border-fg);
   color: var(--color-fg-hover);
-  font-family: var(--font-family-mono);
+  font-family: var(--font-family-base);
   font-size: var(--font-size-ui);
 }
 
@@ -230,7 +230,7 @@
   align-items: center;
   min-height: 12px;
   color: var(--color-fg-hover);
-  font-family: var(--font-family-mono);
+  font-family: var(--font-family-base);
   font-size: var(--font-size-hint);
   line-height: 1;
   text-transform: uppercase;

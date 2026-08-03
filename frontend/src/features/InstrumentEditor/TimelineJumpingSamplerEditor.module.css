@@ -33,7 +33,7 @@
 .sourceIdentity > span:last-child,
 .playheadBar > span,
 .padHeader > span:last-child {
-  font-family: var(--font-family-mono);
+  font-family: var(--font-family-base);
   opacity: 0.65;
 }
 
@@ -65,7 +65,7 @@
 .emptyState span,
 .padEmpty {
   color: var(--color-fg);
-  font-family: var(--font-family-mono);
+  font-family: var(--font-family-base);
   font-size: var(--font-size-ui);
   opacity: 0.65;
 }
@@ -118,7 +118,7 @@
   inset: 0;
   display: grid;
   place-items: center;
-  font-family: var(--font-family-mono);
+  font-family: var(--font-family-base);
   font-size: var(--font-size-ui);
   opacity: 0.55;
 }
@@ -137,7 +137,7 @@
   content: "";
   position: absolute;
   top: 0;
-  left: -4px;
+  left: -3px;
   width: 9px;
   height: 9px;
   background: var(--color-fg);
@@ -150,12 +150,12 @@
   bottom: 6px;
   transform: translateX(-50%);
   min-width: 27px;
-  padding: 2px 3px;
+  padding: 3px;
   color: var(--color-fg);
   background: var(--color-bg);
   border: var(--border-fg);
-  font-family: var(--font-family-mono);
-  font-size: 9px;
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-hint);
   line-height: 1;
   pointer-events: none;
 }
@@ -227,7 +227,7 @@
 }
 
 .audioPickerRow > span:last-child {
-  font-family: var(--font-family-mono);
+  font-family: var(--font-family-base);
   opacity: 0.65;
 }
 

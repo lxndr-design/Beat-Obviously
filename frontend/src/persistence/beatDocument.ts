@@ -4,7 +4,7 @@ import { normalizeInstrumentNodeGraph } from "../features/NodeInstrumentEditor/n
 import { useAudioFileStore, useDocumentStore, useInstrumentStore, usePluginStore, useProjectStore } from "../state/store";
 import { useComponentStore } from "../state/components";
 import { saveAudioFiles, saveComponents, saveInstruments, saveProject } from "./dexie";
-import type { Instrument, Project, Track } from "../state/types";
+import type { Instrument, Project, Segment, Track } from "../state/types";
 import { assetPolicy, buildAssetManifest, stableAssetId } from "./assetReferenceGraph";
 import { normalizeTrackEffectChain } from "../state/effects";
 import { associateInstrumentWithSong, projectInstrumentAssociations } from "../state/instrumentSongAssociations";
@@ -234,9 +234,28 @@ function sanitizeTrack(value: unknown): Track | null {
     recordGainDb: clamp(finiteNumber(value.recordGainDb, 0), -48, 24),
     sends: Array.isArray(value.sends) ? structuredClone(value.sends) : [],
     effects: normalizeTrackEffectChain(value.effects),
-    segments: Array.isArray(value.segments) ? structuredClone(value.segments) : [],
+    segments: Array.isArray(value.segments)
+      ? structuredClone(value.segments).map((segment, segmentIndex) => ensureSegmentNoteIds(segment, id, segmentIndex))
+      : [],
     rowHeight: value.rowHeight === "compact" ? "compact" : "normal",
   };
+}
+
+function ensureSegmentNoteIds(segment: Segment, trackId: string, segmentIndex: number): Segment {
+  const segmentId = segment.id || `${trackId}:segment:${segmentIndex}`;
+  const payload = segment.payload;
+  if (payload?.kind === "midi" || payload?.kind === "mixed") {
+    payload.notes = payload.notes.map((note, noteIndex) => ({
+      ...note,
+      id: note.id ?? `${segmentId}:note:${noteIndex}`,
+    }));
+  } else if (payload?.kind === "drumpad") {
+    payload.hits = payload.hits.map((note, noteIndex) => ({
+      ...note,
+      id: note.id ?? `${segmentId}:hit:${noteIndex}`,
+    }));
+  }
+  return segment;
 }
 
 function sanitizeRecordingInputProfile(value: unknown): Project["recordingInput"] {

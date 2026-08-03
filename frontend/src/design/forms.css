@@ -31,7 +31,7 @@
 .ds-field-hint {
   min-width: 0;
   font-size: var(--font-size-1);
-  font-family: var(--font-family-mono);
+  font-family: var(--font-family-base);
   line-height: var(--line-height-snug);
 }
 

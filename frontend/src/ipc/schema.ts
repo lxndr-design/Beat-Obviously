@@ -303,6 +303,32 @@ export interface DecentSamplerImport {
   audioFiles: AudioFile[];
 }
 
+export interface ScoreOcrArtifacts {
+  artifactDirectoryPath: string;
+  musicXmlPath?: string;
+  omrPath?: string;
+  ocrLogPath?: string;
+  warningCount: number;
+  errorCount: number;
+  exceptionCount: number;
+}
+
+export interface ScoreImportResponse {
+  name?: string;
+  dataBase64?: string;
+  ocrEngine?: "audiveris" | "homr" | "hybrid";
+  artifactDirectoryPath?: string;
+  musicXmlPath?: string;
+  omrPath?: string;
+  ocrLogPath?: string;
+  ocrWarningCount?: number;
+  ocrErrorCount?: number;
+  ocrExceptionCount?: number;
+  pageScores?: Array<{ name: string; dataBase64: string; firstPage: number; lastPage: number; ocrEngine?: "audiveris" | "homr" }>;
+  adaptiveRecovery?: boolean;
+  error?: string;
+}
+
 // ===== Outbound (JS → C++) =================================================
 
 export type OutboundRequest =
@@ -378,6 +404,11 @@ export type OutboundRequest =
   | { kind: "audio.listDevices" }
   | { kind: "audio.selectInputDevice"; typeName?: string; deviceName: string; inputChannelCount?: number }
   | { kind: "audio.selectOutputDevice"; typeName?: string; deviceName: string }
+  // Notated scores --------------------------------------------------------
+  | { kind: "score.import"; pathHint?: string }
+  | { kind: "score.importLibrary"; pathHint?: string }
+  | { kind: "score.revealArtifacts"; path: string }
+  | { kind: "score.openOcrReview"; path: string }
   // Recording -------------------------------------------------------------
   | { kind: "recording.plan"; project: Project; instruments?: Instrument[]; audioFiles?: AudioFile[]; trackId?: Id; startBeat: Beats; countInBeats?: Beats; maxDurationSeconds: number; inputChannels?: number; sampleRate?: number; bpm?: number; requireRecordArm?: boolean }
   | { kind: "recording.prepare"; maxDurationSeconds: number; inputChannels?: number }
@@ -446,6 +477,10 @@ export type ResponseFor<R extends OutboundRequest> =
   R extends { kind: "audio.listDevices" } ? { snapshot: AudioDeviceSnapshot } :
   R extends { kind: "audio.selectInputDevice" } ? { ok: boolean; snapshot: AudioDeviceSnapshot; error?: string } :
   R extends { kind: "audio.selectOutputDevice" } ? { ok: boolean; snapshot: AudioDeviceSnapshot; error?: string } :
+  R extends { kind: "score.import" } ? ScoreImportResponse :
+  R extends { kind: "score.importLibrary" } ? { scores: ScoreImportResponse[] } :
+  R extends { kind: "score.revealArtifacts" } ? { ok: boolean; error?: string } :
+  R extends { kind: "score.openOcrReview" } ? { ok: boolean; error?: string } :
   R extends { kind: "recording.plan" } ? { plan: RecordingSessionPlan | null; error?: string } :
   R extends { kind: "recording.prepare" } ? { ok: boolean; stats: RecordingCaptureStats; error?: string } :
   R extends { kind: "recording.start" } ? { stats: RecordingCaptureStats } :
