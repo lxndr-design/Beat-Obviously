@@ -59,19 +59,19 @@
   },
   "dependencies": {
     "@iconify/core": "^4.1.1",
-    "dexie": "^4.4.4",
+    "dexie": "^4.4.6",
     "fast-xml-parser": "^5.10.1",
     "fflate": "^0.8.3",
     "immer": "^10.1.1",
     "nanoid": "^5.1.16",
-    "solid-js": "^1.9.14",
+    "solid-js": "^1.9.15",
     "three": "^0.170.0",
-    "zustand": "^5.0.14"
+    "zustand": "^5.0.15"
   },
   "devDependencies": {
     "@iconify-json/ph": "^1.2.2",
     "@types/three": "^0.170.0",
-    "esbuild": "^0.28.1",
+    "esbuild": "^0.28.2",
     "typescript": "^5.7.2",
     "vite": "^8.2.0",
     "vite-plugin-solid": "^2.11.14"
