@@ -105,7 +105,7 @@ export function RenderTimingPanel() {
             value={stale() ? "--" : `O ${formatCount(timing().oscillatorSamples)} / WT ${formatCount(timing().wavetableVoiceSamples)}`}
           />
           <StaticRow
-            label="Aether"
+            label="Legacy Synth"
             staticValue={stale() ? "--" : `A ${formatCount(timing().aetherOscASamples)} / B ${formatCount(timing().aetherOscBSamples)}`}
             value={stale() ? "--" : `S ${formatCount(timing().aetherSubSamples)} / N ${formatCount(timing().aetherNoiseSamples)}`}
           />

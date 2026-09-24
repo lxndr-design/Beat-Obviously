@@ -7,7 +7,9 @@
     <script>
       try {
         const storedTheme = JSON.parse(localStorage.getItem("beat.settings.v1") || "{}").themeMode;
-        document.documentElement.dataset.theme = storedTheme === "light" || storedTheme === "mellow" ? storedTheme : "dark";
+        const initialTheme = storedTheme === "light" || storedTheme === "mellow" ? storedTheme : "dark";
+        document.documentElement.dataset.theme = initialTheme;
+        window.__BEAT_NATIVE__?.request("app.setTheme", { theme: initialTheme }).catch(() => {});
       } catch {
         document.documentElement.dataset.theme = "dark";
       }

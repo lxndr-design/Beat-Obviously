@@ -52,7 +52,7 @@ namespace beat
 
         frequencyHz = nextFrequency;
         phaseDelta = sampleRate > 0.0 ? frequencyHz / sampleRate : 0.0;
-        markFrameCacheDirty();
+        markMipCacheDirty();
     }
 
     void WavetableOscillator::setPosition(float newPosition) noexcept
@@ -62,7 +62,7 @@ namespace beat
             return;
 
         position = nextPosition;
-        markFrameCacheDirty();
+        markPositionCacheDirty();
     }
 
     void WavetableOscillator::setPhase(double newPhase) noexcept
@@ -90,22 +90,26 @@ namespace beat
         return std::isfinite(sample) ? juce::jlimit(-1.0f, 1.0f, sample) : 0.0f;
     }
 
-    void WavetableOscillator::updateFrameCache(const Wavetable* source, PlaybackCache& cache) noexcept
+    void WavetableOscillator::updateMipCache(const Wavetable* source, PlaybackCache& cache) noexcept
     {
-        cache = {};
-        cache.dirty = false;
+        cache.mipDirty = false;
 
         if (source == nullptr)
+        {
+            cache = {};
+            cache.mipDirty = false;
+            cache.positionDirty = false;
             return;
+        }
 
-        const int frameCount = source->getFrameCount();
         const int frameSize = source->getFrameSize();
-        if (frameCount <= 0 || frameSize <= 1)
+        if (source->getFrameCount() <= 0 || frameSize <= 1)
+        {
+            cache = {};
+            cache.mipDirty = false;
+            cache.positionDirty = false;
             return;
-
-        const float framePos = position * (float) (frameCount - 1);
-        const int frame0 = juce::jlimit(0, frameCount - 1, (int) std::floor(framePos));
-        const int frame1 = juce::jmin(frame0 + 1, frameCount - 1);
+        }
 
         int mip0 = 0;
         int mip1 = 0;
@@ -116,8 +120,11 @@ namespace beat
             : std::numeric_limits<double>::max();
         for (int mip = 0; mip + 1 < mipCount; ++mip)
         {
-            const auto* current = source->getMipLevel(frame0, mip);
-            const auto* next = source->getMipLevel(frame0, mip + 1);
+            // Mip harmonic limits are validated to be identical for every
+            // timbral frame, so frequency selection never needs to follow
+            // the current frame position.
+            const auto* current = source->getMipLevel(0, mip);
+            const auto* next = source->getMipLevel(0, mip + 1);
             if (current == nullptr || next == nullptr)
                 break;
             if (playbackLimit >= (double) current->maxHarmonic)
@@ -138,22 +145,48 @@ namespace beat
         }
 
         cache.frameSize = frameSize;
-        const auto* f0m0 = source->getMipLevel(frame0, mip0);
-        const auto* f1m0 = source->getMipLevel(frame1, mip0);
-        const auto* f0m1 = source->getMipLevel(frame0, mip1);
-        const auto* f1m1 = source->getMipLevel(frame1, mip1);
+        cache.mip0 = mip0;
+        cache.mip1 = mip1;
+        cache.mipFrac = mipFrac;
+        cache.positionDirty = true;
+    }
+
+    void WavetableOscillator::updatePositionCache(const Wavetable* source, PlaybackCache& cache) noexcept
+    {
+        cache.positionDirty = false;
+        if (source == nullptr || cache.frameSize <= 1)
+        {
+            cache.frame0Mip0Data = nullptr;
+            cache.frame1Mip0Data = nullptr;
+            cache.frame0Mip1Data = nullptr;
+            cache.frame1Mip1Data = nullptr;
+            cache.frameFrac = 0.0f;
+            return;
+        }
+
+        const int frameCount = source->getFrameCount();
+        if (frameCount <= 0)
+            return;
+        const float framePos = position * (float) (frameCount - 1);
+        const int frame0 = juce::jlimit(0, frameCount - 1, (int) std::floor(framePos));
+        const int frame1 = juce::jmin(frame0 + 1, frameCount - 1);
+        const auto* f0m0 = source->getMipLevel(frame0, cache.mip0);
+        const auto* f1m0 = source->getMipLevel(frame1, cache.mip0);
+        const auto* f0m1 = source->getMipLevel(frame0, cache.mip1);
+        const auto* f1m1 = source->getMipLevel(frame1, cache.mip1);
         cache.frame0Mip0Data = f0m0 != nullptr ? f0m0->samples.data() : nullptr;
         cache.frame1Mip0Data = f1m0 != nullptr ? f1m0->samples.data() : nullptr;
         cache.frame0Mip1Data = f0m1 != nullptr ? f0m1->samples.data() : nullptr;
         cache.frame1Mip1Data = f1m1 != nullptr ? f1m1->samples.data() : nullptr;
         cache.frameFrac = framePos - (float) frame0;
-        cache.mipFrac = mipFrac;
     }
 
     float WavetableOscillator::readCurrentSample(const Wavetable* source, PlaybackCache& cache) noexcept
     {
-        if (cache.dirty)
-            updateFrameCache(source, cache);
+        if (cache.mipDirty)
+            updateMipCache(source, cache);
+        if (cache.positionDirty)
+            updatePositionCache(source, cache);
 
         if (cache.frameSize <= 1 || cache.frame0Mip0Data == nullptr || cache.frame1Mip0Data == nullptr
             || cache.frame0Mip1Data == nullptr || cache.frame1Mip1Data == nullptr)

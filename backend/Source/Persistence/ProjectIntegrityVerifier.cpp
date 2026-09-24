@@ -904,6 +904,20 @@ namespace beat
                     const auto sourceStartBeat = doubleProperty(segment, "sourceStartBeat", doubleProperty(payload, "sourceStartBeat", 0.0));
                     const auto fadeInBeats = doubleProperty(segment, "fadeInBeats", doubleProperty(payload, "fadeInBeats", 0.0));
                     const auto fadeOutBeats = doubleProperty(segment, "fadeOutBeats", doubleProperty(payload, "fadeOutBeats", 0.0));
+                    const auto tunePitch = doubleProperty(payload, "tunePitch", -1.0);
+                    const auto tuneRate = tunePitch >= 0.0 && tunePitch <= 127.0
+                        ? std::exp2((std::round(tunePitch) - 60.0) / 12.0)
+                        : 1.0;
+
+                    if (hasProperty(payload, "tunePitch")
+                        && (tunePitch < 0.0 || tunePitch > 127.0 || std::abs(tunePitch - std::round(tunePitch)) > 0.000001))
+                    {
+                        addIssue(report,
+                                 ProjectIntegritySeverity::Error,
+                                 "segment.audio.tunePitch.invalid",
+                                 "Audio segment tune pitch must be a MIDI note from 0 to 127.",
+                                 propertyPath(segmentPath, "payload.tunePitch"));
+                    }
 
                     if (sourceStartBeat < 0.0)
                     {
@@ -967,7 +981,7 @@ namespace beat
                                          "Segment source start is beyond the referenced audio file.",
                                          propertyPath(segmentPath, "sourceStartBeat"));
                             }
-                            else if (sourceStartBeat + lengthBeats > audioLengthBeats + 0.000001)
+                            else if (sourceStartBeat + lengthBeats * tuneRate > audioLengthBeats + 0.000001)
                             {
                                 addIssue(report,
                                          ProjectIntegritySeverity::Warning,

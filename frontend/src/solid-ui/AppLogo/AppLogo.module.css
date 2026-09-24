@@ -8,6 +8,10 @@
   height: 100%;
 }
 
+:global(html[data-theme="light"]) .logo {
+  --beat-logo-filter: none;
+}
+
 .image {
   display: block;
   width: 100%;

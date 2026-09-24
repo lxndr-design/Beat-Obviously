@@ -27,6 +27,7 @@
 .headerCol {
   display: flex;
   flex-direction: column;
+  min-height: 100%;
   border-right: var(--border-fg);
   background: var(--color-bg);
   position: sticky;
@@ -71,6 +72,9 @@
  * floating zoom cluster (anchored to the visible lane viewport). */
 .laneWrap {
   position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
   min-width: 0;
 }
 
@@ -79,6 +83,7 @@
   top: 0;
   z-index: 4;
   height: var(--height-timeline);
+  flex: 0 0 var(--height-timeline);
   overflow: hidden;
   border-bottom: var(--border-fg);
   background: var(--color-bg);
@@ -113,7 +118,8 @@
   overflow-x: auto;
   overflow-y: hidden;
   position: relative;
-  height: auto;
+  flex: 1 0 auto;
+  min-height: 0;
 }
 
 /* Scoped horizontal-scrollbar framing — a 1px inset outline on the track

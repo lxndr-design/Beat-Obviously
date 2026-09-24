@@ -159,41 +159,10 @@
 }
 
 .rowMeta {
-  display: inline-grid;
-  grid-template-columns: minmax(54px, max-content) 21px;
-  align-items: center;
-  gap: 6px;
-  justify-self: end;
-  min-width: 0;
-}
-
-.rowPlay {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  width: var(--button-square-sm);
-  height: var(--button-square-sm);
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--color-fg);
-  cursor: pointer;
-  transition: var(--interaction-transition);
-}
-
-.rowPlay:hover {
-  background: var(--interaction-hover-bg);
-  color: var(--color-fg);
-}
-
-.rowPlayActive {
-  background: var(--interaction-active-bg);
-  color: var(--interaction-active-fg);
-}
-
-.rowPlayActive:hover {
-  background: var(--interaction-active-hover-bg);
-  color: var(--interaction-active-fg);
+  justify-self: end;
+  min-width: 0;
 }
 
 .preview {
@@ -346,6 +315,11 @@
 }
 
 .taxonomySelect {
+  min-width: 0;
+}
+
+.taxonomyTags {
+  grid-column: 1 / -1;
   min-width: 0;
 }
 

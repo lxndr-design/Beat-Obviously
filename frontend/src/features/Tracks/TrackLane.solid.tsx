@@ -1,11 +1,6 @@
 import { createMemo, createSignal, For, Show } from "solid-js";
 import { nanoid as nano } from "nanoid";
 import { createStoreSelector } from "../../solid-utils/store";
-import { appAlert } from "../../solid-ui";
-import { isSupportedAudioFileName, SUPPORTED_AUDIO_IMPORT_LABEL } from "../../audio/audioFormats";
-import { importAudioFile } from "../../audio/audioImport";
-import { createAurumInstrument } from "../../state/aurum";
-import { createDefaultLumenDraft, createDefaultSynthDraft, synthDraftToInstrumentPatch } from "../../state/synthStore";
 import {
   useAudioFileStore,
   useInstrumentStore,
@@ -17,8 +12,8 @@ import {
 } from "../../state/store";
 import { pauseTransport } from "../../audio/transportActions";
 import { drumPlaybackDurationBeats } from "../../state/drumSteps";
+import { userAccessibleInstruments } from "../../state/instrumentAccess";
 import { useComponentStore } from "../../state/components";
-import { clipboardStore } from "../../state/clipboard";
 import { expandTrackSegments } from "../../state/selectors";
 import {
   decentSamplerEditorKind,
@@ -48,6 +43,7 @@ export function TrackLane(props: Props) {
   const beatsToPx = createStoreSelector(useViewStore, (state) => state.beatsToPx);
   const lastLen = createStoreSelector(useViewStore, (state) => state.lastSegmentLength);
   const instruments = createStoreSelector(useInstrumentStore, (state) => state.instruments);
+  const selectableInstruments = createMemo(() => userAccessibleInstruments(instruments()));
   const plugins = createStoreSelector(usePluginStore, (state) => state.plugins);
   const audioFiles = createStoreSelector(useAudioFileStore, (state) => state.files);
 
@@ -58,71 +54,28 @@ export function TrackLane(props: Props) {
 
   const menu = createContextMenu((): ContextMenuItem[] => {
     if (!track()) return [];
-    const canPaste = clipboardStore.getState().segments.length > 0;
     const projectStore = useProjectStore.getState();
     const addEditableSegment = (segment: Partial<SegmentModel>) => {
       const segmentId = projectStore.addSegment(props.trackId, segment);
       useUiStore.getState().setSelectedSegments([segmentId]);
       openSegmentEditor(segmentId, { discardIfUntouched: true });
     };
-    const addEngineSegment = (engine: "aether" | "aurum" | "lumen") => {
-      const label = engine === "aether" ? "Aether" : engine === "aurum" ? "Aurum" : "Lumen";
-      const instrumentStore = useInstrumentStore.getState();
-      const instrumentId = engine === "aurum"
-        ? instrumentStore.addInstrument(createAurumInstrument(nano(), `${label} Segment Instrument`))
-        : instrumentStore.addInstrument({
-            ...synthDraftToInstrumentPatch(engine === "lumen" ? createDefaultLumenDraft() : createDefaultSynthDraft()),
-            name: `${label} Segment Instrument`,
-            userCreated: true,
-          });
-      addEditableSegment({
-        name: nextEngineSegmentName(tracks(), label),
-        startBeat: lastClickBeat,
-        lengthBeats: lastLen(),
-        instrumentId,
-        payload: { kind: "midi", notes: [] },
-      });
-    };
     return [
-      ...(canPaste
-        ? [{
-            label: "Paste",
-            icon: "ph:clipboard-text",
-            onSelect: () => pasteSegmentsIntoTrack(props.trackId, lastClickBeat, clipboardStore.getState().pasteMany()),
-          } as ContextMenuItem]
-        : []),
       {
-        label: "MIDI Segment",
+        label: "Create MIDI",
         icon: "ph:piano-keys",
-        separatorBefore: canPaste,
         onSelect: () => {
           addEditableSegment({
             name: nextSegmentName(tracks(), "midi"),
             startBeat: lastClickBeat,
             lengthBeats: lastLen(),
-            instrumentId: instruments().find((instrument) => instrument.name.toLowerCase() === "lead saw")?.id,
+            instrumentId: selectableInstruments()[0]?.id,
             payload: { kind: "midi", notes: [] },
           });
         },
       },
       {
-        label: "Create Aether Segment",
-        icon: "ph:cube",
-        separatorBefore: true,
-        onSelect: () => addEngineSegment("aether"),
-      },
-      {
-        label: "Create Aurum Segment",
-        icon: "ph:circles-three-plus",
-        onSelect: () => addEngineSegment("aurum"),
-      },
-      {
-        label: "Create Lumen Segment",
-        icon: "ph:sparkle",
-        onSelect: () => addEngineSegment("lumen"),
-      },
-      {
-        label: "Drum Sequencer",
+        label: "Create Drum Sequencer",
         icon: "ph:squares-four",
         onSelect: () => {
           const sourceLengthBeats = 16;
@@ -138,16 +91,16 @@ export function TrackLane(props: Props) {
               sourceLengthBeats,
               defaultPitchHz: 261.63,
               swingPercent: 50,
-              rows: makeDefaultDrumRows(instruments()),
+              rows: makeDefaultDrumRows(selectableInstruments()),
             },
           });
         },
       },
       {
-        label: "Drum Pad",
+        label: "Create Drumpad",
         icon: "ph:piano-keys",
         onSelect: () => {
-          const firstInstrument = instruments()[0];
+          const firstInstrument = selectableInstruments()[0];
           addEditableSegment({
             name: nextSegmentName(tracks(), "drumpad"),
             startBeat: lastClickBeat,
@@ -173,32 +126,6 @@ export function TrackLane(props: Props) {
           });
         },
       },
-      {
-        label: "WAV Segment",
-        icon: "ph:upload",
-        onSelect: async () => {
-          const file = await importAudioFile();
-          if (!file) return;
-          if (!isSupportedAudioFileName(file.name) && !isSupportedAudioFileName(file.path)) {
-            await appAlert(`Unsupported audio file. Supported formats: ${SUPPORTED_AUDIO_IMPORT_LABEL}.`);
-            return;
-          }
-          useAudioFileStore.getState().addFile(file);
-          addEditableSegment({
-            name: nextSegmentName(tracks(), "audio"),
-            startBeat: lastClickBeat,
-            lengthBeats: lastLen(),
-            payload: { kind: "audio", audioFileId: file.id, gainDb: 0 },
-          });
-        },
-      },
-      {
-        label: "Live Record",
-        icon: "ph:record-fill",
-        onSelect: () => {
-          props.onRequestAudioRecording?.({ trackId: props.trackId, startBeat: lastClickBeat, recordingGroupId: nano() });
-        },
-      },
     ];
   });
 
@@ -217,6 +144,12 @@ export function TrackLane(props: Props) {
   function handleContextMenu(event: MouseEvent) {
     lastClickBeat = beatAtX(event.clientX);
     menu.onContextMenu(event);
+  }
+
+  function handleSecondaryMenuMouseDown(event: MouseEvent) {
+    if (event.button !== 2 && !(event.button === 0 && event.ctrlKey)) return;
+    lastClickBeat = beatAtX(event.clientX);
+    menu.onMouseDown(event);
   }
 
   function handleDragOver(event: DragEvent) {
@@ -361,6 +294,7 @@ export function TrackLane(props: Props) {
           props.selected && styles.selected,
         ].filter(Boolean).join(" ")}
         style={{ width: `${lengthBeats() * beatsToPx()}px`, height: "var(--height-track-row)" }}
+        onMouseDown={handleSecondaryMenuMouseDown}
         onContextMenu={handleContextMenu}
         onDragOver={handleDragOver}
         onDragLeave={() => setDragOver(false)}
@@ -441,18 +375,6 @@ function nextSegmentName(tracks: Track[], kind: "midi" | "audio" | "drum" | "dru
   return `${stem} ${next}`;
 }
 
-function nextEngineSegmentName(tracks: Track[], engine: "Aether" | "Aurum" | "Lumen"): string {
-  const stem = `${engine} Segment`;
-  const used = new Set<number>();
-  for (const segment of tracks.flatMap((track) => track.segments)) {
-    const match = (segment.name ?? "").match(new RegExp(`^${stem}\\s+(\\d+)$`));
-    if (match) used.add(Number(match[1]));
-  }
-  let next = 1;
-  while (used.has(next)) next += 1;
-  return `${stem} ${next}`;
-}
-
 function makeDecentSamplerDrumRows(instrumentId: Id, instrument: Instrument): DrumRow[] {
   const zones = instrument.sampleMap ?? [];
   const rowCandidates = zones.filter((zone) => isLikelyDrumZoneName(zone.name ?? zone.path)).slice(0, 16);
@@ -498,26 +420,6 @@ function conciseZoneName(name: string, rootNote: number) {
 
 function isLikelyDrumZoneName(name: string) {
   return /\b(kick|bd|bass drum|808|snare|sd|hat|hihat|hi[- ]?hat|hh|tom|cymbal|crash|ride|splash|clap|rim|perc|conga|bongo|cowbell|timbal|tamb|shaker|triangle|guiro)\b/i.test(name);
-}
-
-function pasteSegmentsIntoTrack(trackId: Id, startBeat: number, segments: SegmentModel[]) {
-  if (segments.length === 0) return;
-  const { project, applySegmentEditCommand } = useProjectStore.getState();
-  const targetTrackIndex = Math.max(0, project.tracks.findIndex((track) => track.id === trackId));
-  const trackIndexById = new Map(project.tracks.map((track, index) => [track.id, index]));
-  const sourceIndexes = segments.map((segment) => trackIndexById.get(segment.trackId) ?? targetTrackIndex);
-  const sourceAnchorIndex = Math.min(...sourceIndexes);
-  const commandSegments = segments.flatMap((segment, index) => {
-    const destinationIndex = Math.max(0, Math.min(project.tracks.length - 1, targetTrackIndex + sourceIndexes[index] - sourceAnchorIndex));
-    const destinationTrack = project.tracks[destinationIndex];
-    if (!destinationTrack) return [];
-    return [{
-      ...structuredClone(segment),
-      trackId: destinationTrack.id,
-      name: segment.name?.trim() ? `${segment.name} copy` : segment.name,
-    }];
-  });
-  applySegmentEditCommand({ kind: "paste", segments: commandSegments, startBeat });
 }
 
 function nextDecentSamplerInstanceName(baseName: string, pluginId: Id, templateInstrumentId: Id, instruments: Instrument[]): string {

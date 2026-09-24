@@ -335,6 +335,8 @@ export type OutboundRequest =
   | { kind: "app.shellReady" }
   | { kind: "app.startupStage"; stage: "instruments" | "components" | "audio"; durationMs: number; itemCount: number }
   | { kind: "app.ready" }
+  | { kind: "app.setTheme"; theme: "dark" | "light" | "mellow" }
+  | { kind: "app.setModalOpen"; open: boolean }
   // Transport ---------------------------------------------------------------
   | { kind: "transport.play" }
   | { kind: "transport.pause" }
@@ -376,7 +378,7 @@ export type OutboundRequest =
   | { kind: "engine.setParameter"; instrumentId: Id; parameterId: string; value: number; sampleOffset?: number; rampSamples?: number }
   | { kind: "engine.previewMidiNote"; trackId: Id; instrumentId: Id; pitch: number; velocity: number; delaySeconds?: number; durationSeconds?: number; gainDb?: number; note?: MidiNote; glideTargetPitch?: number; glideMs?: number }
   | { kind: "engine.stopMidiPreview"; trackId: Id }
-  | { kind: "engine.previewAudioSegment"; trackId: Id; audioFileId: Id; sourceStartBeat?: Beats; positionBeat?: Beats; lengthBeats: Beats; fadeInBeats?: Beats; fadeOutBeats?: Beats; gainDb?: number }
+  | { kind: "engine.previewAudioSegment"; trackId: Id; audioFileId: Id; sourceStartBeat?: Beats; positionBeat?: Beats; lengthBeats: Beats; fadeInBeats?: Beats; fadeOutBeats?: Beats; gainDb?: number; tunePitch?: number }
   | { kind: "engine.stopAudioPreview"; trackId: Id }
   // Instruments ------------------------------------------------------------
   | { kind: "instrument.save"; instrument: Instrument }
@@ -496,6 +498,8 @@ export type ResponseFor<R extends OutboundRequest> =
   R extends { kind: "app.shellReady" }  ? { ok: true } :
   R extends { kind: "app.startupStage" } ? { ok: true } :
   R extends { kind: "app.ready" }       ? { ok: true } :
+  R extends { kind: "app.setTheme" }    ? { ok: true } :
+  R extends { kind: "app.setModalOpen" } ? { ok: true } :
   R extends { kind: "ping" }           ? { pong: true; backendVersion: string } :
   { ok: true };
 

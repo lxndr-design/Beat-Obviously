@@ -3,9 +3,10 @@ import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { existsSync, lstatSync, readFileSync, readdirSync, readlinkSync, statSync } from "node:fs";
 import { basename, join, relative, resolve } from "node:path";
+import { homedir } from "node:os";
 
 const repoRoot = resolve(new URL("..", import.meta.url).pathname);
-const appPath = resolve(process.argv[2] ?? join(repoRoot, "Beat.app"));
+const appPath = resolve(process.argv[2] ?? process.env.BEAT_APP_OUTPUT_PATH ?? join(homedir(), "Applications", "Beat.app"));
 const resourcesPath = join(appPath, "Contents", "Resources");
 const frontendPath = join(resourcesPath, "frontend");
 const executablePath = join(appPath, "Contents", "MacOS", "Beat");

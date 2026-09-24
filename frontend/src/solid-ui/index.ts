@@ -13,6 +13,7 @@ export * from "./RowItem";
 export * from "./LibraryFolder";
 export * from "./LibrarySearch";
 export * from "./SectionRibbon";
+export * from "./RibbonHelp";
 export * from "./TextInput";
 export * from "./Slider";
 export * from "./NumberInput";

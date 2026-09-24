@@ -31,7 +31,7 @@ import {
   denormalizeAetherNoteAutomationValue,
   normalizeAetherNoteAutomationValue,
 } from "../../automation/aetherNoteAutomation";
-import { AUTOMATION_CURVES, automationCurveLabel } from "../../automation/curves";
+import { AUTOMATION_CURVES, automationCurveLabel, evaluateAutomationCurve } from "../../automation/curves";
 import { isSupportedAudioFileName, SUPPORTED_AUDIO_IMPORT_LABEL } from "../../audio/audioFormats";
 import { importAudioFile } from "../../audio/audioImport";
 import { createInstrumentBufferSource, noteFrequency } from "../../audio/synthPreview";
@@ -50,6 +50,7 @@ import {
 } from "../../solid-ui";
 import { isNative, send } from "../../ipc/bridge";
 import { createStoreSelector } from "../../solid-utils/store";
+import { isLegacyAetherInstrument, userAccessibleInstruments } from "../../state/instrumentAccess";
 import { selectSegment } from "../../state/selectors";
 import { retimeDrumSegmentLengthBeats } from "../../state/drumSteps";
 import {
@@ -60,7 +61,7 @@ import {
   useTransportStore,
   useUiStore,
 } from "../../state/store";
-import type { AutomationCurve, DrumRow, DrumSpeed, Instrument, MidiNote, Segment, TimeSignature } from "../../state/types";
+import type { AutomationCurve, DrumRow, DrumSpeed, Instrument, MidiAutomationLane, MidiNote, Segment, TimeSignature } from "../../state/types";
 import { DrumSequencer } from "../DrumEditor/DrumSequencer.solid";
 import { PianoRoll } from "../MidiEditor/PianoRoll.solid";
 import { roundMidiNotesToNearest } from "../MidiEditor/midiNoteRounding";
@@ -72,6 +73,7 @@ import {
 } from "../MidiEditor/midiRemix";
 import { MidiTransport } from "../MidiEditor/MidiTransport.solid";
 import { AudioSegmentTransport } from "./AudioSegmentTransport.solid";
+import { AUDIO_TUNE_OPTIONS } from "../../state/audioSegmentTuning";
 import { SegmentLoopControl } from "./SegmentLoopControl.solid";
 import { SEGMENT_PASTEL_COLORS } from "./segmentColors";
 import {
@@ -95,7 +97,7 @@ type MidiLikePayload = Extract<Segment["payload"], { kind: "midi" | "mixed" }>;
 type DrumPayload = Extract<Segment["payload"], { kind: "drum" }>;
 type AudioPayload = Extract<Segment["payload"], { kind: "audio" }>;
 
-// Keep the default MIDI modal focused on piano-roll editing. Aether arrangement
+// Keep the default MIDI modal focused on piano-roll editing. Instrument
 // automation needs a separate opt-in surface instead of living under every MIDI clip.
 const SHOW_SEGMENT_AUTOMATION_PANEL = false;
 const MIDI_LIVE_BASE_BPM = 120;
@@ -112,6 +114,15 @@ export function SegmentEditorModal(props: SegmentEditorModalProps) {
   const source = createStoreSelector(useProjectStore, () => selectSegment(props.segmentId));
   const project = createStoreSelector(useProjectStore, (s) => s.project);
   const instruments = createStoreSelector(useInstrumentStore, (s) => s.instruments);
+  const selectableInstruments = createMemo(() => userAccessibleInstruments(instruments()));
+  const instrumentOptions = createMemo(() => {
+    const options = selectableInstruments().map((instrument) => ({ value: instrument.id, label: instrument.name }));
+    const currentId = draft()?.instrumentId;
+    const current = currentId ? instruments().find((instrument) => instrument.id === currentId) : undefined;
+    return current && isLegacyAetherInstrument(current)
+      ? [{ value: current.id, label: "Legacy instrument (playback only)", disabled: true }, ...options]
+      : options;
+  });
   const audioFiles = createStoreSelector(useAudioFileStore, (s) => s.files);
   const positionBeat = createStoreSelector(useTransportStore, (s) => s.positionBeat);
   const playing = createStoreSelector(useTransportStore, (s) => s.playing);
@@ -130,6 +141,7 @@ export function SegmentEditorModal(props: SegmentEditorModalProps) {
   const [colorPicker, setColorPicker] = createSignal<{ x: number; y: number } | null>(null);
   const [touched, setTouched] = createSignal(false);
   const [instrumentSelectOpen, setInstrumentSelectOpen] = createSignal(false);
+  const [audioTuneSelectOpen, setAudioTuneSelectOpen] = createSignal(false);
   const [segmentAutomationCurveOpen, setSegmentAutomationCurveOpen] = createSignal(false);
   const [activeSegmentAutomationTarget, setActiveSegmentAutomationTarget] = createSignal<AetherArrangementAutomationTarget>("macro.1");
   const [draggedSegmentAutomationEdge, setDraggedSegmentAutomationEdge] = createSignal<"start" | "mid" | "end" | null>(null);
@@ -257,7 +269,19 @@ export function SegmentEditorModal(props: SegmentEditorModalProps) {
       currentBeat: midiPreviewBeat() ?? 0,
     });
   });
-  const previewMidiNotes = createMemo(() => liveMidiNotes());
+  const previewMidiNotes = createMemo(() => {
+    const currentDraft = draft();
+    if (!currentDraft) return liveMidiNotes();
+    const trackAutomation = project().tracks.find((track) => track.id === currentDraft.trackId)?.automation ?? [];
+    return liveMidiNotes().map((note) => ({
+      ...note,
+      automation: mergePreviewAutomation(
+        note,
+        localizeAutomation(trackAutomation, -currentDraft.startBeat),
+        currentDraft.automation ?? [],
+      ),
+    }));
+  });
   const editorTitle = createMemo(() => {
     const currentDraft = draft();
     if (!currentDraft) return "Segment";
@@ -877,31 +901,33 @@ export function SegmentEditorModal(props: SegmentEditorModalProps) {
           </>
         }
       >
-        <SegmentLoopControl
-          repeats={draft()!.repeats}
-          lengthBeats={draft()!.lengthBeats}
-          onChange={(repeats) => setDraft((current) => current ? { ...current, repeats } : current)}
-        />
-        <div class={styles.segmentIdentityRow}>
-          <TextInput
-            label="Name"
-            layout="inline"
-            value={draft()?.name ?? ""}
-            placeholder="Segment name"
-            onInput={(event) => setDraft((current) => current ? { ...current, name: event.currentTarget.value } : current)}
+        <div classList={{
+          [styles.segmentHeaderRow]: isMidi(),
+          [styles.segmentHeaderStack]: !isMidi(),
+        }}>
+          <SegmentLoopControl
+            repeats={draft()!.repeats}
+            onChange={(repeats) => setDraft((current) => current ? { ...current, repeats } : current)}
           />
-          <button
-            type="button"
-            class={styles.segmentColorButton}
-            style={{ "--segment-swatch": draft()?.color ?? "var(--color-fg)" }}
-            aria-label="Set segment color"
-            title="Segment color"
-            data-segment-color-trigger
-            onClick={openColorPicker}
-          />
-        </div>
-        <Show when={isMidi()}>
-          <>
+          <div class={styles.segmentIdentityRow}>
+            <TextInput
+              label="Name"
+              layout="inline"
+              value={draft()?.name ?? ""}
+              placeholder="Segment name"
+              onInput={(event) => setDraft((current) => current ? { ...current, name: event.currentTarget.value } : current)}
+            />
+            <button
+              type="button"
+              class={styles.segmentColorButton}
+              style={{ "--segment-swatch": draft()?.color ?? "var(--color-fg)" }}
+              aria-label="Set segment color"
+              title="Segment color"
+              data-segment-color-trigger
+              onClick={openColorPicker}
+            />
+          </div>
+          <Show when={isMidi()}>
             <div class={styles.midiTopFields}>
               <FloatingSelect
                 layout="inline"
@@ -910,7 +936,7 @@ export function SegmentEditorModal(props: SegmentEditorModalProps) {
                 ariaLabel="Segment instrument"
                 options={[
                   { value: "", label: "-- none --" },
-                  ...instruments().map((instrument) => ({ value: instrument.id, label: instrument.name })),
+                  ...instrumentOptions(),
                 ]}
                 searchable
                 searchPlaceholder="Search instruments"
@@ -921,6 +947,10 @@ export function SegmentEditorModal(props: SegmentEditorModalProps) {
                 }
               />
             </div>
+          </Show>
+        </div>
+        <Show when={isMidi()}>
+          <>
             <div class={styles.midiLivePanel} aria-label="Live MIDI keyboard recording">
               <div class={styles.midiLiveTransport}>
                 <div class={styles.transportSlot}>
@@ -1151,6 +1181,8 @@ export function SegmentEditorModal(props: SegmentEditorModalProps) {
               instrument={instruments().find((instrument) => instrument.id === draft()!.instrumentId)}
               lengthBeats={draft()!.lengthBeats}
               playheadBeat={playheadBeat()}
+              bpm={bpm()}
+              timeSignature={draft()!.timeSignature ?? timeSignature()}
               hotkeyScopeId={scopeId()}
               showAutomation={false}
               onLengthChange={(lengthBeats: number) => setDraft((current) => current ? { ...current, lengthBeats: Math.max(1, Math.round(lengthBeats)) } : current)}
@@ -1159,9 +1191,9 @@ export function SegmentEditorModal(props: SegmentEditorModalProps) {
             />
 
             {SHOW_SEGMENT_AUTOMATION_PANEL && (
-            <div class={styles.automationPanel} aria-label="Aether segment automation lanes">
+            <div class={styles.automationPanel} aria-label="Instrument segment automation lanes">
               <div class={styles.automationHeader}>
-                <span>Aether segment lanes</span>
+                <span>Instrument segment lanes</span>
                 <span>
                   {aetherArrangementAutomationTargetLabel(activeSegmentAutomationTarget())}
                   {" · "}
@@ -1178,7 +1210,7 @@ export function SegmentEditorModal(props: SegmentEditorModalProps) {
                 <span>{segmentAutomationEffective().label}</span>
                 <span>{segmentAutomationEffective().detail}</span>
               </div>
-              <div class={styles.automationTargets} role="radiogroup" aria-label="Aether segment automation target">
+              <div class={styles.automationTargets} role="radiogroup" aria-label="Instrument segment automation target">
                 {AETHER_ARRANGEMENT_AUTOMATION_TARGETS.map((target) => (
                   <Button
                     size="xs"
@@ -1207,7 +1239,7 @@ export function SegmentEditorModal(props: SegmentEditorModalProps) {
                   open={segmentAutomationCurveOpen()}
                   className={styles.automationCurveSelect}
                   layout="inline"
-                  ariaLabel="Aether segment automation curve"
+                  ariaLabel="Instrument segment automation curve"
                   onOpenChange={setSegmentAutomationCurveOpen}
                   onChange={setSegmentAutomationCurveValue}
                 />
@@ -1274,7 +1306,7 @@ export function SegmentEditorModal(props: SegmentEditorModalProps) {
                   E
                 </button>
               </div>
-              <div class={styles.automationPointEditor} aria-label="Aether segment automation points">
+              <div class={styles.automationPointEditor} aria-label="Instrument segment automation points">
                 <div class={styles.automationPointHeader}>
                   <span>Points</span>
                   <div class={styles.automationPointTools}>
@@ -1376,6 +1408,27 @@ export function SegmentEditorModal(props: SegmentEditorModalProps) {
                   ? { ...current, payload: { ...current.payload, gainDb } }
                   : current)}
               />
+              <FloatingSelect
+                label="Tune to"
+                layout="inline"
+                value={payload().tunePitch == null ? "" : String(payload().tunePitch)}
+                ariaLabel="Tune audio segment to pitch"
+                options={AUDIO_TUNE_OPTIONS}
+                searchable
+                searchPlaceholder="Search pitch"
+                open={audioTuneSelectOpen()}
+                onOpenChange={setAudioTuneSelectOpen}
+                onChange={(value) => setDraft((current) => current?.payload.kind === "audio"
+                  ? {
+                    ...current,
+                    payload: {
+                      ...current.payload,
+                      tunePitch: value === "" ? undefined : Math.max(0, Math.min(127, Math.round(Number(value)))),
+                    },
+                  }
+                  : current)}
+              />
+              <span class={styles.audioTuneHint}>C4 plays at the sample's original pitch.</span>
             </div>
             <AudioSegmentTransport
               segment={draft()!}
@@ -1507,6 +1560,55 @@ function clipMidiNotesToLength(notes: MidiNote[], lengthBeats: number): MidiNote
     };
     return [clipped];
   });
+}
+
+function localizeAutomation(lanes: MidiAutomationLane[], beatOffset: number): MidiAutomationLane[] {
+  return lanes.map((lane) => ({
+    ...lane,
+    points: lane.points.map((point) => ({ ...point, beat: point.beat + beatOffset })),
+  }));
+}
+
+/** Match arrangement playback precedence in the isolated MIDI transport:
+ * track < segment < note. The resulting lanes are clipped to each note so the
+ * native preview engine receives the same parameter state as the main timeline. */
+function mergePreviewAutomation(
+  note: MidiNote,
+  trackAutomation: MidiAutomationLane[],
+  segmentAutomation: MidiAutomationLane[],
+): MidiAutomationLane[] | undefined {
+  const byTarget = new Map<string, MidiAutomationLane>();
+  for (const lane of trackAutomation) byTarget.set(lane.target, lane);
+  for (const lane of segmentAutomation) byTarget.set(lane.target, lane);
+  for (const lane of note.automation ?? []) byTarget.set(lane.target, lane);
+  const clipped = Array.from(byTarget.values())
+    .map((lane) => clipAutomationLaneToNote(lane, note))
+    .filter((lane): lane is MidiAutomationLane => Boolean(lane));
+  return clipped.length > 0 ? clipped : undefined;
+}
+
+function clipAutomationLaneToNote(lane: MidiAutomationLane, note: MidiNote): MidiAutomationLane | null {
+  if (lane.points.length === 0) return null;
+  const startBeat = note.startBeat;
+  const endBeat = note.startBeat + note.lengthBeats;
+  const sorted = [...lane.points].sort((a, b) => a.beat - b.beat);
+  const valueAt = (beat: number) => {
+    if (beat <= sorted[0].beat) return sorted[0].value;
+    if (beat >= sorted[sorted.length - 1].beat) return sorted[sorted.length - 1].value;
+    const rightIndex = sorted.findIndex((point) => point.beat >= beat);
+    const left = sorted[rightIndex - 1];
+    const right = sorted[rightIndex];
+    const ratio = (beat - left.beat) / Math.max(0.000001, right.beat - left.beat);
+    return evaluateAutomationCurve(left.curve, left.value, right.value, ratio);
+  };
+  return {
+    ...lane,
+    points: [
+      { beat: startBeat, value: valueAt(startBeat), curve: sorted.find((point) => point.beat >= startBeat)?.curve },
+      ...sorted.filter((point) => point.beat > startBeat && point.beat < endBeat).map((point) => ({ ...point })),
+      { beat: endBeat, value: valueAt(endBeat), curve: sorted.find((point) => point.beat >= endBeat)?.curve },
+    ],
+  };
 }
 
 function clipNoteCurve(note: MidiNote, startBeat: number, endBeat: number): MidiNote["curve"] {

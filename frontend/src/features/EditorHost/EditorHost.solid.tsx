@@ -4,6 +4,7 @@ import { createStoreSelector } from "../../solid-utils/store";
 import { selectSegment } from "../../state/selectors";
 import { useInstrumentStore, useProjectStore, useUiStore } from "../../state/store";
 import type { Instrument } from "../../state/types";
+import { isLegacyAetherInstrument, isLumenInstrument } from "../../state/instrumentAccess";
 import { ComponentEditorModal } from "../ComponentLibrary/ComponentEditorModal.solid";
 import { DrumpadEditorModal } from "../DrumpadEditor/DrumpadEditorModal.solid";
 import { EqAutomationModal } from "../EqAutomation/EqAutomationModal.solid";
@@ -45,34 +46,34 @@ export function EditorHost() {
               );
             case "synthInstrument": {
               const instrument = () => editor.draftInstrument ?? instruments().find((candidate) => candidate.id === editor.instrumentId) ?? null;
+              const currentInstrument = instrument();
+              if (!currentInstrument || isLegacyAetherInstrument(currentInstrument)) return null;
               const scopeId = `synth-editor-${editor.instrumentId}`;
               return (
                 <Modal
                   open
-                  title={instrument()?.nodeGraph
-                    ? instrument()?.name ?? "Nodemap"
-                    : instrument()?.aurum
+                  title={currentInstrument.nodeGraph
+                    ? currentInstrument.name ?? "Nodemap"
+                    : currentInstrument.aurum
                       ? "Instrument - Aurum Engine"
-                      : instrument()?.synthPatch?.instrumentType === "lumen-hybrid-synth"
-                      ? "Instrument - Lumen Engine"
-                      : "Instrument - Aether Engine"}
+                      : "Instrument - Lumen Engine"}
                   width="editor"
                   scopeId={scopeId}
                   flushBody
                   onClose={() => closeEditor({ kind: "synthInstrument", instrumentId: editor.instrumentId })}
                 >
-                  {instrument()?.nodeGraph ? (
+                  {currentInstrument.nodeGraph ? (
                     <DraftNodeInstrumentEditor
-                      instrument={instrument()!}
+                      instrument={currentInstrument}
                       onCommit={(saved) => {
                         if (instruments().some((candidate) => candidate.id === saved.id)) updateInstrument(saved.id, saved);
                         else addInstrument(saved);
                         closeEditor({ kind: "synthInstrument", instrumentId: editor.instrumentId });
                       }}
                     />
-                  ) : instrument()?.aurum ? (
+                  ) : currentInstrument.aurum ? (
                     <AurumEditor
-                      instrument={instrument()!}
+                      instrument={currentInstrument}
                       onCommit={(saved) => {
                         if (instruments().some((candidate) => candidate.id === saved.id)) updateInstrument(saved.id, saved);
                         else addInstrument(saved);
@@ -80,25 +81,14 @@ export function EditorHost() {
                       }}
                       onClose={() => closeEditor({ kind: "synthInstrument", instrumentId: editor.instrumentId })}
                     />
-                  ) : (
+                  ) : isLumenInstrument(currentInstrument) ? (
                     <SynthEditor instrumentId={editor.instrumentId} hotkeyScopeId={scopeId} />
-                  )}
+                  ) : null}
                 </Modal>
               );
             }
             case "synth":
-              return (
-                <Modal
-                  open
-                  title="Instrument Details - Aether Engine"
-                  width="editor"
-                  scopeId="synth-editor"
-                  flushBody
-                  onClose={() => closeEditor({ kind: "synth" })}
-                >
-                  <SynthEditor hotkeyScopeId="synth-editor" />
-                </Modal>
-              );
+              return null;
             case "lumen":
               return (
                 <Modal

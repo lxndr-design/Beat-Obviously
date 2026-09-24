@@ -1,5 +1,5 @@
 import { createEffect, createMemo, createSignal, For, onCleanup, Show, type JSX } from "solid-js";
-import { ActionFooter, Button, FloatingSelect, HoverInfo, Icon, LibrarySearch, MarqueeText } from "../../solid-ui";
+import { ActionFooter, Button, FloatingSelect, HoverInfo, Icon, LibrarySearch, MarqueeText, RIBBON_HELP } from "../../solid-ui";
 import { useComponentStore, type BeatComponent, type DrumComponent, type MidiComponent } from "../../state/components";
 import {
   drumPlaybackDurationBeats,
@@ -135,7 +135,7 @@ export function PatternsPage() {
       previewClassName={styles.preview}
       browser={
         <>
-          <AssetBrowserRibbon label="Patterns" count={components().length} />
+          <AssetBrowserRibbon label="Patterns" count={components().length} help={RIBBON_HELP.patterns} />
           <div class={styles.browserBody}>
           <div class={styles.browserControls}>
             <span class={styles.searchWrap}>

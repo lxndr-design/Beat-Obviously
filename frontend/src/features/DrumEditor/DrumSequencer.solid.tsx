@@ -2,6 +2,7 @@ import { createEffect, createSignal, onCleanup, type JSX } from "solid-js";
 import { Portal } from "solid-js/web";
 import { Button, FloatingLayer, FloatingSelect, HoverInfo, Icon, NumberInput, RadioGroup, Slider, TextInput } from "../../solid-ui";
 import { DRUM_MAX_STEPS, remixDrumBeat, type GeneratedDrumBeat } from "../../ai/drumBeatGenerator";
+import { isLegacyAetherInstrument, userAccessibleInstruments } from "../../state/instrumentAccess";
 import {
   createInstrumentBufferSource,
   hasCachedInstrumentSamplesForPlayback,
@@ -489,7 +490,8 @@ export function DrumSequencer(props: Props) {
   }
 
   function addRow() {
-    const instrument = props.instruments.find((i) => !props.rows.some((row) => row.instrumentId === i.id)) ?? props.instruments[0];
+    const selectable = userAccessibleInstruments(props.instruments);
+    const instrument = selectable.find((i) => !props.rows.some((row) => row.instrumentId === i.id)) ?? selectable[0];
     props.onChange([
       ...props.rows,
       {
@@ -499,6 +501,17 @@ export function DrumSequencer(props: Props) {
         steps: Array.from({ length: props.stepCount }, () => false),
       },
     ]);
+  }
+
+  function instrumentOptions(currentId?: string) {
+    const options = userAccessibleInstruments(props.instruments).map((instrument) => ({
+      value: instrument.id,
+      label: instrument.name,
+    }));
+    const current = currentId ? props.instruments.find((instrument) => instrument.id === currentId) : undefined;
+    return current && isLegacyAetherInstrument(current)
+      ? [{ value: current.id, label: "Legacy instrument (playback only)", disabled: true }, ...options]
+      : options;
   }
 
   function removeRow(rowId: string) {
@@ -873,10 +886,7 @@ export function DrumSequencer(props: Props) {
                 fillHeight
                 value={row.instrumentId ?? ""}
                 ariaLabel={`${row.name} instrument`}
-                options={props.instruments.map((instrument) => ({
-                  value: instrument.id,
-                  label: instrument.name,
-                }))}
+                options={instrumentOptions(row.instrumentId)}
                 open={openRowId() === row.id}
                 onOpenChange={(open) => {
                   setOpenRowId(open ? row.id : null);
@@ -927,7 +937,7 @@ export function DrumSequencer(props: Props) {
                   class={`${styles.stepNumber} ${isStrongBeat(step, props.speed, activeTimeSignature) ? styles.stepStrong : ""}`}
                   style={swingStepStyle(step, swingPercent(), cellSize())}
                 >
-                  {step + 1}
+                  {isBeatStart(step, props.speed) ? step + 1 : ""}
                 </div>
               ))}
             </div>
@@ -939,6 +949,9 @@ export function DrumSequencer(props: Props) {
                     const selected = selectedCells().has(cellKey(row.id, step));
                     const activeStep = playStep() === step;
                     const customVolume = hasCustomDrumVelocity(row.steps[step]);
+                    const customPitch = cell.pitchHz != null;
+                    const customLean = cell.leanPercent != null;
+                    const customized = customPitch || customVolume || customLean;
                     const volumePercent = customVolume ? velocityToPercent(effectiveDrumVelocity(cell)) : 0;
                     return (
                       <button
@@ -949,8 +962,9 @@ export function DrumSequencer(props: Props) {
                           cell.on && styles.stepCellOn,
                           activeStep && styles.stepCellPlaying,
                           selected && styles.stepCellSelected,
-                          cell.pitchHz && styles.stepCellTuned,
+                          customPitch && styles.stepCellTuned,
                           customVolume && styles.stepCellCustomVolume,
+                          customized && styles.stepCellCustomized,
                         ].filter(Boolean).join(" ")}
                         style={{
                           ...swingStepStyle(step, swingPercent(), cellSize()),
@@ -966,18 +980,12 @@ export function DrumSequencer(props: Props) {
                         aria-pressed={cell.on}
                         aria-selected={selected}
                         aria-label={`${row.name} step ${step + 1}`}
+                        title={customized ? drumCellCustomizationSummary(cell) : undefined}
                         data-drum-cell-row={row.id}
                         data-drum-cell-step={step}
                       >
-                        {cell.pitchHz && (
-                          <span class={styles.cellNote}>{frequencyToNoteName(cell.pitchHz)}</span>
-                        )}
-                        {cell.leanPercent != null && (
-                          <span
-                            class={styles.cellLean}
-                            style={{ "--cell-lean": `${Math.max(-20, Math.min(20, cell.leanPercent * 0.4))}deg` } as JSX.CSSProperties}
-                            title={`${leanToDisplay(cell.leanPercent)}% (${cell.leanPercent >= 0 ? "+" : ""}${cell.leanPercent}%)`}
-                          />
+                        {customized && (
+                          <span class={styles.cellExpressionDot} aria-hidden />
                         )}
                         {customVolume && (
                           <span
@@ -1366,6 +1374,18 @@ function swingStepStyle(step: number, swingPercent: number, cellSize: number): J
 function isStrongBeat(step: number, speed: DrumSpeed, timeSignature: TimeSignature): boolean {
   const stepsPerBar = Math.max(1, timeSignature.num * speed);
   return step % stepsPerBar === 0;
+}
+
+function isBeatStart(step: number, speed: DrumSpeed): boolean {
+  return step % Math.max(1, speed) === 0;
+}
+
+function drumCellCustomizationSummary(cell: DrumCell): string {
+  const details: string[] = [];
+  if (cell.pitchHz != null) details.push(`Pitch ${frequencyToNoteName(cell.pitchHz)}`);
+  if (cell.velocity != null) details.push(`Volume ${velocityToPercent(effectiveDrumVelocity(cell))}%`);
+  if (cell.leanPercent != null) details.push(`Lean ${leanToDisplay(cell.leanPercent)}%`);
+  return details.join(" · ");
 }
 
 function velocityToPercent(velocity: number): number {

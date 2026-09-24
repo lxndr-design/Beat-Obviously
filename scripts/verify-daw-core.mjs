@@ -133,6 +133,28 @@ try {
     ],
     { stdio: "inherit" },
   );
+  execFileSync(
+    esbuild,
+    [
+      join(repoRoot, "frontend/src/state/segmentEventCompiler.ts"),
+      "--bundle",
+      "--format=esm",
+      "--platform=node",
+      `--outfile=${join(outDir, "segmentEventCompiler.js")}`,
+    ],
+    { stdio: "inherit" },
+  );
+  execFileSync(
+    esbuild,
+    [
+      join(repoRoot, "frontend/src/testing/splitLaneTrackRunner.ts"),
+      "--bundle",
+      "--format=esm",
+      "--platform=node",
+      `--outfile=${join(outDir, "splitLaneTrackRunner.js")}`,
+    ],
+    { stdio: "inherit" },
+  );
 
   const store = await import(pathToFileURL(join(outDir, "store.js")));
   const selectors = await import(pathToFileURL(join(outDir, "selectors.js")));
@@ -145,6 +167,8 @@ try {
   const curves = await import(pathToFileURL(join(outDir, "curves.js")));
   const exportStore = await import(pathToFileURL(join(outDir, "exportStore.js")));
   const assetReferenceGraph = await import(pathToFileURL(join(outDir, "assetReferenceGraph.js")));
+  const segmentEventCompiler = await import(pathToFileURL(join(outDir, "segmentEventCompiler.js")));
+  const splitSegmentLanes = await import(pathToFileURL(join(outDir, "splitLaneTrackRunner.js")));
   assert.equal(store.useDocumentStore.getState().recentProjectsLoading, true, "recent projects should expose an initial loading state");
   store.useDocumentStore.getState().setRecentProjectsLoading(false);
   assert.equal(store.useDocumentStore.getState().recentProjectsLoading, false, "recent project loading state should settle after hydration");
@@ -167,6 +191,104 @@ try {
     store.useDocumentStore.getState().recentFilePaths,
     store.useDocumentStore.getState().recentProjects.map((project) => project.path),
     "recent project metadata and legacy path ordering should remain aligned",
+  );
+  const normalizedDrumSegment = {
+    id: "normalized-drums",
+    trackId: "track",
+    startBeat: 0,
+    lengthBeats: 4,
+    sourceStartBeat: 0,
+    repeats: 0,
+    layer: 0,
+    payload: {
+      kind: "drum",
+      rows: [
+        { id: "snare", name: "Snare", instrumentId: "snare-inst", steps: [false, false, true, false] },
+        { id: "kick", name: "Kick", instrumentId: "kick-inst", steps: [true, false, false, false] },
+      ],
+      stepCount: 4,
+      speed: 1,
+      sourceLengthBeats: 4,
+    },
+  };
+  const compiledDrums = segmentEventCompiler.compileSegmentEvents(normalizedDrumSegment);
+  assert.deepEqual(
+    compiledDrums.events.map((event) => [event.startTick, event.instrumentId]),
+    [[0, "kick-inst"], [1920, "snare-inst"]],
+    "drum rows should compile into one globally sorted tick list with lane instrument routing",
+  );
+  assert.deepEqual(
+    segmentEventCompiler.eventsStartingInBeatWindow(compiledDrums, 1.9, 2.1).map((event) => event.instrumentId),
+    ["snare-inst"],
+    "playback lookahead should binary-search only the requested event window",
+  );
+  const splitDrums = splitSegmentLanes.splitSegmentLanePayloads(normalizedDrumSegment);
+  assert.equal(splitDrums.length, 2, "drum lane splitting should create one payload per row");
+  assert.ok(
+    splitDrums.every((lane) => lane.payload.kind === "drum" && lane.payload.rows.length === 1),
+    "each split drum payload should retain exactly one editable source row",
+  );
+  const normalizedDrumpadSegment = {
+    id: "normalized-drumpad",
+    trackId: "track",
+    startBeat: 0,
+    lengthBeats: 4,
+    repeats: 0,
+    layer: 0,
+    payload: {
+      kind: "drumpad",
+      keyboardLayout: "mac",
+      lanes: [
+        { id: "hat-lane", name: "Hat", instrumentId: "hat-inst", pitch: 42 },
+        { id: "kick-lane", name: "Kick", instrumentId: "kick-inst", pitch: 36 },
+      ],
+      hits: [
+        { id: "hat-hit", laneId: "hat-lane", startBeat: 2, lengthBeats: 0.25, velocity: 80 },
+        { id: "kick-hit", laneId: "kick-lane", startBeat: 0, lengthBeats: 0.5, velocity: 120 },
+      ],
+      quantizeSeconds: 1 / 64,
+      gainDb: -2,
+    },
+  };
+  const compiledDrumpad = segmentEventCompiler.compileSegmentEvents(normalizedDrumpadSegment);
+  assert.deepEqual(
+    compiledDrumpad.events.map((event) => [event.startTick, event.instrumentId, event.note.pitch]),
+    [[0, "kick-inst", 36], [1920, "hat-inst", 42]],
+    "drumpad hits should share the globally sorted event representation and preserve lane pitches",
+  );
+  const splitDrumpad = splitSegmentLanes.splitSegmentLanePayloads(normalizedDrumpadSegment);
+  assert.ok(
+    splitDrumpad.every((lane) => lane.payload.kind === "drumpad" && lane.payload.lanes.length === 1 && lane.payload.hits.every((hit) => hit.laneId === lane.sourceLaneId)),
+    "drumpad lane splitting should retain only the selected lane and its hits in each payload",
+  );
+  const normalizedProject = store.createEmptyProject();
+  normalizedProject.tracks[0].segments = [normalizedDrumSegment];
+  const engineProject = segmentEventCompiler.projectWithCompiledSegmentEvents(normalizedProject);
+  const engineSegment = engineProject.tracks[0].segments[0];
+  assert.equal(engineSegment.payload.kind, "midi", "native/export projection should consume normalized drum events");
+  assert.deepEqual(
+    engineSegment.payload.notes.map((note) => note.instrumentId),
+    ["kick-inst", "snare-inst"],
+    "normalized native events should preserve each lane's instrument identity",
+  );
+  const splitProject = splitSegmentLanes.createEmptyProject();
+  const splitSourceTrack = splitProject.tracks[0];
+  splitSourceTrack.name = "Drums";
+  splitSourceTrack.gainDb = -3;
+  splitSourceTrack.segments = [{ ...normalizedDrumSegment, trackId: splitSourceTrack.id }];
+  splitSegmentLanes.useProjectStore.getState().loadProject(splitProject);
+  const splitResult = splitSegmentLanes.splitSegmentToLaneTracks("normalized-drums");
+  assert.equal(splitResult?.trackIds.length, 2, "Split Lanes to Tracks should create one child track per row");
+  const splitResultProject = splitSegmentLanes.useProjectStore.getState().project;
+  assert.equal(splitResultProject.tracks[0].kind, "group", "a dedicated source track should become the shared lane group");
+  assert.equal(splitResultProject.tracks[0].segments.length, 0, "the original combined segment should be replaced");
+  const splitChildren = splitResultProject.tracks.filter((track) => splitResult?.trackIds.includes(track.id));
+  assert.deepEqual(splitChildren.map((track) => track.name), ["Snare", "Kick"], "child track order should follow lane order");
+  assert.ok(splitChildren.every((track) => track.parentTrackId === splitSourceTrack.id), "split tracks should retain one shared bus/FX parent");
+  assert.equal(
+    new Set(splitChildren.map((track) => track.segments[0]?.groupId)).size,
+    1,
+    "split segments should share one edit group until the user chooses Ungroup",
   );
   const loopOccurrences = selectors.expandTrackSegments({
     segments: [{ id: "loop", startBeat: 4, lengthBeats: 4, repeats: 3 }],
@@ -1119,7 +1241,7 @@ try {
     startBeat: 12,
     lengthBeats: 8,
     sourceStartBeat: 1,
-    payload: { kind: "audio", audioFileId: "clip", gainDb: 0 },
+    payload: { kind: "audio", audioFileId: "clip", gainDb: 0, tunePitch: 72 },
   });
   store.useProjectStore.getState().applySegmentEditCommand({
     kind: "trim",
@@ -1138,7 +1260,8 @@ try {
   assert.ok(trimmedAudio, "trimmed audio should still exist");
   assert.equal(trimmedAudio.startBeat, 14);
   assert.equal(trimmedAudio.lengthBeats, 6);
-  assert.equal(trimmedAudio.sourceStartBeat, 3, "trim start should advance audio source offset");
+  assert.equal(trimmedAudio.sourceStartBeat, 5, "trim start should advance tuned audio by its varispeed source rate");
+  assert.equal(trimmedAudio.payload.tunePitch, 72, "audio tune-to pitch should survive non-destructive trim edits");
   assert.equal(trimmedAudio.fadeInBeats, 1.25);
   assert.equal(trimmedAudio.fadeOutBeats, 6, "fade should clamp to segment length");
 

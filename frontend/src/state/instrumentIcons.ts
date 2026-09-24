@@ -34,7 +34,7 @@ export const INSTRUMENT_ICON_OPTIONS: InstrumentIconOption[] = [
   { icon: "ph:wave-square", label: "Square", tags: ["square", "pulse", "chip"] },
   { icon: "ph:wave-triangle", label: "Triangle", tags: ["triangle", "soft", "perc"] },
   { icon: "ph:stack", label: "Layer", tags: ["hybrid", "layer", "stack"] },
-  { icon: "ph:cube", label: "Aether", tags: ["aether", "wavetable", "3d"] },
+  { icon: "ph:cube", label: "Wavetable", tags: ["wavetable", "3d"] },
   { icon: "ph:diamonds-four", label: "Perc", tags: ["percussion", "shaker", "conga"] },
   { icon: "ph:metronome", label: "Rhythm", tags: ["rhythm", "sequence", "loop"] },
   { icon: "ph:vinyl-record", label: "Record", tags: ["vinyl", "sample", "loop"] },

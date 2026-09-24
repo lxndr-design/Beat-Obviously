@@ -8,7 +8,6 @@
   padding: 6px;
   background: var(--color-bg);
   color: var(--color-fg);
-  border: var(--border-fg);
   width: 100vw;
   max-width: 100vw;
   overflow: hidden;
@@ -94,6 +93,14 @@
   font-size: var(--font-size-section);
   font-weight: var(--font-weight-bold);
   text-transform: uppercase;
+  gap: 3px;
+}
+
+.ribbonTitle {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  gap: 3px;
 }
 
 .actionRow,

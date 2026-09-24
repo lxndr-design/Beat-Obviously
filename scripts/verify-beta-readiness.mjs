@@ -9,6 +9,10 @@ const scope = process.argv.find((arg) => arg.startsWith("--scope="))?.slice("--s
 const reportArg = process.argv.find((arg) => arg.startsWith("--report="))?.slice("--report=".length)
   ?? join("/private/tmp", `beat-beta-readiness-${scope}.json`);
 const allowedScopes = new Set(["source", "native", "package", "all"]);
+const nativeBuildDir = process.env.BEAT_BUILD_DIR
+  ?? join(process.env.TMPDIR ?? "/private/tmp", `beat-native-build-${process.getuid?.() ?? "user"}`);
+const packagedApp = process.env.BEAT_APP_OUTPUT_PATH
+  ?? join(process.env.HOME, "Applications", "Beat.app");
 
 if (!allowedScopes.has(scope)) {
   console.error(`Unknown beta gate scope: ${scope}`);
@@ -51,7 +55,7 @@ const gates = [
     label: "Native release configuration",
     group: "native",
     command: "cmake",
-    args: ["-S", repoRoot, "-B", join(repoRoot, "build-native"), "-DCMAKE_BUILD_TYPE=Release", "-DBEAT_BUILD_FRONTEND=ON"],
+    args: ["-S", repoRoot, "-B", nativeBuildDir, "-DCMAKE_BUILD_TYPE=Release", "-DBEAT_BUILD_FRONTEND=OFF"],
     timeoutMs: 10 * 60_000,
   },
   {
@@ -59,14 +63,14 @@ const gates = [
     label: "Native app and stress harness build",
     group: "native",
     command: "cmake",
-    args: ["--build", join(repoRoot, "build-native"), "--target", "BeatBackendStress", "Beat", "--config", "Release", "-j", "6"],
+    args: ["--build", nativeBuildDir, "--target", "BeatBackendStress", "Beat", "--config", "Release", "-j", "6"],
     timeoutMs: 30 * 60_000,
   },
   {
     id: "native-stress",
     label: "Native audio and persistence stress suite",
     group: "native",
-    command: join(repoRoot, "build-native", "bin", "BeatBackendStress"),
+    command: join(nativeBuildDir, "bin", "BeatBackendStress"),
     args: [],
     timeoutMs: 30 * 60_000,
   },
@@ -83,7 +87,7 @@ const gates = [
     label: "Distributable contents audit",
     group: "package",
     command: "node",
-    args: [join(repoRoot, "scripts", "verify-beta-package.mjs"), join(repoRoot, "Beat.app")],
+    args: [join(repoRoot, "scripts", "verify-beta-package.mjs"), packagedApp],
     timeoutMs: 5 * 60_000,
   },
   {
@@ -99,7 +103,7 @@ const gates = [
     label: "Packaged Finder document declaration",
     group: "package",
     command: "node",
-    args: [join(repoRoot, "scripts", "verify-native-document-registration.mjs"), join(repoRoot, "Beat.app")],
+    args: [join(repoRoot, "scripts", "verify-native-document-registration.mjs"), packagedApp],
     timeoutMs: 5 * 60_000,
   },
   {
@@ -107,7 +111,7 @@ const gates = [
     label: "Deep code-signature integrity",
     group: "package",
     command: "codesign",
-    args: ["--verify", "--deep", "--strict", "--verbose=2", join(repoRoot, "Beat.app")],
+    args: ["--verify", "--deep", "--strict", "--verbose=2", packagedApp],
     timeoutMs: 5 * 60_000,
   },
   {
@@ -115,7 +119,7 @@ const gates = [
     label: "Gatekeeper distribution assessment",
     group: "package",
     command: "spctl",
-    args: ["--assess", "--type", "execute", "--verbose=4", join(repoRoot, "Beat.app")],
+    args: ["--assess", "--type", "execute", "--verbose=4", packagedApp],
     timeoutMs: 5 * 60_000,
   },
 ];

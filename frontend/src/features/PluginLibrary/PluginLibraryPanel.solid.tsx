@@ -1,5 +1,5 @@
 import { createSignal, For, Show } from "solid-js";
-import { HoverInfo, Icon, LibrarySearch, RowActionButton, RowItem, SectionRibbon, SectionRibbonActionButton, createContextMenu, type ContextMenuItem } from "../../solid-ui";
+import { HoverInfo, Icon, LibrarySearch, RIBBON_HELP, RowActionButton, RowItem, SectionRibbon, SectionRibbonActionButton, createContextMenu, type ContextMenuItem } from "../../solid-ui";
 import { appConfirm } from "../../solid-ui";
 import { usePluginStore, useUiStore } from "../../state/store";
 import type { PluginAdapter } from "../../state/types";
@@ -15,7 +15,7 @@ interface PluginLibraryPanelProps {
 }
 
 export const BUILTIN_DECENT_SAMPLER_PLUGIN_ID = "plugin-decent-sampler-host";
-const AETHER_BRIDGE_HOST_PLUGIN_ID = "plugin-aether-bridge-host";
+const LUMEN_BRIDGE_HOST_PLUGIN_ID = "plugin-aether-bridge-host";
 const BUILTIN_DECENT_SAMPLER_PLUGIN: PluginAdapter = {
   id: BUILTIN_DECENT_SAMPLER_PLUGIN_ID,
   name: "DecentSampler",
@@ -63,6 +63,7 @@ export function PluginLibraryPanel(props: PluginLibraryPanelProps) {
     <div class={styles.panel}>
       <SectionRibbon
         title="Plugins"
+        help={RIBBON_HELP.plugins}
         expanded={props.expanded}
         onToggle={props.onToggle}
         showToggle={false}
@@ -113,7 +114,7 @@ interface PluginItemProps {
 
 export function PluginItem(props: PluginItemProps) {
   const isBuiltInDecentSampler = () => props.plugin.id === BUILTIN_DECENT_SAMPLER_PLUGIN_ID;
-  const isAetherBridgeHost = () => props.plugin.id === AETHER_BRIDGE_HOST_PLUGIN_ID;
+  const isLumenBridgeHost = () => props.plugin.id === LUMEN_BRIDGE_HOST_PLUGIN_ID;
   const draggablePluginId = () => decentSamplerDragPluginId(props.plugin);
   const menu = createContextMenu((): ContextMenuItem[] => {
     if (isBuiltInDecentSampler()) {
@@ -169,13 +170,16 @@ export function PluginItem(props: PluginItemProps) {
       draggable={Boolean(draggablePluginId())}
       onClick={props.onOpen}
       onDblClick={props.onOpen}
+      tabIndex={0}
+      onMouseDown={menu.onMouseDown}
       onContextMenu={menu.onContextMenu}
+      onKeyDown={menu.onKeyDown}
       onDragStart={onDragStart}
       title={draggablePluginId() ? "Drag to a track to create a new DS instrument instance" : undefined}
       dragSlot={draggablePluginId() && <Icon name="ph:dots-six-vertical" size={18} decorative />}
       icon={
-        isAetherBridgeHost() ? (
-          <AetherBridgeIcon />
+        isLumenBridgeHost() ? (
+          <LumenBridgeIcon />
         ) : isBuiltInDecentSampler() ? (
           <img class={styles.itemLogo} src="/assets/decent-sampler.svg" alt="" />
         ) : props.plugin.format === "decent-sampler" && props.plugin.uiImageDataUrl ? (
@@ -205,7 +209,7 @@ export function PluginItem(props: PluginItemProps) {
   );
 }
 
-function AetherBridgeIcon() {
+function LumenBridgeIcon() {
   return (
     <span class={styles.aetherBridgeIcon}>
       <svg viewBox="0 0 28 28">

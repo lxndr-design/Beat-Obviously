@@ -1,9 +1,9 @@
 import { createEffect, createSignal, For, onCleanup, Show } from "solid-js";
-import { Button, Checkbox, HoverInfo, Icon, LibrarySearch, RowItem, SectionRibbon, SectionRibbonActionButton, createContextMenu, type ContextMenuItem } from "../../solid-ui";
+import { Button, Checkbox, HoverInfo, Icon, LibrarySearch, RIBBON_HELP, RowItem, SectionRibbon, SectionRibbonActionButton, createContextMenu, type ContextMenuItem } from "../../solid-ui";
 import { appAlert, appConfirm } from "../../solid-ui";
 import { isSupportedAudioFileName, SUPPORTED_AUDIO_IMPORT_LABEL } from "../../audio/audioFormats";
 import { importAudioFile } from "../../audio/audioImport";
-import { useAudioFileStore } from "../../state/store";
+import { runProjectHistoryGroup, useAudioFileStore, useProjectStore, useUiStore } from "../../state/store";
 import type { AudioFile } from "../../state/types";
 import { createStoreSelector } from "../../solid-utils/store";
 import { ImportInstrumentModal } from "../InstrumentLibrary/ImportInstrumentModal.solid";
@@ -116,9 +116,10 @@ export function AudioFileLibraryPanel(props: AudioFileLibraryPanelProps) {
   }
 
   return (
-    <div ref={panelElement} class={styles.panel} onContextMenu={panelMenu.onContextMenu}>
+    <div ref={panelElement} class={styles.panel} onMouseDown={panelMenu.onMouseDown} onContextMenu={panelMenu.onContextMenu}>
       <SectionRibbon
         title="Audio Files"
+        help={RIBBON_HELP.audioFiles}
         expanded={props.expanded}
         onToggle={props.onToggle}
         showToggle={false}
@@ -161,6 +162,7 @@ export function AudioFileLibraryPanel(props: AudioFileLibraryPanelProps) {
               selected={selectedIds().has(file.id)}
               onSelect={(event) => selectFile(file.id, event.shiftKey)}
               onEnterSelectMode={() => enterSelectMode(file.id)}
+              onNewTrack={() => createTrackForAudioFile(file)}
               onRemove={() => void deleteFile(file)}
             />
           )}
@@ -181,6 +183,23 @@ export function AudioFileLibraryPanel(props: AudioFileLibraryPanelProps) {
       </Show>
     </div>
   );
+
+  function createTrackForAudioFile(file: AudioFile) {
+    const bpm = useProjectStore.getState().project.bpm;
+    const lengthBeats = Math.max(0.25, file.durationSeconds * (bpm / 60));
+    let segmentId = "";
+    runProjectHistoryGroup(() => {
+      const projectStore = useProjectStore.getState();
+      const trackId = projectStore.addTrack({ name: file.name, kind: "audio" });
+      segmentId = projectStore.addSegment(trackId, {
+        name: file.name,
+        startBeat: 0,
+        lengthBeats,
+        payload: { kind: "audio", audioFileId: file.id, gainDb: 0 },
+      });
+    });
+    if (segmentId) useUiStore.getState().setSelectedSegments([segmentId]);
+  }
 }
 
 interface AudioFileItemProps {
@@ -189,11 +208,17 @@ interface AudioFileItemProps {
   selected: boolean;
   onSelect: (event: MouseEvent) => void;
   onEnterSelectMode: () => void;
+  onNewTrack: () => void;
   onRemove: () => void;
 }
 
 function AudioFileItem(props: AudioFileItemProps) {
   const menu = createContextMenu((): ContextMenuItem[] => [
+    {
+      label: "New Audio Track",
+      icon: "ph:plus",
+      onSelect: props.onNewTrack,
+    },
     {
       label: "Select",
       icon: "ph:checks",
@@ -224,7 +249,10 @@ function AudioFileItem(props: AudioFileItemProps) {
         props.onSelect(event);
       }}
       onDragStart={onDragStart}
+      tabIndex={0}
+      onMouseDown={menu.onMouseDown}
       onContextMenu={menu.onContextMenu}
+      onKeyDown={menu.onKeyDown}
       iconAriaHidden={!props.selectMode}
       icon={props.selectMode ? (
         <Checkbox

@@ -1,8 +1,10 @@
 .segment {
   --segment-color: var(--color-fg);
+  --segment-neutral-bg: var(--color-fg);
+  --segment-neutral-fg: var(--color-fg-inverse);
   position: absolute;
-  background: var(--color-fg);          /* white body — same for audio & midi */
-  color: var(--color-fg-inverse);
+  background: var(--segment-neutral-bg);
+  color: var(--segment-neutral-fg);
   display: flex;
   align-items: stretch;
   overflow: hidden;
@@ -12,6 +14,11 @@
     background var(--duration-hover) var(--ease-linear),
     border-color var(--duration-hover) var(--ease-linear),
     box-shadow var(--duration-hover) var(--ease-linear);
+}
+
+:global(html[data-theme="light"]) .segment {
+  --segment-neutral-bg: #ffffff;
+  --segment-neutral-fg: #000000;
 }
 
 .segment::before,
@@ -253,13 +260,40 @@
   min-height: 0;
   position: relative;
   background: inherit;                  /* picks up the hover tint */
-  color: var(--color-fg-inverse);
+  color: var(--segment-neutral-fg);
   overflow: hidden;
 }
 
 .content > svg {
   position: relative;
   z-index: 1;
+}
+
+.tuneMarker {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-hint);
+  font-weight: var(--font-weight-bold);
+  line-height: 1;
+  pointer-events: none;
+}
+
+.segment.playing .tuneMarker {
+  background: var(--color-fg);
+  color: var(--color-bg);
 }
 
 .innerGrid {

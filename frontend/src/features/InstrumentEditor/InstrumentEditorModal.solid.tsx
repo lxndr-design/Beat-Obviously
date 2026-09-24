@@ -1,6 +1,6 @@
 import { createEffect, createMemo, createSignal, For, Index, onCleanup, Show } from "solid-js";
 import { appAlert, useModalStack } from "../../solid-ui";
-import { Modal, Button, FieldActionButton, FloatingSelect, HoverInfo, Icon, Knob, NumberInput, Slider, TextInput, Toggle } from "../../solid-ui";
+import { Modal, Button, FieldActionButton, FloatingSelect, HoverInfo, Icon, Knob, NumberInput, RIBBON_HELP, RibbonHelp, Slider, TextInput, Toggle } from "../../solid-ui";
 import { ai, type GeneratedInstrument } from "../../ai/aiService";
 import { isSupportedAudioFileName, SUPPORTED_AUDIO_IMPORT_LABEL } from "../../audio/audioFormats";
 import { importAudioFiles } from "../../audio/audioImport";
@@ -10,11 +10,17 @@ import {
   saveInstrumentGenerationFeedback,
   updateInstrumentGenerationFeedback,
 } from "../../persistence/dexie";
-import { INSTRUMENT_TAXONOMY_OPTIONS, taxonomyAssignmentForInstrumentId } from "../../state/instrumentTaxonomy";
+import {
+  INSTRUMENT_TAXONOMY_CATEGORY_OPTIONS,
+  firstInstrumentTaxonomyIdForCategory,
+  instrumentTaxonomyOptionsForCategory,
+  taxonomyAssignmentForInstrumentId,
+} from "../../state/instrumentTaxonomy";
 import { characterizeInstrument, defaultAetherSynthConfig, defaultWavetableConfig, snapshotInstrument, useAudioFileStore, useInstrumentStore, useUiStore } from "../../state/store";
 import { INSTRUMENT_ICON_OPTIONS, instrumentIcon, instrumentIconLabel } from "../../state/instrumentIcons";
 import { normalizeSampleMap, sampleZoneDisplayName, sampleZoneStableId } from "../../state/sampleZones";
 import { normalizeLibraryMetadata, parseLibraryTags } from "../../state/libraryMetadata";
+import { isLegacyAetherInstrument } from "../../state/instrumentAccess";
 import type { AudioFile, Instrument, InstrumentSampleZone, InstrumentSnapshot, WavetableWarpMode } from "../../state/types";
 import { createStoreSelector } from "../../solid-utils/store";
 import { WaveformPicker } from "./WaveformPicker.solid";
@@ -72,7 +78,8 @@ export function InstrumentEditorModal(props: Props) {
   const editorSource = () => props.draftInstrument ?? source();
   const [draft, setDraft] = createSignal<Instrument | undefined>(editorSource() ? structuredClone(editorSource()!) : undefined, { equals: false });
   const [typeOpen, setTypeOpen] = createSignal(false);
-  const [taxonomyOpen, setTaxonomyOpen] = createSignal(false);
+  const [taxonomyCategoryOpen, setTaxonomyCategoryOpen] = createSignal(false);
+  const [taxonomySubcategoryOpen, setTaxonomySubcategoryOpen] = createSignal(false);
   const [iconOpen, setIconOpen] = createSignal(false);
   const [aiPrompt, setAiPrompt] = createSignal("");
   const [generating, setGenerating] = createSignal(false);
@@ -256,7 +263,7 @@ export function InstrumentEditorModal(props: Props) {
   }
 
   return (
-    <Show when={draft()}>
+    <Show when={draft() && samplerEditorMode() && !isLegacyAetherInstrument(draft()!)}>
     <Modal
       open
       scopeId={id()}
@@ -335,17 +342,39 @@ export function InstrumentEditorModal(props: Props) {
               onChange={(kind) => setDraft(instrumentWithKind(currentDraft(), kind as Instrument["kind"]))}
             />
             <FloatingSelect
-              label="Structure"
+              label="Taxonomy Category"
               layout="inline"
-              value={currentDraft().taxonomy?.instrumentId ?? ""}
-              ariaLabel="Instrument library structure"
-              options={INSTRUMENT_TAXONOMY_OPTIONS}
-              open={taxonomyOpen()}
-              onOpenChange={setTaxonomyOpen}
-              onChange={(value) => {
-                const nextTaxonomy = taxonomyAssignmentForInstrumentId(value);
+              value={currentDraft().taxonomy?.categoryId ?? ""}
+              ariaLabel="Instrument taxonomy category"
+              options={[{ value: "", label: "Unassigned" }, ...INSTRUMENT_TAXONOMY_CATEGORY_OPTIONS]}
+              open={taxonomyCategoryOpen()}
+              onOpenChange={setTaxonomyCategoryOpen}
+              onChange={(categoryId) => {
+                const instrumentId = firstInstrumentTaxonomyIdForCategory(categoryId);
+                const nextTaxonomy = instrumentId ? taxonomyAssignmentForInstrumentId(instrumentId) : undefined;
                 setDraft({ ...currentDraft(), taxonomy: nextTaxonomy });
               }}
+            />
+            <FloatingSelect
+              label="Subcategory"
+              layout="inline"
+              value={currentDraft().taxonomy?.instrumentId ?? ""}
+              ariaLabel="Instrument taxonomy subcategory"
+              options={instrumentTaxonomyOptionsForCategory(currentDraft().taxonomy?.categoryId ?? "")}
+              open={taxonomySubcategoryOpen()}
+              onOpenChange={setTaxonomySubcategoryOpen}
+              disabled={!currentDraft().taxonomy?.categoryId}
+              onChange={(instrumentId) => {
+                const nextTaxonomy = taxonomyAssignmentForInstrumentId(instrumentId);
+                setDraft({ ...currentDraft(), taxonomy: nextTaxonomy });
+              }}
+            />
+            <TextInput
+              label="Tags"
+              layout="inline"
+              value={libraryMetadata().tags.join(", ")}
+              placeholder="warm, acoustic, lead"
+              onInput={(event) => updateLibraryMetadata({ tags: parseLibraryTags(event.currentTarget.value) })}
             />
             <div class={styles.generateRow}>
               <TextInput
@@ -793,12 +822,6 @@ export function InstrumentEditorModal(props: Props) {
                 })}
               />
               <TextInput
-                label="Tags"
-                layout="inline"
-                value={libraryMetadata().tags.join(", ")}
-                onInput={(event) => updateLibraryMetadata({ tags: parseLibraryTags(event.currentTarget.value) })}
-              />
-              <TextInput
                 label="Description"
                 layout="inline"
                 value={libraryMetadata().description ?? ""}
@@ -1092,7 +1115,10 @@ function SamplerZoneEditor(props: {
         <Show when={hoveredAssignedCount() > 0}><span class={styles.samplerHoverLink} aria-hidden="true" /></Show>
         <div class={styles.samplerAudioPane}>
           <div class={styles.samplerPaneRibbon}>
-            <span>Audio Files</span>
+            <span class={styles.samplerPaneTitle}>
+              <span>Audio Files</span>
+              <RibbonHelp label="Sampler Audio Files" pages={RIBBON_HELP.samplerAudio} />
+            </span>
             <div class={styles.samplerPaneActions}>
               <Button size="xs" onClick={() => setAudioPickerOpen(true)}>Select Audio</Button>
               <Button size="xs" onClick={() => void importAudioIntoStaging()}>Import Audio</Button>

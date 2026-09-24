@@ -24,6 +24,8 @@ public:
     void emitOpenProjectFile(const juce::String& path);
     std::function<void()> onFrontendShellReady;
     std::function<void()> onFrontendReady;
+    std::function<void(const juce::String&)> onThemeChanged;
+    std::function<void(bool)> onModalOpenChanged;
 
 private:
     juce::WebBrowserComponent::Options createBrowserOptions();

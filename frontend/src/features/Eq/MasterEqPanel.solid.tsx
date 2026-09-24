@@ -1,7 +1,7 @@
 import { createMemo, Show, type JSX } from "solid-js";
 import { send } from "../../ipc/bridge";
 import { createStoreSelector } from "../../solid-utils/store";
-import { Button, HoverInfo, Icon } from "../../solid-ui";
+import { Button, HoverInfo, Icon, RIBBON_HELP, RibbonHelp } from "../../solid-ui";
 import { useProjectStore, useTransportStore, useUiStore } from "../../state/store";
 import { EQ_BAND_COUNT, type EqAutomationPoint } from "../../state/types";
 import { EqGraph } from "./EqGraph.solid";
@@ -43,7 +43,17 @@ export function MasterEqPanel(props: MasterEqPanelProps = {}) {
     >
       <section class={styles.panel} id={props.panelId} role={props.labelledBy ? "tabpanel" : undefined} aria-label={props.labelledBy ? undefined : "Global Mastering"} aria-labelledby={props.labelledBy}>
         <header class={styles.ribbon}>
-          <Show when={props.header} fallback={<span class={styles.title}>Global Mastering</span>}>{props.header}</Show>
+          <Show
+            when={props.header}
+            fallback={(
+              <span class={styles.titleGroup}>
+                <span class={styles.title}>Global Mastering</span>
+                <RibbonHelp label="Global Mastering" pages={RIBBON_HELP.mastering} />
+              </span>
+            )}
+          >
+            {props.header}
+          </Show>
           <div class={styles.ribbonActions}>
             <HoverInfo content="Open EQ automation editor">
               <Button class={styles.editButton} iconOnly size="xs" onClick={() => useUiStore.getState().openEditor({ kind: "eq" })} aria-label="Edit automation">

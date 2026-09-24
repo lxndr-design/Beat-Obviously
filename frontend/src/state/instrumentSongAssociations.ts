@@ -81,6 +81,7 @@ export function instrumentRepositorySearchText(instrument: Instrument, extra: st
     instrument.waveform,
     instrument.source?.label ?? "",
     ...(instrument.descriptors ?? []),
+    ...(instrument.libraryMetadata?.tags ?? []),
     ...instrumentSongTitles(instrument),
     ...(instrument.songAssociations ?? []).flatMap((association) => association.trackNames ?? []),
     ...extra,

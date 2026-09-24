@@ -31,7 +31,7 @@ export interface CreateAetherEffectPresetOptions {
 
 export function createAetherEffectPresetRecord(options: CreateAetherEffectPresetOptions): AetherEffectPresetRecord {
   const now = safeTimestamp(options.now, Date.now());
-  const name = sanitizePresetName(options.name, "Aether FX Preset");
+  const name = sanitizePresetName(options.name, "Instrument FX Preset");
   const chain = normalizeTrackEffectChain(options.chain);
   return {
     schemaVersion: AETHER_EFFECT_PRESET_SCHEMA_VERSION,
@@ -49,7 +49,7 @@ export function createAetherEffectPresetRecord(options: CreateAetherEffectPreset
 
 export function normalizeAetherEffectPresetRecord(value: unknown): AetherEffectPresetRecord | null {
   if (!isRecord(value) || !isRecord(value.chain)) return null;
-  const name = sanitizePresetName(value.name, "Aether FX Preset");
+  const name = sanitizePresetName(value.name, "Instrument FX Preset");
   const chain = normalizeTrackEffectChain(value.chain);
   const updatedAt = safeTimestamp(value.updatedAt, Date.now());
   return {

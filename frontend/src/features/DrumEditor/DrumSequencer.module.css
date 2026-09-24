@@ -162,7 +162,7 @@
 }
 
 .stepPlane {
-  --cell-gap: 3px;
+  --cell-gap: 2px;
   position: relative;
   display: flex;
   flex-direction: column;
@@ -179,10 +179,7 @@
     var(--play-step) * (var(--cell-width) + var(--cell-gap))
   );
   width: var(--cell-width);
-  background: color-mix(in srgb, var(--color-fg) 18%, transparent);
-  box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--color-fg) 32%, transparent),
-    0 0 16px color-mix(in srgb, var(--color-fg) 20%, transparent);
+  background: color-mix(in srgb, var(--color-fg) 9%, transparent);
   pointer-events: none;
   z-index: 2;
 }
@@ -210,7 +207,7 @@
   min-width: 0;
   padding: 0;
   background: var(--color-bg);
-  color: var(--color-fg);
+  color: color-mix(in srgb, var(--color-fg) 52%, transparent);
   border: 0;
   font-family: var(--font-family-base);
   font-size: var(--font-size-ui);
@@ -219,12 +216,12 @@
 }
 
 .stepStrong {
-  box-shadow: inset 1px 0 0 var(--color-fg);
+  box-shadow: inset 1px 0 0 color-mix(in srgb, var(--color-fg) 42%, transparent);
 }
 
 .stepGrid {
   padding: 0;
-  background: var(--grid-line-faint);
+  background: transparent;
 }
 
 .stepCell {
@@ -236,7 +233,7 @@
   height: var(--cell-height);
   min-width: 0;
   padding: 0;
-  border: var(--border-fg);
+  border: 1px solid color-mix(in srgb, var(--color-fg) 20%, transparent);
   background: var(--color-bg);
   color: var(--color-fg);
   cursor: pointer;
@@ -257,6 +254,7 @@
 .stepCellOn {
   background: var(--interaction-active-bg);
   color: var(--interaction-active-fg);
+  border-color: var(--color-fg);
 }
 
 .stepCellOn:hover {
@@ -264,7 +262,7 @@
 }
 
 .stepCellSelected {
-  box-shadow: inset 0 0 0 1px var(--border-fg-color);
+  box-shadow: inset 0 0 0 1px var(--color-fg);
 }
 
 .stepCellOn.stepCellSelected {
@@ -272,10 +270,7 @@
 }
 
 .stepCellPlaying {
-  border-color: var(--color-fg);
-  box-shadow:
-    inset 0 0 0 1px color-mix(in srgb, var(--color-fg) 56%, transparent),
-    0 0 12px color-mix(in srgb, var(--color-fg) 32%, transparent);
+  border-color: color-mix(in srgb, var(--color-fg) 58%, transparent);
 }
 
 .stepCellOn.stepCellPlaying {
@@ -283,29 +278,20 @@
   color: var(--color-bg);
 }
 
-.stepCellOn.stepCellPlaying .cellNote,
-.stepCellOn.stepCellPlaying:hover .cellNote {
-  color: var(--color-bg);
-}
-
 .stepCellCustomVolume {
   padding-right: 3px;
 }
 
-.cellNote {
-  font-family: var(--font-family-base);
-  font-size: var(--font-size-hint);
-  line-height: 1;
+.cellExpressionDot {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.58;
   pointer-events: none;
-}
-
-.stepCellTuned .cellNote {
-  color: var(--color-fg);
-}
-
-.stepCellOn .cellNote,
-.stepCellOn:hover .cellNote {
-  color: var(--color-fg-inverse);
 }
 
 .cellVolume {
@@ -315,19 +301,16 @@
   width: 3px;
   height: max(3px, var(--cell-volume));
   background: currentColor;
-  opacity: 0.88;
+  opacity: 0;
   cursor: ns-resize;
   pointer-events: auto;
+  transition: var(--interaction-transition);
 }
 
-.cellLean {
-  position: absolute;
-  inset: 3px;
-  border-left: 2px solid currentColor;
-  opacity: 0.65;
-  pointer-events: none;
-  transform: skewX(var(--cell-lean));
-  transform-origin: center;
+.stepCell:hover .cellVolume,
+.stepCell:focus-visible .cellVolume,
+.stepCellSelected .cellVolume {
+  opacity: 0.82;
 }
 
 .stepCellOn .cellVolume {

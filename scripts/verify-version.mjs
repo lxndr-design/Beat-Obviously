@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { existsSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
+import { homedir } from "node:os";
 
 const repoRoot = new URL("..", import.meta.url).pathname;
 const failures = [];
@@ -73,13 +74,14 @@ assertVersion(
 const storePath = join(repoRoot, "frontend", "src", "state", "store.ts");
 const storeSource = readText(storePath);
 assertVersion(
-  "Aether Bridge Host adapter",
+  "Lumen Bridge Host adapter",
   storePath,
-  storeSource.match(/name:\s*"Aether Bridge Host"[\s\S]*?version:\s*"([^"]+)"/)?.[1],
+  storeSource.match(/name:\s*"Lumen Bridge Host"[\s\S]*?version:\s*"([^"]+)"/)?.[1],
   version,
 );
 
 const appPlistPath = [
+  join(process.env.BEAT_APP_OUTPUT_PATH ?? join(homedir(), "Applications", "Beat.app"), "Contents", "Info.plist"),
   join(repoRoot, "Beat.app", "Contents", "Info.plist"),
   join(repoRoot, "build-native-release", "backend", "Beat_artefacts", "Release", "Beat.app", "Contents", "Info.plist"),
   join(repoRoot, "build-native", "backend", "Beat_artefacts", "Release", "Beat.app", "Contents", "Info.plist"),

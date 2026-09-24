@@ -7,7 +7,7 @@ import {
 } from "../InstrumentLibrary/decentSamplerInstrument";
 import { isNative, send } from "../../ipc/bridge";
 import type { DecentSamplerImport, DecentSamplerUiControl } from "../../ipc/schema";
-import { createDefaultSynthDraft, synthDraftToInstrumentPatch, type SynthDraftPatch, useSynthStore } from "../../state/synthStore";
+import { createDefaultLumenDraft, synthDraftToInstrumentPatch, type SynthDraftPatch, useSynthStore } from "../../state/synthStore";
 import { useAudioFileStore, useInstrumentStore, usePluginStore, useUiStore } from "../../state/store";
 import type { PluginAdapter, PluginEditorKind } from "../../state/types";
 import { createStoreSelector } from "../../solid-utils/store";
@@ -34,7 +34,7 @@ export function PluginHostModal(props: PluginHostModalProps) {
   function createInstrument() {
     const current = plugin();
     if (!current) return;
-    const defaultDraft = createDefaultSynthDraft();
+    const defaultDraft = createDefaultLumenDraft();
     const draft: SynthDraftPatch = {
       ...structuredClone(defaultDraft),
       name: `${current.name} Instrument`,
@@ -50,9 +50,9 @@ export function PluginHostModal(props: PluginHostModalProps) {
       icon: "ph:puzzle-piece",
       source: {
         kind: "plugin",
-        label: current.status === "installed" ? current.name : `${current.name} via Aether`,
+        label: current.status === "installed" ? current.name : `${current.name} via Lumen`,
         pluginId: current.id,
-        fallbackEngine: current.status === "installed" ? undefined : "aether",
+        fallbackEngine: current.status === "installed" ? undefined : "lumen",
         importedAt: Date.now(),
       },
       userCreated: true,
@@ -60,7 +60,7 @@ export function PluginHostModal(props: PluginHostModalProps) {
     useSynthStore.getState().bindInstrument(id);
     useSynthStore.getState().setDraft(draft);
     close();
-    useUiStore.getState().openEditor({ kind: "synth" });
+    useUiStore.getState().openEditor({ kind: "lumen" });
   }
 
   return (
@@ -122,7 +122,7 @@ export function PluginHostModal(props: PluginHostModalProps) {
                     <RouteCard
                       icon="ph:wave-sine"
                       title="Instrument"
-                      value={currentPlugin().kind === "synth" ? "Plugin-backed when installed, Aether fallback when missing." : "Unavailable for this plugin type."}
+                      value={currentPlugin().kind === "synth" ? "Plugin-backed when installed, Lumen fallback when missing." : "Unavailable for this plugin type."}
                     />
                     <RouteCard
                       icon="ph:file-audio"

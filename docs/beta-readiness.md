@@ -26,13 +26,14 @@ cd frontend
 npm run package:beta
 ```
 
-The archive is written to `release/Beat-<version>-macOS-arm64.zip` with an
-adjacent SHA-256 file. The release command extracts that ZIP into a temporary
+The archive is written to `~/Downloads/Beat Public Release/Beat-<version>-macOS-arm64.zip`
+with an adjacent SHA-256 file. Set `BEAT_RELEASE_DIR` to override that location.
+The release command extracts that ZIP into a temporary
 directory and reruns the runtime-content and deep-signature audits against the
 extracted copy, so the checked artifact is the file a tester receives.
 
 The complete gate runs every source verifier, builds and executes the native
-stress harness, packages the canonical `Beat.app`, rejects development/source
+stress harness, packages the installed `~/Applications/Beat.app`, rejects development/source
 artifacts inside the bundle, verifies version and Finder declarations, checks
 the deep signature, and asks Gatekeeper to assess distribution readiness. It
 does not stop at the first failure; the JSON report retains the result and tail

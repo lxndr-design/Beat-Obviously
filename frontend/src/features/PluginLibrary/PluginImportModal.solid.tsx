@@ -53,7 +53,7 @@ export function PluginImportModal(props: {
         kind: detected().kind,
         format: detected().format,
         status: "installed",
-        instrumentMode: detected().kind === "synth" ? "fallback-aether" : "rendered-audio",
+        instrumentMode: detected().kind === "synth" ? "fallback-lumen" : "rendered-audio",
         version: detected().version,
         sourceFileName: selectedFile.name,
         installedAt: Date.now(),

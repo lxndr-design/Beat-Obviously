@@ -26,6 +26,13 @@ try {
   assert.ok(panelSource.includes("moveReturnBusEffect") && panelSource.includes("removeReturnBusEffect"), "Bus insert rack should support reorder and removal");
   assert.ok(panelSource.includes('label="Mode"') && panelSource.includes("channelLayout"), "Bus panel should expose mono/stereo channel mode");
   assert.ok(panelSource.includes("BusInputRow") && panelSource.includes('title="Inputs"'), "Bus panel should identify routed track, bus, and send inputs");
+  assert.ok(panelSource.includes("function InputAdder") && panelSource.includes('>Add</Button>'), "Master and Bus input headers should expose a shared Add route control");
+  assert.ok(panelSource.includes('>Remove</Button>') && panelSource.includes("props.source().onRemove"), "each input row should expose a functional Remove route control");
+  assert.ok(panelSource.includes("removeTrackSend(track.id, props.bus.id)") && panelSource.includes("removeAudioBusSend(bus.id, props.bus.id)"), "removing send inputs should delete the corresponding Track or Bus send");
+  assert.ok(panelSource.includes("setTrackOutputBus(track.id, undefined, true)") && panelSource.includes("setAudioBusOutput(bus.id, undefined, true)"), "removing direct Bus inputs should restore their primary route to Master");
+  const outputSectionSource = panelSource.slice(panelSource.indexOf('<section class={styles.outputSection}'), panelSource.indexOf('<section class={styles.sendSection}'));
+  assert.ok(!outputSectionSource.includes('title="Sends"'), "Sends should not remain nested inside the Output section");
+  assert.ok(panelSource.includes('<section class={styles.sendSection}') && panelCss.includes(".sendSection"), "Sends should have a dedicated channel section and scroll area");
   assert.ok(panelSource.includes("<SectionRibbon") && panelSource.includes("<RowItem"), "Bus panel should reuse shared section-header and row primitives");
   assert.ok(!panelSource.includes("styles.sectionTitle") && !/\.sectionTitle\s*\{/.test(panelCss), "Bus section headers should retain the shared SectionRibbon geometry instead of feature-local overrides");
   assert.ok(!panelSource.includes("<button"), "Bus panel should not introduce raw feature-local buttons");

@@ -225,7 +225,7 @@ export const NODE_DEFINITIONS: Record<InstrumentNodeKind, NodeDefinition> = {
   panWidth: {
     label: "Pan / Width",
     icon: "ph:arrows-in-line-horizontal",
-    description: "Positions audio in the stereo field and controls width. Compiles to Aether pan/width style routing where available.",
+    description: "Positions audio in the stereo field and controls width. Compiles to the instrument engine's pan and width routing where available.",
     inputs: [
       AUDIO_IN,
       { id: "pan-cv", label: "Pan", kind: "input", signal: "control" },
@@ -303,7 +303,7 @@ export const NODE_DEFINITIONS: Record<InstrumentNodeKind, NodeDefinition> = {
   unison: {
     label: "Unison / Voice Stack",
     icon: "ph:sparkle",
-    description: "Audio passthrough that enables multiple Aether voices with detune and stereo spread. Detune and Spread accept CV.",
+    description: "Audio passthrough that enables multiple instrument voices with detune and stereo spread. Detune and Spread accept CV.",
     inputs: [
       AUDIO_IN,
       { id: "detune-cv", label: "Detune", kind: "input", signal: "control" },
@@ -660,7 +660,7 @@ export const NODE_DEFINITIONS: Record<InstrumentNodeKind, NodeDefinition> = {
   delay: {
     label: "Delay",
     icon: "ph:sparkle",
-    description: "Echo stage for rhythmic repeats. Routed delay nodes compile into instrument-owned Aether delay FX.",
+    description: "Echo stage for rhythmic repeats. Routed delay nodes compile into instrument-owned delay FX.",
     inputs: [AUDIO_IN],
     outputs: [AUDIO_OUT],
     parameters: [
@@ -673,7 +673,7 @@ export const NODE_DEFINITIONS: Record<InstrumentNodeKind, NodeDefinition> = {
   chorus: {
     label: "Chorus",
     icon: "ph:sparkle",
-    description: "Stereo modulation stage for width and movement. Routed chorus nodes compile into instrument-owned Aether chorus FX.",
+    description: "Stereo modulation stage for width and movement. Routed chorus nodes compile into instrument-owned chorus FX.",
     inputs: [AUDIO_IN],
     outputs: [AUDIO_OUT],
     parameters: [

@@ -1,9 +1,10 @@
-import { createSignal, For, Show } from "solid-js";
+import { createMemo, createSignal, For, Show } from "solid-js";
 import type { RecentProjectEntry } from "../../ipc/schema";
 import { appConfirm } from "../../solid-ui";
-import { AppLogo, Button, createContextMenu, HoverInfo, Icon, LoadingIndicator, LoadingSkeleton, type ContextMenuItem } from "../../solid-ui";
+import { AppLogo, Button, createContextMenu, HoverInfo, Icon, LoadingIndicator, LoadingSkeleton, RIBBON_HELP, RibbonHelp, type ContextMenuItem } from "../../solid-ui";
 import { useComponentStore } from "../../state/components";
 import { useAudioFileStore, useDocumentStore, useInstrumentStore } from "../../state/store";
+import { userAccessibleInstruments } from "../../state/instrumentAccess";
 import { createStoreSelector } from "../../solid-utils/store";
 import { AudioFilesPage } from "./AudioFilesPage.solid";
 import { InstrumentsPage } from "./InstrumentsPage.solid";
@@ -38,7 +39,8 @@ export function HomeHub(props: HomeHubProps) {
   const recentProjects = createStoreSelector(useDocumentStore, (s) => s.recentProjects);
   const recentProjectsLoading = createStoreSelector(useDocumentStore, (s) => s.recentProjectsLoading);
   const audioFileCount = createStoreSelector(useAudioFileStore, (s) => s.files.length);
-  const instrumentCount = createStoreSelector(useInstrumentStore, (s) => s.instruments.length);
+  const instruments = createStoreSelector(useInstrumentStore, (s) => s.instruments);
+  const instrumentCount = createMemo(() => userAccessibleInstruments(instruments()).length);
   const patternCount = createStoreSelector(useComponentStore, (s) => s.components.length);
 
   async function quitBeat() {
@@ -82,7 +84,10 @@ export function HomeHub(props: HomeHubProps) {
 
         <div class={styles.grid}>
           <section class={styles.panel}>
-            <div class={styles.ribbon}>Projects</div>
+            <div class={styles.ribbon}>
+              <span>Projects</span>
+              <RibbonHelp label="Projects" pages={RIBBON_HELP.projects} />
+            </div>
             <div class={styles.projectActions}>
               <Button variant="ghost" class={styles.actionRow} onClick={props.onNew}>
                 <Icon name="ph:plus" size={18} decorative />
@@ -98,7 +103,10 @@ export function HomeHub(props: HomeHubProps) {
               </Button>
             </div>
             <div class={styles.subRibbon}>
-              <span>Recent</span>
+              <span class={styles.ribbonTitle}>
+                <span>Recent</span>
+                <RibbonHelp label="Recent" pages={RIBBON_HELP.recent} />
+              </span>
               <Show when={recentProjectsLoading()}>
                 <LoadingIndicator size="sm" label="Refreshing" />
               </Show>
@@ -134,7 +142,10 @@ export function HomeHub(props: HomeHubProps) {
 
           <div class={styles.panelStack}>
             <section class={styles.panel}>
-              <div class={styles.ribbon}>Assets</div>
+              <div class={styles.ribbon}>
+                <span>Assets</span>
+                <RibbonHelp label="Assets" pages={RIBBON_HELP.assets} />
+              </div>
               <Button variant="ghost" class={styles.assetRow} onClick={() => setPage("audio")}>
                 <span>
                   <Icon name="ph:music-note" size={18} decorative />
@@ -234,23 +245,14 @@ function RecentProjectCard(props: {
     },
   ]);
 
-  function openMenuFromSecondaryMouseDown(event: MouseEvent) {
-    if (event.button !== 2 && !(event.button === 0 && event.ctrlKey)) return;
-    event.preventDefault();
-    event.stopPropagation();
-    const { clientX, clientY } = event;
-    // WKWebView can consume the later `contextmenu` event for a secondary click.
-    // Open after the current mousedown finishes so the menu's outside-click
-    // listener cannot immediately close the menu it just mounted.
-    window.setTimeout(() => menu.openAt(clientX, clientY), 0);
-  }
-
   return (
     <div
       class={styles.recentCard}
       data-recent-project-path={props.project.path}
-      onMouseDown={openMenuFromSecondaryMouseDown}
+      tabIndex={0}
+      onMouseDown={menu.onMouseDown}
       onContextMenu={menu.onContextMenu}
+      onKeyDown={menu.onKeyDown}
     >
       <Button variant="ghost" class={styles.recentOpen} onClick={props.onOpen} title={props.project.path}>
         <span class={styles.recentLogoFrame} aria-hidden="true">

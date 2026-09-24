@@ -1,6 +1,7 @@
 import { Show, splitProps, type JSX } from "solid-js";
 import { Button } from "../Button";
 import { Icon } from "../Icon";
+import { RibbonHelp, type RibbonHelpPage } from "../RibbonHelp";
 import { Tag } from "../Tag";
 import styles from "./SectionRibbon.module.css";
 
@@ -12,10 +13,12 @@ export interface SectionRibbonProps extends Omit<JSX.HTMLAttributes<HTMLDivEleme
   count?: number;
   showToggle?: boolean;
   className?: string;
+  help?: RibbonHelpPage[];
+  helpLabel?: string;
 }
 
 export function SectionRibbon(allProps: SectionRibbonProps) {
-  const [local, props] = splitProps(allProps, ["title", "expanded", "onToggle", "actions", "count", "showToggle", "class", "className"]);
+  const [local, props] = splitProps(allProps, ["title", "expanded", "onToggle", "actions", "count", "showToggle", "class", "className", "help", "helpLabel"]);
   const showToggle = () => local.showToggle ?? true;
   return (
     <div
@@ -41,7 +44,12 @@ export function SectionRibbon(allProps: SectionRibbonProps) {
           </span>
         </Button>
       </Show>
-      <span class={styles.label}>{local.title}</span>
+      <span class={styles.label}>
+        <span class={styles.labelText}>{local.title}</span>
+        <Show when={local.help?.length}>
+          <RibbonHelp label={local.helpLabel ?? local.title} pages={local.help ?? []} />
+        </Show>
+      </span>
       <span class={styles.right}>
         <Show when={typeof local.count === "number"}>
           <span class={styles.count}><Tag tone={local.count === 0 ? "zero" : "default"}>{local.count}</Tag></span>

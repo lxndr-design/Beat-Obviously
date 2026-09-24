@@ -1,7 +1,16 @@
 import { defineConfig } from "vite";
 import solid from "vite-plugin-solid";
 
+const environment = (globalThis as {
+  process?: { env?: Record<string, string | undefined> };
+}).process?.env;
+
 export default defineConfig({
+  define: {
+    __BEAT_INCLUDE_INTERNAL_TEST_BANKS__: JSON.stringify(
+      environment?.VITE_BEAT_INCLUDE_INTERNAL_TEST_BANKS !== "false",
+    ),
+  },
   plugins: [
     solid({ include: "**/*.solid.tsx" }),
   ],

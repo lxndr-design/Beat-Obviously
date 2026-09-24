@@ -1082,8 +1082,5 @@ function clamp(value: number, min: number, max: number): number {
 }
 
 function shouldAcceptNodeEditorDevEvents() {
-  if (import.meta.env.DEV) return true;
-  if (typeof window === "undefined") return false;
-  const isLocalPreview = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1" || window.location.hostname === "::1";
-  return isLocalPreview && new URLSearchParams(window.location.search).has("beatDevFixture");
+  return import.meta.env.DEV;
 }

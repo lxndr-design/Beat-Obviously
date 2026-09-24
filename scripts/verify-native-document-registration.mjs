@@ -3,12 +3,13 @@ import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { existsSync, statSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
+import { homedir } from "node:os";
 
 const repoRoot = resolve(new URL("..", import.meta.url).pathname);
 const args = process.argv.slice(2);
 const requireDefaultHandler = args.includes("--require-default-handler");
 const appArg = args.find((arg) => !arg.startsWith("--"));
-const appPath = resolve(appArg ?? join(repoRoot, "Beat.app"));
+const appPath = resolve(appArg ?? process.env.BEAT_APP_OUTPUT_PATH ?? join(homedir(), "Applications", "Beat.app"));
 const infoPlistPath = join(appPath, "Contents", "Info.plist");
 const executablePath = join(appPath, "Contents", "MacOS", "Beat");
 const iconPath = join(appPath, "Contents", "Resources", "Icon.icns");
@@ -25,7 +26,16 @@ const plist = JSON.parse(execFileSync("plutil", ["-convert", "json", "-o", "-", 
 
 assert.equal(plist.CFBundleIdentifier, "com.beat.app", "Beat bundle identifier changed");
 assert.equal(plist.CFBundleExecutable, "Beat", "Beat executable name changed");
-assert.equal(plist.CFBundleIconFile, "Icon.icns", "Beat app icon file must be Icon.icns");
+const appIconFile = plist.CFBundleIconFile;
+assert.ok(
+  appIconFile === "AppIcon.icns" || appIconFile === "Icon.icns",
+  `Beat app icon file must be AppIcon.icns or Icon.icns, got ${appIconFile}`,
+);
+assert.equal(
+  existsSync(join(appPath, "Contents", "Resources", appIconFile)),
+  true,
+  `Declared Beat app icon does not exist: ${appIconFile}`,
+);
 
 const documentTypes = Array.isArray(plist.CFBundleDocumentTypes) ? plist.CFBundleDocumentTypes : [];
 const beatDocumentType = documentTypes.find((type) => {

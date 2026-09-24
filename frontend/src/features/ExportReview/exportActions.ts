@@ -2,7 +2,7 @@ import { isNative, send } from "../../ipc/bridge";
 import { buildCurrentBeatDocument } from "../../persistence/beatDocument";
 import { useAudioFileStore, useDocumentStore, useInstrumentStore, useProjectStore, useTransportStore, useUiStore } from "../../state/store";
 import type { Id, Track } from "../../state/types";
-import { projectWithRenderedMidiArpeggiations } from "../../state/midiNoteGroups";
+import { projectWithCompiledSegmentEvents } from "../../state/segmentEventCompiler";
 import {
   exportPresetById,
   exportValidationBlocksExport,
@@ -26,7 +26,7 @@ export async function runProjectExport(mode: ExportPresetTarget = "project") {
   const validation = await validateCurrentProjectBeforeExport();
   if (exportValidationBlocksExport(validation)) throw new Error(validation.message);
   const request = {
-    project: projectWithRenderedMidiArpeggiations(useProjectStore.getState().project),
+    project: projectWithCompiledSegmentEvents(useProjectStore.getState().project),
     instruments: useInstrumentStore.getState().instruments,
     audioFiles: useAudioFileStore.getState().files,
     pathHint,
@@ -133,7 +133,7 @@ export async function runProjectExport(mode: ExportPresetTarget = "project") {
 export async function exportTrackAsWav(trackId: Id) {
   const exportState = useExportStore.getState();
   const sourceProject = useProjectStore.getState().project;
-  const project = projectWithRenderedMidiArpeggiations(sourceProject);
+  const project = projectWithCompiledSegmentEvents(sourceProject);
   const track = sourceProject.tracks.find((candidate) => candidate.id === trackId);
   if (!track) throw new Error("Track was not found.");
   if (!isRenderableStemTrack(track)) throw new Error("Group tracks cannot be exported as individual WAV files yet.");
@@ -174,7 +174,7 @@ export async function bounceTrackInPlace(trackId?: Id) {
 
   const projectState = useProjectStore.getState();
   const sourceProject = projectState.project;
-  const project = projectWithRenderedMidiArpeggiations(sourceProject);
+  const project = projectWithCompiledSegmentEvents(sourceProject);
   const sourceTrack = sourceProject.tracks.find((track) => track.id === selectedTrackIds[0]);
   if (!sourceTrack) throw new Error("Selected track was not found.");
   if (sourceTrack.kind === "group") throw new Error("Group track bounce is not supported yet.");

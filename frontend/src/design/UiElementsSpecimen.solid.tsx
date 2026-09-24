@@ -132,13 +132,13 @@ export function UiElementsSpecimen() {
 
       <SpecimenSection title="Inputs And Controls" note="Use shared controls so hit zones, drag behavior, focus, and disabled state are consistent.">
         <div class={styles.controlGrid}>
-          <TextInput label="Name" value="Aether Patch 1" />
+          <TextInput label="Name" value="Lumen Patch 1" />
           <NumberInput label="Buffer" value={numberValue()} min={32} max={2048} step={32} unit="samples" onChange={setNumberValue} />
           <FloatingSelect
             label="Engine"
             value={selectValue()}
             options={[
-              { value: "wavetable", label: "Aether" },
+              { value: "wavetable", label: "Lumen" },
               { value: "nodemap", label: "Nodemap" },
               { value: "sampler", label: "Sampler" },
             ]}
@@ -258,11 +258,11 @@ export function UiElementsSpecimen() {
             <div class={styles.modalShell}>
               <div class={styles.modalHeader}>
                 <Icon name="ph:waveform" size={18} decorative />
-                <strong>Instrument Details - Aether Engine</strong>
+                <strong>Instrument Details - Lumen Engine</strong>
                 <Button iconOnly aria-label="Close mock modal"><Icon name="ph:x" size={18} decorative /></Button>
               </div>
               <div class={styles.modalBody}>
-                <TextInput label="Name" value="Aether Patch 1" />
+                <TextInput label="Name" value="Lumen Patch 1" />
                 <FloatingSelect
                   label="Category"
                   value="synth"

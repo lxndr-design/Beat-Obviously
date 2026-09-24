@@ -6,6 +6,7 @@ import type { AudioWaveformSummary } from "../../ipc/schema";
 import { Button, HoverInfo, Icon, LoadingIndicator } from "../../solid-ui";
 import { useTransportStore } from "../../state/store";
 import type { AudioFile, Segment } from "../../state/types";
+import { audioTuneRate } from "../../state/audioSegmentTuning";
 import styles from "./AudioSegmentTransport.module.css";
 
 interface Props {
@@ -77,6 +78,7 @@ export function AudioSegmentTransport(props: Props) {
       fadeInBeats: props.segment.fadeInBeats ?? 0,
       fadeOutBeats: props.segment.fadeOutBeats ?? 0,
       gainDb: payload()?.gainDb ?? 0,
+      tunePitch: payload()?.tunePitch ?? null,
       bpm: props.bpm,
       speed: playbackSpeed(),
     });
@@ -125,6 +127,7 @@ export function AudioSegmentTransport(props: Props) {
           fadeInBeats: props.segment.fadeInBeats ?? 0,
           fadeOutBeats: props.segment.fadeOutBeats ?? 0,
           gainDb: currentPayload.gainDb ?? 0,
+          tunePitch: currentPayload.tunePitch,
         });
         if (token !== playbackToken) return;
         if (accepted === false) throw new Error("The project engine could not start this audio segment.");
@@ -221,13 +224,15 @@ export function AudioSegmentTransport(props: Props) {
     const source = context.createBufferSource();
     const gain = context.createGain();
     const speed = playbackSpeed();
-    const offsetSeconds = (sourceStartBeat() + beat) * secondsPerBeat();
+    const tuneRate = audioTuneRate(payload()?.tunePitch);
+    const effectiveRate = speed * tuneRate;
+    const offsetSeconds = (sourceStartBeat() + beat * tuneRate) * secondsPerBeat();
     if (offsetSeconds >= buffer.duration) throw new Error("The segment trim begins beyond the available audio source.");
-    const remainingSourceSeconds = (lengthBeats() - beat) * secondsPerBeat();
+    const remainingSourceSeconds = (lengthBeats() - beat) * secondsPerBeat() * tuneRate;
     const sourceDurationSeconds = Math.max(0.001, Math.min(remainingSourceSeconds, buffer.duration - offsetSeconds));
-    const outputDurationSeconds = sourceDurationSeconds / speed;
+    const outputDurationSeconds = sourceDurationSeconds / effectiveRate;
     source.buffer = buffer;
-    source.playbackRate.value = speed;
+    source.playbackRate.value = effectiveRate;
     scheduleBrowserGain(gain.gain, context.currentTime, beat, outputDurationSeconds, currentGain(), props.segment.fadeInBeats ?? 0, props.segment.fadeOutBeats ?? 0, lengthBeats(), secondsPerBeat(), speed);
     source.connect(gain);
     gain.connect(context.destination);

@@ -2,7 +2,7 @@ import { createEffect, createMemo, createSignal, For, onCleanup, Show } from "so
 import { previewFrequency, renderAetherOutputPreviewSamples, renderedInstrumentBuffer } from "../../../audio/synthPreview";
 import { createSynthWorkletPreviewNode } from "../../../audio/synthWorkletPreview";
 import { registerGlobalAudioStop } from "../../../audio/globalAudioSafety";
-import { appAlert, Button, FieldActionButton, FloatingSelect, HoverInfo, Icon, Knob, meshTintVariantFor, NumberInput, Slider, TextInput, Toggle } from "../../../solid-ui";
+import { appAlert, Button, FieldActionButton, FloatingSelect, HoverInfo, Icon, Knob, meshTintVariantFor, NumberInput, RIBBON_HELP, RibbonHelp, Slider, TextInput, Toggle } from "../../../solid-ui";
 import { send } from "../../../ipc/bridge";
 import { useContextualHotkey } from "../../../solid-utils/contextualHotkeys.solid";
 import { createStoreSelector } from "../../../solid-utils/store";
@@ -21,6 +21,7 @@ import {
 import {
   FACTORY_SYNTH_PRESETS,
   MACRO_IDS,
+  cloneAetherDraftAsLumen,
   getEnvelopeCurveParam,
   getNumberParam,
   macroConflictDetailsForId,
@@ -457,7 +458,9 @@ export function SynthEditor(props: SynthEditorProps & { editorKind?: "synth" | "
   }
 
   function importFactoryPreset(preset: SynthFactoryPresetRecord) {
-    setDraft(preset.patch);
+    setDraft(draft().instrumentType === "lumen-hybrid-synth"
+      ? cloneAetherDraftAsLumen(preset.patch, preset.name)
+      : preset.patch);
     setImportPresetOpen(false);
     setTaxonomyTypeOpen(false);
     setTaxonomyNameOpen(false);
@@ -485,7 +488,7 @@ export function SynthEditor(props: SynthEditorProps & { editorKind?: "synth" | "
     <div
       class={`ds-editor-shell ds-fill ${styles.shell}`}
       role="region"
-      aria-label={draft().instrumentType === "lumen-hybrid-synth" ? "Lumen engine" : "Aether engine"}
+      aria-label={draft().instrumentType === "lumen-hybrid-synth" ? "Lumen engine" : "Legacy synth engine"}
     >
       <div ref={bodyRef} class={`ds-editor-body ds-scroll ${styles.body}`}>
         <section
@@ -498,7 +501,7 @@ export function SynthEditor(props: SynthEditorProps & { editorKind?: "synth" | "
               samples={analyzerWaveform()}
               playing={auditioning()}
               onToggle={() => void onAudition()}
-              instrumentName={draft().instrumentType === "lumen-hybrid-synth" ? "Lumen" : "Aether"}
+              instrumentName={draft().instrumentType === "lumen-hybrid-synth" ? "Lumen" : "Legacy Synth"}
             />
             <div class={styles.identityFields}>
               <div class={styles.nameRow}>
@@ -521,7 +524,7 @@ export function SynthEditor(props: SynthEditorProps & { editorKind?: "synth" | "
                   Import Preset
                 </Button>
                 <Show when={importPresetOpen()}>
-                  <div class={styles.importPresetMenu} role="menu" aria-label="Factory Aether presets">
+                  <div class={styles.importPresetMenu} role="menu" aria-label="Factory synth presets">
                     <For each={importPresetOptions()}>
                       {(preset) => (
                         <Button
@@ -564,7 +567,7 @@ export function SynthEditor(props: SynthEditorProps & { editorKind?: "synth" | "
                 />
               </div>
               <MpeZoneControls />
-              <div class={styles.expressionSummary} aria-label="Aether expression and performance summary">
+              <div class={styles.expressionSummary} aria-label="Instrument expression and performance summary">
                 <For each={synthExpressionSummary(draft(), effectiveExpressionActivity())}>
                   {(item) => (
                     <div
@@ -674,7 +677,10 @@ function LumenArpeggiatorPanel() {
         >
           <Icon name={enabled() ? "ph:power-fill" : "ph:power"} size={18} decorative />
         </Button>
-        <div class={styles.ampFilterRibbonTitle}>Arpeggiator</div>
+        <div class={styles.ampFilterRibbonTitle}>
+          <span>Arpeggiator</span>
+          <RibbonHelp label="Arpeggiator" pages={RIBBON_HELP.arpeggiator} />
+        </div>
       </div>
       <div class={styles.ampFilterBody}>
         <div class={`${styles.ampFilterGroup} ${styles.ampFilterWideGroup}`}>
@@ -821,7 +827,10 @@ function LumenClipPanel() {
         >
           <Icon name={enabled() ? "ph:power-fill" : "ph:power"} size={18} decorative />
         </Button>
-        <div class={styles.ampFilterRibbonTitle}>Clip</div>
+        <div class={styles.ampFilterRibbonTitle}>
+          <span>Clip</span>
+          <RibbonHelp label="Clip" pages={RIBBON_HELP.clipSource} />
+        </div>
       </div>
       <div class={`${styles.ampFilterBody} ${styles.clipBody}`}>
         <div class={styles.ampFilterGroup}>
@@ -913,12 +922,12 @@ function MpeZoneControls() {
   }
 
   return (
-    <div class={styles.mpeZoneControls} aria-label="Aether MPE member zone">
+    <div class={styles.mpeZoneControls} aria-label="Instrument MPE member zone">
       <Toggle
         className={styles.mpeZoneToggle}
         label="MPE zone"
         checked={enabled()}
-        aria-label="Enable Aether MPE member zone"
+        aria-label="Enable instrument MPE member zone"
         onChange={(next) => setBooleanParameter("aether.mpe.enabled", next && valid())}
       />
       <NumberInput
@@ -967,7 +976,7 @@ function InstrumentOutputPreview(props: {
   samples: number[];
   playing: boolean;
   onToggle: () => void;
-  instrumentName: "Aether" | "Lumen";
+  instrumentName: "Legacy Synth" | "Lumen";
 }) {
   return (
     <div class={styles.identityPreview} aria-label={`${props.instrumentName} output preview`}>
@@ -989,7 +998,7 @@ function InstrumentFxRack() {
   const draft = createStoreSelector(useSynthStore, (state) => state.draft);
   const setDraft = useSynthStore.getState().setDraft;
   const effects = createMemo(() => draft().effects.filters);
-  const instrumentName = createMemo(() => draft().instrumentType === "lumen-hybrid-synth" ? "Lumen" : "Aether");
+  const instrumentName = createMemo(() => draft().instrumentType === "lumen-hybrid-synth" ? "Lumen" : "Legacy Synth");
   const [draggedEffectId, setDraggedEffectId] = createSignal<string | null>(null);
   const [dragOverEffectId, setDragOverEffectId] = createSignal<string | null>(null);
 
@@ -1082,12 +1091,12 @@ function InstrumentFxRack() {
   }
 
   return (
-    <section class={`ds-panel ${styles.fxPanel}`} aria-label={instrumentName() === "Lumen" ? "Lumen instrument effects" : "Aether instrument effects"}>
+    <section class={`ds-panel ${styles.fxPanel}`} aria-label={`${instrumentName()} instrument effects`}>
       <header class="ds-panel-header">
         <div class="ds-panel-title">Instrument FX</div>
       </header>
       <div class={`ds-panel-body ${styles.fxBody}`}>
-        <div class={styles.fxChainSummary} aria-label={instrumentName() === "Lumen" ? "Current Lumen FX chain" : "Current Aether FX chain"}>
+        <div class={styles.fxChainSummary} aria-label={`Current ${instrumentName()} FX chain`}>
           <span>Current chain: {describeEffectChain(effects())}</span>
           <FloatingSelect
             layout="bare"
@@ -1834,7 +1843,10 @@ function AmpFilterPanel(props: { focusedSourceTarget?: SynthModulationSourceEdit
         >
           <Icon name={filterEnabled() ? "ph:power-fill" : "ph:power"} size={18} decorative />
         </Button>
-        <div class={styles.ampFilterRibbonTitle}>AMP/Filter</div>
+        <div class={styles.ampFilterRibbonTitle}>
+          <span>AMP/Filter</span>
+          <RibbonHelp label="AMP and Filter" pages={RIBBON_HELP.ampFilter} />
+        </div>
       </div>
       <div class={styles.ampFilterBody}>
         <div class={styles.envelopeCards}>
@@ -2041,7 +2053,7 @@ function AmpFilterPanel(props: { focusedSourceTarget?: SynthModulationSourceEdit
               min={0}
               max={127}
               step={1}
-              ariaLabel="Aether sample slot 1 root MIDI note"
+              ariaLabel={`${sampleSlotLabel()} root MIDI note`}
               onChange={(value) => setNumericParameter(sampleParameterId("rootNote"), value)}
             />
             <SynthParameterKnob id={sampleParameterId("level")} label="Level" defaultValue={0.8} onChange={setNumericParameter} />
@@ -2130,7 +2142,7 @@ function AmpFilterPanel(props: { focusedSourceTarget?: SynthModulationSourceEdit
             <SynthParameterKnob id={sampleParameterId("loop.start")} label="Loop Start" defaultValue={0} onChange={setNumericParameter} />
             <SynthParameterKnob id={sampleParameterId("loop.end")} label="Loop End" defaultValue={1} onChange={setNumericParameter} />
           </div>
-          <div class={styles.ampFilterShapeRow} aria-label="Aether Sample Slot 1 mapped zones">
+          <div class={styles.ampFilterShapeRow} aria-label={`${sampleSlotLabel()} mapped zones`}>
             <Button size="xs" onClick={addMappedZone} disabled={mappedZones().length >= 8 || (!mappedZones().length && !baseZone().audioFileId)}>
               {mappedZones().length ? "Add Zone" : "Create Key Map"}
             </Button>
@@ -2171,7 +2183,7 @@ function AmpFilterPanel(props: { focusedSourceTarget?: SynthModulationSourceEdit
           <div class={styles.ampFilterShapeRow}>
             <Toggle
               label="Enabled"
-              aria-label={isLumen() ? `Enable Source ${activeLumenSampleSlot().toUpperCase()} granular` : "Enable Aether granular slot 2"}
+              aria-label={isLumen() ? `Enable Source ${activeLumenSampleSlot().toUpperCase()} granular` : "Enable legacy granular slot 2"}
               aria-describedby="aether-granular-slot-2-source-status"
               checked={draft().parameters[granularParameterId("enabled")] === true}
               disabled={!granularSourceAvailable()}
@@ -2181,7 +2193,7 @@ function AmpFilterPanel(props: { focusedSourceTarget?: SynthModulationSourceEdit
               label="Route"
               layout="inline"
               value={String(draft().parameters[granularParameterId("route")] ?? "filter")}
-              ariaLabel="Aether granular slot 2 route"
+              ariaLabel={isLumen() ? `Source ${activeLumenSampleSlot().toUpperCase()} granular route` : "Legacy granular slot 2 route"}
               ariaDescribedBy="aether-granular-slot-2-source-status"
               options={[
                 { value: "filter", label: "Filter" },
@@ -2242,14 +2254,14 @@ function AmpFilterPanel(props: { focusedSourceTarget?: SynthModulationSourceEdit
             <NumberInput label="Seed" layout="inline" value={getNumberParam(draft(), granularParameterId("randomSeed"))} min={1} max={4294967295} step={1} ariaLabel="Granular deterministic seed" onChange={(value) => setNumericParameter(granularParameterId("randomSeed"), value)} />
           </div>
         </section>
-        <div class={`${styles.ampFilterGroup} ${styles.ampFilterWideGroup}`} aria-label={`${isLumen() ? "Lumen" : "Aether"} source FX buses`}>
+        <div class={`${styles.ampFilterGroup} ${styles.ampFilterWideGroup}`} aria-label={`${isLumen() ? "Lumen" : "Legacy synth"} source FX buses`}>
           <div class={styles.ampFilterGroupTitle}>Source FX</div>
           <div class={styles.ampFilterShapeRow}>
             <FloatingSelect
               label="Bus 1"
               layout="inline"
               value={String(draft().parameters["aether.fxBus1Id"] ?? "")}
-              ariaLabel={`${isLumen() ? "Lumen" : "Aether"} FX bus 1 target`}
+              ariaLabel={`${isLumen() ? "Lumen" : "Legacy synth"} FX bus 1 target`}
               options={fxBusOptions()}
               open={fxBus1Open()}
               onOpenChange={setFxBus1Open}
@@ -2259,7 +2271,7 @@ function AmpFilterPanel(props: { focusedSourceTarget?: SynthModulationSourceEdit
               label="Bus 2"
               layout="inline"
               value={String(draft().parameters["aether.fxBus2Id"] ?? "")}
-              ariaLabel={`${isLumen() ? "Lumen" : "Aether"} FX bus 2 target`}
+              ariaLabel={`${isLumen() ? "Lumen" : "Legacy synth"} FX bus 2 target`}
               options={fxBusOptions()}
               open={fxBus2Open()}
               onOpenChange={setFxBus2Open}

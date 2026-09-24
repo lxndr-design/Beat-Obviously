@@ -1,5 +1,5 @@
 import { createEffect, createMemo, createSignal, For, onCleanup, Show } from "solid-js";
-import { appAlert, Button, FloatingSelect, Icon, LoadingIndicator, Modal, NumberInput, TextInput } from "../../solid-ui";
+import { appAlert, Button, FloatingSelect, Icon, LoadingIndicator, Modal, NumberInput, RIBBON_HELP, RibbonHelp, TextInput } from "../../solid-ui";
 import {
   cachedInstrumentSampleBuffer,
   getBrowserPreviewAudioContext,
@@ -211,7 +211,10 @@ export function TimelineJumpingSamplerEditor(props: Props) {
     <div class={styles.editor}>
       <div class={styles.sourceRibbon}>
         <div class={styles.sourceIdentity}>
-          <span class={styles.eyebrow}>Source Timeline</span>
+          <span class={styles.sourceTitle}>
+            <span class={styles.eyebrow}>Source Timeline</span>
+            <RibbonHelp label="Source Timeline" pages={RIBBON_HELP.clipSource} />
+          </span>
           <strong>{sourceAudio()?.name ?? (sourcePath() ? sourcePath().split(/[\\/]/).pop() : "No audio selected")}</strong>
           <Show when={duration() > 0}><span>{formatTimelineSeconds(duration())}</span></Show>
         </div>

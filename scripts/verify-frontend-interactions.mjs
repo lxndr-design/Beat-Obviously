@@ -18,9 +18,11 @@ try {
       join(repoRoot, "frontend/src/testing/interactionRunner.ts"),
       join(repoRoot, "frontend/src/features/MidiEditor/pianoRollInteraction.ts"),
       join(repoRoot, "frontend/src/features/MidiEditor/midiNoteRounding.ts"),
+      join(repoRoot, "frontend/src/features/MidiEditor/midiNoteSubdivision.ts"),
       join(repoRoot, "frontend/src/features/MidiEditor/midiPreviewScheduling.ts"),
       join(repoRoot, "frontend/src/state/midiNoteGroups.ts"),
       join(repoRoot, "frontend/src/features/SegmentEditor/midiLiveRecording.ts"),
+      join(repoRoot, "frontend/src/state/audioSegmentTuning.ts"),
       join(repoRoot, "frontend/src/features/DrumEditor/drumGridSelection.ts"),
       join(repoRoot, "frontend/src/automation/aetherNoteAutomation.ts"),
       join(repoRoot, "frontend/src/automation/aetherArrangementAutomation.ts"),
@@ -40,9 +42,11 @@ try {
   const runner = await import(pathToFileURL(join(outDir, "testing/interactionRunner.js")));
   const midiInteraction = await import(pathToFileURL(join(outDir, "features/MidiEditor/pianoRollInteraction.js")));
   const midiNoteRounding = await import(pathToFileURL(join(outDir, "features/MidiEditor/midiNoteRounding.js")));
+  const midiNoteSubdivision = await import(pathToFileURL(join(outDir, "features/MidiEditor/midiNoteSubdivision.js")));
   const midiPreviewScheduling = await import(pathToFileURL(join(outDir, "features/MidiEditor/midiPreviewScheduling.js")));
   const midiNoteGroups = await import(pathToFileURL(join(outDir, "state/midiNoteGroups.js")));
   const midiLiveRecording = await import(pathToFileURL(join(outDir, "features/SegmentEditor/midiLiveRecording.js")));
+  const audioSegmentTuning = await import(pathToFileURL(join(outDir, "state/audioSegmentTuning.js")));
   const drumGridSelection = await import(pathToFileURL(join(outDir, "features/DrumEditor/drumGridSelection.js")));
   const noteAutomation = await import(pathToFileURL(join(outDir, "automation/aetherNoteAutomation.js")));
   const arrangementAutomation = await import(pathToFileURL(join(outDir, "automation/aetherArrangementAutomation.js")));
@@ -55,6 +59,7 @@ try {
   const pianoRollCss = readFileSync(join(repoRoot, "frontend/src/features/MidiEditor/PianoRoll.module.css"), "utf8");
   const midiTransportSource = readFileSync(join(repoRoot, "frontend/src/features/MidiEditor/MidiTransport.solid.tsx"), "utf8");
   const timelineMidiPlaybackSource = readFileSync(join(repoRoot, "frontend/src/audio/TimelineMidiPlayback.solid.tsx"), "utf8");
+  const segmentEventCompilerSource = readFileSync(join(repoRoot, "frontend/src/state/segmentEventCompiler.ts"), "utf8");
   const segmentEditorSource = readFileSync(join(repoRoot, "frontend/src/features/SegmentEditor/SegmentEditorModal.solid.tsx"), "utf8");
   const segmentColorsSource = readFileSync(join(repoRoot, "frontend/src/features/SegmentEditor/segmentColors.ts"), "utf8");
   const segmentSource = readFileSync(join(repoRoot, "frontend/src/features/Tracks/Segment.solid.tsx"), "utf8");
@@ -119,7 +124,10 @@ try {
   const instrumentsPageCss = readFileSync(join(repoRoot, "frontend/src/features/HomeHub/InstrumentsPage.module.css"), "utf8");
   const instrumentEditorSource = readFileSync(join(repoRoot, "frontend/src/features/InstrumentEditor/InstrumentEditorModal.solid.tsx"), "utf8");
   const componentLibrarySource = readFileSync(join(repoRoot, "frontend/src/features/ComponentLibrary/ComponentLibraryPanel.solid.tsx"), "utf8");
+  const audioFileLibrarySource = readFileSync(join(repoRoot, "frontend/src/features/AudioFiles/AudioFileLibraryPanel.solid.tsx"), "utf8");
   const instrumentLibrarySource = readFileSync(join(repoRoot, "frontend/src/features/InstrumentLibrary/InstrumentLibraryPanel.solid.tsx"), "utf8");
+  const contextMenuSource = readFileSync(join(repoRoot, "frontend/src/solid-ui/ContextMenu/ContextMenu.solid.tsx"), "utf8");
+  const instrumentAccessSource = readFileSync(join(repoRoot, "frontend/src/state/instrumentAccess.ts"), "utf8");
   const trackLaneSource = readFileSync(join(repoRoot, "frontend/src/features/Tracks/TrackLane.solid.tsx"), "utf8");
   const trackListSource = readFileSync(join(repoRoot, "frontend/src/features/Tracks/TrackList.solid.tsx"), "utf8");
   const trackListCss = readFileSync(join(repoRoot, "frontend/src/features/Tracks/TrackList.module.css"), "utf8");
@@ -129,6 +137,7 @@ try {
   const knobSource = readFileSync(join(repoRoot, "frontend/src/solid-ui/Knob/Knob.solid.tsx"), "utf8");
   const audioRecordingModalSource = readFileSync(join(repoRoot, "frontend/src/features/Tracks/AudioRecordingModal.solid.tsx"), "utf8");
   const drumSequencerSource = readFileSync(join(repoRoot, "frontend/src/features/DrumEditor/DrumSequencer.solid.tsx"), "utf8");
+  const drumSequencerCss = readFileSync(join(repoRoot, "frontend/src/features/DrumEditor/DrumSequencer.module.css"), "utf8");
   const devHooksSource = readFileSync(join(repoRoot, "frontend/src/testing/devHooks.ts"), "utf8");
 
   assert.equal(runner.snapBeat(1.12, 0.25), 1, "snapBeat should snap to nearest grid");
@@ -390,6 +399,33 @@ try {
       && instrumentsPageSource.includes("collapsedGroups"),
     "Instruments should expose search, filtering, alphabetical/engine grouping, useful sorting, and explicit group controls",
   );
+  {
+    const timelineContextSource = trackLaneSource.slice(
+      trackLaneSource.indexOf("const menu = createContextMenu"),
+      trackLaneSource.indexOf("function openSegmentEditor"),
+    );
+    assert.deepEqual(
+      [...timelineContextSource.matchAll(/label:\s*"([^"]+)"/g)].map((match) => match[1]),
+      ["Create MIDI", "Create Drum Sequencer", "Create Drumpad"],
+      "the empty timeline context menu should expose only the three neutral editable segment types",
+    );
+    assert.ok(
+      !timelineContextSource.includes("Aether")
+        && !timelineContextSource.includes("Aurum")
+        && !timelineContextSource.includes("Lumen")
+        && !timelineContextSource.includes("WAV Segment")
+        && !timelineContextSource.includes("Live Record")
+        && !timelineContextSource.includes("Paste"),
+      "timeline creation should not expose engine-specific, audio, recording, or clipboard entries",
+    );
+  }
+  assert.ok(
+    instrumentsPageSource.includes("onDblClick={() => void playPreview(instrument)}")
+      && instrumentsPageSource.includes("Double-click to audition")
+      && !instrumentsPageSource.includes("styles.rowPlay")
+      && !instrumentsPageCss.includes(".rowPlay"),
+    "instrument repository rows should audition on double-click without a per-row play button",
+  );
   assert.ok(
     instrumentsPageSource.includes("previewLoadingId")
       && instrumentsPageSource.includes("styles.previewSpinner")
@@ -408,33 +444,29 @@ try {
     "the protected Lumen Test factory group should display with its exact product-testing name",
   );
   assert.ok(
+    instrumentLibrarySource.includes('label: "Create Lumen"')
+      && !instrumentLibrarySource.includes('label: "Create Aether"')
+      && instrumentLibrarySource.includes("userAccessibleInstruments(instruments())")
+      && instrumentsPageSource.includes("isLegacyAetherInstrument(instrument)")
+      && instrumentAccessSource.includes("Aether remains readable by the audio engine")
+      && instrumentAccessSource.includes("isLegacyAetherInstrument")
+      && instrumentAccessSource.includes("isLumenInstrument"),
+    "Aether should remain playback-compatible but be absent from user creation and browsing surfaces",
+  );
+  assert.ok(
     ['kind: "audio.listDevices"', 'kind: "audio.selectInputDevice"', 'kind: "recording.plan"', 'kind: "recording.prepare"', 'kind: "recording.start"', 'kind: "recording.stop"', 'kind: "recording.commitTake"']
       .every((request) => audioRecordingModalSource.includes(request))
       && audioRecordingModalSource.includes("Recorded Takes")
       && audioRecordingModalSource.includes("props.onToggleTake")
       && audioRecordingModalSource.includes("Bluetooth")
       && audioRecordingModalSource.includes("ensureNativeInputReady")
-      && trackLaneSource.includes("recordingGroupId: nano()")
+      && trackLaneSource.includes("segment().recordingGroupId")
       && trackListSource.includes("recordingTakeNumber")
       && trackListSource.includes("muted: !enabled")
       && storeSource.includes("updateRecordingInput")
       && storeSource.includes("recordingGroups")
       && typesSource.includes("recordingGroupId?: Id"),
-    "Live Record should use native microphone capture, enumerate connected inputs, and retain toggleable layered takes per segment",
-  );
-  assert.ok(
-    ["Aether", "Aurum", "Lumen"].every((engine) =>
-      trackLaneSource.includes(`Create ${engine} Segment`)),
-    "track creation UI should expose dedicated Aether, Aurum, and Lumen segment actions",
-  );
-  assert.ok(
-    trackLaneSource.includes('addEngineSegment("aether")')
-      && trackLaneSource.includes('addEngineSegment("aurum")')
-      && trackLaneSource.includes('addEngineSegment("lumen")')
-      && trackLaneSource.includes("createAurumInstrument")
-      && trackLaneSource.includes("createDefaultLumenDraft")
-      && trackLaneSource.includes("createDefaultSynthDraft"),
-    "each engine segment action should construct and bind its own engine instrument",
+    "Live Record should use native microphone capture, enumerate connected inputs, and retain reopenable layered takes per segment",
   );
   assert.equal(runner.snapBeat(1.13, 0.25), 1.25, "snapBeat should round upward past the midpoint");
   assert.deepEqual(
@@ -563,9 +595,32 @@ try {
       && pianoRollSource.includes("midiNoteSelectionAfterAdditiveClick")
       && pianoRollSource.includes("midiNoteSelectionAfterMarquee")
       && pianoRollSource.includes('"meta+a"')
+      && pianoRollSource.includes('e.key.toLowerCase() === "x"')
+      && pianoRollSource.includes("selectPitchRow")
+      && pianoRollSource.includes("visibleNoteEntries")
+      && pianoRollSource.includes("timelineTicks")
       && pianoRollSource.includes("midiNoteSelectionForContextMenu")
       && pianoRollSource.includes("midiNotePointerRequestsContextMenu"),
     "piano roll selection should expose accessible state, scoped select-all, additive marquee, and selection-preserving context-click behavior",
+  );
+  assert.ok(
+    pianoRollSource.includes("Subdivide notes…")
+      && pianoRollSource.includes("subdivideMidiNotes")
+      && pianoRollCss.includes(".subdivisionPopover")
+      && pianoRollCss.includes(".rowSelected"),
+    "MIDI note selections should expose subdivision and full pitch-row selection affordances",
+  );
+  assert.ok(
+    segmentEditorSource.includes("mergePreviewAutomation")
+      && segmentEditorSource.includes("localizeAutomation(trackAutomation, -currentDraft.startBeat)")
+      && segmentEditorSource.includes("track < segment < note"),
+    "isolated MIDI playback should preserve arrangement automation precedence",
+  );
+  assert.ok(
+    segmentEditorSource.includes('aria-label="Instrument segment automation lanes"')
+      && segmentEditorSource.includes('ariaLabel="Instrument segment automation curve"')
+      && !segmentEditorSource.includes("Aether segment"),
+    "segment automation should use engine-neutral wording",
   );
   assert.ok(
     pianoRollSource.includes("const TOP_PITCH = 127")
@@ -642,6 +697,11 @@ try {
     "cross-track segment drags should show a target-lane landing ghost from the pending move",
   );
   assert.ok(
+    segmentSource.includes('label: "Split Lanes to Tracks"')
+      && segmentSource.includes("splitSegmentToLaneTracks(segment.id)"),
+    "multi-lane drum and drumpad segments should expose their lane-to-track split command",
+  );
+  assert.ok(
     trackDetailsSource.includes("<Knob")
       && trackDetailsSource.includes('label="Output bus"')
       && trackDetailsSource.includes("setTrackOutputBus")
@@ -657,11 +717,11 @@ try {
     "floating select option lists should stack above note-editing popovers",
   );
   assert.ok(
-    appSource.includes("projectWithRenderedMidiArpeggiations")
+    appSource.includes("projectWithCompiledSegmentEvents")
       && midiTransportSource.includes("renderMidiArpeggiations(latest.notes)")
-      && timelineMidiPlaybackSource.includes("renderMidiArpeggiations(payload.notes)")
-      && exportActionsSource.includes("projectWithRenderedMidiArpeggiations"),
-    "realtime native playback, browser playback, bounce, and export should render MIDI arpeggiation modifiers",
+      && timelineMidiPlaybackSource.includes("compileSegmentEvents(seg)")
+      && exportActionsSource.includes("projectWithCompiledSegmentEvents"),
+    "native playback, browser playback, bounce, and export should consume the shared compiled event list",
   );
   assert.ok(
     pianoRollSource.includes("has: (_target, property) => Reflect.has(props.notes, property)")
@@ -776,17 +836,39 @@ try {
     "drum and drumpad segment editors should use exclusive native instrument preview when a project track is available",
   );
   assert.ok(
+    drumSequencerSource.includes("isBeatStart(step, props.speed) ? step + 1")
+      && drumSequencerSource.includes("drumCellCustomizationSummary(cell)")
+      && drumSequencerSource.includes("styles.cellExpressionDot")
+      && !drumSequencerSource.includes("styles.cellLean")
+      && !drumSequencerSource.includes("styles.cellNote")
+      && drumSequencerCss.includes(".cellExpressionDot")
+      && drumSequencerCss.includes(".stepCell:hover .cellVolume")
+      && !drumSequencerCss.includes("0 0 16px"),
+    "drum sequencer cells should keep expression available through one quiet marker instead of persistent pitch, lean, and volume chrome",
+  );
+  assert.ok(
     segmentEditorSource.includes("<AudioSegmentTransport")
       && segmentEditorSource.includes("file={audioFile()}")
       && audioSegmentTransportSource.includes('kind: "engine.previewAudioSegment"')
       && audioSegmentTransportSource.includes('kind: "engine.stopAudioPreview"')
       && audioSegmentTransportSource.includes('kind: "audio.waveform"')
       && audioSegmentTransportSource.includes("prepareExclusivePreview()")
-      && audioSegmentTransportSource.includes("sourceStartBeat() + beat")
+      && audioSegmentTransportSource.includes("sourceStartBeat() + beat * tuneRate")
       && audioSegmentTransportSource.includes("fadeInBeats")
-      && audioSegmentTransportSource.includes("fadeOutBeats"),
-    "audio segments should expose real waveform playback with trim, fades, gain, seeking, and exclusive native routing",
+      && audioSegmentTransportSource.includes("fadeOutBeats")
+      && audioSegmentTransportSource.includes("tunePitch: currentPayload.tunePitch")
+      && segmentEditorSource.includes('label="Tune to"')
+      && segmentEditorSource.includes("AUDIO_TUNE_OPTIONS")
+      && segmentSource.includes("audioTunePitchName")
+      && segmentSource.includes("styles.tuneMarker")
+      && segmentCss.includes(".tuneMarker"),
+    "audio segments should expose waveform playback with trim, fades, gain, tune-to pitch, timeline badge, and exclusive native routing",
   );
+  assert.equal(audioSegmentTuning.audioTunePitchName(60), "C4", "audio tuning should label MIDI 60 as C4");
+  assert.equal(audioSegmentTuning.audioTuneRate(undefined), 1, "untuned audio should preserve original rate");
+  assert.equal(audioSegmentTuning.audioTuneRate(60), 1, "C4 should be the explicit neutral tuning reference");
+  assert.equal(audioSegmentTuning.audioTuneRate(72), 2, "C5 should tune audio one octave above the C4 reference");
+  assert.equal(audioSegmentTuning.audioTuneRate(48), 0.5, "C3 should tune audio one octave below the C4 reference");
   assert.ok(
     drumpadEditorSource.includes("function togglePlayback()")
       && drumpadEditorSource.includes("createInstrumentBufferSource")
@@ -908,9 +990,19 @@ try {
       && themeTokensSource.includes('url("/assets/fonts/almarai-extra-bold.ttf")')
       && !themeTokensSource.includes('"Akzidenz Grotesk Next"')
       && frontendIndexSource.includes('storedTheme === "light" || storedTheme === "mellow"')
+      && frontendIndexSource.includes('request("app.setTheme", { theme: initialTheme })')
       && frontendIndexSource.includes('font-family: Almarai, Arial, Helvetica, sans-serif;')
+      && segmentCss.includes(':global(html[data-theme="light"]) .segment')
+      && segmentCss.includes('--segment-neutral-bg: #ffffff;')
+      && segmentCss.includes('--segment-neutral-fg: #000000;')
+      && ipcSchemaSource.includes('| { kind: "app.setTheme"; theme: "dark" | "light" | "mellow" }')
+      && ipcBackendSchemaSource.includes('APP_SET_THEME       = "app.setTheme"')
+      && mainComponentSource.includes('if (kind == beat::ipc::kind::APP_SET_THEME)')
+      && nativeMainSource.includes('if (normalized == "mellow") return juce::Colour(0xff4a4a4a);')
+      && nativeMainSource.includes('g.fillAll(background);')
+      && nativeMainSource.includes('persistNativeTheme(normalized);')
       && !pianoRollCss.includes("background: #000"),
-    "theme preferences should persist Dark, Light, and Mellow Gray, apply them before render, and use Almarai for all UI text",
+    "theme preferences should persist Dark, Light, and Mellow Gray, apply them before render and to native window chrome, and use Almarai for all UI text",
   );
   {
     const sourceNotes = [
@@ -991,6 +1083,28 @@ try {
     );
   }
   {
+    const subdivided = midiNoteSubdivision.subdivideMidiNotes([
+      {
+        pitch: 60,
+        startBeat: 1,
+        lengthBeats: 2,
+        velocity: 96,
+        curve: [{ beat: 1, pitch: 60 }, { beat: 3, pitch: 64 }],
+        automation: [{ target: "amp.level", points: [{ beat: 1, value: 0.2 }, { beat: 3, value: 0.8 }] }],
+        connectToIndex: 1,
+      },
+      { pitch: 67, startBeat: 3, lengthBeats: 1, velocity: 80 },
+    ], [0], 4);
+    assert.deepEqual(
+      subdivided.notes.slice(0, 4).map((note) => [note.startBeat, note.lengthBeats, note.pitch]),
+      [[1, 0.5, 60], [1.5, 0.5, 60], [2, 0.5, 60], [2.5, 0.5, 60]],
+      "subdivide should preserve the selected note span as equal consecutive notes",
+    );
+    assert.equal(subdivided.notes[3].connectToIndex, 4, "the final subdivision should preserve the source note's outgoing connection");
+    assert.deepEqual(subdivided.selectedIndices, [0, 1, 2, 3], "all new subdivisions should remain selected");
+    assert.equal(subdivided.notes[0].curve[1].pitch, 61, "pitch curves should be interpolated at subdivision boundaries");
+  }
+  {
     const result = midiNoteRounding.roundMidiNotesToNearest([
       {
         pitch: 60,
@@ -1067,17 +1181,20 @@ try {
   );
   assert.ok(
     instrumentsPageSource.includes('label="Category"')
-      && instrumentsPageSource.includes('label="Instrument"')
+      && instrumentsPageSource.includes('label="Subcategory"')
+      && instrumentsPageSource.includes('label="Tags"')
       && instrumentsPageSource.includes("firstInstrumentTaxonomyIdForCategory")
       && instrumentsPageSource.includes("taxonomyAssignmentForInstrumentId")
       && instrumentsPageSource.includes("updateInstrument(activeInstrument()!.id, { taxonomy: instrumentId ? taxonomyAssignmentForInstrumentId(instrumentId) : undefined })")
       && instrumentsPageSource.includes("updateInstrument(activeInstrument()!.id, { taxonomy: value ? taxonomyAssignmentForInstrumentId(value) : undefined })"),
-    "instrument organizer preview should expose editable category and instrument taxonomy before advanced details",
+    "instrument organizer preview should expose editable category, subcategory, and tags before advanced details",
   );
   assert.ok(
-    instrumentEditorSource.includes('label="Structure"')
+    instrumentEditorSource.includes('label="Taxonomy Category"')
+      && instrumentEditorSource.includes('label="Subcategory"')
+      && instrumentEditorSource.includes('label="Tags"')
       && instrumentEditorSource.includes("setDraft({ ...currentDraft(), taxonomy: nextTaxonomy })"),
-    "instrument creation/editor modal should expose the same library structure selector",
+    "instrument creation/editor modal should expose the same library taxonomy controls",
   );
   assert.ok(
     trackHeaderSource.includes('data-meter-channel="left"') && trackHeaderSource.includes('data-meter-channel="right"'),
@@ -1114,7 +1231,7 @@ try {
     segmentEditorSource.includes("lengthBeats={payload().sourceLengthBeats ?? payload().stepCount}")
       && segmentEditorSource.includes("sourceLengthBeats: nextLength")
       && segmentSource.includes('liveSeg()?.payload.kind === "drum" && newLen < currentDrag.startLen')
-      && timelineMidiPlaybackSource.includes("segment.payload.sourceLengthBeats ?? segment.payload.stepCount")
+      && segmentEventCompilerSource.includes("segment.payload.sourceLengthBeats ?? segment.payload.stepCount")
       && ipcBackendBridgeSource.includes('payload.getProperty("sourceLengthBeats", stepCount)'),
     "drum audition and native playback should preserve source-grid timing while either trim handle clips only the segment end",
   );
@@ -1223,9 +1340,12 @@ try {
   );
   assert.ok(
     homeHubSource.includes("onContextMenu={menu.onContextMenu}")
-      && homeHubSource.includes("onMouseDown={openMenuFromSecondaryMouseDown}")
-      && homeHubSource.includes("event.button !== 2")
-      && homeHubSource.includes("event.button === 0 && event.ctrlKey")
+      && homeHubSource.includes("onMouseDown={menu.onMouseDown}")
+      && homeHubSource.includes("onKeyDown={menu.onKeyDown}")
+      && contextMenuSource.includes("event.button !== 2")
+      && contextMenuSource.includes("event.button === 0 && event.ctrlKey")
+      && contextMenuSource.includes('event.key !== "ContextMenu"')
+      && contextMenuSource.includes('event.key === "F10" && event.shiftKey')
       && homeHubSource.includes('label: "Reveal in Finder"')
       && homeHubSource.includes('label: "Duplicate Project"')
       && homeHubSource.includes('label: "Remove from Recent"')
@@ -1237,6 +1357,17 @@ try {
       && ipcBackendBridgeSource.includes("relocateDocumentSidecarPaths(document, source, destination)")
       && ipcBackendBridgeSource.includes("projectRepo.recordRecentProject(destination, document)"),
     "recent project cards should expose reveal, safe independent duplication, and removal through the shared context menu",
+  );
+  assert.ok(
+    audioFileLibrarySource.includes('label: "New Audio Track"')
+      && audioFileLibrarySource.includes('kind: "audio"')
+      && audioFileLibrarySource.includes('payload: { kind: "audio", audioFileId: file.id, gainDb: 0 }')
+      && componentLibrarySource.includes('label: "New Track"')
+      && componentLibrarySource.includes('payload: { kind: "midi", notes: structuredClone(component.notes) }')
+      && componentLibrarySource.includes('kind: "drum"')
+      && instrumentLibrarySource.includes("onMouseDown={menu.onMouseDown}")
+      && trackLaneSource.includes("menu.onMouseDown(event)"),
+    "asset rows and timeline targets should expose native-compatible context menus and create correctly typed tracks",
   );
   assert.ok(
     trackEffectRowsSource.includes("Unsupported effect (${kind || \"unknown\"})")
@@ -1267,13 +1398,25 @@ try {
     "arrangement marquee should not start from an FX point and should select FX points when drawn across their lane",
   );
   assert.ok(
-    segmentLoopControlSource.includes("<Toggle")
-      && segmentLoopControlSource.includes('aria-label="Enable segment looping"')
+    segmentLoopControlSource.includes("<Button")
+      && segmentLoopControlSource.includes('aria-label="Loop segment"')
+      && segmentLoopControlSource.includes("aria-pressed={enabled()}")
       && segmentLoopControlSource.includes('label="Repeats"')
       && segmentLoopControlSource.includes("disabled={!enabled()}")
-      && segmentLoopControlSource.includes("next ? Math.max(1")
-      && segmentLoopControlSource.includes(": 0"),
-    "segment editors should expose an explicit loop switch and an enabled-only additional-repeat count",
+      && segmentLoopControlSource.includes("enabled() ? 0 : Math.max(1")
+      && segmentEditorSource.includes("styles.segmentHeaderRow")
+      && segmentEditorSource.indexOf("<SegmentLoopControl") < segmentEditorSource.indexOf('label="Name"')
+      && segmentEditorSource.indexOf('label="Name"') < segmentEditorSource.indexOf('label="Instrument"'),
+    "the MIDI header should keep Loop, Repeats, Name, color, and Instrument in one compact row",
+  );
+  assert.ok(
+    pianoRollSource.includes("onMount(() => {")
+      && pianoRollSource.includes("startLengthBeats: Number(lengthBeats)")
+      && pianoRollSource.includes("aria-pressed={toolMode() === \"select\"}")
+      && pianoRollCss.includes(':global(html[data-theme="light"]) .noteSelected')
+      && pianoRollCss.includes(':global(html[data-theme="light"]) .selectBox')
+      && pianoRollCss.includes(':global(html[data-theme="light"]) .toolButtonActive'),
+    "MIDI edits should preserve the current viewport, resize from a fixed pointer-down length, and expose unmistakable Light-mode selection",
   );
   assert.ok(
     numberInputSource.indexOf("const raw = event.currentTarget.value")
@@ -1289,8 +1432,10 @@ try {
       && trackListSource.includes("onScroll={(event) => setHorizontalScrollLeft(event.currentTarget.scrollLeft)}")
       && timelineSource.includes("props.scrollLeft")
       && /\.timelineDock\s*\{[^}]*position:\s*sticky;[^}]*top:\s*0;/s.test(trackListCss)
+      && /\.laneWrap\s*\{[^}]*display:\s*flex;[^}]*flex-direction:\s*column;[^}]*min-height:\s*100%;/s.test(trackListCss)
+      && /\.laneScroll\s*\{[^}]*overflow-x:\s*auto;[^}]*overflow-y:\s*hidden;[^}]*flex:\s*1 0 auto;/s.test(trackListCss)
       && /\.zoomFloat\s*\{[^}]*position:\s*absolute;[^}]*top:\s*var\(--space-3\);/s.test(trackListCss),
-    "the timeline ruler and zoom controls should remain fixed at the top while track rows scroll",
+    "the timeline ruler and zoom controls should remain fixed at the top while the lane viewport fills the track area and keeps its scrollbar at the bottom",
   );
   assert.ok(
     knobSource.includes('activePointerId = event.pointerId')
@@ -2142,16 +2287,19 @@ try {
     "browser fixture automation drag coverage should include non-macro direct Aether target lanes",
   );
   assert.ok(
-    editorHostSource.includes("Instrument - Aether Engine")
+    !editorHostSource.includes("Instrument - Aether Engine")
+      && editorHostSource.includes('case "synth":\n              return null;')
+      && editorHostSource.includes("isLegacyAetherInstrument(currentInstrument)")
+      && editorHostSource.includes("Instrument - Lumen Engine")
       && synthEditorSource.includes('`${props.instrumentName} output preview`')
-      && synthEditorSource.includes('instrumentName={draft().instrumentType === "lumen-hybrid-synth" ? "Lumen" : "Aether"}')
+      && synthEditorSource.includes('instrumentName={draft().instrumentType === "lumen-hybrid-synth" ? "Lumen" : "Legacy Synth"}')
       && synthEditorSource.includes('label="Name"')
       && synthEditorSource.includes('label="Category"')
       && synthEditorSource.includes('label="Instrument"')
       && synthEditorSource.includes("expressionSummaryInfo")
-      && synthEditorSource.includes('aria-label="Aether expression and performance summary"')
+      && synthEditorSource.includes('aria-label="Instrument expression and performance summary"')
       && !synthEditorSource.includes('aria-label="Change instrument icon"'),
-    "Aether Synth Editor should expose instrument details, taxonomy, preview, and expression summary for browser coverage",
+    "Lumen should remain the exposed synth editor while legacy Aether editor routes fail closed",
   );
   assert.ok(
     synthEditorSource.includes('aria-label="LFO"')
@@ -2159,7 +2307,7 @@ try {
       && synthEditorSource.includes('ariaLabel={`LFO ${props.lfo} Sync Rate`}')
       && synthEditorSource.includes('label="Smooth"')
       && synthEditorSource.includes('label="Random"'),
-    "Aether Synth Editor should expose LFO shape, sync-rate, and smoothing/random controls for browser coverage",
+    "Lumen Synth Editor should expose LFO shape, sync-rate, and smoothing/random controls for browser coverage",
   );
   assert.ok(
     devHooksSource.includes("exerciseAetherLfoEditorFlow")
@@ -2188,9 +2336,9 @@ try {
     "browser fixture coverage should exercise Aether oscillator, disabled-row, and voice-stack editing",
   );
   assert.ok(
-    synthEditorSource.includes('"Lumen instrument effects" : "Aether instrument effects"')
+    synthEditorSource.includes('aria-label={`${instrumentName()} instrument effects`}')
       && synthEditorSource.includes('aria-label="Add instrument effect"')
-      && synthEditorSource.includes('"Current Lumen FX chain" : "Current Aether FX chain"')
+      && synthEditorSource.includes('aria-label={`Current ${instrumentName()} FX chain`}')
       && synthEditorSource.includes("Drag ${EFFECT_LABELS[effect().kind]} to reorder")
       && synthEditorSource.includes("Bypass")
       && synthEditorSource.includes("Remove ${EFFECT_LABELS[effect().kind]}"),
@@ -2243,7 +2391,7 @@ try {
 	      && synthEditorSource.includes('draft().parameters[sampleParameterId("loop.enabled")] === true')
 	      && synthEditorSource.includes('sampleParameterId("loop.start")')
 	      && synthEditorSource.includes('sampleParameterId("loop.end")')
-      && synthEditorSource.includes('aria-label="Aether Sample Slot 1 mapped zones"')
+      && synthEditorSource.includes('aria-label={`${sampleSlotLabel()} mapped zones`}')
       && synthEditorSource.includes("Create Key Map")
       && synthEditorSource.includes('label="Key Low"')
       && synthEditorSource.includes('label="Key High"')
@@ -2259,7 +2407,7 @@ try {
       && synthEditorSource.includes('sampleParameterId("fxSend2")')
       && synthEditorSource.includes("overlaps crossfade")
       && synthEditorSource.includes("zones.slice(0, 8)"),
-    "Aether Sample Slot 1 should expose bounded mapped-zone selection and per-zone playback controls",
+    "Lumen sample sources should expose bounded mapped-zone selection and per-zone playback controls",
   );
   assert.ok(
     synthEditorSource.includes('aria-labelledby="aether-sample-slot-1-title"')
@@ -2268,13 +2416,13 @@ try {
       && synthEditorSource.includes('aria-describedby="aether-sample-slot-1-source-status"')
       && synthEditorSource.includes('aria-labelledby="aether-granular-slot-2-title"')
       && synthEditorSource.includes('id="aether-granular-slot-2-source-status"')
-      && synthEditorSource.includes('isLumen() ? `Enable Source ${activeLumenSampleSlot().toUpperCase()} granular` : "Enable Aether granular slot 2"')
+      && synthEditorSource.includes('isLumen() ? `Enable Source ${activeLumenSampleSlot().toUpperCase()} granular` : "Enable legacy granular slot 2"')
       && synthEditorSource.includes('aria-describedby="aether-granular-slot-2-source-status"')
       && synthEditorSource.includes('aria-busy={importingSfz()}')
       && synthEditorSource.includes('aria-busy={importingGranular()}')
       && synthEditorSource.includes('queueMicrotask(() => sampleImportButton?.focus())')
       && synthEditorSource.includes('queueMicrotask(() => granularImportButton?.focus())'),
-    "Aether Slot 1/2 controls should expose source state, disabled reasons, busy state, and deterministic focus restoration",
+    "Lumen source controls should expose source state, disabled reasons, busy state, and deterministic focus restoration",
   );
   assert.ok(
     floatingSelectSource.includes('event.key === "Escape"')
@@ -2287,13 +2435,13 @@ try {
     "shared source selectors and switches should preserve keyboard focus and expose disabled context",
   );
   assert.ok(
-    synthEditorSource.includes('aria-label="Aether MPE member zone"')
-      && synthEditorSource.includes('aria-label="Enable Aether MPE member zone"')
+    synthEditorSource.includes('aria-label="Instrument MPE member zone"')
+      && synthEditorSource.includes('aria-label="Enable instrument MPE member zone"')
       && synthEditorSource.includes('ariaLabel="MPE manager channel"')
       && synthEditorSource.includes('ariaLabel="First MPE member channel"')
       && synthEditorSource.includes('ariaLabel="Last MPE member channel"')
       && synthEditorSource.includes('setBooleanParameter("aether.mpe.enabled", false)'),
-    "Aether Synth Editor should expose validated saved MPE zone controls",
+    "Lumen Synth Editor should expose validated saved MPE zone controls",
   );
   assert.ok(
     oscillatorPanelSource.includes('ariaLabel={`${props.oscillator.toUpperCase()} tuning mode`}')
@@ -2307,17 +2455,18 @@ try {
   );
   assert.ok(
     synthEditorSource.includes("Import Preset")
-      && editorHostSource.includes("Instrument Details - Aether Engine")
+      && editorHostSource.includes("Instrument - Lumen Engine")
+      && synthEditorSource.includes("cloneAetherDraftAsLumen(preset.patch, preset.name)")
       && synthEditorSource.includes("onAudition")
       && synthEditorSource.includes("onSaveInstrument"),
-    "browser fixture coverage should track current Aether import, audition, and save controls",
+    "browser fixture coverage should track current Lumen import, audition, and save controls",
   );
   assert.ok(
     synthEditorSource.includes("Cancel")
       && synthEditorSource.includes("Save")
       && synthEditorSource.includes("className={styles.footerButton}")
       && synthEditorSource.includes("variant=\"primary\""),
-    "Aether Synth Editor should expose current footer cancel/save actions",
+    "Lumen Synth Editor should expose current footer cancel/save actions",
   );
   const movedTrackPoint = arrangementAutomation.updateTrackAutomationPoint(insertedTrackPoint, "filter.cutoff", 64, 1, 48, 0.74);
   assert.deepEqual(

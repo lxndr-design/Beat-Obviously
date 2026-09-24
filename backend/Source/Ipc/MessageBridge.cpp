@@ -697,6 +697,8 @@ namespace beat
             payload->setProperty("kind", "audio");
             payload->setProperty("audioFileId", segment.audioFileId);
             payload->setProperty("gainDb", segment.audioGainDb);
+            if (segment.audioTunePitch >= 0)
+                payload->setProperty("tunePitch", segment.audioTunePitch);
 
             juce::DynamicObject::Ptr object = new juce::DynamicObject();
             object->setProperty("id", segment.id);
@@ -2472,6 +2474,8 @@ namespace beat
                                 s.kind = parseSegmentKind(payload.getProperty("kind", "midi"));
                                 s.audioFileId = payload.getProperty("audioFileId", "").toString();
                                 s.audioGainDb = (float) (double) payload.getProperty("gainDb", 0.0);
+                                const int tunePitch = (int) payload.getProperty("tunePitch", -1);
+                                s.audioTunePitch = tunePitch < 0 ? -1 : juce::jlimit(0, 127, tunePitch);
                                 if (s.kind == SegmentPayloadKind::Drum)
                                 {
                                     const int stepCount = juce::jmax(1, (int) payload.getProperty("stepCount", 16));
@@ -2533,7 +2537,9 @@ namespace beat
                                     {
                                         if (!noteVar.isObject()) continue;
                                         MidiNote n;
-                                        n.instrumentId = s.instrumentId.isNotEmpty() ? s.instrumentId : t.instrumentId;
+                                        n.instrumentId = noteVar.getProperty(
+                                            "instrumentId",
+                                            s.instrumentId.isNotEmpty() ? s.instrumentId : t.instrumentId).toString();
                                         n.pitch = juce::jlimit(0, 127, (int) noteVar.getProperty("pitch", 60) + transpose);
                                         n.velocity = juce::jlimit(0, 127, (int) noteVar.getProperty("velocity", 100));
                                         n.startBeat = (double) noteVar.getProperty("startBeat", 0.0);
@@ -3711,7 +3717,8 @@ namespace beat
                 (double) payload.getProperty("lengthBeats", 0.0),
                 (double) payload.getProperty("fadeInBeats", 0.0),
                 (double) payload.getProperty("fadeOutBeats", 0.0),
-                (float) (double) payload.getProperty("gainDb", 0.0)));
+                (float) (double) payload.getProperty("gainDb", 0.0),
+                (int) payload.getProperty("tunePitch", -1)));
         }
 
         if (kind == ENGINE_STOP_AUDIO_PREVIEW)

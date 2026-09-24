@@ -24,6 +24,13 @@
   font-size: var(--font-size-ui);
 }
 
+.sourceTitle {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  gap: 3px;
+}
+
 .sourceIdentity strong {
   overflow: hidden;
   text-overflow: ellipsis;

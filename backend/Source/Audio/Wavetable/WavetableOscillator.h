@@ -27,8 +27,11 @@ namespace beat
     private:
         struct PlaybackCache
         {
-            bool dirty { true };
+            bool mipDirty { true };
+            bool positionDirty { true };
             int frameSize { 0 };
+            int mip0 { 0 };
+            int mip1 { 0 };
             const float* frame0Mip0Data { nullptr };
             const float* frame1Mip0Data { nullptr };
             const float* frame0Mip1Data { nullptr };
@@ -37,8 +40,21 @@ namespace beat
             float mipFrac { 0.0f };
         };
 
-        void markFrameCacheDirty() noexcept { currentCache.dirty = true; previousCache.dirty = true; }
-        void updateFrameCache(const Wavetable* source, PlaybackCache& cache) noexcept;
+        void markFrameCacheDirty() noexcept
+        {
+            currentCache.mipDirty = currentCache.positionDirty = true;
+            previousCache.mipDirty = previousCache.positionDirty = true;
+        }
+        void markMipCacheDirty() noexcept
+        {
+            currentCache.mipDirty = previousCache.mipDirty = true;
+        }
+        void markPositionCacheDirty() noexcept
+        {
+            currentCache.positionDirty = previousCache.positionDirty = true;
+        }
+        void updateMipCache(const Wavetable* source, PlaybackCache& cache) noexcept;
+        void updatePositionCache(const Wavetable* source, PlaybackCache& cache) noexcept;
         float readCurrentSample(const Wavetable* source, PlaybackCache& cache) noexcept;
 
         const Wavetable* table { nullptr };

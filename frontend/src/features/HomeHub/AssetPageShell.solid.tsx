@@ -1,5 +1,5 @@
 import { Show, type JSX } from "solid-js";
-import { Icon, LoadingIndicator } from "../../solid-ui";
+import { Icon, LoadingIndicator, RibbonHelp, type RibbonHelpPage } from "../../solid-ui";
 import styles from "./AssetPageShell.module.css";
 
 type AssetPageVariant = "balanced" | "wide-browser" | "instrument";
@@ -35,10 +35,15 @@ export function AssetPageShell(props: AssetPageShellProps) {
   );
 }
 
-export function AssetBrowserRibbon(props: { label: string; count?: number }) {
+export function AssetBrowserRibbon(props: { label: string; count?: number; help?: RibbonHelpPage[] }) {
   return (
     <div class={styles.browserRibbon}>
-      <span>{props.label}</span>
+      <span class={styles.browserRibbonTitle}>
+        <span>{props.label}</span>
+        <Show when={props.help?.length}>
+          <RibbonHelp label={props.label} pages={props.help ?? []} />
+        </Show>
+      </span>
       <Show when={typeof props.count === "number"}>
         <strong>{props.count}</strong>
       </Show>

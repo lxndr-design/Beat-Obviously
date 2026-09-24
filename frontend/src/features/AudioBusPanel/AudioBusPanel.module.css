@@ -3,6 +3,7 @@
   --bus-parameter-column-min: calc(var(--space-10) * 5 + var(--space-8));
   --bus-insert-column-min: calc(var(--space-10) * 13);
   --bus-output-column-min: calc(var(--space-10) * 7 + var(--space-6));
+  --bus-send-column-min: calc(var(--space-10) * 8);
   --bus-master-insert-column-min: calc(var(--space-10) * 18);
   display: flex;
   min-height: 0;
@@ -110,7 +111,7 @@
   display: grid;
   min-height: 0;
   flex: 1 1 auto;
-  grid-template-columns: minmax(var(--bus-input-column-min), 0.72fr) minmax(var(--bus-parameter-column-min), 0.62fr) minmax(var(--bus-insert-column-min), 1.75fr) minmax(var(--bus-output-column-min), 0.85fr);
+  grid-template-columns: minmax(var(--bus-input-column-min), 0.72fr) minmax(var(--bus-parameter-column-min), 0.62fr) minmax(var(--bus-insert-column-min), 1.75fr) minmax(var(--bus-output-column-min), 0.85fr) minmax(var(--bus-send-column-min), 0.95fr);
   align-items: stretch;
   overflow: auto;
 }
@@ -118,7 +119,8 @@
 .inputSection,
 .parametersSection,
 .insertSection,
-.outputSection {
+.outputSection,
+.sendSection {
   display: flex;
   min-width: 0;
   min-height: 0;
@@ -139,20 +141,11 @@
 }
 
 .outputSection {
-  gap: var(--space-2);
-  border-right: 0;
   padding-bottom: var(--space-2);
 }
 
-.sectionMeta {
-  display: block;
-  max-width: calc(var(--space-10) * 5);
-  overflow: hidden;
-  padding: 0 var(--space-2);
-  opacity: var(--structural-muted-opacity);
-  font-size: var(--font-size-hint);
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.sendSection {
+  border-right: 0;
 }
 
 .inputRows,
@@ -167,9 +160,24 @@
 .inputRow {
   --row-height: var(--height-topbar);
   --row-icon-track: 0;
-  --row-action-width: var(--height-track-row-compact);
+  --row-action-width: calc(var(--height-track-row-compact) + var(--space-10) * 2);
   --row-padding-inline-start: var(--space-2);
   --row-padding-inline-end: 0;
+}
+
+.inputActions {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.inputRemove.inputRemove {
+  height: 100%;
+  min-height: 100%;
+  border-left: var(--border-fg);
+  border-radius: 0;
 }
 
 .inputLevelKnob {
@@ -313,14 +321,16 @@
   padding: var(--space-2);
 }
 
-.outputSection > :not(.sectionTitle, .sendHeader, .sendRows, .outputMeter) {
-  margin-inline: var(--space-2);
+.outputControls {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-2);
 }
 
 .outputMeter {
   display: grid;
   gap: var(--space-1);
-  margin: 0 var(--space-2);
 }
 
 .meterLane {
@@ -339,11 +349,6 @@
   transform: scaleX(0);
   transform-origin: left center;
   transition: transform var(--duration-hover) var(--ease-linear);
-}
-
-.sendHeader {
-  min-height: var(--sidebar-rail-size);
-  border-block: var(--border-fg);
 }
 
 .sendRow {

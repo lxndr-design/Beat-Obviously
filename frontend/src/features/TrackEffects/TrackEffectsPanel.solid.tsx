@@ -1,6 +1,6 @@
 import { createEffect, createMemo, createSignal, For, onCleanup, Show, type JSX } from "solid-js";
 import { Portal } from "solid-js/web";
-import { Button, HoverInfo, Icon, NumberInput, Toggle } from "../../solid-ui";
+import { Button, HoverInfo, Icon, NumberInput, RIBBON_HELP, RibbonHelp, Toggle } from "../../solid-ui";
 import { useProjectStore, useUiStore } from "../../state/store";
 import { createStoreSelector } from "../../solid-utils/store";
 import { createTrackEffect, EFFECT_DEFAULT_PARAMS, EFFECT_LABELS, EFFECT_OPTIONS, EFFECT_PARAM_SPECS, type EffectKind } from "../../state/effects";
@@ -125,7 +125,10 @@ export function TrackEffectsPanel() {
             onPointerCancel={endDrag}
           >
             <div class={styles.titleBlock}>
-              <h2 class={styles.title}>Effects / Filters</h2>
+              <span class={styles.titleRow}>
+                <h2 class={styles.title}>Effects / Filters</h2>
+                <RibbonHelp label="Effects and Filters" pages={RIBBON_HELP.trackEffects} />
+              </span>
               <span class={styles.trackName}>{currentTrack().name}</span>
               <div class={styles.filterDots} aria-label={`${effects().length} filter${effects().length === 1 ? "" : "s"}`}>
                 <For each={effects()}>

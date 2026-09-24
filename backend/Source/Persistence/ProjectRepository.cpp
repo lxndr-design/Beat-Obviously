@@ -1535,6 +1535,8 @@ namespace beat
                 so->setProperty("kind",        (int) s.kind);
                 so->setProperty("audioFileId", s.audioFileId);
                 so->setProperty("audioGainDb", s.audioGainDb);
+                if (s.audioTunePitch >= 0)
+                    so->setProperty("audioTunePitch", s.audioTunePitch);
 
                 juce::Array<juce::var> notesArr;
                 for (const auto& n : s.notes)
@@ -2299,6 +2301,8 @@ namespace beat
                             s.kind        = (SegmentPayloadKind) (int) sv.getProperty("kind", 1);
                             s.audioFileId = sv.getProperty("audioFileId", "").toString();
                             s.audioGainDb = (float) (double) sv.getProperty("audioGainDb", 0.0);
+                            const int tunePitch = (int) sv.getProperty("audioTunePitch", -1);
+                            s.audioTunePitch = tunePitch < 0 ? -1 : juce::jlimit(0, 127, tunePitch);
 
                             if (auto* notes = sv.getProperty("notes", {}).getArray())
                             {

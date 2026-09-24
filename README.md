@@ -49,24 +49,27 @@ Prerequisites: CMake ≥ 3.22, Xcode 15+, Node ≥ 20, JUCE 8 (fetched automatic
 # Frontend dev (live-reload while building UI in isolation)
 cd frontend && npm install && npm run dev
 
-# Full app build
-cmake -B build-native -G Xcode
-cmake --build build-native --config Release
-
-# Package/register the canonical repo-root launcher
+# Full app build and installation
 ./scripts/package-macos.sh
-open ./Beat.app
+
+# Launch the installed app
+open "$HOME/Applications/Beat.app"
 
 # Or register an already-packaged root app for .beat files
-./scripts/register-current-beat-app.sh ./Beat.app
+./scripts/register-current-beat-app.sh "$HOME/Applications/Beat.app"
 ```
 
-`build-native/backend/Beat_artefacts/Release/Beat.app` is the CMake/JUCE build artifact.
-Use the repo-root `Beat.app` as the manual launcher and LaunchServices-registered app.
+Packaging stages npm, Vite, CMake, and JUCE output outside the repository and
+installs the app at `~/Applications/Beat.app`. Override the destinations with
+`BEAT_BUILD_DIR` and `BEAT_APP_OUTPUT_PATH` when needed.
 
 In dev mode, set `BEAT_DEV_FRONTEND_URL=http://localhost:6174` before launching the app to point the embedded webview at the Vite dev server. On startup, the native app checks that the configured port is actually serving the Beat frontend before loading it, adds a launch cache-buster, and refreshes the dev webview once to avoid stale startup documents. If the dev URL is unavailable or occupied by the wrong server, a bundled frontend build is used when present.
 
-In production builds, `frontend/dist/` is copied into `Beat.app/Contents/Resources/frontend` and served by JUCE's `WebBrowserComponent::Options::withResourceProvider()`. The native menu sends commands into the Solid UI through the JUCE native bridge exposed as `window.__BEAT_NATIVE__`.
+In production packaging, the externally staged frontend `dist/` is copied into
+`Beat.app/Contents/Resources/frontend` and served by JUCE's
+`WebBrowserComponent::Options::withResourceProvider()`. The native menu sends
+commands into the Solid UI through the JUCE native bridge exposed as
+`window.__BEAT_NATIVE__`.
 
 Optional local ML tools are installed separately from the app build:
 

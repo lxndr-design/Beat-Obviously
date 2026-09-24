@@ -605,14 +605,14 @@ namespace beat
                 filterState.updateResonanceIfChanged(params.resonance01, 0.001f);
                 break;
             }
-            case RealtimeParam::FilterDrive:
-            case RealtimeParam::AmpLevel:
-            case RealtimeParam::OscAPosition:
-            case RealtimeParam::OscBPosition:
             case RealtimeParam::OscAFine:
             case RealtimeParam::OscBFine:
                 refreshCachedPitchRates();
                 break;
+            case RealtimeParam::FilterDrive:
+            case RealtimeParam::AmpLevel:
+            case RealtimeParam::OscAPosition:
+            case RealtimeParam::OscBPosition:
             case RealtimeParam::OscALevel:
             case RealtimeParam::OscBLevel:
             case RealtimeParam::UnisonDetune:

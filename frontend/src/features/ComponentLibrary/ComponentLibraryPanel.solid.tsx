@@ -1,5 +1,5 @@
 import { createSignal, For, onCleanup, Show } from "solid-js";
-import { Icon, LibraryFolder, LibrarySearch, RowActionButton, RowItem, SectionRibbon, SectionRibbonActionButton, createContextMenu, type ContextMenuItem } from "../../solid-ui";
+import { Icon, LibraryFolder, LibrarySearch, RIBBON_HELP, RowActionButton, RowItem, SectionRibbon, SectionRibbonActionButton, createContextMenu, type ContextMenuItem } from "../../solid-ui";
 import { appPrompt } from "../../solid-ui";
 import { createInstrumentBufferSource, noteFrequency, preloadInstrumentSample } from "../../audio/synthPreview";
 import { registerGlobalAudioStop } from "../../audio/globalAudioSafety";
@@ -18,7 +18,7 @@ import {
   type BeatComponent,
   type ComponentFolder,
 } from "../../state/components";
-import { useInstrumentStore, useProjectStore, useUiStore } from "../../state/store";
+import { runProjectHistoryGroup, useInstrumentStore, useProjectStore, useUiStore } from "../../state/store";
 import type { Instrument, MidiNote } from "../../state/types";
 import { createStoreSelector } from "../../solid-utils/store";
 import styles from "./ComponentLibraryPanel.module.css";
@@ -78,9 +78,10 @@ export function ComponentLibraryPanel(props: ComponentLibraryPanelProps) {
   }
 
   return (
-    <div class={styles.panel} onContextMenu={addMenu.onContextMenu}>
+    <div class={styles.panel} onMouseDown={addMenu.onMouseDown} onContextMenu={addMenu.onContextMenu}>
       <SectionRibbon
         title="Components"
+        help={RIBBON_HELP.components}
         expanded={props.expanded}
         onToggle={props.onToggle}
         showToggle={false}
@@ -152,6 +153,7 @@ export function ComponentLibraryPanel(props: ComponentLibraryPanelProps) {
                         : component.notes.length}
                       playing={playingId() === component.id}
                       onTogglePreview={() => togglePreview(component)}
+                      onNewTrack={() => createTrackForComponent(component)}
                       onMoveBefore={(componentId) => useComponentStore.getState().moveToFolder(componentId, folder.id, component.id)}
                     />
                   )}
@@ -165,6 +167,39 @@ export function ComponentLibraryPanel(props: ComponentLibraryPanelProps) {
       {addMenu.menu()}
     </div>
   );
+
+  function createTrackForComponent(component: BeatComponent) {
+    let segmentId = "";
+    runProjectHistoryGroup(() => {
+      const projectStore = useProjectStore.getState();
+      const trackId = projectStore.addTrack({ name: component.name, kind: "midi" });
+      if (component.kind === "drum") {
+        segmentId = projectStore.addSegment(trackId, {
+          name: component.name,
+          startBeat: 0,
+          lengthBeats: drumPlaybackDurationBeats(component.lengthBeats, component.speed),
+          payload: {
+            kind: "drum",
+            rows: structuredClone(component.rows),
+            stepCount: component.stepCount,
+            speed: component.speed,
+            sourceLengthBeats: component.lengthBeats,
+            defaultPitchHz: component.defaultPitchHz,
+            swingPercent: component.swingPercent,
+            timeSignature: component.timeSignature,
+          },
+        });
+      } else {
+        segmentId = projectStore.addSegment(trackId, {
+          name: component.name,
+          startBeat: 0,
+          lengthBeats: component.lengthBeats,
+          payload: { kind: "midi", notes: structuredClone(component.notes) },
+        });
+      }
+    });
+    if (segmentId) useUiStore.getState().setSelectedSegments([segmentId]);
+  }
 }
 
 interface ItemProps {
@@ -172,11 +207,17 @@ interface ItemProps {
   itemCount: number;
   playing: boolean;
   onTogglePreview: () => void;
+  onNewTrack: () => void;
   onMoveBefore: (componentId: string) => void;
 }
 
 function ComponentItem(props: ItemProps) {
   const menu = createContextMenu((): ContextMenuItem[] => [
+    {
+      label: "New Track",
+      icon: "ph:plus",
+      onSelect: props.onNewTrack,
+    },
     {
       label: "Edit",
       icon: "ph:pencil-line",
@@ -231,7 +272,10 @@ function ComponentItem(props: ItemProps) {
       onDragStart={onDragStart}
       onDragOver={onDragOver}
       onDrop={onDrop}
+      tabIndex={0}
+      onMouseDown={menu.onMouseDown}
       onContextMenu={menu.onContextMenu}
+      onKeyDown={menu.onKeyDown}
       title={`${props.itemCount} ${kind() === "drum" ? "hit" : "note"}${props.itemCount === 1 ? "" : "s"} · ${componentPlaybackLength(props.component)} beats`}
       icon={kind() === "drum" ? <span class={styles.drumIcon} aria-hidden /> : <Icon name="ph:piano-keys" size={18} decorative />}
       hoverIcon={<Icon name="ph:dots-six-vertical" size={18} decorative />}

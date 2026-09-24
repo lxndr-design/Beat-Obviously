@@ -18,6 +18,7 @@ target_sources(Beat PRIVATE
     Source/Main.cpp
     Source/MainComponent.cpp
     Source/MainComponent.h
+    Source/NativeWindowStyle.h
 
     Source/Audio/AudioEngine.cpp
     Source/Audio/AudioEngine.h
@@ -146,6 +147,10 @@ target_sources(Beat PRIVATE
     Source/Score/PdfPageRenderer.h
 )
 
+if(APPLE)
+    target_sources(Beat PRIVATE Source/NativeWindowStyle.mm)
+endif()
+
 target_compile_definitions(Beat PRIVATE
     JUCE_WEB_BROWSER=1
     JUCE_MODAL_LOOPS_PERMITTED=1
@@ -155,7 +160,7 @@ target_compile_definitions(Beat PRIVATE
 )
 
 if(APPLE)
-    target_link_libraries(Beat PRIVATE "-framework CoreGraphics" "-framework ImageIO")
+    target_link_libraries(Beat PRIVATE "-framework CoreGraphics" "-framework ImageIO" "-framework QuartzCore")
     add_custom_command(TARGET Beat POST_BUILD
         COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/../scripts/register-beat-document-type.sh"
                 "$<TARGET_BUNDLE_DIR:Beat>/Contents/Info.plist"

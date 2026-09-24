@@ -1,6 +1,7 @@
 import { createSignal, For, Show } from "solid-js";
 import { Button, Modal } from "../../solid-ui";
 import { useInstrumentStore, useUiStore } from "../../state/store";
+import { userAccessibleInstruments } from "../../state/instrumentAccess";
 import type { Id } from "../../state/types";
 import { createStoreSelector } from "../../solid-utils/store";
 import { editorRequestForInstrument } from "../InstrumentEditor/instrumentEditorRouting";
@@ -15,7 +16,7 @@ export function MergeInstrumentModal(props: Props) {
   const instruments = createStoreSelector(useInstrumentStore, (s) => s.instruments);
   const [pickedId, setPickedId] = createSignal<Id | null>(null);
   const source = () => instruments().find((instrument) => instrument.id === props.sourceId);
-  const others = () => instruments().filter((instrument) => instrument.id !== props.sourceId);
+  const others = () => userAccessibleInstruments(instruments()).filter((instrument) => instrument.id !== props.sourceId);
 
   function confirm() {
     const picked = pickedId();
@@ -23,7 +24,10 @@ export function MergeInstrumentModal(props: Props) {
     const id = useInstrumentStore.getState().mergeInstruments(props.sourceId, picked);
     if (id) {
       const instrument = useInstrumentStore.getState().instruments.find((candidate) => candidate.id === id);
-      if (instrument) useUiStore.getState().openEditor(editorRequestForInstrument(instrument));
+      if (instrument) {
+        const request = editorRequestForInstrument(instrument);
+        if (request) useUiStore.getState().openEditor(request);
+      }
     }
     props.onClose();
   }

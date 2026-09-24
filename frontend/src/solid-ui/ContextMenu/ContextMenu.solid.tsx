@@ -26,13 +26,24 @@ let nextContextMenuOwnerId = 1;
 export function createContextMenu(itemsFactory: () => ContextMenuItem[]) {
   const [state, setState] = createSignal<MenuState | null>(null, { equals: false });
   const ownerId = nextContextMenuOwnerId++;
+  let secondaryOpenTimer: number | undefined;
+  let fallbackOpen: { x: number; y: number; at: number } | undefined;
+
+  function clearSecondaryOpenTimer() {
+    if (secondaryOpenTimer === undefined) return;
+    window.clearTimeout(secondaryOpenTimer);
+    secondaryOpenTimer = undefined;
+  }
 
   function onAnyMenuOpen(event: Event) {
     const nextOwnerId = event instanceof CustomEvent ? event.detail?.ownerId : undefined;
     if (nextOwnerId !== ownerId) setState(null);
   }
   window.addEventListener(CONTEXT_MENU_OPEN_EVENT, onAnyMenuOpen);
-  onCleanup(() => window.removeEventListener(CONTEXT_MENU_OPEN_EVENT, onAnyMenuOpen));
+  onCleanup(() => {
+    clearSecondaryOpenTimer();
+    window.removeEventListener(CONTEXT_MENU_OPEN_EVENT, onAnyMenuOpen);
+  });
 
   function announceOpen() {
     window.dispatchEvent(new CustomEvent(CONTEXT_MENU_OPEN_EVENT, { detail: { ownerId } }));
@@ -48,7 +59,43 @@ export function createContextMenu(itemsFactory: () => ContextMenuItem[]) {
   function onContextMenu(event: MouseEvent) {
     event.preventDefault();
     event.stopPropagation();
+    clearSecondaryOpenTimer();
+    if (
+      fallbackOpen
+      && performance.now() - fallbackOpen.at < 500
+      && Math.abs(fallbackOpen.x - event.clientX) < 2
+      && Math.abs(fallbackOpen.y - event.clientY) < 2
+    ) {
+      fallbackOpen = undefined;
+      return;
+    }
+    fallbackOpen = undefined;
     openAt(event.clientX, event.clientY);
+  }
+
+  function onMouseDown(event: MouseEvent) {
+    if (event.button !== 2 && !(event.button === 0 && event.ctrlKey)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const { clientX, clientY } = event;
+    clearSecondaryOpenTimer();
+    // WKWebView can consume the later contextmenu event. A deferred fallback
+    // keeps custom menus working for both secondary-click and macOS Control-click.
+    secondaryOpenTimer = window.setTimeout(() => {
+      secondaryOpenTimer = undefined;
+      fallbackOpen = { x: clientX, y: clientY, at: performance.now() };
+      openAt(clientX, clientY);
+    }, 0);
+  }
+
+  function onKeyDown(event: KeyboardEvent) {
+    if (event.key !== "ContextMenu" && !(event.key === "F10" && event.shiftKey)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const target = event.currentTarget;
+    if (!(target instanceof HTMLElement)) return;
+    const rect = target.getBoundingClientRect();
+    openAt(rect.left + Math.min(24, rect.width / 2), rect.top + Math.min(24, rect.height));
   }
 
   function close() {
@@ -68,7 +115,7 @@ export function createContextMenu(itemsFactory: () => ContextMenuItem[]) {
     </Show>
   );
 
-  return { onContextMenu, openAt, menu, close };
+  return { onContextMenu, onMouseDown, onKeyDown, openAt, menu, close };
 }
 
 function ContextMenuPortal(props: {

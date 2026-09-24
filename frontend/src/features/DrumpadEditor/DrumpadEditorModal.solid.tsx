@@ -5,8 +5,9 @@ import { getTimelineAudioContext } from "../../audio/timelineAudio";
 import { registerGlobalAudioStop, stopAllBrowserAudio } from "../../audio/globalAudioSafety";
 import { pauseTransport } from "../../audio/transportActions";
 import { isNative, send } from "../../ipc/bridge";
-import { Button, FloatingSelect, Icon, MicroButton, Modal, TextInput } from "../../solid-ui";
+import { Button, FloatingSelect, Icon, MicroButton, Modal, RIBBON_HELP, RibbonHelp, TextInput } from "../../solid-ui";
 import { createStoreSelector } from "../../solid-utils/store";
+import { isLegacyAetherInstrument, userAccessibleInstruments } from "../../state/instrumentAccess";
 import { selectSegment } from "../../state/selectors";
 import { useInstrumentStore, useProjectStore, useTransportStore, useUiStore } from "../../state/store";
 import type { DrumpadHit, DrumpadLane, DrumpadPayload, Id, Instrument, Segment } from "../../state/types";
@@ -99,6 +100,7 @@ export function DrumpadEditorModal(props: Props) {
   const project = createStoreSelector(useProjectStore, (state) => state.project);
   const source = createStoreSelector(useProjectStore, () => selectSegment(props.segmentId));
   const instruments = createStoreSelector(useInstrumentStore, (state) => state.instruments);
+  const selectableInstruments = createMemo(() => userAccessibleInstruments(instruments()));
   const closeEditor = useUiStore.getState().closeEditor;
   const setSelectedSegments = useUiStore.getState().setSelectedSegments;
   const updateSegment = useProjectStore.getState().updateSegment;
@@ -182,9 +184,13 @@ export function DrumpadEditorModal(props: Props) {
     }
     return map;
   });
-  const instrumentOptions = createMemo(() =>
-    instruments().map((instrument) => ({ value: instrument.id, label: instrument.name }))
-  );
+  const instrumentOptions = (currentId?: Id) => {
+    const options = selectableInstruments().map((instrument) => ({ value: instrument.id, label: instrument.name }));
+    const current = currentId ? instruments().find((instrument) => instrument.id === currentId) : undefined;
+    return current && isLegacyAetherInstrument(current)
+      ? [{ value: current.id, label: "Legacy instrument (playback only)", disabled: true }, ...options]
+      : options;
+  };
   const timelineLengthBeats = createMemo(() => Math.max(draft()?.lengthBeats ?? MIN_DRUMPAD_LENGTH_BEATS, playheadBeat(), ...hits().map((hit) => hit.startBeat + hit.lengthBeats), MIN_DRUMPAD_LENGTH_BEATS));
   const visibleLengthBeats = createMemo(() => recording()
     ? Math.max(MIN_DRUMPAD_LENGTH_BEATS, LIVE_WINDOW_SECONDS * (project().bpm / 60))
@@ -333,7 +339,7 @@ export function DrumpadEditorModal(props: Props) {
 
   function addLane() {
     const used = new Set(lanes().map((lane) => lane.instrumentId).filter(Boolean));
-    const instrument = instruments().find((candidate) => !used.has(candidate.id)) ?? instruments()[0];
+    const instrument = selectableInstruments().find((candidate) => !used.has(candidate.id)) ?? selectableInstruments()[0];
     const lane: DrumpadLane = {
       id: nano(),
       instrumentId: instrument?.id,
@@ -945,7 +951,6 @@ export function DrumpadEditorModal(props: Props) {
             </div>
             <SegmentLoopControl
               repeats={draft()!.repeats}
-              lengthBeats={draft()!.lengthBeats}
               onChange={(repeats) => setDraft((current) => current ? { ...current, repeats } : current)}
             />
 
@@ -1043,7 +1048,10 @@ export function DrumpadEditorModal(props: Props) {
             </div>
 
             <div class={styles.trackPanel}>
-              <div class={styles.sectionRibbon}>Track</div>
+              <div class={styles.sectionRibbon}>
+                <span>Track</span>
+                <RibbonHelp label="Drum Track" pages={RIBBON_HELP.drumTrack} />
+              </div>
               <div class={styles.trackToolbar}>
                 <Button size="xs" onClick={jumpToStart} iconOnly aria-label="Skip to start" title="Skip to start">
                   <Icon name="ph:skip-back" size={18} decorative />
@@ -1110,7 +1118,7 @@ export function DrumpadEditorModal(props: Props) {
                           value={lane.instrumentId ?? ""}
                           ariaLabel="Lane instrument"
                           className={styles.laneSelectWrap}
-                          options={instrumentOptions()}
+                          options={instrumentOptions(lane.instrumentId)}
                           open={laneSelectOpen() === lane.id}
                           searchable
                           searchPlaceholder="Search instruments"

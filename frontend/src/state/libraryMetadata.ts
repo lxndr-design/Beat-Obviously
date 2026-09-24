@@ -32,7 +32,7 @@ export function normalizeLibraryMetadata(
     updatedAt,
     version: Math.max(1, Math.round(finiteNumber(value?.version, 1))),
     description: optionalText(value?.description ?? options.description, 500),
-    tags: normalizeTags(value?.tags?.length ? value.tags : options.tags),
+    tags: normalizeTags(value?.tags ?? options.tags),
     license: optionalText(value?.license ?? options.license, 120),
     provenance: optionalText(value?.provenance ?? options.provenance, 500),
     visibility: value?.visibility === "public" || value?.visibility === "unlisted" ? value.visibility : "private",

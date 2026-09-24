@@ -8,10 +8,30 @@ export function isAnySoloActive(): boolean {
 
 /** A track is audible if (no solo) || (this is soloed), AND not muted. */
 export function isTrackAudible(track: Track): boolean {
-  if (track.mute) return false;
-  const soloMode = isAnySoloActive();
-  if (soloMode && !track.solo) return false;
+  const tracks = useProjectStore.getState().project.tracks;
+  const chain = trackAndParents(track, tracks);
+  if (chain.some((candidate) => candidate.mute)) return false;
+  const soloMode = tracks.some((candidate) => candidate.solo);
+  if (soloMode && !chain.some((candidate) => candidate.solo)) return false;
   return true;
+}
+
+export function trackGainDbIncludingParents(track: Track, tracks: Track[]): number {
+  return trackAndParents(track, tracks).reduce((gainDb, candidate) => gainDb + candidate.gainDb, 0);
+}
+
+function trackAndParents(track: Track, tracks: Track[]): Track[] {
+  const chain = [track];
+  const visited = new Set<Id>([track.id]);
+  let parentId = track.parentTrackId;
+  while (parentId && !visited.has(parentId)) {
+    const parent = tracks.find((candidate) => candidate.id === parentId);
+    if (!parent) break;
+    chain.push(parent);
+    visited.add(parent.id);
+    parentId = parent.parentTrackId;
+  }
+  return chain;
 }
 
 export const selectTracks = () => useProjectStore.getState().project.tracks;

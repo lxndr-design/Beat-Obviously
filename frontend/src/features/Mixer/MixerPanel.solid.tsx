@@ -1,6 +1,6 @@
 import { createMemo, createSignal, For, Show } from "solid-js";
 import { bounceTrackInPlace, unfreezeBouncedTrack } from "../ExportReview/exportActions";
-import { Button, FloatingSelect, Icon, MicroButton, Slider, Tag } from "../../solid-ui";
+import { Button, FloatingSelect, Icon, MicroButton, RIBBON_HELP, RibbonHelp, Slider, Tag } from "../../solid-ui";
 import { createStoreSelector } from "../../solid-utils/store";
 import { useAnalyzerStore } from "../../state/analyzerStore";
 import { EFFECT_LABELS, formatEffectLatency } from "../../state/effects";
@@ -26,6 +26,7 @@ export function MixerPanel() {
         <div class={styles.title}>
           <Icon name="ph:sliders-horizontal" size={18} decorative />
           <span>Mixer</span>
+          <RibbonHelp label="Mixer" pages={RIBBON_HELP.mixer} />
         </div>
         <Tag>{activeTracks()} tracks</Tag>
         <Tag>{sendCount()} sends / {effectCount()} inserts</Tag>

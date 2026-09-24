@@ -38,6 +38,13 @@
   letter-spacing: var(--letter-spacing-uppercase);
 }
 
+.titleRow {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  gap: 3px;
+}
+
 .trackName {
   min-width: 0;
   overflow: hidden;

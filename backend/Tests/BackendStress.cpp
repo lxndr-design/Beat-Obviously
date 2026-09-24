@@ -4366,6 +4366,7 @@ namespace
         segment.kind = beat::SegmentPayloadKind::Audio;
         segment.audioFileId = "audio-file";
         segment.audioGainDb = -2.0f;
+        segment.audioTunePitch = 72;
         segment.startBeat = 1.0;
         segment.lengthBeats = 2.0;
         segment.sourceStartBeat = 0.25;
@@ -4391,13 +4392,14 @@ namespace
                     std::abort();
                 if (ev.sampleOffset != 0 || ev.lengthSamples <= 0)
                     std::abort();
-                if (std::abs(ev.sourceOffsetBeats - 0.75) > 0.0001)
+                if (std::abs(ev.sourceOffsetBeats - 1.25) > 0.0001)
                     std::abort();
                 if (std::abs(ev.clipOffsetBeats - 0.5) > 0.0001 || std::abs(ev.clipLengthBeats - 2.0) > 0.0001)
                     std::abort();
                 if (std::abs(ev.fadeInBeats - 0.25) > 0.0001 || std::abs(ev.fadeOutBeats - 0.5) > 0.0001)
                     std::abort();
-                if (!near(ev.trackGainDb, -4.0f) || !near(ev.trackPan, -0.25f) || !near(ev.segmentGainDb, -2.0f))
+                if (!near(ev.trackGainDb, -4.0f) || !near(ev.trackPan, -0.25f) || !near(ev.segmentGainDb, -2.0f)
+                    || ev.tunePitch != 72)
                     std::abort();
             });
 
@@ -5865,104 +5867,143 @@ namespace
         return ok;
     }
 
-    bool stressAudioEngineMidiPreviewLifecycleCleanup()
-    {
-        auto project = makeDenseAetherProject();
-        project.tracks.front().segments.clear();
+    bool stressAudioEngineSegmentInstrumentRouting() {
+      auto project = makeDenseAetherProject();
+      auto secondaryInstrument = project.instruments.front();
+      secondaryInstrument.id = "segment-selected-aether";
+      secondaryInstrument.aether.oscA.waveform = 2;
+      secondaryInstrument.aether.oscB.waveform = 1;
+      project.instruments.push_back(std::move(secondaryInstrument));
 
-        beat::AudioEngine engine;
-        engine.prepareForOffline(48000.0, 256, 2);
-        engine.applyProject(std::move(project));
-        engine.requestPause();
-        renderEngineBlock(engine, 256);
+      auto &track = project.tracks.front();
+      auto &segment = track.segments.front();
+      segment.instrumentId = "segment-selected-aether";
+      segment.lengthBeats = 2.0;
+      segment.notes.clear();
+      beat::MidiNote note;
+      note.instrumentId = segment.instrumentId;
+      note.pitch = 64;
+      note.velocity = 108;
+      note.startBeat = 0.0;
+      note.lengthBeats = 1.5;
+      segment.notes.push_back(note);
+      const auto trackId = track.id;
+      const auto segmentInstrumentId = segment.instrumentId;
 
-        const bool accepted = engine.requestMidiPreviewNote(
-            "dense-aether-track", "dense-aether", 67, 108, 0.0, 0.02);
-        const bool activeAtRequest = engine.isMidiPreviewActiveForTest();
-        bool stayedActiveIntoTail = false;
-        bool clearedAutomatically = false;
-        double previewEnergy = 0.0;
-        for (int blockIndex = 0; blockIndex < 192; ++blockIndex)
-        {
-            const auto block = renderEngineBlock(engine, 256);
-            previewEnergy += bufferEnergy(block);
-            const bool active = engine.isMidiPreviewActiveForTest();
-            if (blockIndex >= 4 && active)
-                stayedActiveIntoTail = true;
-            if (stayedActiveIntoTail && !active)
-            {
-                clearedAutomatically = true;
-                break;
-            }
+      beat::AudioEngine engine;
+      engine.prepareForOffline(48000.0, 512, 2);
+      engine.applyProject(std::move(project));
+      engine.requestPause();
+      renderEngineBlock(engine, 512);
+      const bool previewAccepted = engine.requestMidiPreviewNote(
+          trackId, segmentInstrumentId, note.pitch, note.velocity, 0.0, 0.08);
+      const auto preview = renderEngineBlock(engine, 4096);
+      engine.requestStopMidiPreview(trackId);
+      renderEngineBlock(engine, 512);
+      engine.requestRestart();
+      const auto arrangement = renderEngineBlock(engine, 8192);
+
+      const auto previewEnergy = bufferEnergy(preview);
+      const auto arrangementEnergy = bufferEnergy(arrangement);
+      const bool ok = previewAccepted && previewEnergy > 1.0e-6 &&
+                      arrangementEnergy > 1.0e-6;
+      if (!ok)
+        std::cerr << "Per-segment instrument routing failed previewAccepted="
+                  << previewAccepted << " previewEnergy=" << previewEnergy
+                  << " arrangementEnergy=" << arrangementEnergy << "\n";
+      return ok;
+    }
+
+    bool stressAudioEngineMidiPreviewLifecycleCleanup() {
+      auto project = makeDenseAetherProject();
+      project.tracks.front().segments.clear();
+
+      beat::AudioEngine engine;
+      engine.prepareForOffline(48000.0, 256, 2);
+      engine.applyProject(std::move(project));
+      engine.requestPause();
+      renderEngineBlock(engine, 256);
+
+      const bool accepted = engine.requestMidiPreviewNote(
+          "dense-aether-track", "dense-aether", 67, 108, 0.0, 0.02);
+      const bool activeAtRequest = engine.isMidiPreviewActiveForTest();
+      bool stayedActiveIntoTail = false;
+      bool clearedAutomatically = false;
+      double previewEnergy = 0.0;
+      for (int blockIndex = 0; blockIndex < 192; ++blockIndex) {
+        const auto block = renderEngineBlock(engine, 256);
+        previewEnergy += bufferEnergy(block);
+        const bool active = engine.isMidiPreviewActiveForTest();
+        if (blockIndex >= 4 && active)
+          stayedActiveIntoTail = true;
+        if (stayedActiveIntoTail && !active) {
+          clearedAutomatically = true;
+          break;
         }
+      }
 
-        const auto idle = renderEngineBlock(engine, 512);
-        const auto idleEnergy = bufferEnergy(idle);
+      const auto idle = renderEngineBlock(engine, 512);
+      const auto idleEnergy = bufferEnergy(idle);
 
-        auto sampleFile = juce::File("/private/tmp").getChildFile("BeatBackendStress-preview-lifecycle.wav");
-        const bool sampleFixtureReady = writeAudioClipFixture(sampleFile, 4096);
-        bool sampleAccepted = false;
-        bool sampleActiveAtRequest = false;
-        bool sampleClearedAutomatically = false;
-        double samplePreviewEnergy = 0.0;
-        double sampleIdleEnergy = std::numeric_limits<double>::infinity();
-        if (sampleFixtureReady)
-        {
-            auto sampleProject = makeSampleInstrumentOfflineProject(sampleFile);
-            auto rowSampleInstrument = sampleProject.instruments.front();
-            rowSampleInstrument.id = "sample-row-cymbal-instrument";
-            sampleProject.instruments.push_back(std::move(rowSampleInstrument));
-            const auto sampleNote = sampleProject.tracks.front().segments.front().notes.front();
-            sampleProject.tracks.front().segments.clear();
-            beat::AudioEngine sampleEngine;
-            sampleEngine.prepareForOffline(48000.0, 256, 2);
-            sampleEngine.applyProject(std::move(sampleProject));
-            sampleEngine.requestPause();
-            renderEngineBlock(sampleEngine, 256);
-            sampleAccepted = sampleEngine.requestMidiPreviewNote(
-                "sample-route-track", "sample-row-cymbal-instrument", sampleNote.pitch, sampleNote.velocity,
-                0.0, 0.02, 0.0f, &sampleNote);
-            sampleActiveAtRequest = sampleEngine.isMidiPreviewActiveForTest();
-            for (int blockIndex = 0; blockIndex < 192; ++blockIndex)
-            {
-                const auto block = renderEngineBlock(sampleEngine, 256);
-                samplePreviewEnergy += bufferEnergy(block);
-                if (!sampleEngine.isMidiPreviewActiveForTest())
-                {
-                    sampleClearedAutomatically = true;
-                    break;
-                }
-            }
-            sampleIdleEnergy = bufferEnergy(renderEngineBlock(sampleEngine, 512));
+      auto sampleFile =
+          juce::File("/private/tmp")
+              .getChildFile("BeatBackendStress-preview-lifecycle.wav");
+      const bool sampleFixtureReady = writeAudioClipFixture(sampleFile, 4096);
+      bool sampleAccepted = false;
+      bool sampleActiveAtRequest = false;
+      bool sampleClearedAutomatically = false;
+      double samplePreviewEnergy = 0.0;
+      double sampleIdleEnergy = std::numeric_limits<double>::infinity();
+      if (sampleFixtureReady) {
+        auto sampleProject = makeSampleInstrumentOfflineProject(sampleFile);
+        auto rowSampleInstrument = sampleProject.instruments.front();
+        rowSampleInstrument.id = "sample-row-cymbal-instrument";
+        sampleProject.instruments.push_back(std::move(rowSampleInstrument));
+        const auto sampleNote =
+            sampleProject.tracks.front().segments.front().notes.front();
+        sampleProject.tracks.front().segments.clear();
+        beat::AudioEngine sampleEngine;
+        sampleEngine.prepareForOffline(48000.0, 256, 2);
+        sampleEngine.applyProject(std::move(sampleProject));
+        sampleEngine.requestPause();
+        renderEngineBlock(sampleEngine, 256);
+        sampleAccepted = sampleEngine.requestMidiPreviewNote(
+            "sample-route-track", "sample-row-cymbal-instrument",
+            sampleNote.pitch, sampleNote.velocity, 0.0, 0.02, 0.0f,
+            &sampleNote);
+        sampleActiveAtRequest = sampleEngine.isMidiPreviewActiveForTest();
+        for (int blockIndex = 0; blockIndex < 192; ++blockIndex) {
+          const auto block = renderEngineBlock(sampleEngine, 256);
+          samplePreviewEnergy += bufferEnergy(block);
+          if (!sampleEngine.isMidiPreviewActiveForTest()) {
+            sampleClearedAutomatically = true;
+            break;
+          }
         }
-        sampleFile.deleteFile();
+        sampleIdleEnergy = bufferEnergy(renderEngineBlock(sampleEngine, 512));
+      }
+      sampleFile.deleteFile();
 
-        const bool ok = accepted
-            && activeAtRequest
-            && stayedActiveIntoTail
-            && clearedAutomatically
-            && previewEnergy > 1.0e-6
-            && idleEnergy < 1.0e-10
-            && sampleFixtureReady
-            && sampleAccepted
-            && sampleActiveAtRequest
-            && sampleClearedAutomatically
-            && samplePreviewEnergy > 1.0e-6
-            && sampleIdleEnergy < 1.0e-10;
-        if (!ok)
-            std::cerr << "MIDI preview lifecycle cleanup failed accepted=" << accepted
-                      << " activeAtRequest=" << activeAtRequest
-                      << " tailActive=" << stayedActiveIntoTail
-                      << " cleared=" << clearedAutomatically
-                      << " previewEnergy=" << previewEnergy
-                      << " idleEnergy=" << idleEnergy
-                      << " sampleFixture=" << sampleFixtureReady
-                      << " sampleAccepted=" << sampleAccepted
-                      << " sampleActiveAtRequest=" << sampleActiveAtRequest
-                      << " sampleCleared=" << sampleClearedAutomatically
-                      << " samplePreviewEnergy=" << samplePreviewEnergy
-                      << " sampleIdleEnergy=" << sampleIdleEnergy << "\n";
-        return ok;
+      const bool ok =
+          accepted && activeAtRequest && stayedActiveIntoTail &&
+          clearedAutomatically && previewEnergy > 1.0e-6 &&
+          idleEnergy < 1.0e-10 && sampleFixtureReady && sampleAccepted &&
+          sampleActiveAtRequest && sampleClearedAutomatically &&
+          samplePreviewEnergy > 1.0e-6 && sampleIdleEnergy < 1.0e-10;
+      if (!ok)
+        std::cerr << "MIDI preview lifecycle cleanup failed accepted="
+                  << accepted << " activeAtRequest=" << activeAtRequest
+                  << " tailActive=" << stayedActiveIntoTail
+                  << " cleared=" << clearedAutomatically
+                  << " previewEnergy=" << previewEnergy
+                  << " idleEnergy=" << idleEnergy
+                  << " sampleFixture=" << sampleFixtureReady
+                  << " sampleAccepted=" << sampleAccepted
+                  << " sampleActiveAtRequest=" << sampleActiveAtRequest
+                  << " sampleCleared=" << sampleClearedAutomatically
+                  << " samplePreviewEnergy=" << samplePreviewEnergy
+                  << " sampleIdleEnergy=" << sampleIdleEnergy << "\n";
+      return ok;
     }
 
     juce::AudioBuffer<float> renderOfflineChunks(beat::Project project, int samples, int blockSize = 256, double sampleRate = 44100.0)
@@ -6592,7 +6633,8 @@ namespace
             segment.lengthBeats,
             segment.fadeInBeats,
             segment.fadeOutBeats,
-            segment.audioGainDb);
+            segment.audioGainDb,
+            segment.audioTunePitch);
 
         juce::AudioBuffer<float> output(2, samples);
         juce::AudioBuffer<float> block(2, blockSize);
@@ -6631,6 +6673,7 @@ namespace
         segment.fadeInBeats = 0.1875;
         segment.fadeOutBeats = 0.25;
         segment.audioGainDb = -3.5f;
+        segment.audioTunePitch = 72;
 
         constexpr double positionBeat = 0.125;
         constexpr int samples = 12000;
@@ -6644,19 +6687,62 @@ namespace
         const auto relativeResidual = residual.sourceEnergy > 0.0
             ? residual.residualEnergy / residual.sourceEnergy
             : std::numeric_limits<double>::infinity();
+        int firstCrossing = -1;
+        int lastCrossing = -1;
+        int crossingCount = 0;
+        const auto* tunedSamples = arrangement.getReadPointer(0);
+        for (int sample = 1; sample < arrangement.getNumSamples(); ++sample)
+        {
+            if (tunedSamples[sample - 1] <= 0.0f && tunedSamples[sample] > 0.0f)
+            {
+                if (firstCrossing < 0) firstCrossing = sample;
+                lastCrossing = sample;
+                ++crossingCount;
+            }
+        }
+        const auto tunedFrequency = crossingCount > 1 && lastCrossing > firstCrossing
+            ? (double) (crossingCount - 1) * 44100.0 / (double) (lastCrossing - firstCrossing)
+            : 0.0;
         const bool ok = accepted
             && residual.ok
             && residual.sourceEnergy > 1.0e-6
             && residual.maxAbsDiff <= 0.00008f
-            && relativeResidual <= 1.0e-8;
+            && relativeResidual <= 1.0e-8
+            && std::abs(tunedFrequency - 440.0) <= 1.0;
         if (!ok)
         {
+            int maxDiffSample = 0;
+            float maxDiffValue = 0.0f;
+            int commonMaxDiffSample = 0;
+            float commonMaxDiffValue = 0.0f;
+            for (int sample = 0; sample < samples; ++sample)
+            {
+                const auto difference = std::abs(arrangement.getSample(0, sample) - preview.getSample(0, sample));
+                if (difference > maxDiffValue)
+                {
+                    maxDiffValue = difference;
+                    maxDiffSample = sample;
+                }
+                if (sample < 6800 && difference > commonMaxDiffValue)
+                {
+                    commonMaxDiffValue = difference;
+                    commonMaxDiffSample = sample;
+                }
+            }
             std::cerr << "Audio segment editor/global preview parity failed accepted=" << accepted
                       << " arrangementEnergy=" << residual.sourceEnergy
                       << " residualEnergy=" << residual.residualEnergy
                       << " relativeResidual=" << relativeResidual
                       << " meanAbsDiff=" << residual.meanAbsDiff
-                      << " maxAbsDiff=" << residual.maxAbsDiff << "\n";
+                      << " maxAbsDiff=" << residual.maxAbsDiff
+                      << " tunedFrequency=" << tunedFrequency
+                      << " maxDiffSample=" << maxDiffSample
+                      << " arrangementSample=" << arrangement.getSample(0, maxDiffSample)
+                      << " previewSample=" << preview.getSample(0, maxDiffSample)
+                      << " commonMaxDiff=" << commonMaxDiffValue
+                      << " commonMaxDiffSample=" << commonMaxDiffSample
+                      << " commonArrangement=" << arrangement.getSample(0, commonMaxDiffSample)
+                      << " commonPreview=" << preview.getSample(0, commonMaxDiffSample) << "\n";
         }
         return ok;
     }
@@ -10862,6 +10948,7 @@ namespace
         segment.fadeInBeats = 0.125;
         segment.fadeOutBeats = 0.25;
         segment.audioGainDb = -3.0f;
+        segment.audioTunePitch = 67;
         track.segments.push_back(segment);
         project.tracks.push_back(track);
 
@@ -10938,6 +11025,7 @@ namespace
             && loaded->tracks.front().segments.front().audioFileId == audioFile.id
             && std::abs(loaded->tracks.front().segments.front().sourceStartBeat - 0.25) < 0.0001
             && std::abs(loaded->tracks.front().segments.front().audioGainDb + 3.0f) < 0.0001f
+            && loaded->tracks.front().segments.front().audioTunePitch == 67
             && loaded->tracks[1].segments.size() == 1
             && loaded->instruments.size() == 1
             && std::abs(loaded->instruments.front().glideMs - 140.0f) < 0.0001f
@@ -23797,6 +23885,7 @@ int main(int argc, char** argv)
     if (argc == 2 && juce::String(argv[1]) == "--midi-preview")
     {
         if (!stressAudioEngineMidiEditorPreview()
+            || !stressAudioEngineSegmentInstrumentRouting()
             || !stressAudioEngineMidiPreviewLifecycleCleanup()
             || !stressAudioEngineLumenMidiPreviewParity())
         {
@@ -23810,6 +23899,7 @@ int main(int argc, char** argv)
     if (argc == 2 && juce::String(argv[1]) == "--editor-preview")
     {
         if (!stressAudioEngineMidiEditorPreview()
+            || !stressAudioEngineSegmentInstrumentRouting()
             || !stressAudioEngineMidiPreviewLifecycleCleanup()
             || !stressAudioEngineLumenMidiPreviewParity()
             || !stressAudioEngineMidiEditorDetailedParity()
@@ -23959,6 +24049,11 @@ int main(int argc, char** argv)
     if (!stressAudioEngineMidiEditorPreview())
     {
         std::cerr << "MIDI editor native preview stress failed\n";
+        return 1;
+    }
+    if (!stressAudioEngineSegmentInstrumentRouting())
+    {
+        std::cerr << "Per-segment instrument routing stress failed\n";
         return 1;
     }
     if (!stressAudioEngineMidiPreviewLifecycleCleanup())

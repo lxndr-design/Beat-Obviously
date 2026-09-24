@@ -49,6 +49,13 @@
   white-space: nowrap;
 }
 
+.titleGroup {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  gap: 3px;
+}
+
 .graphHost {
   flex: 1 1 auto;
   min-height: 0;

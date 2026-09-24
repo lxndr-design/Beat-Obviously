@@ -50,6 +50,13 @@
   font-weight: var(--font-weight-medium);
 }
 
+.browserRibbonTitle {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  gap: 3px;
+}
+
 .stateMessage {
   display: grid;
   grid-template-columns: 21px minmax(0, 1fr);

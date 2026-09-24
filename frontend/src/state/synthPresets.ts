@@ -71,7 +71,7 @@ export interface CreateAurumPresetOptions {
 
 export function createSynthPresetRecord(options: CreateSynthPresetOptions): SynthPresetRecord {
   const now = safeTimestamp(options.now, Date.now());
-  const name = sanitizePresetName(options.name, "Aether Preset");
+  const name = sanitizePresetName(options.name, "Synth Preset");
   return {
     schemaVersion: SYNTH_PRESET_SCHEMA_VERSION,
     kind: "instrument",
@@ -87,7 +87,7 @@ export function createSynthPresetRecord(options: CreateSynthPresetOptions): Synt
 
 export function normalizeSynthPresetRecord(value: unknown): SynthPresetRecord | null {
   if (!isRecord(value) || !isRecord(value.patch) || (value.kind !== undefined && value.kind !== "instrument")) return null;
-  const name = sanitizePresetName(value.name, "Aether Preset");
+  const name = sanitizePresetName(value.name, "Synth Preset");
   const updatedAt = safeTimestamp(value.updatedAt, Date.now());
   return {
     schemaVersion: SYNTH_PRESET_SCHEMA_VERSION,

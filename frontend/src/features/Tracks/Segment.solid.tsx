@@ -32,6 +32,7 @@ import { SegmentMidiPreview } from "./SegmentMidiPreview.solid";
 import { SegmentDrumPreview } from "./SegmentDrumPreview.solid";
 import { SegmentDrumpadPreview } from "./SegmentDrumpadPreview.solid";
 import { SegmentWaveform } from "./SegmentWaveform.solid";
+import { audioTunePitchName } from "../../state/audioSegmentTuning";
 import {
   cancelStemSeparation,
   separateSegmentIntoStems,
@@ -46,6 +47,7 @@ import {
   convertStemToMidi,
 } from "../../audio/audioToMidi";
 import { linkedResizeTargets, linkedSegmentsFor } from "../../audio/stemGrouping";
+import { splitSegmentLanePayloads, splitSegmentToLaneTracks } from "../../state/splitSegmentLanes";
 import { setSegmentLandingGhosts } from "./segmentDragPreview";
 import styles from "./Segment.module.css";
 import type { Id, Segment as SegmentType } from "../../state/types";
@@ -449,6 +451,7 @@ export function Segment(props: Props) {
     const canSplitAtPlayhead = playheadBeat > segment.startBeat + GRID_TICK_BEATS / 4
       && playheadBeat < segment.startBeat + segment.lengthBeats - GRID_TICK_BEATS / 4;
     const dsPlugin = decentSamplerPlugin();
+    const splitLanes = splitSegmentLanePayloads(segment);
     return [
       { label: "Edit", icon: "ph:pencil-simple", onSelect: props.onEdit },
       ...(dsPlugin
@@ -500,6 +503,14 @@ export function Segment(props: Props) {
               const [createdId] = projectStore.applySegmentEditCommand({ kind: "split", segmentId: props.segmentId, splitBeat: playheadBeat });
               if (createdId) uiStore.setSelectedSegments([createdId]);
             },
+          } as ContextMenuItem]
+        : []),
+      ...(splitLanes.length > 1
+        ? [{
+            label: "Split Lanes to Tracks",
+            icon: "ph:rows",
+            separatorBefore: !canSplitAtPlayhead,
+            onSelect: () => splitSegmentToLaneTracks(segment.id),
           } as ContextMenuItem]
         : []),
       ...(isAudio
@@ -670,12 +681,22 @@ export function Segment(props: Props) {
     ];
   });
 
+
   function handleContextMenu(event: MouseEvent) {
     if (!selected()) {
       useUiStore.getState().setSelectedSegments([props.segmentId]);
       useUiStore.getState().setSelectedTracks([]);
     }
     menu.onContextMenu(event);
+  }
+
+  function handleSecondaryMenuMouseDown(event: MouseEvent) {
+    if (event.button !== 2 && !(event.button === 0 && event.ctrlKey)) return;
+    if (!selected()) {
+      useUiStore.getState().setSelectedSegments([props.segmentId]);
+      useUiStore.getState().setSelectedTracks([]);
+    }
+    menu.onMouseDown(event);
   }
 
   const visualStartBeat = createMemo(() => dragPreview()?.startBeat ?? props.startBeat);
@@ -691,6 +712,12 @@ export function Segment(props: Props) {
   const fadeInHandleX = createMemo(() => Math.min(Math.max(8, fadeInPx()), Math.max(8, width() - 8)));
   const fadeOutHandleInset = createMemo(() => Math.min(Math.max(8, fadeOutPx()), Math.max(8, width() - 8)));
   const label = createMemo(() => liveSeg()?.name?.trim() || defaultName(props.payloadKind));
+  const audioTuneLabel = createMemo(() => {
+    const payload = liveSeg()?.payload;
+    return payload?.kind === "audio" && payload.tunePitch != null
+      ? audioTunePitchName(payload.tunePitch)
+      : null;
+  });
   const kindIcon = createMemo(() =>
     props.payloadKind === "midi"
       ? "ph:piano-keys"
@@ -728,6 +755,7 @@ export function Segment(props: Props) {
         useUiStore.getState().setSelectedTracks([]);
         props.onEdit();
       }}
+      onMouseDown={handleSecondaryMenuMouseDown}
       onContextMenu={handleContextMenu}
       data-segment-id={props.segmentId}
       data-mesh-variant={meshTintVariantFor(props.segmentId)}
@@ -841,6 +869,13 @@ export function Segment(props: Props) {
           </Show>
           <Show when={props.payloadKind === "audio" && liveSeg()}>
             {(segment) => <SegmentWaveform segment={segment()} />}
+          </Show>
+          <Show when={audioTuneLabel()}>
+            {(pitch) => (
+              <span class={styles.tuneMarker} aria-label={`Tuned to ${pitch()}`} title={`Tuned to ${pitch()}`}>
+                {pitch()}
+              </span>
+            )}
           </Show>
           <Show when={props.repetition === 0 && liveSeg()}>
             <div class={styles.fadeLayer}>

@@ -23,6 +23,7 @@ import { RailButtonDemo } from "../solid-ui/RailButton/RailButton.demo.solid";
 import { RowItemDemo } from "../solid-ui/RowItem/RowItem.demo.solid";
 import { RowActionButtonDemo } from "../solid-ui/RowActionButton/RowActionButton.demo.solid";
 import { SectionRibbonDemo } from "../solid-ui/SectionRibbon/SectionRibbon.demo.solid";
+import { RibbonHelpDemo } from "../solid-ui/RibbonHelp/RibbonHelp.demo.solid";
 import { SliderDemo } from "../solid-ui/Slider/Slider.demo.solid";
 import { TagDemo } from "../solid-ui/Tag/Tag.demo.solid";
 import { StatusChipDemo } from "../solid-ui/StatusChip/StatusChip.demo.solid";
@@ -52,6 +53,7 @@ export function SolidUiKitCatalog() {
       <LoadingStateDemo />
       <RowItemDemo />
       <SectionRibbonDemo />
+      <RibbonHelpDemo />
       <TextInputDemo />
       <SliderDemo />
       <NumberInputDemo />

@@ -48,6 +48,11 @@ try {
   assert.equal(migrated.project.tracks[0].inputChannelStart, 1024, "track input channel start should clamp to the supported range");
   assert.equal(migrated.project.tracks[0].inputChannelCount, 1, "track input channel count should clamp to at least one channel");
   assert.equal(migrated.project.tracks[0].recordGainDb, 24, "track record gain should clamp to the supported range");
+  assert.equal(
+    migrated.project.tracks[0].segments.find((segment) => segment.id === "seg-audio")?.payload.tunePitch,
+    67,
+    "audio segment tune-to pitch should survive document migration",
+  );
   assert.deepEqual(
     migrated.project.tracks[0].freezeSource,
     {
@@ -601,6 +606,7 @@ function makeRepresentativeDocument() {
                 kind: "audio",
                 audioFileId: "audio-kick",
                 gainDb: -1.5,
+                tunePitch: 67,
               },
             },
           ],

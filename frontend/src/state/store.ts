@@ -26,6 +26,7 @@ import {
 } from "../collaboration/projectOperations";
 import { normalizeLibraryMetadata, touchLibraryMetadata } from "./libraryMetadata";
 import { AUDIO_BUS_SCHEMA_VERSION } from "./types";
+import { audioTuneRate } from "./audioSegmentTuning";
 import type { BeatProjectAsset, BeatProjectIntegrityReport, ProjectSidecarCleanupReport, RecentProjectEntry } from "../ipc/schema";
 import type {
   Beats,
@@ -1033,7 +1034,8 @@ export const useProjectStore = create<ProjectSlice>()(
               right.startBeat = splitBeat;
               right.lengthBeats = rightLength;
               right.repeats = 0;
-              right.sourceStartBeat = (segment.sourceStartBeat ?? 0) + leftLength;
+              right.sourceStartBeat = (segment.sourceStartBeat ?? 0)
+                + leftLength * (segment.payload.kind === "audio" ? audioTuneRate(segment.payload.tunePitch) : 1);
               right.fadeInBeats = clampFade(right.fadeInBeats ?? 0, rightLength);
               right.fadeOutBeats = clampFade(right.fadeOutBeats ?? 0, rightLength);
 
@@ -1305,7 +1307,8 @@ function applySegmentWindow(
   }
   segment.startBeat = newStartBeat;
   segment.lengthBeats = newLengthBeats;
-  segment.sourceStartBeat = Math.max(0, oldSourceStartBeat + localStart);
+  const sourceRate = segment.payload.kind === "audio" ? audioTuneRate(segment.payload.tunePitch) : 1;
+  segment.sourceStartBeat = Math.max(0, oldSourceStartBeat + localStart * sourceRate);
   enforceSegmentBounds(segment, projectLengthBeats);
 }
 
@@ -1776,17 +1779,22 @@ export function normalizePluginAdapter(patch: Partial<PluginAdapter> = {}): Plug
   }
 
   const kind = patch.kind ?? "synth";
-  const capabilities = patch.capabilities ?? [
+  const instrumentMode = patch.instrumentMode === "fallback-aether" ? "fallback-lumen" : patch.instrumentMode;
+  const capabilities = (patch.capabilities ?? [
     {
       id: `${kind}-fallback`,
       kind: kind === "synth" ? "instrument" : kind,
-      label: kind === "synth" ? "Create Aether-backed instrument" : "Preserve plugin metadata",
+      label: kind === "synth" ? "Create Lumen-backed instrument" : "Preserve plugin metadata",
       realtime: kind === "synth" && patch.instrumentMode === "live-instrument",
       offline: true,
       latencySamples: 0,
-      fallbackMode: kind === "synth" ? "aether" : "pass-through",
+      fallbackMode: kind === "synth" ? "lumen" : "pass-through",
     },
-  ];
+  ]).map((capability) => ({
+    ...capability,
+    label: capability.label.replaceAll("Aether", "Lumen"),
+    fallbackMode: capability.fallbackMode === "aether" ? "lumen" : capability.fallbackMode,
+  }));
 
   return {
     id: nanoid(),
@@ -1796,10 +1804,10 @@ export function normalizePluginAdapter(patch: Partial<PluginAdapter> = {}): Plug
     kind,
     format: "bridge",
     status: "available",
-    instrumentMode: "fallback-aether",
     description: "Protected host shell for imported synths, effects, renderers, and utility backends.",
-    capabilities,
     ...patch,
+    instrumentMode: instrumentMode ?? "fallback-lumen",
+    capabilities,
   };
 }
 
@@ -1854,24 +1862,24 @@ export const usePluginStore = create<PluginLibrarySlice>()(
     plugins: [
       normalizePluginAdapter({
         id: PLUGIN_BRIDGE_ID,
-        name: "Aether Bridge Host",
+        name: "Lumen Bridge Host",
         vendor: "Beat",
         version: "0.3.2",
         kind: "synth",
         format: "bridge",
         status: "available",
-        instrumentMode: "fallback-aether",
+        instrumentMode: "fallback-lumen",
         factory: true,
-        description: "Creates Aether fallback instruments until native plugin hosting is wired.",
+        description: "Creates Lumen fallback instruments until native plugin hosting is wired.",
         capabilities: [
           {
-            id: "aether-fallback-instrument",
+            id: "lumen-fallback-instrument",
             kind: "instrument",
-            label: "Create Aether-backed instrument",
+            label: "Create Lumen-backed instrument",
             realtime: true,
             offline: true,
             latencySamples: 0,
-            fallbackMode: "aether",
+            fallbackMode: "lumen",
           },
         ],
       }),
@@ -2064,18 +2072,30 @@ export const ORCHESTRA_SET_ID = "orchestra-pit";
 export const TEMPORARY_DS_INSTRUMENT_SET_ID = "temporary-ds-instruments";
 export const USER_INSTRUMENT_SET_ID = "user-instruments";
 
+const includeInternalTestInstrumentBanks =
+  typeof __BEAT_INCLUDE_INTERNAL_TEST_BANKS__ !== "boolean"
+  || __BEAT_INCLUDE_INTERNAL_TEST_BANKS__;
+
+const isInternalTestInstrumentSet = (setId: Id | undefined) =>
+  setId === AURUM_TEST_SET_ID || setId === LUMEN_TEST_INSTRUMENT_SET_ID;
+
 function defaultInstrumentSets(): InstrumentSet[] {
-  return [
+  const sets: InstrumentSet[] = [
     { id: ROCK_DRUM_SET_ID, name: "Rock & Roll", factory: true },
     { id: FACTORY_DRUM_SET_ID, name: "Classic Machines", factory: true },
     { id: FACTORY_KEYS_SET_ID, name: "Acoustic Keys", factory: true },
     { id: ORCHESTRA_SET_ID, name: "Orchestra Pit", factory: true },
     { id: FACTORY_SYNTH_SET_ID, name: "Synths", factory: true },
-    { id: AURUM_TEST_SET_ID, name: "Aurum Test", factory: true },
-    { id: LUMEN_TEST_INSTRUMENT_SET_ID, name: "Lumen Test", factory: true },
     { id: TEMPORARY_DS_INSTRUMENT_SET_ID, name: "Instanced Instruments", factory: true },
     { id: USER_INSTRUMENT_SET_ID, name: "User", factory: true },
   ];
+  if (includeInternalTestInstrumentBanks) {
+    sets.splice(5, 0,
+      { id: AURUM_TEST_SET_ID, name: "Aurum Test", factory: true },
+      { id: LUMEN_TEST_INSTRUMENT_SET_ID, name: "Lumen Test", factory: true },
+    );
+  }
+  return sets;
 }
 
 function defaultInstrument(): Instrument {
@@ -2482,6 +2502,7 @@ function normalizeInstrumentSets(sets?: InstrumentSet[]): InstrumentSet[] {
   }
   const byId = new Map(defaults.map((set) => [set.id, set]));
   for (const set of sets) {
+    if (!includeInternalTestInstrumentBanks && isInternalTestInstrumentSet(set.id)) continue;
     const defaultSet = byId.get(set.id);
     const next =
       defaultSet?.factory
@@ -2750,7 +2771,7 @@ export const useInstrumentStore = create<InstrumentLibrarySlice>()(
         kind: "created",
         label: "Made in Beat",
       };
-      const lumenTestSeeds: Instrument[] = FACTORY_SYNTH_PRESETS
+      const lumenTestSeeds: Instrument[] = includeInternalTestInstrumentBanks ? FACTORY_SYNTH_PRESETS
         .filter((preset) => preset.tags.includes("mvp-test") && preset.patch.instrumentType === "lumen-hybrid-synth")
         .map((preset) => {
           const patch = synthDraftToInstrumentPatch(preset.patch);
@@ -2768,7 +2789,7 @@ export const useInstrumentStore = create<InstrumentLibrarySlice>()(
             descriptors: ["lumen", "mvp-test", "lumen-test-bank", "v16", preset.category.toLowerCase()],
             userCreated: false,
           });
-        });
+        }) : [];
 
       const seeds: Instrument[] = [
         withOriginal(createSalamanderCompactGrand(FACTORY_KEYS_SET_ID)),
@@ -2923,7 +2944,9 @@ export const useInstrumentStore = create<InstrumentLibrarySlice>()(
         }),
         ...lumenTestSeeds,
       ];
-      seeds.push(...createAurumTestInstruments(AURUM_TEST_SET_ID).map(withOriginal));
+      if (includeInternalTestInstrumentBanks) {
+        seeds.push(...createAurumTestInstruments(AURUM_TEST_SET_ID).map(withOriginal));
+      }
       const deprecatedBreakcoreAetherInstrumentNames = new Set([
         "Breakcore Kick (Aether)",
         "Breakcore Snare (Aether)",
@@ -2966,6 +2989,7 @@ export const useInstrumentStore = create<InstrumentLibrarySlice>()(
         s.instrumentSets = normalizeInstrumentSets(s.instrumentSets);
         s.instruments = s.instruments
           .map((instrument) => normalizeInstrument(instrument))
+          .filter((instrument) => includeInternalTestInstrumentBanks || !isInternalTestInstrumentSet(instrument.setId))
           .filter((instrument) => instrument.userCreated || !isDeprecatedBreakcoreAetherInstrument(instrument));
         const seedByName = new Map(activeSeeds.map((instrument) => [instrument.name, instrument]));
         const seedById = new Map(activeSeeds.map((instrument) => [instrument.id, instrument]));

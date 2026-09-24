@@ -13,6 +13,8 @@ namespace beat::ipc
         constexpr const char* APP_SHELL_READY     = "app.shellReady";
         constexpr const char* APP_STARTUP_STAGE   = "app.startupStage";
         constexpr const char* APP_READY           = "app.ready";
+        constexpr const char* APP_SET_THEME       = "app.setTheme";
+        constexpr const char* APP_SET_MODAL_OPEN  = "app.setModalOpen";
 
         // Transport
         constexpr const char* TRANSPORT_PLAY      = "transport.play";

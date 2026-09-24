@@ -1,4 +1,4 @@
-import { For, createEffect, createMemo, createSignal, onCleanup, type JSX } from "solid-js";
+import { For, createEffect, createMemo, createSignal, onCleanup, onMount, type JSX } from "solid-js";
 import { Portal } from "solid-js/web";
 import {
   AETHER_NOTE_AUTOMATION_TARGETS,
@@ -68,6 +68,7 @@ import {
   snapMidiBeatToVisibleGrid,
   type MidiGridLineKind,
 } from "./pianoRollInteraction";
+import { subdivideMidiNotes } from "./midiNoteSubdivision";
 import styles from "./PianoRoll.module.css";
 
 export interface PianoRollProps {
@@ -76,6 +77,8 @@ export interface PianoRollProps {
   lengthBeats: number;
   /** Current playhead position relative to this segment, in beats. */
   playheadBeat?: number | null;
+  bpm?: number;
+  timeSignature?: { num: number };
   hotkeyScopeId?: string;
   onLengthChange?: (lengthBeats: number) => void;
   onChange: (notes: MidiNote[]) => void;
@@ -89,7 +92,7 @@ export interface PianoRollProps {
   defaultNoteLengthBeats?: number;
   minimumNoteLengthBeats?: number;
   maxNotes?: number;
-  /** Advanced per-note Aether automation. Hidden by default so the piano roll stays a plain MIDI editor. */
+  /** Advanced per-note instrument automation. Hidden by default so the piano roll stays a plain MIDI editor. */
   showAutomation?: boolean;
   /** Active track/component instrument. Used for sampler-zone note overrides. */
   instrument?: Instrument;
@@ -115,6 +118,7 @@ const MAX_PX_PER_BEAT = 384;
 const ZOOM_STEP = 8;
 const PX_PER_PITCH = 16;
 const VIEW_HEIGHT = 520;
+const VIEWPORT_OVERSCAN_BEATS = 4;
 const ENABLE_AETHER_NOTE_AUTOMATION_PANEL = false;
 const TOP_PITCH = 127;    // G9 — expose the complete MIDI note range by default.
 const BOTTOM_PITCH = 0;   // C-1 — bass/sub notes must remain visible and editable.
@@ -192,6 +196,7 @@ export function PianoRoll(props: PianoRollProps) {
   const keysScrollRef = createRef<HTMLDivElement | null>(null);
   const timeScrollRef = createRef<HTMLDivElement | null>(null);
   const [selected, setSelected] = createSignal<number[]>([]);
+  const [selectedPitchRows, setSelectedPitchRows] = createSignal<number[]>([]);
   const [pxPerBeat, setPxPerBeat] = createSignal(DEFAULT_PX_PER_BEAT);
   const [selectBox, setSelectBox] = createSignal<Rect | null>(null);
   const [noteMenu, setNoteMenu] = createSignal<{ x: number; y: number; idx: number; target: PasteTarget } | null>(null);
@@ -199,6 +204,7 @@ export function PianoRoll(props: PianoRollProps) {
   const [volumePopover, setVolumePopover] = createSignal<VolumePopoverState | null>(null);
   const [noteEditor, setNoteEditor] = createSignal<NoteEditorState | null>(null);
   const [arpeggiationPopover, setArpeggiationPopover] = createSignal<ArpeggiationPopoverState | null>(null);
+  const [subdivisionPopover, setSubdivisionPopover] = createSignal<SubdivisionPopoverState | null>(null);
   const [arpeggiationSequenceSelectOpen, setArpeggiationSequenceSelectOpen] = createSignal(false);
   const [hoveredNoteSide, setHoveredNoteSide] = createSignal<{ idx: number; side: "left" | "right" } | null>(null);
   const [toolMode, setToolMode] = createSignal<MidiToolMode>("draw");
@@ -215,9 +221,10 @@ export function PianoRoll(props: PianoRollProps) {
   const [automationPointClipboard, setAutomationPointClipboard] = createSignal<AetherNoteAutomationPointClipboard | null>(null);
   const [selectedAutomationPointIndices, setSelectedAutomationPointIndices] = createSignal<number[]>([]);
   const [viewportVersion, setViewportVersion] = createSignal(0);
+  const [viewport, setViewport] = createSignal({ scrollLeft: 0, width: 0 });
   const anchoredNoteMenu = createMemo(() => {
     const state = noteMenu();
-    return state ? noteAnchoredViewportState(state, 150, 214) : null;
+    return state ? noteAnchoredViewportState(state, 166, 286) : null;
   });
   const anchoredVolumePopover = createMemo(() => {
     const state = volumePopover();
@@ -230,6 +237,10 @@ export function PianoRoll(props: PianoRollProps) {
   const anchoredArpeggiationPopover = createMemo(() => {
     const state = arpeggiationPopover();
     return state ? noteAnchoredViewportState(state, 244, 190) : null;
+  });
+  const anchoredSubdivisionPopover = createMemo(() => {
+    const state = subdivisionPopover();
+    return state ? noteAnchoredViewportState(state, 226, 128) : null;
   });
   const lastDrawnLengthRef = createRef(defaultNoteLength);
   const lastPointerTargetRef = createRef<PasteTarget | null>(null);
@@ -306,8 +317,37 @@ export function PianoRoll(props: PianoRollProps) {
 
   const width = () => lengthBeats * pxPerBeat();
   const height = pitchRange * PX_PER_PITCH;
-  const gridLines = createMemo(() => makeGridLines(lengthBeats, pxPerBeat()));
+  const visibleBeatRange = createMemo(() => {
+    const current = viewport();
+    const scale = pxPerBeat();
+    return {
+      start: Math.max(0, current.scrollLeft / scale - VIEWPORT_OVERSCAN_BEATS),
+      end: Math.min(Number(lengthBeats), (current.scrollLeft + Math.max(1, current.width)) / scale + VIEWPORT_OVERSCAN_BEATS),
+    };
+  });
+  const visibleNoteEntries = createMemo(() => {
+    const range = visibleBeatRange();
+    return props.notes
+      .map((note, index) => ({ note, index }))
+      .filter(({ note }) => note.startBeat < range.end && note.startBeat + note.lengthBeats > range.start);
+  });
+  const gridLines = createMemo(() => {
+    const range = visibleBeatRange();
+    return makeGridLines(lengthBeats, pxPerBeat(), range.start, range.end);
+  });
   const noteGroupBounds = createMemo(() => midiGroupBounds(props.notes));
+  const visibleNoteGroupBounds = createMemo(() => {
+    const range = visibleBeatRange();
+    return noteGroupBounds().filter((group) => group.minStartBeat < range.end && group.maxEndBeat > range.start);
+  });
+  const timelineTicks = createMemo(() => makeTimelineTicks(
+    Number(lengthBeats),
+    pxPerBeat(),
+    visibleBeatRange().start,
+    visibleBeatRange().end,
+    props.bpm ?? 120,
+    props.timeSignature?.num ?? 4,
+  ));
   const selectedAutomationSummary = createMemo(() =>
     selectedMidiNoteAutomationSummary(props.notes, selected(), activeAutomationTarget())
   );
@@ -458,6 +498,7 @@ export function PianoRoll(props: PianoRollProps) {
 
   function selectAllNotes() {
     setSelected(notes.map((_, index) => index));
+    setSelectedPitchRows([]);
     setNoteMenu(null);
     setGridMenu(null);
   }
@@ -472,9 +513,15 @@ export function PianoRoll(props: PianoRollProps) {
     () => Boolean(props.hotkeyScopeId),
   );
 
-  // Keep selected() indices valid if notes shrink.
+  // Keep selected indices valid only after an actual shrink. A newly drawn note
+  // is selected before the parent delivers its new note array.
+  const previousNoteCountRef = createRef(notes.length);
   createCompatEffect(() => {
-    setSelected((prev) => prev.filter((i) => i >= 0 && i < notes.length));
+    const nextCount = notes.length;
+    if (nextCount < previousNoteCountRef.current) {
+      setSelected((prev) => prev.filter((i) => i >= 0 && i < nextCount));
+    }
+    previousNoteCountRef.current = nextCount;
   }, [notes.length]);
 
   createCompatEffect(() => {
@@ -490,7 +537,7 @@ export function PianoRoll(props: PianoRollProps) {
     return () => window.removeEventListener("pointerdown", closeNoteDetails, true);
   }, [noteEditor(), volumePopover()]);
 
-  createCompatEffect(() => {
+  onMount(() => {
     const scroll = timeScrollRef.current;
     if (!scroll) return;
     const pitches = notes
@@ -509,7 +556,21 @@ export function PianoRoll(props: PianoRollProps) {
     const maxScrollTop = Math.max(0, height - VIEW_HEIGHT);
     scroll.scrollTop = clamp(noteCenter - VIEW_HEIGHT / 2, 0, maxScrollTop);
     syncKeyScroll();
-  }, []);
+
+    const updateViewport = () => {
+      const current = timeScrollRef.current;
+      if (!current) return;
+      setViewport({ scrollLeft: current.scrollLeft, width: current.clientWidth });
+    };
+    updateViewport();
+    const observer = new ResizeObserver(updateViewport);
+    observer.observe(scroll);
+    window.addEventListener("resize", updateViewport);
+    onCleanup(() => {
+      observer.disconnect();
+      window.removeEventListener("resize", updateViewport);
+    });
+  });
 
   createCompatEffect(() => {
     if (!dragActive()) return;
@@ -634,6 +695,7 @@ export function PianoRoll(props: PianoRollProps) {
     if (isMidiInteractiveTarget(e.target)) return;
     if (e.button !== 0) return;
     e.preventDefault();
+    setSelectedPitchRows([]);
     setNoteMenu(null);
     setGridMenu(null);
     setVolumePopover(null);
@@ -695,6 +757,7 @@ export function PianoRoll(props: PianoRollProps) {
   }
 
   function startMarquee(anchorX: number, anchorY: number, pointerId: number, additive: boolean) {
+    if (!additive) setSelectedPitchRows([]);
     const y = clamp(anchorY, 0, height);
     drag.current = { mode: "select", anchorX, anchorY: y, pointerId, additive, baseSelection: selected() };
     setSelectBox({ left: anchorX, top: y, width: 0, height: 0 });
@@ -710,7 +773,7 @@ export function PianoRoll(props: PianoRollProps) {
     setGridMenu(null);
     setVolumePopover(null);
     setNoteEditor(null);
-    drag.current = { mode: "length-resize", startX: e.clientX, startLengthBeats: lengthBeats };
+    drag.current = { mode: "length-resize", startX: e.clientX, startLengthBeats: Number(lengthBeats) };
     setLengthHandleActive(true);
     setDragActive(true);
   }
@@ -739,6 +802,7 @@ export function PianoRoll(props: PianoRollProps) {
     e.preventDefault();
     e.stopPropagation();
     if (e.button !== 0) return;
+    setSelectedPitchRows([]);
     setNoteMenu(null);
     setGridMenu(null);
     setVolumePopover(null);
@@ -1032,6 +1096,23 @@ export function PianoRoll(props: PianoRollProps) {
     });
   }
 
+  function openSubdivisionEditor(idx: number) {
+    const indices = linkedSelection(selected().length > 0 ? selected() : [idx]);
+    if (indices.length === 0) return;
+    setSubdivisionPopover({ indices, idx, x: 0, y: 0, divisions: 2 });
+  }
+
+  function applySubdivision() {
+    const current = subdivisionPopover();
+    if (!current) return;
+    const result = subdivideMidiNotes(props.notes, current.indices, current.divisions);
+    if (result.selectedIndices.length === 0) return;
+    commitChange(result.notes);
+    setSelected(result.selectedIndices);
+    setSelectedPitchRows([]);
+    setSubdivisionPopover(null);
+  }
+
   function applyArpeggiation() {
     const current = arpeggiationPopover();
     if (!current) return;
@@ -1232,7 +1313,12 @@ export function PianoRoll(props: PianoRollProps) {
   }
 
   function deleteNote(idx: number) {
-    const removed = new Set(linkedSelection(selected().includes(idx) ? selected() : [idx]));
+    removeNotes(linkedSelection(selected().includes(idx) ? selected() : [idx]));
+  }
+
+  function removeNotes(indices: number[]) {
+    const removed = new Set(indices);
+    if (removed.size === 0) return false;
     const indexMap = new Map<number, number>();
     let nextIndex = 0;
     notes.forEach((_, index) => {
@@ -1251,6 +1337,8 @@ export function PianoRoll(props: PianoRollProps) {
     setConnectPointer(null);
     setCurveFrom(null);
     setCurvePointer(null);
+    setSelectedPitchRows([]);
+    return true;
   }
 
   function addAutomationLaneToSelection() {
@@ -1454,6 +1542,12 @@ export function PianoRoll(props: PianoRollProps) {
     return copyNotes(indices);
   }
 
+  function cutCurrentSelection(fallbackIdx?: number): boolean {
+    const indices = linkedSelection(selected().length > 0 ? selected() : fallbackIdx == null ? [] : [fallbackIdx]);
+    if (!copyNotes(indices)) return false;
+    return removeNotes(indices);
+  }
+
   function pasteCopiedNotes(_target?: PasteTarget): boolean {
     if (!midiNoteClipboard || midiNoteClipboard.notes.length === 0) return false;
     const maxStart = Math.max(0, lengthBeats - midiNoteClipboard.spanBeats);
@@ -1496,6 +1590,7 @@ export function PianoRoll(props: PianoRollProps) {
         setNoteEditor(null);
         setArpeggiationSequenceSelectOpen(false);
         setArpeggiationPopover(null);
+        setSubdivisionPopover(null);
         setSelectBox(null);
         drag.current = null;
         setDragActive(false);
@@ -1512,7 +1607,6 @@ export function PianoRoll(props: PianoRollProps) {
         return;
       }
       if (isCopyPasteModifier && e.key.toLowerCase() === "a") {
-        if (props.hotkeyScopeId) return;
         e.preventDefault();
         e.stopPropagation();
         e.stopImmediatePropagation();
@@ -1521,6 +1615,13 @@ export function PianoRoll(props: PianoRollProps) {
       }
       if (isCopyPasteModifier && e.key.toLowerCase() === "c") {
         if (!copyCurrentSelection()) return;
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        return;
+      }
+      if (isCopyPasteModifier && e.key.toLowerCase() === "x") {
+        if (!cutCurrentSelection()) return;
         e.preventDefault();
         e.stopPropagation();
         e.stopImmediatePropagation();
@@ -1538,27 +1639,14 @@ export function PianoRoll(props: PianoRollProps) {
       e.preventDefault();
       e.stopPropagation();
       e.stopImmediatePropagation();
-      const removed = new Set(linkedSelection(selected()));
-      const indexMap = new Map<number, number>();
-      let nextIndex = 0;
-      notes.forEach((_, i) => {
-        if (!removed.has(i)) indexMap.set(i, nextIndex++);
-      });
-      const next = notes
-        .filter((_, i) => !removed.has(i))
-        .map((note) => {
-          const mapped = note.connectToIndex == null ? undefined : indexMap.get(note.connectToIndex);
-          return { ...note, connectToIndex: mapped };
-        });
-      commitChange(next);
-      setSelected([]);
+      removeNotes(linkedSelection(selected()));
     }
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
   }, [selected(), notes, onChange, volumePopover(), props.playheadBeat]);
 
   createCompatEffect(() => {
-    if (connectFrom() == null && curveFrom() == null && !noteMenu() && !gridMenu() && !volumePopover() && !noteEditor() && !arpeggiationPopover()) return;
+    if (connectFrom() == null && curveFrom() == null && !noteMenu() && !gridMenu() && !volumePopover() && !noteEditor() && !arpeggiationPopover() && !subdivisionPopover()) return;
     function cancel(e: MouseEvent) {
       const target = e.target as Node;
       if (rollWrapRef.current?.contains(target)) return;
@@ -1569,6 +1657,7 @@ export function PianoRoll(props: PianoRollProps) {
       setNoteEditor(null);
       setArpeggiationSequenceSelectOpen(false);
       setArpeggiationPopover(null);
+      setSubdivisionPopover(null);
       if (connectFrom() != null) {
         setConnectFrom(null);
         setConnectPointer(null);
@@ -1580,11 +1669,15 @@ export function PianoRoll(props: PianoRollProps) {
     }
     window.addEventListener("mousedown", cancel);
     return () => window.removeEventListener("mousedown", cancel);
-  }, [connectFrom(), curveFrom(), noteMenu(), gridMenu(), volumePopover(), noteEditor(), arpeggiationPopover()]);
+  }, [connectFrom(), curveFrom(), noteMenu(), gridMenu(), volumePopover(), noteEditor(), arpeggiationPopover(), subdivisionPopover()]);
 
   function syncKeyScroll() {
     if (!keysScrollRef.current || !timeScrollRef.current) return;
     keysScrollRef.current.scrollTop = timeScrollRef.current.scrollTop;
+    setViewport({
+      scrollLeft: timeScrollRef.current.scrollLeft,
+      width: timeScrollRef.current.clientWidth,
+    });
     setViewportVersion((version) => version + 1);
   }
 
@@ -1719,9 +1812,45 @@ export function PianoRoll(props: PianoRollProps) {
     return out;
   }, []);
 
+  function selectPitchRow(pitch: number, additive: boolean) {
+    const pitchIndices = props.notes
+      .map((note, index) => ({ note, index }))
+      .filter(({ note }) => note.pitch === pitch)
+      .map(({ index }) => index);
+    setSelected((current) => additive
+      ? Array.from(new Set([...current, ...pitchIndices])).sort((a, b) => a - b)
+      : pitchIndices);
+    setSelectedPitchRows((current) => additive
+      ? current.includes(pitch) ? current.filter((value) => value !== pitch) : [...current, pitch]
+      : [pitch]);
+    setNoteMenu(null);
+    setGridMenu(null);
+  }
+
   return (
     <div ref={(element) => { rollWrapRef.current = element; }} class={styles.rollWrap}>
       <div class={styles.editorFrame}>
+        <div class={styles.timelineCorner} aria-hidden />
+        <div class={styles.timelineViewport} aria-label="MIDI timeline">
+          <div
+            class={styles.timelineRuler}
+            style={{ width: px(width()), transform: `translateX(${-viewport().scrollLeft}px)` }}
+          >
+            <For each={timelineTicks()}>
+              {(tick) => (
+                <div
+                  class={`${styles.timelineTick} ${tick.major ? styles.timelineTickMajor : ""}`}
+                  style={{ left: px(tick.beat * pxPerBeat()) }}
+                >
+                  {tick.label && <span>{tick.label}</span>}
+                </div>
+              )}
+            </For>
+            {props.playheadBeat != null && props.playheadBeat >= 0 && props.playheadBeat <= lengthBeats && (
+              <div class={styles.timelinePlayhead} style={{ left: px(props.playheadBeat * pxPerBeat()) }} />
+            )}
+          </div>
+        </div>
         <div
           ref={(element) => {
             keysScrollRef.current = element;
@@ -1733,12 +1862,16 @@ export function PianoRoll(props: PianoRollProps) {
           {/* Key column */}
           <div class={styles.keys} style={{ width: px(KEY_LABEL_WIDTH), height: px(height) }}>
             {keyLabels().map((k) => (
-              <div
-                class={`${styles.key} ${k.isBlack ? styles.keyBlack : ""}`}
+              <button
+                type="button"
+                class={`${styles.key} ${k.isBlack ? styles.keyBlack : ""} ${selectedPitchRows().includes(k.pitch) ? styles.keySelected : ""}`}
                 style={{ height: px(PX_PER_PITCH) }}
+                aria-label={`Select all ${k.label} notes`}
+                aria-pressed={selectedPitchRows().includes(k.pitch)}
+                onClick={(event) => selectPitchRow(k.pitch, event.shiftKey || event.metaKey || event.ctrlKey)}
               >
                 {k.label}
-              </div>
+              </button>
             ))}
           </div>
         </div>
@@ -1789,7 +1922,7 @@ export function PianoRoll(props: PianoRollProps) {
               {/* Horizontal rows (per pitch) */}
               {keyLabels().map((k, i) => (
                 <div
-                  class={`${styles.row} ${k.isBlack ? styles.rowBlack : ""}`}
+                  class={`${styles.row} ${k.isBlack ? styles.rowBlack : ""} ${selectedPitchRows().includes(k.pitch) ? styles.rowSelected : ""}`}
                   style={{ top: px(i * PX_PER_PITCH), height: px(PX_PER_PITCH) }}
                 />
               ))}
@@ -1803,7 +1936,7 @@ export function PianoRoll(props: PianoRollProps) {
               ))}
 
               <svg class={styles.connections} width={width()} height={height} aria-hidden>
-                {notes.map((note, i) => {
+                {visibleNoteEntries().map(({ note, index: i }) => {
                   if (!note.curve || note.curve.length < 2) return null;
                   if (noteEditor()?.idx === i) return null;
                   const [from, to] = note.curve;
@@ -1826,7 +1959,7 @@ export function PianoRoll(props: PianoRollProps) {
                     </g>
                   );
                 })}
-                {notes.map((note) => {
+                {visibleNoteEntries().map(({ note }) => {
                   const to = note.connectToIndex;
                   if (to == null || !notes[to]) return null;
                   const fromRect = noteRect(note);
@@ -1880,7 +2013,7 @@ export function PianoRoll(props: PianoRollProps) {
               </svg>
 
             {/* Linked-note groups remain source geometry; arpeggiation is rendered only for playback/export. */}
-            <For each={noteGroupBounds()}>
+            <For each={visibleNoteGroupBounds()}>
               {(group) => (
                 <div
                   class={`${styles.noteGroupOutline} ${group.arpeggiated ? styles.noteGroupOutlineArpeggiated : ""}`}
@@ -1898,9 +2031,10 @@ export function PianoRoll(props: PianoRollProps) {
             </For>
 
             {/* Notes */}
-            <For each={props.notes}>
-              {(n, index) => {
-                const i = index();
+            <For each={visibleNoteEntries()}>
+              {(entry) => {
+                const n = entry.note;
+                const i = entry.index;
                 const rect = createMemo(() => visibleNoteRect(n));
                 const noteStyle = createMemo(() => {
                   const currentRect = rect();
@@ -2044,8 +2178,10 @@ export function PianoRoll(props: PianoRollProps) {
               iconOnly
               size="xs"
               selected={toolMode() === "draw"}
+              className={toolMode() === "draw" ? styles.toolButtonActive : undefined}
               onClick={() => setToolMode("draw")}
               aria-label="Draw notes tool, B"
+              aria-pressed={toolMode() === "draw"}
             >
               <Icon name="ph:pen" size={18} decorative />
             </Button>
@@ -2055,8 +2191,10 @@ export function PianoRoll(props: PianoRollProps) {
               iconOnly
               size="xs"
               selected={toolMode() === "select"}
+              className={toolMode() === "select" ? styles.toolButtonActive : undefined}
               onClick={() => setToolMode("select")}
               aria-label="Select notes tool, V"
+              aria-pressed={toolMode() === "select"}
             >
               <Icon name="ph:cursor" size={18} decorative />
             </Button>
@@ -2111,9 +2249,9 @@ export function PianoRoll(props: PianoRollProps) {
           </div>
         )}
         {ENABLE_AETHER_NOTE_AUTOMATION_PANEL && props.showAutomation && (
-          <div class={styles.automationPanel} aria-label="Aether note automation lanes">
+          <div class={styles.automationPanel} aria-label="Instrument note automation lanes">
             <div class={styles.automationHeader}>
-              <span>Aether lanes</span>
+              <span>Instrument lanes</span>
               <span>{aetherNoteAutomationTargetLabel(activeAutomationTarget())} · {selectedAutomationSummary()}</span>
             </div>
             <div
@@ -2124,7 +2262,7 @@ export function PianoRoll(props: PianoRollProps) {
               <span>{selectedAutomationEffective().label}</span>
               <span>{selectedAutomationEffective().detail}</span>
             </div>
-            <div class={styles.automationTargets} role="radiogroup" aria-label="Aether note automation target">
+            <div class={styles.automationTargets} role="radiogroup" aria-label="Instrument note automation target">
               {AETHER_NOTE_AUTOMATION_TARGETS.map((target) => (
                 <Button
                   size="xs"
@@ -2150,7 +2288,7 @@ export function PianoRoll(props: PianoRollProps) {
                   open={automationCurveSelectOpen()}
                   className={styles.automationCurveSelect}
                   layout="inline"
-                  ariaLabel="Aether note automation curve"
+                  ariaLabel="Instrument note automation curve"
                   onOpenChange={setAutomationCurveSelectOpen}
                   onChange={setAutomationCurve}
                 />
@@ -2216,7 +2354,7 @@ export function PianoRoll(props: PianoRollProps) {
                   E
                 </button>
               </div>
-              <div class={styles.automationPointEditor} aria-label="Aether note automation points">
+              <div class={styles.automationPointEditor} aria-label="Instrument note automation points">
                 <div class={styles.automationPointHeader}>
                   <span>Points</span>
                   <div class={styles.automationPointTools}>
@@ -2324,6 +2462,10 @@ export function PianoRoll(props: PianoRollProps) {
             openArpeggiationEditor(currentNoteMenu.idx);
             setNoteMenu(null);
           }}
+          onSubdivide={() => {
+            openSubdivisionEditor(currentNoteMenu.idx);
+            setNoteMenu(null);
+          }}
           onGroup={() => {
             groupCurrentSelection();
             setNoteMenu(null);
@@ -2338,6 +2480,10 @@ export function PianoRoll(props: PianoRollProps) {
           }}
           onCopy={() => {
             copyCurrentSelection(currentNoteMenu.idx);
+            setNoteMenu(null);
+          }}
+          onCut={() => {
+            cutCurrentSelection(currentNoteMenu.idx);
             setNoteMenu(null);
           }}
           onPaste={() => {
@@ -2438,6 +2584,18 @@ export function PianoRoll(props: PianoRollProps) {
           />
         );
       })()}
+      {(() => {
+        const currentSubdivision = anchoredSubdivisionPopover();
+        if (!currentSubdivision) return null;
+        return (
+          <SubdivisionPopover
+            state={currentSubdivision}
+            onChange={(divisions) => setSubdivisionPopover({ ...currentSubdivision, divisions })}
+            onApply={applySubdivision}
+            onCancel={() => setSubdivisionPopover(null)}
+          />
+        );
+      })()}
     </div>
   );
 }
@@ -2449,10 +2607,12 @@ function NoteMenu({
   onConnect,
   onCurve,
   onArpeggiation,
+  onSubdivide,
   onGroup,
   onUngroup,
   onRemoveArpeggiation,
   onCopy,
+  onCut,
   onPaste,
   onDelete,
   canCopy,
@@ -2468,10 +2628,12 @@ function NoteMenu({
   onConnect: () => void;
   onCurve: () => void;
   onArpeggiation: () => void;
+  onSubdivide: () => void;
   onGroup: () => void;
   onUngroup: () => void;
   onRemoveArpeggiation: () => void;
   onCopy: () => void;
+  onCut: () => void;
   onPaste: () => void;
   onDelete: () => void;
   canCopy: boolean;
@@ -2524,6 +2686,12 @@ function NoteMenu({
           Remove arpeggiation
         </Button>
       )}
+      <Button variant="ghost" fullWidth class={styles.noteMenuItem} onClick={(event) => runMenuAction(event, onSubdivide)} disabled={!canCopy} role="menuitem">
+        Subdivide notes…
+      </Button>
+      <Button variant="ghost" fullWidth class={styles.noteMenuItem} onClick={(event) => runMenuAction(event, onCut)} disabled={!canCopy} role="menuitem">
+        Cut
+      </Button>
       <Button variant="ghost" fullWidth class={styles.noteMenuItem} onClick={(event) => runMenuAction(event, onCopy)} disabled={!canCopy} role="menuitem">
         Copy
       </Button>
@@ -2668,6 +2836,46 @@ interface ArpeggiationPopoverState {
   sequence: MidiArpeggiationSequence;
   timingType: MidiArpeggiationTimingType;
   noteValue: MidiArpeggiationNoteValue;
+}
+
+interface SubdivisionPopoverState {
+  indices: number[];
+  idx: number;
+  x: number;
+  y: number;
+  divisions: number;
+}
+
+function SubdivisionPopover(props: {
+  state: SubdivisionPopoverState;
+  onChange: (divisions: number) => void;
+  onApply: () => void;
+  onCancel: () => void;
+}) {
+  return createPortal(
+    <FloatingLayer class={styles.subdivisionPopover} x={props.state.x} y={props.state.y} role="dialog" aria-label="Subdivide selected notes">
+      <div class={styles.arpeggiationTitle}>Subdivide notes</div>
+      <NumberInput
+        layout="inline"
+        label="Parts"
+        min={2}
+        max={64}
+        step={1}
+        value={props.state.divisions}
+        onChange={(value) => props.onChange(clamp(Math.round(value), 2, 64))}
+      />
+      <div class={styles.subdivisionPresets}>
+        <For each={[2, 3, 4, 6, 8, 16]}>
+          {(value) => <Button size="xs" variant={props.state.divisions === value ? "primary" : "ghost"} onClick={() => props.onChange(value)}>{value}</Button>}
+        </For>
+      </div>
+      <div class={styles.arpeggiationActions}>
+        <Button size="xs" variant="ghost" onClick={props.onCancel}>Cancel</Button>
+        <Button size="xs" onClick={props.onApply}>Apply</Button>
+      </div>
+    </FloatingLayer>,
+    document.body,
+  );
 }
 
 function CurveHandles({
@@ -3078,19 +3286,53 @@ function midiGridLineClass(kind: MidiGridLineKind): string {
   return styles.beatLineSixteenth;
 }
 
-function makeGridLines(lengthBeats: number, pxPerBeat: number): Array<{ beat: number; kind: MidiGridLineKind }> {
+function makeGridLines(
+  lengthBeats: number,
+  pxPerBeat: number,
+  visibleStart = 0,
+  visibleEnd = lengthBeats,
+): Array<{ beat: number; kind: MidiGridLineKind }> {
   const step = midiVisibleGridBeatStep(pxPerBeat);
-  const count = Math.floor(lengthBeats / step);
+  const first = Math.max(0, Math.floor(visibleStart / step));
+  const last = Math.min(Math.floor(lengthBeats / step), Math.ceil(visibleEnd / step));
   const lines: Array<{ beat: number; kind: MidiGridLineKind }> = [];
-  for (let i = 0; i <= count; i++) {
+  for (let i = first; i <= last; i++) {
     const beat = Math.round(i * step * 10000) / 10000;
     lines.push({
       beat,
       kind: midiGridLineKind(beat),
     });
   }
-  if (Math.abs(lengthBeats - count * step) > 0.0001) {
+  if (visibleEnd >= lengthBeats && Math.abs(lengthBeats - Math.floor(lengthBeats / step) * step) > 0.0001) {
     lines.push({ beat: lengthBeats, kind: "bar" });
   }
   return lines;
+}
+
+function makeTimelineTicks(
+  lengthBeats: number,
+  pxPerBeat: number,
+  visibleStart: number,
+  visibleEnd: number,
+  bpm: number,
+  beatsPerMeasure: number,
+): Array<{ beat: number; major: boolean; label: string }> {
+  const safeBpm = Math.max(1, bpm);
+  const measure = Math.max(1, beatsPerMeasure);
+  const labelEveryBeats = pxPerBeat >= 80 ? 1 : pxPerBeat >= 40 ? measure : measure * Math.ceil(56 / Math.max(1, pxPerBeat * measure));
+  const first = Math.max(0, Math.floor(visibleStart));
+  const last = Math.min(Math.ceil(lengthBeats), Math.ceil(visibleEnd));
+  const ticks: Array<{ beat: number; major: boolean; label: string }> = [];
+  for (let beat = first; beat <= last; beat += 1) {
+    const major = beat % measure === 0;
+    const shouldLabel = beat % labelEveryBeats === 0;
+    ticks.push({ beat, major, label: shouldLabel ? formatTimelineTime((beat * 60) / safeBpm) : "" });
+  }
+  return ticks;
+}
+
+function formatTimelineTime(seconds: number): string {
+  const wholeSeconds = Math.max(0, Math.floor(seconds));
+  const minutes = Math.floor(wholeSeconds / 60);
+  return `${minutes}:${String(wholeSeconds % 60).padStart(2, "0")}`;
 }

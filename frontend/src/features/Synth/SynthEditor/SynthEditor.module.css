@@ -994,6 +994,8 @@
 }
 
 .ampFilterRibbonTitle {
+  display: inline-flex;
+  align-items: center;
   min-width: 0;
   padding: 0 var(--synth-gap);
   color: var(--color-fg);
@@ -1001,6 +1003,7 @@
   font-weight: var(--font-weight-bold);
   line-height: 1;
   text-transform: none;
+  gap: 3px;
 }
 
 .ampFilterBody {

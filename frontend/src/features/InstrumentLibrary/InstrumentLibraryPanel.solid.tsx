@@ -1,25 +1,18 @@
-import { createEffect, createSignal, For, onCleanup, Show } from "solid-js";
-import { Button, Checkbox, HoverInfo, Icon, LibraryFolder, LibrarySearch, LoadingIndicator, RowActionButton, RowItem, SectionRibbon, SectionRibbonActionButton, createContextMenu, type ContextMenuItem } from "../../solid-ui";
+import { createEffect, createMemo, createSignal, For, onCleanup, Show } from "solid-js";
+import { Button, Checkbox, HoverInfo, Icon, LibraryFolder, LibrarySearch, LoadingIndicator, RIBBON_HELP, RowActionButton, RowItem, SectionRibbon, SectionRibbonActionButton, createContextMenu, type ContextMenuItem } from "../../solid-ui";
 import { createInstrumentBufferSource, preloadInstrumentSamplesForPlayback, previewFrequency } from "../../audio/synthPreview";
 import { registerGlobalAudioStop } from "../../audio/globalAudioSafety";
-import { LUMEN_TEST_INSTRUMENT_SET_ID, TEMPORARY_DS_INSTRUMENT_SET_ID, snapshotInstrument, useInstrumentStore, usePluginStore, useProjectStore, useUiStore } from "../../state/store";
+import { AURUM_TEST_SET_ID, LUMEN_TEST_INSTRUMENT_SET_ID, TEMPORARY_DS_INSTRUMENT_SET_ID, runProjectHistoryGroup, useInstrumentStore, usePluginStore, useProjectStore, useUiStore } from "../../state/store";
 import { createAurumInstrument } from "../../state/aurum";
+import { userAccessibleInstruments } from "../../state/instrumentAccess";
+import { createInstrumentSegmentPatch, instrumentUsesDrumSegment } from "../../state/instrumentTrackCreation";
 import { instrumentIcon, instrumentIconLabel } from "../../state/instrumentIcons";
 import { instrumentRepositorySearchText } from "../../state/instrumentSongAssociations";
-import {
-  FACTORY_SYNTH_PRESETS,
-  canCloneAetherInstrumentAsLumen,
-  cloneAetherDraftAsLumen,
-  createDefaultLumenDraft,
-  createDefaultSynthDraft,
-  synthDraftToInstrumentPatch,
-  useSynthStore,
-  type SynthDraftPatch,
-} from "../../state/synthStore";
+import { createDefaultLumenDraft, synthDraftToInstrumentPatch, useSynthStore, type SynthDraftPatch } from "../../state/synthStore";
 import type { Instrument, InstrumentSet } from "../../state/types";
 import { createStoreSelector } from "../../solid-utils/store";
 import { MergeInstrumentModal } from "./MergeInstrumentModal.solid";
-import { decentSamplerPluginForInstrument } from "../PluginLibrary/decentSamplerPluginAdapter";
+import { decentSamplerEditorKind, decentSamplerPluginForInstrument } from "../PluginLibrary/decentSamplerPluginAdapter";
 import { editorRequestForInstrument } from "../InstrumentEditor/instrumentEditorRouting";
 import { compileNodeGraphToInstrumentPatch, createStarterInstrumentNodeGraph } from "../NodeInstrumentEditor/nodeGraph";
 import styles from "./InstrumentLibraryPanel.module.css";
@@ -28,23 +21,10 @@ const KIND_HINT: Record<string, string> = {
   synth: "Synth",
   sampler: "Sampler",
   hybrid: "Hybrid",
-  wavetable: "Aether WT",
+  wavetable: "Wavetable",
 };
 
 const INSTRUMENT_SET_EXPANSION_KEY = "beat.instrument-library.open-sets.v1";
-
-interface WavetableStarter {
-  label: string;
-  icon: string;
-  presetId: string;
-  fallbackNameBase: string;
-  engine: "aether" | "lumen";
-}
-
-const WAVETABLE_STARTERS: WavetableStarter[] = [
-  { label: "Create Aether", icon: "ph:cube", presetId: "factory.init", fallbackNameBase: "Aether Patch", engine: "aether" },
-  { label: "Create Lumen", icon: "ph:sparkle", presetId: "", fallbackNameBase: "Lumen Patch", engine: "lumen" },
-];
 
 function createDraftId() {
   return globalThis.crypto?.randomUUID?.() ?? `draft_${Date.now()}_${Math.random().toString(36).slice(2)}`;
@@ -72,6 +52,7 @@ export function InstrumentLibraryPanel(props: InstrumentLibraryPanelProps) {
   const [searchQuery, setSearchQuery] = createSignal("");
   const normalizedSearch = () => searchQuery().trim().toLowerCase();
   const instruments = createStoreSelector(useInstrumentStore, (s) => s.instruments);
+  const accessibleInstruments = createMemo(() => userAccessibleInstruments(instruments()));
   const instrumentSets = createStoreSelector(useInstrumentStore, (s) => s.instrumentSets);
   const loading = createStoreSelector(useInstrumentStore, (s) => s.loading);
   const plugins = createStoreSelector(usePluginStore, (s) => s.plugins);
@@ -85,7 +66,7 @@ export function InstrumentLibraryPanel(props: InstrumentLibraryPanelProps) {
   let previewRequest = 0;
   let panelElement: HTMLDivElement | undefined;
 
-  const selectedInstruments = () => instruments().filter((instrument) => selectedIds().has(instrument.id));
+  const selectedInstruments = () => accessibleInstruments().filter((instrument) => selectedIds().has(instrument.id));
   const sortedInstrumentSets = () => [...instrumentSets()]
     .sort((a, b) => instrumentSetDisplayName(a).localeCompare(instrumentSetDisplayName(b), undefined, { sensitivity: "base" }));
 
@@ -110,14 +91,9 @@ export function InstrumentLibraryPanel(props: InstrumentLibraryPanelProps) {
       onSelect: createAurum,
     },
     {
-      label: "Create Aether",
-      icon: "ph:cube",
-      onSelect: () => createWavetable(WAVETABLE_STARTERS[0]),
-    },
-    {
       label: "Create Lumen",
       icon: "ph:sparkle",
-      onSelect: () => createWavetable(WAVETABLE_STARTERS[1]),
+      onSelect: createLumen,
     },
     {
       label: "Create Sampler",
@@ -169,7 +145,7 @@ export function InstrumentLibraryPanel(props: InstrumentLibraryPanelProps) {
   });
 
   function createNodemap() {
-    const draft = createDefaultSynthDraft();
+    const draft = createDefaultLumenDraft();
     const instrumentName = nextInstrumentName(instruments(), "Nodemap Patch");
     const namedDraft: SynthDraftPatch = {
       ...structuredClone(draft),
@@ -248,19 +224,16 @@ export function InstrumentLibraryPanel(props: InstrumentLibraryPanelProps) {
     });
   }
 
-  function createWavetable(starter: WavetableStarter) {
-    const preset = FACTORY_SYNTH_PRESETS.find((candidate) => candidate.id === starter.presetId);
-    const draft = starter.engine === "lumen" ? createDefaultLumenDraft() : preset?.patch ?? createDefaultSynthDraft();
-    const instrumentName = nextInstrumentName(instruments(), starter.fallbackNameBase);
+  function createLumen() {
+    const draft = createDefaultLumenDraft();
+    const instrumentName = nextInstrumentName(instruments(), "Lumen Patch");
     const namedDraft: SynthDraftPatch = {
       ...structuredClone(draft),
       name: instrumentName,
     };
     useSynthStore.getState().bindInstrument(null);
     useSynthStore.getState().setDraft(namedDraft);
-    useUiStore.getState().openEditor(starter.engine === "lumen"
-      ? { kind: "lumen" }
-      : { kind: "synthInstrument", instrumentId: createDraftId() });
+    useUiStore.getState().openEditor({ kind: "lumen" });
   }
 
   function createNewGroup() {
@@ -310,11 +283,11 @@ export function InstrumentLibraryPanel(props: InstrumentLibraryPanelProps) {
     setSelectMode(true);
     const current = selectedIds();
     if (shiftKey && lastSelectedId()) {
-      const start = instruments().findIndex((instrument) => instrument.id === lastSelectedId());
-      const end = instruments().findIndex((instrument) => instrument.id === instrumentId);
+      const start = accessibleInstruments().findIndex((instrument) => instrument.id === lastSelectedId());
+      const end = accessibleInstruments().findIndex((instrument) => instrument.id === instrumentId);
       if (start >= 0 && end >= 0) {
         const [lo, hi] = start < end ? [start, end] : [end, start];
-        setSelectedIds(new Set([...current, ...instruments().slice(lo, hi + 1).map((instrument) => instrument.id)]));
+        setSelectedIds(new Set([...current, ...accessibleInstruments().slice(lo, hi + 1).map((instrument) => instrument.id)]));
         setLastSelectedId(instrumentId);
         return;
       }
@@ -341,22 +314,22 @@ export function InstrumentLibraryPanel(props: InstrumentLibraryPanelProps) {
     useInstrumentStore.getState().removeInstrument(instrument.id);
   }
 
-  function cloneAsLumen(instrument: Instrument) {
-    if (!canCloneAetherInstrumentAsLumen(instrument)) return;
-    const name = nextInstrumentName(instruments(), `${instrument.name} Lumen`);
-    const lumenDraft = cloneAetherDraftAsLumen(instrument, name);
-    const requestedId = createDraftId();
-    const id = useInstrumentStore.getState().addInstrument(createDraftInstrument({
-      ...synthDraftToInstrumentPatch(lumenDraft),
-      id: requestedId,
-      name,
-      setId: instrument.setId,
-      source: { kind: "derived", label: `Lumen clone of ${instrument.name}`, edited: false },
-      original: snapshotInstrument(instrument),
-      parentIds: [instrument.id],
-      userCreated: true,
-    }));
-    useUiStore.getState().openEditor({ kind: "synthInstrument", instrumentId: id });
+  function createTrackForInstrument(instrument: Instrument) {
+    const dsPlugin = decentSamplerPluginForInstrument(instrument, plugins());
+    const drum = dsPlugin
+      ? decentSamplerEditorKind(dsPlugin) === "drum"
+      : instrumentUsesDrumSegment(instrument);
+    let segmentId = "";
+    runProjectHistoryGroup(() => {
+      const projectStore = useProjectStore.getState();
+      const trackId = projectStore.addTrack({
+        name: instrument.name,
+        kind: "midi",
+        instrumentId: instrument.id,
+      });
+      segmentId = projectStore.addSegment(trackId, createInstrumentSegmentPatch(instrument, { drum }));
+    });
+    if (segmentId) useUiStore.getState().setSelectedSegments([segmentId]);
   }
 
   function groupSelected() {
@@ -368,9 +341,10 @@ export function InstrumentLibraryPanel(props: InstrumentLibraryPanelProps) {
   }
 
   return (
-    <div ref={panelElement} class={styles.panel} onContextMenu={panelMenu.onContextMenu}>
+    <div ref={panelElement} class={styles.panel} onMouseDown={panelMenu.onMouseDown} onContextMenu={panelMenu.onContextMenu}>
       <SectionRibbon
         title="Instruments"
+        help={RIBBON_HELP.instruments}
         expanded={props.expanded}
         onToggle={props.onToggle}
         showToggle={false}
@@ -408,14 +382,14 @@ export function InstrumentLibraryPanel(props: InstrumentLibraryPanelProps) {
             <LoadingIndicator size="md" label="Loading Instruments" announce={false} />
           </div>
         </Show>
-        <Show when={!loading() && instruments().length === 0}>
+        <Show when={!loading() && accessibleInstruments().length === 0}>
           <div class={styles.empty}>No instruments yet.</div>
         </Show>
         <Show when={!loading()}>
           <For each={sortedInstrumentSets()}>
             {(set) => {
               const setOpen = () => openSets()[set.id] ?? false;
-              const items = () => instruments().filter((instrument) =>
+              const items = () => accessibleInstruments().filter((instrument) =>
                 instrumentSetId(instrument) === set.id
                 && (!normalizedSearch() || instrumentRepositorySearchText(instrument).includes(normalizedSearch())),
               );
@@ -451,16 +425,17 @@ export function InstrumentLibraryPanel(props: InstrumentLibraryPanelProps) {
                     {(instrument) => (
                       <InstrumentItem
                         instrument={instrument}
+                        onNewTrack={() => createTrackForInstrument(instrument)}
                         onEdit={() => {
                           const dsPlugin = decentSamplerPluginForInstrument(instrument, plugins());
                           if (dsPlugin) {
                             useUiStore.getState().openEditor({ kind: "plugin", pluginId: dsPlugin.id });
                             return;
                           }
-                          useUiStore.getState().openEditor(editorRequestForInstrument(instrument));
+                          const request = editorRequestForInstrument(instrument);
+                          if (request) useUiStore.getState().openEditor(request);
                         }}
                         onDuplicate={() => useInstrumentStore.getState().duplicateInstrument(instrument.id)}
-                        onCloneAsLumen={() => cloneAsLumen(instrument)}
                         onMerge={() => setMergeFromId(instrument.id)}
                         onDelete={() => void deleteInstrument(instrument)}
                         onMoveBefore={(draggedId) => useInstrumentStore.getState().moveInstrument(draggedId, set.id, instrument.id)}
@@ -497,9 +472,9 @@ export function InstrumentLibraryPanel(props: InstrumentLibraryPanelProps) {
 
 interface InstrumentItemProps {
   instrument: Instrument;
+  onNewTrack: () => void;
   onEdit: () => void;
   onDuplicate: () => void;
-  onCloneAsLumen: () => void;
   onMerge: () => void;
   onDelete: () => void;
   onMoveBefore: (instrumentId: string) => void;
@@ -513,14 +488,10 @@ interface InstrumentItemProps {
 
 function InstrumentItem(props: InstrumentItemProps) {
   const menu = createContextMenu((): ContextMenuItem[] => [
+    { label: "New Track", icon: "ph:plus", onSelect: props.onNewTrack },
     { label: "Select", icon: "ph:checks", onSelect: props.onEnterSelectMode },
     { label: "Edit", icon: "ph:pencil-simple", onSelect: props.onEdit },
     { label: "Duplicate", icon: "ph:copy", onSelect: props.onDuplicate },
-    ...(canCloneAetherInstrumentAsLumen(props.instrument) ? [{
-      label: "Clone as Lumen",
-      icon: "ph:sparkle",
-      onSelect: props.onCloneAsLumen,
-    }] : []),
     { label: "Merge with...", icon: "ph:intersect", onSelect: props.onMerge },
     {
       label: props.instrument.userCreated ? "Delete" : "Delete (system)",
@@ -574,7 +545,10 @@ function InstrumentItem(props: InstrumentItemProps) {
       onDragOver={onDragOver}
       onDrop={onDrop}
       onDblClick={props.onEdit}
+      tabIndex={0}
+      onMouseDown={menu.onMouseDown}
       onContextMenu={menu.onContextMenu}
+      onKeyDown={menu.onKeyDown}
       iconAriaHidden={!props.selectMode}
       icon={props.selectMode ? (
         <Checkbox
@@ -637,7 +611,7 @@ function persistOpenInstrumentSets(openSets: Record<string, boolean>) {
 }
 
 function instrumentSetDisplayName(set: InstrumentSet): string {
-  if (!set.factory || set.id === "user-instruments" || set.id === TEMPORARY_DS_INSTRUMENT_SET_ID || set.id === LUMEN_TEST_INSTRUMENT_SET_ID || set.name === "Aurum Test") return set.name;
+  if (!set.factory || set.id === "user-instruments" || set.id === TEMPORARY_DS_INSTRUMENT_SET_ID || set.id === LUMEN_TEST_INSTRUMENT_SET_ID || set.id === AURUM_TEST_SET_ID) return set.name;
   return set.name.toLowerCase().startsWith("factory ") ? set.name : `Factory ${set.name}`;
 }
 

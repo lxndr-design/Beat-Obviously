@@ -65,8 +65,11 @@ export function LibraryFolder(props: LibraryFolderProps) {
         aria-disabled={props.renaming || hasItems() ? undefined : true}
         aria-label={props.renaming ? undefined : hasItems() ? `${expanded() ? "Collapse" : "Expand"} ${props.name}` : props.name}
         onClick={props.renaming || !hasItems() ? undefined : props.onToggle}
+        onMouseDown={menu.onMouseDown}
         onContextMenu={menu.onContextMenu}
-        onKeyDown={props.renaming || !hasItems() ? undefined : (event) => {
+        onKeyDown={(event) => {
+          menu.onKeyDown(event);
+          if (event.defaultPrevented || props.renaming || !hasItems()) return;
           if (event.key !== "Enter" && event.key !== " ") return;
           event.preventDefault();
           props.onToggle();

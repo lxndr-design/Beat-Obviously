@@ -99,7 +99,9 @@ export function Sidebar() {
               <RailButton
                 class={styles.railButton}
                 onClick={() => void onSave()}
+                onMouseDown={saveMenu.onMouseDown}
                 onContextMenu={saveMenu.onContextMenu}
+                onKeyDown={saveMenu.onKeyDown}
                 aria-label="Save"
               >
                 <Icon name="ph:floppy-disk" size={18} decorative />

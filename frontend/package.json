@@ -41,6 +41,8 @@
     "verify:score-import": "node ../scripts/verify-score-import.mjs",
     "verify:interactions": "node ../scripts/verify-frontend-interactions.mjs && node ../scripts/verify-stable-control-rows.mjs && npm run verify:midi-remix",
     "verify:stable-controls": "node ../scripts/verify-stable-control-rows.mjs",
+    "verify:ribbon-help": "node ../scripts/verify-ribbon-help.mjs",
+    "verify:instrument-track-creation": "node --experimental-strip-types ../scripts/verify-instrument-track-creation.mjs",
     "verify:beta": "node ../scripts/verify-beta-readiness.mjs --scope=source",
     "verify:beta:all": "node ../scripts/verify-beta-readiness.mjs --scope=all",
     "package:beta": "../scripts/package-beta-release.sh",

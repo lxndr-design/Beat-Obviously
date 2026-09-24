@@ -1563,7 +1563,8 @@ namespace beat
                                                  Beats lengthBeats,
                                                  Beats fadeInBeats,
                                                  Beats fadeOutBeats,
-                                                 float segmentGainDb)
+                                                 float segmentGainDb,
+                                                 int tunePitch)
     {
         const juce::ScopedLock lock(sampleLock);
         const auto clampedLength = juce::jmax(0.0, lengthBeats);
@@ -1583,13 +1584,17 @@ namespace beat
         const auto speed = juce::jmax(0.1, seq.getSpeed());
         const auto outputSamplesPerBeat = (renderSampleRate * 60.0 / tempo) / speed;
         const auto remainingBeats = clampedLength - clampedPosition;
+        const auto clampedTunePitch = tunePitch < 0 ? -1 : juce::jlimit(0, 127, tunePitch);
+        const auto tuneRate = clampedTunePitch >= 0
+            ? std::exp2(((double) clampedTunePitch - 60.0) / 12.0)
+            : 1.0;
         const Sequencer::AudioClipEvent event {
             trackId,
             "__audio-preview__",
             audioFileId,
             0,
             juce::jmax(1, (int) std::round(remainingBeats * outputSamplesPerBeat)),
-            juce::jmax(0.0, sourceStartBeat + clampedPosition),
+            juce::jmax(0.0, sourceStartBeat + clampedPosition * tuneRate),
             clampedPosition,
             clampedLength,
             juce::jlimit(0.0, clampedLength, fadeInBeats),
@@ -1599,6 +1604,7 @@ namespace beat
             0.0f,
             0.0f,
             juce::jlimit(-96.0f, 24.0f, segmentGainDb),
+            clampedTunePitch,
         };
         const bool started = startAudioClipVoiceLocked(event, true);
         audioPreviewActive.store(started, std::memory_order_release);
@@ -3031,259 +3037,364 @@ namespace beat
                 continue;
             }
 
-            auto routeStorage = std::make_unique<InstrumentRenderState>();
-            auto& route = *routeStorage;
-            route.trackId = track.id;
-            route.instrumentId = track.instrumentId;
-            route.parentTrackId = track.parentTrackId;
-            route.outputBusId = track.outputBusId;
-            route.outputEnabled = track.outputEnabled;
-            route.mute = track.mute;
-            route.gainDb = track.gainDb;
-            route.pan = track.pan;
-
-            const InstrumentDefinition* routeInstrument = nullptr;
-            if (track.instrumentId.isNotEmpty())
-            {
-                const auto foundInstrument = instrumentById.find(track.instrumentId);
-                if (foundInstrument != instrumentById.end())
-                    routeInstrument = foundInstrument->second;
+            std::vector<Id> routeInstrumentIds;
+            routeInstrumentIds.reserve(4);
+            const auto appendRouteInstrument = [&](const Id &instrumentId) {
+              if (instrumentId.isEmpty() ||
+                  std::find(routeInstrumentIds.begin(),
+                            routeInstrumentIds.end(),
+                            instrumentId) != routeInstrumentIds.end())
+                return;
+              routeInstrumentIds.push_back(instrumentId);
+            };
+            appendRouteInstrument(track.instrumentId);
+            for (const auto &segment : track.segments) {
+              appendRouteInstrument(segment.instrumentId);
+              for (const auto &note : segment.notes)
+                appendRouteInstrument(note.instrumentId);
             }
+            // Audio-only tracks still need one route for clips, monitoring,
+            // track FX, sends, meters, and bus routing.
+            if (routeInstrumentIds.empty())
+              routeInstrumentIds.emplace_back();
 
-            if ((track.kind == TrackKind::Midi || track.kind == TrackKind::Mixed)
-                && (track.recordArmed || track.inputMonitoring)
-                && routeInstrument != nullptr
-                && isMidiExpressionInstrument(*routeInstrument))
-            {
+            for (size_t trackRouteIndex = 0;
+                 trackRouteIndex < routeInstrumentIds.size();
+                 ++trackRouteIndex) {
+              const auto &routeInstrumentId =
+                  routeInstrumentIds[trackRouteIndex];
+              auto routeStorage = std::make_unique<InstrumentRenderState>();
+              auto &route = *routeStorage;
+              route.trackId = track.id;
+              route.instrumentId = routeInstrumentId;
+              route.rendersTrackSources = trackRouteIndex == 0;
+              route.parentTrackId = track.parentTrackId;
+              route.outputBusId = track.outputBusId;
+              route.outputEnabled = track.outputEnabled;
+              route.mute = track.mute;
+              route.gainDb = track.gainDb;
+              route.pan = track.pan;
+
+              const InstrumentDefinition *routeInstrument = nullptr;
+              if (routeInstrumentId.isNotEmpty()) {
+                const auto foundInstrument =
+                    instrumentById.find(routeInstrumentId);
+                if (foundInstrument != instrumentById.end())
+                  routeInstrument = foundInstrument->second;
+              }
+
+              if ((track.kind == TrackKind::Midi ||
+                   track.kind == TrackKind::Mixed) &&
+                  (track.recordArmed || track.inputMonitoring) &&
+                  routeInstrument != nullptr &&
+                  isMidiExpressionInstrument(*routeInstrument)) {
                 const bool duplicate = std::any_of(
                     nextMidiExpressionTargets.begin(),
                     nextMidiExpressionTargets.end(),
-                    [&](const MonitoredMidiExpressionTarget& target) {
-                        return target.instrumentId == track.instrumentId;
+                    [&](const MonitoredMidiExpressionTarget &target) {
+                      return target.instrumentId == routeInstrumentId;
                     });
-                if (!duplicate)
-                {
-                    nextMidiExpressionTargets.push_back({
-                        track.id,
-                        track.instrumentId,
-                        juce::jlimit(0.0f, 24.0f, routeInstrument->pitchBendRangeSemitones),
-                    });
-                    retainedMidiExpressionInstrumentIds.push_back(track.instrumentId);
+                if (!duplicate) {
+                  nextMidiExpressionTargets.push_back({
+                      track.id,
+                      routeInstrumentId,
+                      juce::jlimit(0.0f, 24.0f,
+                                   routeInstrument->pitchBendRangeSemitones),
+                  });
+                  retainedMidiExpressionInstrumentIds.push_back(
+                      routeInstrumentId);
                 }
-            }
+              }
 
-            route.effects = composeRouteEffects(routeInstrument, track.effects);
-            route.sends = track.sends;
-            if (anyAudioBusSolo)
-            {
-                for (auto& send : route.sends)
-                    send.enabled = send.enabled && routeFeedsSoloTarget(project, send.busId);
-                const bool primaryFeedsSolo = route.outputBusId.isNotEmpty() && routeFeedsSoloTarget(project, route.outputBusId);
+              route.effects =
+                  composeRouteEffects(routeInstrument, track.effects);
+              route.sends = track.sends;
+              if (anyAudioBusSolo) {
+                for (auto &send : route.sends)
+                  send.enabled =
+                      send.enabled && routeFeedsSoloTarget(project, send.busId);
+                const bool primaryFeedsSolo =
+                    route.outputBusId.isNotEmpty() &&
+                    routeFeedsSoloTarget(project, route.outputBusId);
                 route.outputEnabled = route.outputEnabled && primaryFeedsSolo;
-                route.audible = primaryFeedsSolo || std::any_of(route.sends.begin(), route.sends.end(),
-                                                               [](const TrackSend& send) { return send.enabled; });
-            }
-            route.baseGainDb = track.gainDb;
-            route.basePan = track.pan;
-            route.baseMute = track.mute;
-            route.audibilityGain = track.mute ? 0.0f : 1.0f;
-            route.audibilityTargetGain = route.audibilityGain;
-            route.baseSends = route.sends;
-            route.baseEffects = route.effects;
-            route.routeLatencySamples = routeEffectsLatencySamples(project, route.effects);
+                route.audible =
+                    primaryFeedsSolo ||
+                    std::any_of(
+                        route.sends.begin(), route.sends.end(),
+                        [](const TrackSend &send) { return send.enabled; });
+              }
+              route.baseGainDb = track.gainDb;
+              route.basePan = track.pan;
+              route.baseMute = track.mute;
+              route.audibilityGain = track.mute ? 0.0f : 1.0f;
+              route.audibilityTargetGain = route.audibilityGain;
+              route.baseSends = route.sends;
+              route.baseEffects = route.effects;
+              route.routeLatencySamples =
+                  routeEffectsLatencySamples(project, route.effects);
 
-            if (routeInstrument != nullptr)
-            {
-                if (routeInstrument->synthEngine == InstrumentDefinition::SynthEngine::Lumen)
-                {
-                    const auto& arp = routeInstrument->lumen.arpeggiator;
-                    route.lumenArpeggiatorConfig.enabled = arp.enabled;
-                    route.lumenArpeggiatorConfig.mode = arp.mode == 1 ? LumenArpeggiator::Mode::down
-                        : arp.mode == 2 ? LumenArpeggiator::Mode::upDown
-                        : arp.mode == 3 ? LumenArpeggiator::Mode::random
-                        : LumenArpeggiator::Mode::up;
-                    route.lumenArpeggiatorConfig.gate = arp.gate;
-                    route.lumenArpeggiatorConfig.swing = arp.swing;
-                    route.lumenArpeggiatorConfig.octaves = arp.octaves;
-                    route.lumenArpeggiatorConfig.rootPitchClass = arp.rootPitchClass;
-                    route.lumenArpeggiatorConfig.scale = arp.scale == 1 ? LumenArpeggiator::Scale::major
-                        : arp.scale == 2 ? LumenArpeggiator::Scale::naturalMinor
-                        : arp.scale == 3 ? LumenArpeggiator::Scale::majorPentatonic
-                        : arp.scale == 4 ? LumenArpeggiator::Scale::blues
-                        : LumenArpeggiator::Scale::chromatic;
-                    route.lumenArpeggiatorRateDivision = arp.rateDivision;
-                    route.lumenArpeggiator.prepare(routeBuf.getNumSamples() > 0 ? routeBuf.getNumSamples() : 512);
-                    const auto& clip = routeInstrument->lumen.clip;
-                    route.lumenClipConfig.enabled = clip.enabled;
-                    route.lumenClipConfig.swing = clip.swing;
-                    route.lumenClipConfig.lengthSteps = clip.lengthSteps;
-                    route.lumenClipConfig.noteCount = clip.noteCount;
-                    for (int index = 0; index < LumenClipSequencer::maxNotes; ++index)
-                    {
-                        route.lumenClipConfig.notes[(size_t) index].startStep = clip.notes[(size_t) index].startStep;
-                        route.lumenClipConfig.notes[(size_t) index].pitchOffset = clip.notes[(size_t) index].pitchOffset;
-                        route.lumenClipConfig.notes[(size_t) index].lengthSteps = clip.notes[(size_t) index].lengthSteps;
-                        route.lumenClipConfig.notes[(size_t) index].velocity = clip.notes[(size_t) index].velocity;
-                    }
-                    route.lumenClipRateDivision = clip.rateDivision;
-                    route.lumenClipSequencer.prepare(routeBuf.getNumSamples() > 0 ? routeBuf.getNumSamples() : 512);
+              if (routeInstrument != nullptr) {
+                if (routeInstrument->synthEngine ==
+                    InstrumentDefinition::SynthEngine::Lumen) {
+                  const auto &arp = routeInstrument->lumen.arpeggiator;
+                  route.lumenArpeggiatorConfig.enabled = arp.enabled;
+                  route.lumenArpeggiatorConfig.mode =
+                      arp.mode == 1   ? LumenArpeggiator::Mode::down
+                      : arp.mode == 2 ? LumenArpeggiator::Mode::upDown
+                      : arp.mode == 3 ? LumenArpeggiator::Mode::random
+                                      : LumenArpeggiator::Mode::up;
+                  route.lumenArpeggiatorConfig.gate = arp.gate;
+                  route.lumenArpeggiatorConfig.swing = arp.swing;
+                  route.lumenArpeggiatorConfig.octaves = arp.octaves;
+                  route.lumenArpeggiatorConfig.rootPitchClass =
+                      arp.rootPitchClass;
+                  route.lumenArpeggiatorConfig.scale =
+                      arp.scale == 1   ? LumenArpeggiator::Scale::major
+                      : arp.scale == 2 ? LumenArpeggiator::Scale::naturalMinor
+                      : arp.scale == 3
+                          ? LumenArpeggiator::Scale::majorPentatonic
+                      : arp.scale == 4 ? LumenArpeggiator::Scale::blues
+                                       : LumenArpeggiator::Scale::chromatic;
+                  route.lumenArpeggiatorRateDivision = arp.rateDivision;
+                  route.lumenArpeggiator.prepare(routeBuf.getNumSamples() > 0
+                                                     ? routeBuf.getNumSamples()
+                                                     : 512);
+                  const auto &clip = routeInstrument->lumen.clip;
+                  route.lumenClipConfig.enabled = clip.enabled;
+                  route.lumenClipConfig.swing = clip.swing;
+                  route.lumenClipConfig.lengthSteps = clip.lengthSteps;
+                  route.lumenClipConfig.noteCount = clip.noteCount;
+                  for (int index = 0; index < LumenClipSequencer::maxNotes;
+                       ++index) {
+                    route.lumenClipConfig.notes[(size_t)index].startStep =
+                        clip.notes[(size_t)index].startStep;
+                    route.lumenClipConfig.notes[(size_t)index].pitchOffset =
+                        clip.notes[(size_t)index].pitchOffset;
+                    route.lumenClipConfig.notes[(size_t)index].lengthSteps =
+                        clip.notes[(size_t)index].lengthSteps;
+                    route.lumenClipConfig.notes[(size_t)index].velocity =
+                        clip.notes[(size_t)index].velocity;
+                  }
+                  route.lumenClipRateDivision = clip.rateDivision;
+                  route.lumenClipSequencer.prepare(
+                      routeBuf.getNumSamples() > 0 ? routeBuf.getNumSamples()
+                                                   : 512);
                 }
-                std::shared_ptr<const ImmutableMappedSampleSource> aetherSampleSlot1;
+                std::shared_ptr<const ImmutableMappedSampleSource>
+                    aetherSampleSlot1;
                 std::shared_ptr<const SfzDecodedInstrument> aetherSfzSlot1;
-                std::array<std::shared_ptr<const ImmutableMappedSampleSource>, 3> lumenSampleSlots;
-                std::array<std::shared_ptr<const SfzDecodedInstrument>, 3> lumenSfzSlots;
-                std::array<std::shared_ptr<const ImmutableGranularSource>, 3> lumenGranularSlots;
-                std::shared_ptr<const ImmutableGranularSource> aetherGranularSlot2;
-                const auto loadSampleSlot = [&](const InstrumentDefinition::AetherSampleSlot& slot,
-                                                std::shared_ptr<const ImmutableMappedSampleSource>& mappedOutput,
-                                                std::shared_ptr<const SfzDecodedInstrument>& sfzOutput)
-                {
-                    auto sampleIdentity = juce::String();
-                    if (!slot.enabled) return sampleIdentity;
-                    if (slot.managedSfz.manifestPath.isNotEmpty())
-                    {
-                        const auto loaded = loadManagedSfzAsset(juce::File(slot.managedSfz.manifestPath));
+                std::array<std::shared_ptr<const ImmutableMappedSampleSource>,
+                           3>
+                    lumenSampleSlots;
+                std::array<std::shared_ptr<const SfzDecodedInstrument>, 3>
+                    lumenSfzSlots;
+                std::array<std::shared_ptr<const ImmutableGranularSource>, 3>
+                    lumenGranularSlots;
+                std::shared_ptr<const ImmutableGranularSource>
+                    aetherGranularSlot2;
+                const auto loadSampleSlot =
+                    [&](const InstrumentDefinition::AetherSampleSlot &slot,
+                        std::shared_ptr<const ImmutableMappedSampleSource>
+                            &mappedOutput,
+                        std::shared_ptr<const SfzDecodedInstrument>
+                            &sfzOutput) {
+                      auto sampleIdentity = juce::String();
+                      if (!slot.enabled)
+                        return sampleIdentity;
+                      if (slot.managedSfz.manifestPath.isNotEmpty()) {
+                        const auto loaded = loadManagedSfzAsset(
+                            juce::File(slot.managedSfz.manifestPath));
                         if (loaded.isAccepted())
-                            sfzOutput = loaded.instrument;
-                    }
-                    float selectedSliceStart = 0.0f;
-                    float selectedSliceEnd = 1.0f;
-                    bool hasSelectedSlice = false;
-                    if (slot.selectedSliceId.isNotEmpty())
-                        if (const auto selected = std::find_if(slot.slices.begin(), slot.slices.end(),
-                                [&](const auto& slice) { return slice.id == slot.selectedSliceId; });
-                            selected != slot.slices.end())
-                        {
-                            selectedSliceStart = selected->startRatio;
-                            selectedSliceEnd = selected->endRatio;
-                            hasSelectedSlice = true;
+                          sfzOutput = loaded.instrument;
+                      }
+                      float selectedSliceStart = 0.0f;
+                      float selectedSliceEnd = 1.0f;
+                      bool hasSelectedSlice = false;
+                      if (slot.selectedSliceId.isNotEmpty())
+                        if (const auto selected = std::find_if(
+                                slot.slices.begin(), slot.slices.end(),
+                                [&](const auto &slice) {
+                                  return slice.id == slot.selectedSliceId;
+                                });
+                            selected != slot.slices.end()) {
+                          selectedSliceStart = selected->startRatio;
+                          selectedSliceEnd = selected->endRatio;
+                          hasSelectedSlice = true;
                         }
-                    auto map = std::make_shared<ImmutableMappedSampleSource>();
-                    const auto addZone = [&](const Id& audioFileId, int rootNote, int loNote, int hiNote,
-                                             int loVelocity, int hiVelocity, float level, float pan,
-                                             float startRatio, float endRatio, bool loopEnabled,
-                                             float loopStartRatio, float loopEndRatio)
-                    {
-                        if (map->zoneCount >= ImmutableMappedSampleSource::maximumZones || audioFileId.isEmpty())
-                            return;
-                        if (hasSelectedSlice)
-                        {
-                            startRatio = selectedSliceStart;
-                            endRatio = selectedSliceEnd;
-                            loopStartRatio = juce::jlimit(startRatio, endRatio, loopStartRatio);
-                            loopEndRatio = juce::jlimit(startRatio, endRatio, loopEndRatio);
-                            if (loopEndRatio <= loopStartRatio)
-                            {
-                                loopStartRatio = startRatio;
-                                loopEndRatio = endRatio;
-                            }
+                      auto map =
+                          std::make_shared<ImmutableMappedSampleSource>();
+                      const auto addZone = [&](const Id &audioFileId,
+                                               int rootNote, int loNote,
+                                               int hiNote, int loVelocity,
+                                               int hiVelocity, float level,
+                                               float pan, float startRatio,
+                                               float endRatio, bool loopEnabled,
+                                               float loopStartRatio,
+                                               float loopEndRatio) {
+                        if (map->zoneCount >=
+                                ImmutableMappedSampleSource::maximumZones ||
+                            audioFileId.isEmpty())
+                          return;
+                        if (hasSelectedSlice) {
+                          startRatio = selectedSliceStart;
+                          endRatio = selectedSliceEnd;
+                          loopStartRatio = juce::jlimit(startRatio, endRatio,
+                                                        loopStartRatio);
+                          loopEndRatio =
+                              juce::jlimit(startRatio, endRatio, loopEndRatio);
+                          if (loopEndRatio <= loopStartRatio) {
+                            loopStartRatio = startRatio;
+                            loopEndRatio = endRatio;
+                          }
                         }
                         auto source = std::make_shared<ImmutableSampleSource>();
-                        const auto foundSample = nextAudioFiles.find(audioFileId);
-                        if (foundSample != nextAudioFiles.end() && foundSample->second)
-                        {
-                            source->audio = std::shared_ptr<const juce::AudioBuffer<float>>(
-                                foundSample->second, &foundSample->second->audio);
-                            source->sourceSampleRate = foundSample->second->sourceSampleRate;
-                        }
-                        else
-                        {
-                            const auto foundStream = nextStreamedAudioFiles.find(audioFileId);
-                            if (foundStream == nextStreamedAudioFiles.end() || !nextStreamingSession)
-                                return;
-                            source->streamingSession = nextStreamingSession;
-                            source->streamingAssetIndex = foundStream->second.index;
-                            source->streamingFrameCount = foundStream->second.frames;
-                            source->streamingChannelCount = foundStream->second.channels;
-                            source->sourceSampleRate = foundStream->second.sampleRate;
+                        const auto foundSample =
+                            nextAudioFiles.find(audioFileId);
+                        if (foundSample != nextAudioFiles.end() &&
+                            foundSample->second) {
+                          source->audio =
+                              std::shared_ptr<const juce::AudioBuffer<float>>(
+                                  foundSample->second,
+                                  &foundSample->second->audio);
+                          source->sourceSampleRate =
+                              foundSample->second->sourceSampleRate;
+                        } else {
+                          const auto foundStream =
+                              nextStreamedAudioFiles.find(audioFileId);
+                          if (foundStream == nextStreamedAudioFiles.end() ||
+                              !nextStreamingSession)
+                            return;
+                          source->streamingSession = nextStreamingSession;
+                          source->streamingAssetIndex =
+                              foundStream->second.index;
+                          source->streamingFrameCount =
+                              foundStream->second.frames;
+                          source->streamingChannelCount =
+                              foundStream->second.channels;
+                          source->sourceSampleRate =
+                              foundStream->second.sampleRate;
                         }
                         source->rootNote = juce::jlimit(0, 127, rootNote);
-                        source->loNote = juce::jlimit(0, 127, juce::jmin(loNote, hiNote));
-                        source->hiNote = juce::jlimit(0, 127, juce::jmax(loNote, hiNote));
-                        source->loVelocity = juce::jlimit(0, 127, juce::jmin(loVelocity, hiVelocity));
-                        source->hiVelocity = juce::jlimit(0, 127, juce::jmax(loVelocity, hiVelocity));
+                        source->loNote =
+                            juce::jlimit(0, 127, juce::jmin(loNote, hiNote));
+                        source->hiNote =
+                            juce::jlimit(0, 127, juce::jmax(loNote, hiNote));
+                        source->loVelocity = juce::jlimit(
+                            0, 127, juce::jmin(loVelocity, hiVelocity));
+                        source->hiVelocity = juce::jlimit(
+                            0, 127, juce::jmax(loVelocity, hiVelocity));
                         source->gain = juce::jlimit(0.0f, 1.0f, level);
                         source->pan = juce::jlimit(-1.0f, 1.0f, pan);
-                        source->startRatio = juce::jlimit(0.0f, 1.0f, startRatio);
+                        source->startRatio =
+                            juce::jlimit(0.0f, 1.0f, startRatio);
                         source->endRatio = juce::jlimit(0.0f, 1.0f, endRatio);
                         source->loopEnabled = loopEnabled;
-                        source->loopStartRatio = juce::jlimit(0.0f, 1.0f, loopStartRatio);
-                        source->loopEndRatio = juce::jlimit(0.0f, 1.0f, loopEndRatio);
-                        if (source->streamingSession)
-                        {
-                            const int64_t frames = source->streamingFrameCount;
-                            const auto ratioFrame = [frames](float ratio) {
-                                return juce::jlimit<int64_t>(0, frames - 1,
-                                    (int64_t) std::llround((double) ratio * (double) frames));
-                            };
-                            const int64_t startFrame = ratioFrame(source->startRatio);
-                            const int64_t endFrame = ratioFrame(source->endRatio);
-                            const int64_t initialFrame = slot.reverse
-                                ? juce::jmax<int64_t>(0, endFrame - 1) : startFrame;
-                            (void) nextStreamingSession->preloadFrame(source->streamingAssetIndex, initialFrame);
-                            (void) nextStreamingSession->preloadFrame(source->streamingAssetIndex,
-                                slot.reverse
-                                    ? juce::jmax<int64_t>(0, initialFrame - BoundedSamplePageCache::pageFrames)
-                                    : juce::jmin<int64_t>(frames - 1,
-                                        initialFrame + BoundedSamplePageCache::pageFrames));
-                            if (source->loopEnabled)
-                            {
-                                (void) nextStreamingSession->preloadFrame(
-                                    source->streamingAssetIndex, ratioFrame(source->loopStartRatio));
-                                (void) nextStreamingSession->preloadFrame(
-                                    source->streamingAssetIndex,
-                                    juce::jmax<int64_t>(0, ratioFrame(source->loopEndRatio) - 64));
-                            }
+                        source->loopStartRatio =
+                            juce::jlimit(0.0f, 1.0f, loopStartRatio);
+                        source->loopEndRatio =
+                            juce::jlimit(0.0f, 1.0f, loopEndRatio);
+                        if (source->streamingSession) {
+                          const int64_t frames = source->streamingFrameCount;
+                          const auto ratioFrame = [frames](float ratio) {
+                            return juce::jlimit<int64_t>(
+                                0, frames - 1,
+                                (int64_t)std::llround((double)ratio *
+                                                      (double)frames));
+                          };
+                          const int64_t startFrame =
+                              ratioFrame(source->startRatio);
+                          const int64_t endFrame = ratioFrame(source->endRatio);
+                          const int64_t initialFrame =
+                              slot.reverse
+                                  ? juce::jmax<int64_t>(0, endFrame - 1)
+                                  : startFrame;
+                          (void)nextStreamingSession->preloadFrame(
+                              source->streamingAssetIndex, initialFrame);
+                          (void)nextStreamingSession->preloadFrame(
+                              source->streamingAssetIndex,
+                              slot.reverse
+                                  ? juce::jmax<int64_t>(
+                                        0,
+                                        initialFrame -
+                                            BoundedSamplePageCache::pageFrames)
+                                  : juce::jmin<int64_t>(
+                                        frames - 1, initialFrame +
+                                                        BoundedSamplePageCache::
+                                                            pageFrames));
+                          if (source->loopEnabled) {
+                            (void)nextStreamingSession->preloadFrame(
+                                source->streamingAssetIndex,
+                                ratioFrame(source->loopStartRatio));
+                            (void)nextStreamingSession->preloadFrame(
+                                source->streamingAssetIndex,
+                                juce::jmax<int64_t>(
+                                    0, ratioFrame(source->loopEndRatio) - 64));
+                          }
                         }
                         map->zones[map->zoneCount++] = std::move(source);
-                        sampleIdentity += audioFileId + ":" + juce::String(rootNote) + ":"
-                            + juce::String(loNote) + ":" + juce::String(hiNote) + ":"
-                            + juce::String(loVelocity) + ":" + juce::String(hiVelocity) + ":"
-                            + juce::String(level, 6) + ":" + juce::String(pan, 6) + ":"
-                            + juce::String(startRatio, 6) + ":" + juce::String(endRatio, 6) + ":"
-                            + juce::String((int) loopEnabled) + ":" + juce::String(loopStartRatio, 6) + ":"
-                            + juce::String(loopEndRatio, 6) + ";";
-                    };
-                    if (slot.zones.empty())
-                        addZone(slot.audioFileId, slot.rootNote, 0, 127, 0, 127, slot.level, slot.pan,
-                                slot.startRatio, slot.endRatio, slot.loopEnabled, slot.loopStartRatio, slot.loopEndRatio);
-                    else
-                        for (const auto& zone : slot.zones)
-                            addZone(zone.audioFileId, zone.rootNote, zone.loNote, zone.hiNote,
-                                    zone.loVelocity, zone.hiVelocity, zone.level, zone.pan,
-                                    zone.startRatio, zone.endRatio, zone.loopEnabled,
-                                    zone.loopStartRatio, zone.loopEndRatio);
-                    if (!sfzOutput && map->zoneCount > 0)
+                        sampleIdentity +=
+                            audioFileId + ":" + juce::String(rootNote) + ":" +
+                            juce::String(loNote) + ":" + juce::String(hiNote) +
+                            ":" + juce::String(loVelocity) + ":" +
+                            juce::String(hiVelocity) + ":" +
+                            juce::String(level, 6) + ":" +
+                            juce::String(pan, 6) + ":" +
+                            juce::String(startRatio, 6) + ":" +
+                            juce::String(endRatio, 6) + ":" +
+                            juce::String((int)loopEnabled) + ":" +
+                            juce::String(loopStartRatio, 6) + ":" +
+                            juce::String(loopEndRatio, 6) + ";";
+                      };
+                      if (slot.zones.empty())
+                        addZone(slot.audioFileId, slot.rootNote, 0, 127, 0, 127,
+                                slot.level, slot.pan, slot.startRatio,
+                                slot.endRatio, slot.loopEnabled,
+                                slot.loopStartRatio, slot.loopEndRatio);
+                      else
+                        for (const auto &zone : slot.zones)
+                          addZone(zone.audioFileId, zone.rootNote, zone.loNote,
+                                  zone.hiNote, zone.loVelocity, zone.hiVelocity,
+                                  zone.level, zone.pan, zone.startRatio,
+                                  zone.endRatio, zone.loopEnabled,
+                                  zone.loopStartRatio, zone.loopEndRatio);
+                      if (!sfzOutput && map->zoneCount > 0)
                         mappedOutput = std::move(map);
-                    return sampleIdentity;
-                };
-                const auto& slot = routeInstrument->aether.sampleSlot1;
-                auto sampleIdentity = routeInstrument->hasAether
-                        && routeInstrument->synthEngine != InstrumentDefinition::SynthEngine::Lumen
-                    ? loadSampleSlot(slot, aetherSampleSlot1, aetherSfzSlot1)
-                    : juce::String();
+                      return sampleIdentity;
+                    };
+                const auto &slot = routeInstrument->aether.sampleSlot1;
+                auto sampleIdentity =
+                    routeInstrument->hasAether &&
+                            routeInstrument->synthEngine !=
+                                InstrumentDefinition::SynthEngine::Lumen
+                        ? loadSampleSlot(slot, aetherSampleSlot1,
+                                         aetherSfzSlot1)
+                        : juce::String();
                 std::array<juce::String, 3> lumenSampleIdentities;
-                if (routeInstrument->synthEngine == InstrumentDefinition::SynthEngine::Lumen)
-                    for (size_t index = 0; index < lumenSampleSlots.size(); ++index)
-                        lumenSampleIdentities[index] = loadSampleSlot(routeInstrument->lumen.sampleSlots[index],
-                            lumenSampleSlots[index], lumenSfzSlots[index]);
-                const auto loadGranularSlot = [&](const InstrumentDefinition::AetherGranularSlot& granular)
-                {
-                    std::shared_ptr<const ImmutableGranularSource> result;
-                    if (!granular.enabled) return result;
-                    ManagedGranularLoadResult loaded;
-                    if (granular.builtinSource == "benchmark")
-                    {
+                if (routeInstrument->synthEngine ==
+                    InstrumentDefinition::SynthEngine::Lumen)
+                  for (size_t index = 0; index < lumenSampleSlots.size();
+                       ++index)
+                    lumenSampleIdentities[index] = loadSampleSlot(
+                        routeInstrument->lumen.sampleSlots[index],
+                        lumenSampleSlots[index], lumenSfzSlots[index]);
+                const auto loadGranularSlot =
+                    [&](const InstrumentDefinition::AetherGranularSlot
+                            &granular) {
+                      std::shared_ptr<const ImmutableGranularSource> result;
+                      if (!granular.enabled)
+                        return result;
+                      ManagedGranularLoadResult loaded;
+                      if (granular.builtinSource == "benchmark") {
                         loaded.audio = makeGranularBenchmarkAudio();
                         loaded.sourceSampleRate = 48000.0;
-                    }
-                    else if (granular.managedAsset.manifestPath.isNotEmpty())
-                    {
-                        loaded = loadManagedGranularAsset(juce::File(granular.managedAsset.manifestPath));
-                    }
-                    if (loaded.ok())
-                    {
-                        auto source = std::make_shared<ImmutableGranularSource>();
+                      } else if (granular.managedAsset.manifestPath
+                                     .isNotEmpty()) {
+                        loaded = loadManagedGranularAsset(
+                            juce::File(granular.managedAsset.manifestPath));
+                      }
+                      if (loaded.ok()) {
+                        auto source =
+                            std::make_shared<ImmutableGranularSource>();
                         source->audio = std::move(loaded.audio);
                         source->sourceSampleRate = loaded.sourceSampleRate;
                         source->rootNote = granular.rootNote;
@@ -3294,111 +3405,150 @@ namespace beat
                         source->pitchSemitones = granular.pitchSemitones;
                         source->stereoSpread = granular.stereoSpread;
                         source->randomSeed = granular.randomSeed;
-                        if (source->isValid()) result = std::move(source);
-                    }
-                    return result;
-                };
-                const auto& granular = routeInstrument->aether.granularSlot2;
-                if (routeInstrument->hasAether) aetherGranularSlot2 = loadGranularSlot(granular);
-                if (routeInstrument->synthEngine == InstrumentDefinition::SynthEngine::Lumen)
-                    for (size_t index = 0; index < lumenGranularSlots.size(); ++index)
-                        lumenGranularSlots[index] = loadGranularSlot(routeInstrument->lumen.granularSlots[index]);
-                route.synth = createInstrumentSynth(*routeInstrument,
-                    std::move(aetherSampleSlot1), std::move(aetherSfzSlot1), std::move(aetherGranularSlot2),
-                    std::move(lumenSampleSlots), std::move(lumenSfzSlots), std::move(lumenGranularSlots));
+                        if (source->isValid())
+                          result = std::move(source);
+                      }
+                      return result;
+                    };
+                const auto &granular = routeInstrument->aether.granularSlot2;
+                if (routeInstrument->hasAether)
+                  aetherGranularSlot2 = loadGranularSlot(granular);
+                if (routeInstrument->synthEngine ==
+                    InstrumentDefinition::SynthEngine::Lumen)
+                  for (size_t index = 0; index < lumenGranularSlots.size();
+                       ++index)
+                    lumenGranularSlots[index] = loadGranularSlot(
+                        routeInstrument->lumen.granularSlots[index]);
+                route.synth = createInstrumentSynth(
+                    *routeInstrument, std::move(aetherSampleSlot1),
+                    std::move(aetherSfzSlot1), std::move(aetherGranularSlot2),
+                    std::move(lumenSampleSlots), std::move(lumenSfzSlots),
+                    std::move(lumenGranularSlots));
                 route.sourceFxBusIds = routeInstrument->aether.fxBusIds;
-                route.aetherSampleSlot1Identity = slot.enabled
-                    ? juce::String(slot.routing) + ":" + juce::String(slot.fxSends[0], 6) + ":"
-                        + juce::String(slot.fxSends[1], 6) + ":"
-                        + (slot.managedSfz.assetId.isNotEmpty()
-                            ? "sfz:" + slot.managedSfz.assetId : sampleIdentity)
-                    : juce::String();
-                if (routeInstrument->synthEngine == InstrumentDefinition::SynthEngine::Lumen)
-                    for (size_t index = 0; index < routeInstrument->lumen.sampleSlots.size(); ++index)
-                    {
-                        const auto& lumenSlot = routeInstrument->lumen.sampleSlots[index];
-                        if (!lumenSlot.enabled) continue;
-                        route.aetherSampleSlot1Identity += "|lumen-sample-" + juce::String((int) index) + ":"
-                            + juce::String(lumenSlot.routing) + ":" + juce::String(lumenSlot.fxSends[0], 6) + ":"
-                            + juce::String(lumenSlot.fxSends[1], 6) + ":"
-                            + (lumenSlot.managedSfz.assetId.isNotEmpty()
-                                ? "sfz:" + lumenSlot.managedSfz.assetId : lumenSampleIdentities[index]);
-                    }
+                route.aetherSampleSlot1Identity =
+                    slot.enabled ? juce::String(slot.routing) + ":" +
+                                       juce::String(slot.fxSends[0], 6) + ":" +
+                                       juce::String(slot.fxSends[1], 6) + ":" +
+                                       (slot.managedSfz.assetId.isNotEmpty()
+                                            ? "sfz:" + slot.managedSfz.assetId
+                                            : sampleIdentity)
+                                 : juce::String();
+                if (routeInstrument->synthEngine ==
+                    InstrumentDefinition::SynthEngine::Lumen)
+                  for (size_t index = 0;
+                       index < routeInstrument->lumen.sampleSlots.size();
+                       ++index) {
+                    const auto &lumenSlot =
+                        routeInstrument->lumen.sampleSlots[index];
+                    if (!lumenSlot.enabled)
+                      continue;
+                    route.aetherSampleSlot1Identity +=
+                        "|lumen-sample-" + juce::String((int)index) + ":" +
+                        juce::String(lumenSlot.routing) + ":" +
+                        juce::String(lumenSlot.fxSends[0], 6) + ":" +
+                        juce::String(lumenSlot.fxSends[1], 6) + ":" +
+                        (lumenSlot.managedSfz.assetId.isNotEmpty()
+                             ? "sfz:" + lumenSlot.managedSfz.assetId
+                             : lumenSampleIdentities[index]);
+                  }
                 if (granular.enabled)
-                    route.aetherSampleSlot1Identity += "|granular:" + granular.builtinSource + ":"
-                        + granular.managedAsset.assetId + ":" + juce::String(granular.rootNote) + ":"
-                        + juce::String(granular.position, 6) + ":" + juce::String(granular.positionSpread, 6) + ":"
-                        + juce::String(granular.grainMilliseconds, 3) + ":" + juce::String(granular.densityHz, 3) + ":"
-                        + juce::String(granular.pitchSemitones, 3) + ":" + juce::String(granular.stereoSpread, 6) + ":"
-                        + juce::String((int64_t) granular.randomSeed) + ":" + juce::String(granular.level, 6) + ":"
-                        + juce::String(granular.routing) + ":" + juce::String(granular.fxSends[0], 6) + ":"
-                        + juce::String(granular.fxSends[1], 6);
-                if (routeInstrument->synthEngine == InstrumentDefinition::SynthEngine::Lumen)
-                    for (size_t index = 0; index < routeInstrument->lumen.granularSlots.size(); ++index)
-                    {
-                        const auto& source = routeInstrument->lumen.granularSlots[index];
-                        if (!source.enabled) continue;
-                        route.aetherSampleSlot1Identity += "|lumen-granular-" + juce::String((int) index) + ":"
-                            + source.builtinSource + ":" + source.managedAsset.assetId + ":"
-                            + juce::String(source.rootNote) + ":" + juce::String(source.position, 6) + ":"
-                            + juce::String(source.positionSpread, 6) + ":" + juce::String(source.grainMilliseconds, 3) + ":"
-                            + juce::String(source.densityHz, 3) + ":" + juce::String(source.pitchSemitones, 3) + ":"
-                            + juce::String(source.stereoSpread, 6) + ":" + juce::String((int64_t) source.randomSeed);
-                    }
-            }
+                  route.aetherSampleSlot1Identity +=
+                      "|granular:" + granular.builtinSource + ":" +
+                      granular.managedAsset.assetId + ":" +
+                      juce::String(granular.rootNote) + ":" +
+                      juce::String(granular.position, 6) + ":" +
+                      juce::String(granular.positionSpread, 6) + ":" +
+                      juce::String(granular.grainMilliseconds, 3) + ":" +
+                      juce::String(granular.densityHz, 3) + ":" +
+                      juce::String(granular.pitchSemitones, 3) + ":" +
+                      juce::String(granular.stereoSpread, 6) + ":" +
+                      juce::String((int64_t)granular.randomSeed) + ":" +
+                      juce::String(granular.level, 6) + ":" +
+                      juce::String(granular.routing) + ":" +
+                      juce::String(granular.fxSends[0], 6) + ":" +
+                      juce::String(granular.fxSends[1], 6);
+                if (routeInstrument->synthEngine ==
+                    InstrumentDefinition::SynthEngine::Lumen)
+                  for (size_t index = 0;
+                       index < routeInstrument->lumen.granularSlots.size();
+                       ++index) {
+                    const auto &source =
+                        routeInstrument->lumen.granularSlots[index];
+                    if (!source.enabled)
+                      continue;
+                    route.aetherSampleSlot1Identity +=
+                        "|lumen-granular-" + juce::String((int)index) + ":" +
+                        source.builtinSource + ":" +
+                        source.managedAsset.assetId + ":" +
+                        juce::String(source.rootNote) + ":" +
+                        juce::String(source.position, 6) + ":" +
+                        juce::String(source.positionSpread, 6) + ":" +
+                        juce::String(source.grainMilliseconds, 3) + ":" +
+                        juce::String(source.densityHz, 3) + ":" +
+                        juce::String(source.pitchSemitones, 3) + ":" +
+                        juce::String(source.stereoSpread, 6) + ":" +
+                        juce::String((int64_t)source.randomSeed);
+                  }
+              }
 
-            for (auto& sourceFxBuffer : route.sourceFxBuffers)
-            {
-                sourceFxBuffer.setSize(routeBuf.getNumChannels(), routeBuf.getNumSamples(), false, false, true);
+              for (auto &sourceFxBuffer : route.sourceFxBuffers) {
+                sourceFxBuffer.setSize(routeBuf.getNumChannels(),
+                                       routeBuf.getNumSamples(), false, false,
+                                       true);
                 sourceFxBuffer.clear();
-            }
+              }
 
-            prepareRouteEffects(route);
-            if (nextRenderStates.size() < RenderBudgets::instrumentRoutes)
+              prepareRouteEffects(route);
+              if (nextRenderStates.size() < RenderBudgets::instrumentRoutes)
                 nextRenderStates.push_back(std::move(route));
-            else
+              else
                 blockEventOverflows.fetch_add(1, std::memory_order_relaxed);
+            }
         }
 
-        for (const auto* busPtr : orderedAudioBuses(project))
-        {
-            const auto& bus = *busPtr;
+        for (const auto *busPtr : orderedAudioBuses(project)) {
+          const auto &bus = *busPtr;
 
-            auto routeStorage = std::make_unique<InstrumentRenderState>();
-            auto& route = *routeStorage;
-            route.trackId = bus.id;
-            route.outputBusId = bus.outputBusId;
-            route.outputEnabled = bus.outputEnabled;
-            route.inputTrimDb = bus.inputTrimDb;
-            route.mute = bus.mute;
-            route.gainDb = bus.gainDb;
-            route.pan = bus.pan;
-            route.effects = bus.effects;
-            route.sends = bus.sends;
-            if (anyAudioBusSolo)
-            {
-                route.audible = busIsOnSoloPath(project, bus.id);
-                for (auto& send : route.sends)
-                    send.enabled = send.enabled && busIsOnSoloPath(project, send.busId);
-                if (route.outputBusId.isNotEmpty())
-                    route.outputEnabled = route.outputEnabled && busIsOnSoloPath(project, route.outputBusId);
-                else
-                    route.outputEnabled = route.outputEnabled && busIsSoloOrDownstream(project, bus.id);
-            }
-            route.baseGainDb = bus.gainDb;
-            route.basePan = bus.pan;
-            route.baseInputTrimDb = bus.inputTrimDb;
-            route.baseMute = bus.mute;
-            route.audibilityGain = bus.mute ? 0.0f : 1.0f;
-            route.audibilityTargetGain = route.audibilityGain;
-            route.baseSends = route.sends;
-            route.baseEffects = bus.effects;
-            route.routeLatencySamples = routeEffectsLatencySamples(project, route.effects);
-            route.returnBus = true;
-            route.returnBuffer.setSize(routeBuf.getNumChannels(), routeBuf.getNumSamples(), false, false, true);
-            route.returnBuffer.clear();
-            nextReturnStates.push_back(std::move(route));
-            nextMeterStates.emplace_back(bus.id);
+          auto routeStorage = std::make_unique<InstrumentRenderState>();
+          auto &route = *routeStorage;
+          route.trackId = bus.id;
+          route.outputBusId = bus.outputBusId;
+          route.outputEnabled = bus.outputEnabled;
+          route.inputTrimDb = bus.inputTrimDb;
+          route.mute = bus.mute;
+          route.gainDb = bus.gainDb;
+          route.pan = bus.pan;
+          route.effects = bus.effects;
+          route.sends = bus.sends;
+          if (anyAudioBusSolo) {
+            route.audible = busIsOnSoloPath(project, bus.id);
+            for (auto &send : route.sends)
+              send.enabled =
+                  send.enabled && busIsOnSoloPath(project, send.busId);
+            if (route.outputBusId.isNotEmpty())
+              route.outputEnabled = route.outputEnabled &&
+                                    busIsOnSoloPath(project, route.outputBusId);
+            else
+              route.outputEnabled =
+                  route.outputEnabled && busIsSoloOrDownstream(project, bus.id);
+          }
+          route.baseGainDb = bus.gainDb;
+          route.basePan = bus.pan;
+          route.baseInputTrimDb = bus.inputTrimDb;
+          route.baseMute = bus.mute;
+          route.audibilityGain = bus.mute ? 0.0f : 1.0f;
+          route.audibilityTargetGain = route.audibilityGain;
+          route.baseSends = route.sends;
+          route.baseEffects = bus.effects;
+          route.routeLatencySamples =
+              routeEffectsLatencySamples(project, route.effects);
+          route.returnBus = true;
+          route.returnBuffer.setSize(routeBuf.getNumChannels(),
+                                     routeBuf.getNumSamples(), false, false,
+                                     true);
+          route.returnBuffer.clear();
+          nextReturnStates.push_back(std::move(route));
+          nextMeterStates.emplace_back(bus.id);
         }
 
         std::map<Id, int> busInputLatency;
@@ -3512,7 +3662,10 @@ namespace beat
                 {
                     nextRoute.effectGraphTransition.prepare(sampleRate);
                     const auto found = std::find_if(currentRoutes.begin(), currentRoutes.end(),
-                        [&](const InstrumentRenderState& current) { return current.trackId == nextRoute.trackId; });
+                        [&](const InstrumentRenderState& current) {
+                            return current.trackId == nextRoute.trackId
+                                && current.instrumentId == nextRoute.instrumentId;
+                        });
                     if (found != currentRoutes.end()
                         && (!equivalentEffectGraphs(found->effects, nextRoute.effects)
                             || found->aetherSampleSlot1Identity != nextRoute.aetherSampleSlot1Identity))
@@ -5422,11 +5575,14 @@ namespace beat
             return false;
         }
 
+        const auto tuneRate = ev.tunePitch >= 0
+            ? std::exp2(((double) juce::jlimit(0, 127, ev.tunePitch) - 60.0) / 12.0)
+            : 1.0;
         activeAudioClipVoices.push_back({
             ev.trackId,
             sample,
             juce::jmax(0.0, sourcePosition),
-            (sample->sourceSampleRate / sampleRate) * speed,
+            (sample->sourceSampleRate / sampleRate) * speed * tuneRate,
             juce::Decibels::decibelsToGain(ev.segmentGainDb),
             ev.sampleOffset,
             ev.lengthSamples,
@@ -6149,10 +6305,13 @@ namespace beat
 
                     addAetherSourceSendsLocked(route, 0, numSamples);
 
-                    const auto routeSampleStartTicks = markTicks();
-                    renderSampleVoicesForRouteLocked(route.trackId, routeBuf, numSamples);
-                    renderAudioClipVoicesForRouteLocked(route.trackId, routeBuf, numSamples);
-                    samplesTicks += ticksBetween(routeSampleStartTicks, markTicks());
+                    if (route.rendersTrackSources)
+                    {
+                        const auto routeSampleStartTicks = markTicks();
+                        renderSampleVoicesForRouteLocked(route.trackId, routeBuf, numSamples);
+                        renderAudioClipVoicesForRouteLocked(route.trackId, routeBuf, numSamples);
+                        samplesTicks += ticksBetween(routeSampleStartTicks, markTicks());
+                    }
                     const auto routeModulationStartTicks = markTicks();
                     const auto routeEffectTicksBefore = routeEffectTicks;
                     processRouteAutomationLocked(route, routeBuf, numSamples, &routeEffectTicks, &routeEffectWork);
@@ -6182,10 +6341,13 @@ namespace beat
                         || previewSampleActive
                         || previewSynthActive,
                     std::memory_order_release);
-                audioPreviewActive.store(
-                    std::any_of(activeAudioClipVoices.begin(), activeAudioClipVoices.end(),
-                                [](const auto& voice) { return voice.preview; }),
-                    std::memory_order_release);
+                // Keep the paused engine awake after a preview clip reaches
+                // its source end so route FX can render the same tail as
+                // arrangement playback. The editor explicitly stops or
+                // restarts the preview at its segment boundary.
+                if (std::any_of(activeAudioClipVoices.begin(), activeAudioClipVoices.end(),
+                                [](const auto& voice) { return voice.preview; }))
+                    audioPreviewActive.store(true, std::memory_order_release);
                 routeCount = (int) instrumentRenderStates.size() + (int) groupRenderStates.size() + (int) returnRenderStates.size();
                 automationEventCount = (int) blockRealtimeParameterEvents.size()
                     + (int) blockRouteParameterEvents.size()

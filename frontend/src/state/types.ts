@@ -100,6 +100,8 @@ export interface MidiArpeggiation {
 export interface MidiNote {
   /** Stable identity for collaboration, selection, and future note-level comments. */
   id?: Id;
+  /** Engine-only route override used by normalized drum/drumpad event lists. */
+  instrumentId?: Id;
   pitch: number; // MIDI note number 0..127
   /** Optional exact oscillator frequency. Used by drum cells that store Hz. */
   frequencyHz?: number;
@@ -173,7 +175,7 @@ export interface DrumpadPayload {
 }
 
 export type SegmentPayload =
-  | { kind: "audio"; audioFileId: Id; gainDb: number }
+  | { kind: "audio"; audioFileId: Id; gainDb: number; /** Optional varispeed target; MIDI C4 (60) is the source's neutral/original pitch. */ tunePitch?: number }
   | { kind: "midi"; notes: MidiNote[]; gainDb?: number }
   | { kind: "drum"; rows: DrumRow[]; stepCount: number; speed: DrumSpeed; sourceLengthBeats?: Beats; defaultPitchHz?: number; swingPercent?: number; timeSignature?: TimeSignature }
   | DrumpadPayload
@@ -981,7 +983,7 @@ export interface InstrumentSource {
   importedAt?: number;
   edited?: boolean;
   pluginId?: Id;
-  fallbackEngine?: "aether";
+  fallbackEngine?: "aether" | "lumen";
 }
 
 export interface InstrumentTaxonomyAssignment {
@@ -993,7 +995,7 @@ export type PluginKind = "synth" | "effect" | "renderer" | "utility";
 export type PluginFormat = "native" | "vst3" | "audio-unit" | "bridge" | "decent-sampler";
 export type PluginInstallState = "available" | "installed" | "missing" | "blocked";
 export type PluginCapabilityKind = "instrument" | "effect" | "renderer" | "utility";
-export type PluginFallbackMode = "aether" | "rendered-audio" | "pass-through";
+export type PluginFallbackMode = "aether" | "lumen" | "rendered-audio" | "pass-through";
 export type PluginEditorKind = "midi" | "drum";
 
 export interface DecentSamplerUiBinding {
@@ -1035,7 +1037,7 @@ export interface PluginAdapter {
   format: PluginFormat;
   status: PluginInstallState;
   /** Synth plugins can either create live instruments or render audio when hosting is unavailable. */
-  instrumentMode: "live-instrument" | "rendered-audio" | "fallback-aether";
+  instrumentMode: "live-instrument" | "rendered-audio" | "fallback-aether" | "fallback-lumen";
   description: string;
   factory?: boolean;
   sourceFileName?: string;

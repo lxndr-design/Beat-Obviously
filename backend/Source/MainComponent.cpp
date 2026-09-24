@@ -1,5 +1,6 @@
 #include "MainComponent.h"
 #include "DiagnosticLog.h"
+#include "Ipc/Schema.h"
 
 #include <cstring>
 #include <optional>
@@ -241,7 +242,7 @@ MainComponent::~MainComponent()
 
 void MainComponent::paint(juce::Graphics& g)
 {
-    g.fillAll(juce::Colours::black);
+    g.fillAll(getLookAndFeel().findColour(juce::ResizableWindow::backgroundColourId));
 }
 
 void MainComponent::resized()
@@ -277,6 +278,28 @@ juce::WebBrowserComponent::Options MainComponent::createBrowserOptions()
 
 juce::var MainComponent::handleNativeRequest(const juce::String& kind, const juce::var& payload)
 {
+    if (kind == beat::ipc::kind::APP_SET_THEME)
+    {
+        const auto theme = payload.getProperty("theme", "dark").toString();
+        if (onThemeChanged)
+            onThemeChanged(theme);
+
+        juce::DynamicObject::Ptr response = new juce::DynamicObject();
+        response->setProperty("ok", true);
+        return juce::var(response.get());
+    }
+
+    if (kind == beat::ipc::kind::APP_SET_MODAL_OPEN)
+    {
+        const bool open = (bool) payload.getProperty("open", false);
+        if (onModalOpenChanged)
+            onModalOpenChanged(open);
+
+        juce::DynamicObject::Ptr response = new juce::DynamicObject();
+        response->setProperty("ok", true);
+        return juce::var(response.get());
+    }
+
     if (!bridge)
     {
         juce::DynamicObject::Ptr response = new juce::DynamicObject();

@@ -147,7 +147,7 @@ export function UiKitOnePager() {
     {
       name: "Tag / default",
       note: "Metadata chip",
-      render: () => <Tag>Aether</Tag>,
+      render: () => <Tag>Lumen</Tag>,
     },
     {
       name: "Tag / zero",
@@ -400,7 +400,7 @@ export function UiKitOnePager() {
         <ul class={styles.rowList}>
           <RowItem
             density="compact"
-            name="Aether Keys"
+            name="Lumen Keys"
             icon={<Icon name="ph:piano-keys" size={18} decorative />}
             hoverIcon={<Icon name="ph:dots-six-vertical" size={18} decorative />}
             detail="Synth / Keys"

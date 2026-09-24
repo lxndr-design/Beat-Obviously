@@ -1,5 +1,6 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "MainComponent.h"
+#include "NativeWindowStyle.h"
 #include "DiagnosticLog.h"
 
 #include <array>
@@ -58,6 +59,47 @@ namespace
         return {};
     }
 
+    juce::String normalizeTheme(const juce::String& value)
+    {
+        const auto normalized = value.trim().toLowerCase();
+        return normalized == "light" || normalized == "mellow" ? normalized : "dark";
+    }
+
+    juce::Colour themeBackgroundColour(const juce::String& theme)
+    {
+        const auto normalized = normalizeTheme(theme);
+        if (normalized == "light") return juce::Colour(0xfff5f5f5);
+        if (normalized == "mellow") return juce::Colour(0xff4a4a4a);
+        return juce::Colours::black;
+    }
+
+    juce::Colour themeForegroundColour(const juce::String& theme)
+    {
+        return normalizeTheme(theme) == "light"
+            ? juce::Colour(0xff1a1a1a)
+            : juce::Colour(0xfff4f4f4);
+    }
+
+    juce::File nativeThemeFile()
+    {
+        return juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory)
+            .getChildFile("Beat")
+            .getChildFile("ui-theme.txt");
+    }
+
+    juce::String loadNativeTheme()
+    {
+        const auto file = nativeThemeFile();
+        return file.existsAsFile() ? normalizeTheme(file.loadFileAsString()) : juce::String("dark");
+    }
+
+    void persistNativeTheme(const juce::String& theme)
+    {
+        const auto file = nativeThemeFile();
+        file.getParentDirectory().createDirectory();
+        file.replaceWithText(normalizeTheme(theme));
+    }
+
     class SquareWindowButton : public juce::Button,
                                private juce::Timer
     {
@@ -75,11 +117,13 @@ namespace
             const auto liveHover = isPointerActuallyOverButton();
             lastPointerHover = liveHover;
             const auto active = liveHover || down;
-            auto fg = active ? juce::Colours::black : juce::Colours::white;
+            const auto background = getLookAndFeel().findColour(juce::ResizableWindow::backgroundColourId);
+            const auto foreground = getLookAndFeel().findColour(juce::DocumentWindow::textColourId);
+            auto fg = active ? background : foreground;
 
             if (active)
             {
-                g.setColour(juce::Colours::white);
+                g.setColour(foreground);
                 g.fillRect(r);
             }
             g.setColour(fg);
@@ -133,8 +177,13 @@ namespace
     public:
         BeatLookAndFeel()
         {
-            setColour(juce::DocumentWindow::textColourId, juce::Colours::white);
-            setColour(juce::ResizableWindow::backgroundColourId, juce::Colours::black);
+            setTheme("dark");
+        }
+
+        void setTheme(const juce::String& theme)
+        {
+            setColour(juce::DocumentWindow::textColourId, themeForegroundColour(theme));
+            setColour(juce::ResizableWindow::backgroundColourId, themeBackgroundColour(theme));
         }
 
         juce::Button* createDocumentWindowButton(int buttonType) override
@@ -194,8 +243,10 @@ namespace
             const juce::Image*,
             bool) override
         {
-            g.fillAll(juce::Colours::black);
-            g.setColour(juce::Colours::white.withAlpha(0.55f));
+            const auto background = window.findColour(juce::ResizableWindow::backgroundColourId);
+            const auto foreground = window.findColour(juce::DocumentWindow::textColourId);
+            g.fillAll(background);
+            g.setColour(foreground.withAlpha(0.55f));
             g.drawLine(0.0f, static_cast<float>(h - 1), static_cast<float>(w), static_cast<float>(h - 1), 1.0f);
         }
     };
@@ -219,10 +270,12 @@ namespace
 
         void paint(juce::Graphics& g) override
         {
-            g.fillAll(juce::Colours::black);
+            const auto background = getLookAndFeel().findColour(juce::ResizableWindow::backgroundColourId);
+            const auto foreground = getLookAndFeel().findColour(juce::DocumentWindow::textColourId);
+            g.fillAll(background);
 
             const auto bounds = getLocalBounds();
-            g.setColour(juce::Colours::white.withAlpha(0.055f));
+            g.setColour(foreground.withAlpha(0.055f));
             for (int x = bounds.getX(); x < bounds.getRight(); x += 48)
                 g.drawVerticalLine(x, (float) bounds.getY(), (float) bounds.getBottom());
             for (int y = bounds.getY(); y < bounds.getBottom(); y += 48)
@@ -231,11 +284,11 @@ namespace
             const int panelWidth = juce::jmin(420, juce::jmax(280, bounds.getWidth() - 36));
             const int panelHeight = juce::jmin(286, juce::jmax(230, bounds.getHeight() - 36));
             auto panel = juce::Rectangle<int>(panelWidth, panelHeight).withCentre(bounds.getCentre());
-            g.setColour(juce::Colours::white.withAlpha(0.08f));
+            g.setColour(foreground.withAlpha(0.08f));
             g.fillRect(panel.translated(10, 10));
-            g.setColour(juce::Colours::black);
+            g.setColour(background);
             g.fillRect(panel);
-            g.setColour(juce::Colours::white);
+            g.setColour(foreground);
             g.drawRect(panel.toFloat().reduced(0.5f), 1.0f);
 
             auto header = panel.reduced(12).withHeight(58);
@@ -245,30 +298,30 @@ namespace
                                   juce::RectanglePlacement::centred | juce::RectanglePlacement::onlyReduceInSize);
             else
             {
-                g.setColour(juce::Colours::white);
+                g.setColour(foreground);
                 g.drawRect(logoBounds.toFloat(), 1.0f);
             }
 
             const auto phase = (float) ((juce::Time::getMillisecondCounter() % 1200) / 1200.0);
-            g.setColour(juce::Colours::white);
+            g.setColour(foreground);
             g.setFont(juce::FontOptions(10.0f).withStyle("Bold"));
             g.drawText("NATIVE AUDIO WORKSPACE", header.withTrimmedLeft(12).withHeight(15), juce::Justification::topLeft);
             g.setFont(juce::FontOptions(24.0f).withStyle("Bold"));
             g.drawText("Beat", header.withTrimmedLeft(12).withTrimmedTop(14).withHeight(27), juce::Justification::centredLeft);
-            g.setColour(juce::Colours::white.withAlpha(0.62f));
+            g.setColour(foreground.withAlpha(0.62f));
             g.setFont(juce::FontOptions(12.0f));
             g.drawText("Preparing audio engine and interface", header.withTrimmedLeft(12).withTrimmedTop(41), juce::Justification::topLeft);
 
             auto motion = panel.reduced(12).withTrimmedTop(68).withHeight(88);
-            g.setColour(juce::Colours::white.withAlpha(0.24f));
+            g.setColour(foreground.withAlpha(0.24f));
             g.drawRect(motion.toFloat().reduced(0.5f), 1.0f);
             for (int index = 0; index <= 16; ++index)
             {
                 const int x = motion.getX() + index * motion.getWidth() / 16;
-                g.setColour(juce::Colours::white.withAlpha(index % 4 == 0 ? 0.23f : 0.09f));
+                g.setColour(foreground.withAlpha(index % 4 == 0 ? 0.23f : 0.09f));
                 g.drawVerticalLine(x, (float) motion.getY(), (float) motion.getBottom());
             }
-            g.setColour(juce::Colours::white.withAlpha(0.12f));
+            g.setColour(foreground.withAlpha(0.12f));
             g.drawHorizontalLine(motion.getCentreY(), (float) motion.getX(), (float) motion.getRight());
 
             constexpr int signalBars = 9;
@@ -281,24 +334,24 @@ namespace
                 const float wave = 0.5f + 0.5f * std::sin((phase * juce::MathConstants<float>::twoPi)
                     + (float) index * 0.92f);
                 const int height = 14 + (int) std::round(wave * 44.0f);
-                g.setColour(juce::Colours::white.withAlpha(0.55f + wave * 0.45f));
+                g.setColour(foreground.withAlpha(0.55f + wave * 0.45f));
                 g.fillRect(signalStart + index * (signalWidth + signalGap), motion.getCentreY() - height / 2,
                            signalWidth, height);
             }
             const int playheadX = motion.getX() + (int) std::round(phase * (float) motion.getWidth());
-            g.setColour(juce::Colours::white);
+            g.setColour(foreground);
             g.drawVerticalLine(playheadX, (float) motion.getY(), (float) motion.getBottom());
 
             auto status = panel.reduced(12).withTrimmedTop(164);
-            g.setColour(juce::Colours::white.withAlpha(0.62f));
+            g.setColour(foreground.withAlpha(0.62f));
             g.setFont(juce::FontOptions(10.0f).withStyle("Bold"));
             g.drawText("PREPARING SESSION", status.removeFromTop(18), juce::Justification::centredLeft);
             auto bar = status.removeFromTop(8);
-            g.setColour(juce::Colours::white.withAlpha(0.18f));
+            g.setColour(foreground.withAlpha(0.18f));
             g.fillRect(bar);
             const auto fillWidth = juce::jmax(18, (int) std::round((double) bar.getWidth() * 0.28));
             const auto fillStart = bar.getX() + (int) std::round((double) (bar.getWidth() - fillWidth) * phase);
-            g.setColour(juce::Colours::white);
+            g.setColour(foreground);
             g.fillRect(fillStart, bar.getY(), fillWidth, bar.getHeight());
 
             status.removeFromTop(12);
@@ -307,9 +360,9 @@ namespace
             for (int index = 0; index < 3; ++index)
             {
                 auto stage = juce::Rectangle<int>(status.getX() + index * (stageWidth + 6), status.getY(), stageWidth, 34);
-                g.setColour(juce::Colours::white.withAlpha(0.4f));
+                g.setColour(foreground.withAlpha(0.4f));
                 g.drawRect(stage.toFloat().reduced(0.5f), 1.0f);
-                g.setColour(juce::Colours::white.withAlpha(0.72f));
+                g.setColour(foreground.withAlpha(0.72f));
                 g.setFont(juce::FontOptions(9.0f).withStyle("Bold"));
                 g.drawText(stageLabels[(size_t) index], stage.reduced(6), juce::Justification::centredLeft);
             }
@@ -366,7 +419,9 @@ public:
         if (initialProjectPath.isEmpty())
             initialProjectPath = pendingProjectPath;
         pendingProjectPath.clear();
-        mainWindow.reset(new MainWindow(getApplicationName(), initialProjectPath));
+        const auto initialTheme = loadNativeTheme();
+        lookAndFeel.setTheme(initialTheme);
+        mainWindow.reset(new MainWindow(getApplicationName(), initialProjectPath, initialTheme));
     }
 
     void shutdown() override
@@ -453,9 +508,9 @@ private:
     class MainWindow : public juce::DocumentWindow
     {
     public:
-        explicit MainWindow(const juce::String& name, const juce::String& initialProjectPath)
+        explicit MainWindow(const juce::String& name, const juce::String& initialProjectPath, const juce::String& initialTheme)
             : DocumentWindow(name,
-                             juce::Colours::black,
+                             themeBackgroundColour(initialTheme),
                              DocumentWindow::allButtons),
               pendingProjectPath(initialProjectPath)
         {
@@ -475,6 +530,19 @@ private:
                     if (safeThis != nullptr)
                         safeThis->handleFrontendReady();
                 };
+                main->onThemeChanged = [safeThis = juce::Component::SafePointer<MainWindow>(this)](const juce::String& theme)
+                {
+                    if (safeThis != nullptr)
+                        safeThis->applyTheme(theme);
+                };
+                main->onModalOpenChanged = [safeThis = juce::Component::SafePointer<MainWindow>(this)](bool open)
+                {
+                    if (safeThis != nullptr)
+                    {
+                        safeThis->modalOpen = open;
+                        safeThis->repaint();
+                    }
+                };
             }
             addAndMakeVisible(&startupSplash);
 
@@ -482,6 +550,11 @@ private:
             setResizable(true, true);
             centreWithSize(1440, 900);
             setVisible(true);
+            juce::MessageManager::callAsync([safeThis = juce::Component::SafePointer<MainWindow>(this)]
+            {
+                if (safeThis != nullptr)
+                    beat::applyNativeWindowCornerRadius(*safeThis, 16.0f);
+            });
             startupSplash.toFront(false);
             juce::Timer::callAfterDelay(6500, [safeThis = juce::Component::SafePointer<MainWindow>(this)]
             {
@@ -494,6 +567,7 @@ private:
         {
             DocumentWindow::resized();
             startupSplash.setBounds(getLocalBounds());
+            beat::applyNativeWindowCornerRadius(*this, 16.0f);
         }
 
         void closeButtonPressed() override
@@ -529,8 +603,13 @@ private:
 
         void paintOverChildren(juce::Graphics& g) override
         {
-            g.setColour(juce::Colours::white);
-            g.drawRect(getLocalBounds().toFloat().reduced(0.5f), 1.0f);
+            if (modalOpen)
+            {
+                g.setColour(juce::Colours::black.withAlpha(0.46f));
+                g.fillRect(getLocalBounds().withHeight(getTitleBarHeight()));
+            }
+            g.setColour(findColour(juce::DocumentWindow::textColourId));
+            g.drawRoundedRectangle(getLocalBounds().toFloat().reduced(0.5f), 16.0f, 1.0f);
         }
 
         void hideStartupSplash()
@@ -541,6 +620,18 @@ private:
         }
 
     private:
+        bool modalOpen { false };
+        void applyTheme(const juce::String& theme)
+        {
+            const auto normalized = normalizeTheme(theme);
+            persistNativeTheme(normalized);
+            if (auto* beatLookAndFeel = dynamic_cast<BeatLookAndFeel*>(&getLookAndFeel()))
+                beatLookAndFeel->setTheme(normalized);
+            setBackgroundColour(themeBackgroundColour(normalized));
+            sendLookAndFeelChange();
+            repaint();
+        }
+
         void handleFrontendReady()
         {
             frontendReady = true;

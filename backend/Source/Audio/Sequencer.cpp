@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <numeric>
 
 namespace beat
 {
@@ -80,10 +81,45 @@ namespace beat
 
             return 0.0f;
         }
+
+        void sortSegmentNotesAndRemapConnections(Segment& segment)
+        {
+            if (segment.notes.size() < 2)
+                return;
+
+            std::vector<size_t> order(segment.notes.size());
+            std::iota(order.begin(), order.end(), (size_t) 0);
+            std::stable_sort(order.begin(), order.end(), [&](size_t a, size_t b) {
+                const auto& lhs = segment.notes[a];
+                const auto& rhs = segment.notes[b];
+                if (lhs.startBeat != rhs.startBeat) return lhs.startBeat < rhs.startBeat;
+                return lhs.pitch < rhs.pitch;
+            });
+
+            std::vector<int> oldToNew(segment.notes.size(), -1);
+            std::vector<MidiNote> sortedNotes;
+            sortedNotes.reserve(segment.notes.size());
+            for (size_t nextIndex = 0; nextIndex < order.size(); ++nextIndex)
+            {
+                oldToNew[order[nextIndex]] = (int) nextIndex;
+                sortedNotes.push_back(std::move(segment.notes[order[nextIndex]]));
+            }
+            for (auto& note : sortedNotes)
+            {
+                if (note.connectToIndex >= 0 && note.connectToIndex < (int) oldToNew.size())
+                    note.connectToIndex = oldToNew[(size_t) note.connectToIndex];
+                else
+                    note.connectToIndex = -1;
+            }
+            segment.notes = std::move(sortedNotes);
+        }
     }
 
     void Sequencer::setProject(Project p)
     {
+        for (auto& track : p.tracks)
+            for (auto& segment : track.segments)
+                sortSegmentNotesAndRemapConnections(segment);
         std::atomic_store(&projectSnapshot,
                           std::static_pointer_cast<const Project>(
                               std::make_shared<Project>(std::move(p))));
@@ -473,9 +509,17 @@ namespace beat
                             || seg.kind == SegmentPayloadKind::Mixed
                             || seg.kind == SegmentPayloadKind::Drum)
                         {
-                            for (size_t noteIndex = 0; noteIndex < seg.notes.size(); ++noteIndex)
+                            const Beats localSpanStart = juce::jmax(0.0, spanStart - occStart);
+                            const Beats localSpanEnd = juce::jmin(segLen, spanEnd - occStart);
+                            auto noteIt = std::lower_bound(
+                                seg.notes.begin(),
+                                seg.notes.end(),
+                                localSpanStart,
+                                [](const MidiNote& note, Beats beat) { return note.startBeat < beat; });
+                            for (; noteIt != seg.notes.end() && noteIt->startBeat < localSpanEnd; ++noteIt)
                             {
-                                const auto& note = seg.notes[noteIndex];
+                                const auto noteIndex = (size_t) std::distance(seg.notes.begin(), noteIt);
+                                const auto& note = *noteIt;
                                 if (note.startBeat < 0.0 || note.startBeat >= segLen)
                                     continue;
 
@@ -534,6 +578,9 @@ namespace beat
                             const Beats eventEnd = juce::jmin(spanEnd, occEnd);
                             if (eventEnd > eventBeat)
                             {
+                                const auto tuneRate = seg.audioTunePitch >= 0
+                                    ? std::exp2(((double) juce::jlimit(0, 127, seg.audioTunePitch) - 60.0) / 12.0)
+                                    : 1.0;
                                 const int offsetSamples = sampleBaseOffset + (int) std::round((eventBeat - spanStart) * samplesPerBeat);
                                 const int lengthSamples = juce::jmax(1, (int) std::round((eventEnd - eventBeat) * samplesPerBeat));
                                 onAudioClip({
@@ -542,7 +589,7 @@ namespace beat
                                     seg.audioFileId,
                                     juce::jlimit(0, numSamples - 1, offsetSamples),
                                     juce::jlimit(1, juce::jmax(1, numSamples - juce::jlimit(0, numSamples - 1, offsetSamples)), lengthSamples),
-                                    juce::jmax(0.0, seg.sourceStartBeat + eventBeat - occStart),
+                                    juce::jmax(0.0, seg.sourceStartBeat + (eventBeat - occStart) * tuneRate),
                                     juce::jmax(0.0, eventBeat - occStart),
                                     seg.lengthBeats,
                                     juce::jlimit(0.0, seg.lengthBeats, seg.fadeInBeats),
@@ -552,6 +599,7 @@ namespace beat
                                     track.gainDb,
                                     track.pan,
                                     seg.audioGainDb,
+                                    seg.audioTunePitch,
                                 });
                             }
                         }

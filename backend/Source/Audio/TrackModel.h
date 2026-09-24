@@ -127,6 +127,9 @@ namespace beat
         // Payload — only the relevant field is populated based on `kind`.
         Id    audioFileId;
         float audioGainDb { 0.0f };
+        // Optional audio-clip varispeed target. MIDI C4 (60) is neutral;
+        // -1 disables tuning and preserves the original playback rate.
+        int audioTunePitch { -1 };
         std::vector<MidiNote> notes;
         std::vector<MidiAutomationLane> automation;
     };

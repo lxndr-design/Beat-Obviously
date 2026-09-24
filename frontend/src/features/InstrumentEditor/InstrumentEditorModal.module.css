@@ -32,7 +32,7 @@
 
 .identityStack {
   display: grid;
-  grid-template-rows: repeat(4, var(--field-control-height));
+  grid-template-rows: repeat(6, var(--field-control-height));
   gap: 6px;
   min-width: 0;
 }
@@ -452,6 +452,13 @@
   padding: 0 6px;
   border-bottom: var(--border-fg);
   font-size: var(--font-size-ui);
+}
+
+.samplerPaneTitle {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  gap: 3px;
 }
 
 .samplerPaneActions {

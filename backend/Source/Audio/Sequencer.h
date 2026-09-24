@@ -102,6 +102,7 @@ namespace beat
             float  trackGainDb { 0.0f };
             float  trackPan { 0.0f };
             float  segmentGainDb { 0.0f };
+            int    tunePitch { -1 };
         };
         using AudioClipHandler = CallbackRef<void(const AudioClipEvent&)>;
 

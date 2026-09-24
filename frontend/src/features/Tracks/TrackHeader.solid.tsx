@@ -125,6 +125,12 @@ export function TrackHeader(props: Props) {
     menu.onContextMenu(event);
   }
 
+  function handleSecondaryMenuMouseDown(event: MouseEvent) {
+    if (event.button !== 2 && !(event.button === 0 && event.ctrlKey)) return;
+    if (!props.selected) props.onSelect?.(event);
+    menu.onMouseDown(event);
+  }
+
   function onHandleDragStart(event: DragEvent) {
     event.dataTransfer?.setData(DND_MIME, props.trackId);
     if (event.dataTransfer) event.dataTransfer.effectAllowed = "move";
@@ -169,6 +175,7 @@ export function TrackHeader(props: Props) {
             dropPosition() === "above" && styles.dropAbove,
             dropPosition() === "below" && styles.dropBelow,
           ].filter(Boolean).join(" ")}
+          onMouseDown={handleSecondaryMenuMouseDown}
           onContextMenu={handleContextMenu}
           onClick={(event) => {
             if (!isPlainSelectionClick(event)) return;

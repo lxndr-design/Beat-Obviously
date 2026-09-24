@@ -1,5 +1,5 @@
 import { createEffect, createMemo, createSignal, onCleanup } from "solid-js";
-import { ActionFooter, Button, FloatingSelect, HoverInfo, Icon, LibrarySearch, MarqueeText } from "../../solid-ui";
+import { ActionFooter, Button, FloatingSelect, HoverInfo, Icon, LibrarySearch, MarqueeText, TextInput } from "../../solid-ui";
 import {
   cachedInstrumentSampleBuffer,
   createInstrumentSampleBufferSource,
@@ -19,9 +19,11 @@ import {
   instrumentTaxonomyOptionsForCategory,
   taxonomyAssignmentForInstrumentId,
 } from "../../state/instrumentTaxonomy";
-import { TEMPORARY_DS_INSTRUMENT_SET_ID, useInstrumentStore, useProjectStore } from "../../state/store";
+import { AURUM_TEST_SET_ID, TEMPORARY_DS_INSTRUMENT_SET_ID, useInstrumentStore, useProjectStore } from "../../state/store";
 import { instrumentRepositorySearchText, instrumentSongTitles } from "../../state/instrumentSongAssociations";
+import { isLumenInstrument, isLegacyAetherInstrument } from "../../state/instrumentAccess";
 import { instrumentIcon } from "../../state/instrumentIcons";
+import { normalizeLibraryMetadata, parseLibraryTags } from "../../state/libraryMetadata";
 import type { Instrument, InstrumentSet, Project } from "../../state/types";
 import { createStoreSelector } from "../../solid-utils/store";
 import { AssetPageShell, AssetStateMessage } from "./AssetPageShell.solid";
@@ -126,6 +128,7 @@ export function InstrumentsPage() {
   const visibleInstruments = createMemo(() => {
     const query = searchQuery().trim().toLowerCase();
     const filtered = instruments().filter((instrument) => {
+      if (isLegacyAetherInstrument(instrument)) return false;
       if (!instrumentMatchesFilter(instrument, filterMode())) return false;
       if (!query) return true;
       const setName = instrumentSetDisplayName(sets().find((set) => set.id === (instrument.setId ?? "user-instruments")));
@@ -515,6 +518,8 @@ export function InstrumentsPage() {
                   role="button"
                   tabIndex={0}
                   onClick={() => setActiveId(instrument.id)}
+                  onDblClick={() => void playPreview(instrument)}
+                  title={`${instrument.name} · Double-click to audition`}
                   onKeyDown={(event) => {
                     if (event.key !== "Enter" && event.key !== " ") return;
                     event.preventDefault();
@@ -525,22 +530,6 @@ export function InstrumentsPage() {
                   <MarqueeText className={styles.rowName} text={instrument.name} />
                   <span class={styles.rowMeta}>
                     <span class={styles.rowType}>{formatInstrumentType(instrument)}</span>
-                    <Button
-                      iconOnly
-                      variant="ghost"
-                      selected={playingId() === instrument.id}
-                      class={styles.rowPlay}
-                      aria-label={`${previewLoadingId() === instrument.id ? "Cancel loading" : playingId() === instrument.id ? "Pause" : "Preview"} ${instrument.name}`}
-                      aria-busy={previewLoadingId() === instrument.id}
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        void playPreview(instrument);
-                      }}
-                    >
-                      {previewLoadingId() === instrument.id
-                        ? <span class={styles.previewSpinner} aria-hidden="true" />
-                        : <Icon name={playingId() === instrument.id ? "ph:pause-fill" : "ph:play-fill"} size={18} decorative />}
-                    </Button>
                   </span>
                 </div>
               ))}
@@ -622,7 +611,7 @@ export function InstrumentsPage() {
                 </Button>
               </HoverInfo>
             </div>
-            <div class={styles.taxonomyRow}>
+            <div class={styles.taxonomyRow} role="group" aria-label="Taxonomy">
               <FloatingSelect
                 className={styles.taxonomySelect}
                 label="Category"
@@ -639,15 +628,38 @@ export function InstrumentsPage() {
               />
               <FloatingSelect
                 className={styles.taxonomySelect}
-                label="Instrument"
+                label="Subcategory"
                 layout="inline"
                 value={activeInstrument()!.taxonomy?.instrumentId ?? ""}
-                ariaLabel="Instrument taxonomy"
+                ariaLabel="Instrument taxonomy subcategory"
                 options={taxonomyInstrumentOptions(activeInstrument()!)}
                 open={taxonomyInstrumentOpen()}
                 onOpenChange={setTaxonomyInstrumentOpen}
                 onChange={(value) => {
                   updateInstrument(activeInstrument()!.id, { taxonomy: value ? taxonomyAssignmentForInstrumentId(value) : undefined });
+                }}
+              />
+              <TextInput
+                className={styles.taxonomyTags}
+                label="Tags"
+                layout="inline"
+                value={(activeInstrument()!.libraryMetadata?.tags ?? activeInstrument()!.descriptors ?? []).join(", ")}
+                placeholder="warm, acoustic, lead"
+                onInput={(event) => {
+                  const instrument = activeInstrument()!;
+                  updateInstrument(instrument.id, {
+                    libraryMetadata: {
+                      ...normalizeLibraryMetadata(instrument.libraryMetadata, {
+                        factory: !instrument.userCreated,
+                        createdAt: instrument.createdAt,
+                        updatedAt: instrument.updatedAt,
+                        tags: instrument.descriptors,
+                        license: instrument.source?.license,
+                        provenance: instrument.source?.label,
+                      }),
+                      tags: parseLibraryTags(event.currentTarget.value),
+                    },
+                  });
                 }}
               />
             </div>
@@ -702,7 +714,7 @@ export function InstrumentsPage() {
 
 function instrumentSetDisplayName(set?: InstrumentSet): string {
   if (!set) return "User Instruments";
-  if (!set.factory || set.id === TEMPORARY_DS_INSTRUMENT_SET_ID || set.name === "Aurum Test") return set.name;
+  if (!set.factory || set.id === TEMPORARY_DS_INSTRUMENT_SET_ID || set.id === AURUM_TEST_SET_ID) return set.name;
   return `Factory ${set.name}`;
 }
 
@@ -718,7 +730,7 @@ function instrumentMatchesFilter(instrument: Instrument, filter: InstrumentFilte
   const category = instrumentCategoryLabel(instrument).toLowerCase();
   if (filter === "sample") return type.includes("sampler") || (instrument.sampleMap?.length ?? 0) > 0;
   if (filter === "drum") return category.includes("drum") || category.includes("percussion");
-  return ["aether", "aurum", "lumen", "nodemap", "basic"].some((label) => type.includes(label));
+  return ["aurum", "lumen", "nodemap", "basic"].some((label) => type.includes(label));
 }
 
 function compareInstruments(
@@ -1778,16 +1790,10 @@ function isSustainedPreview(instrument: Instrument) {
   return instrument.kind === "synth" || instrument.kind === "wavetable" || Boolean(instrument.aether || instrument.aurum || instrument.synthPatch);
 }
 
-function isLumenInstrument(instrument: Instrument) {
-  return instrument.synthPatch?.instrumentType === "lumen-hybrid-synth"
-    || instrument.synthPatch?.namespace === "lumen";
-}
-
 function formatEngine(instrument: Instrument) {
   if (instrument.nodeGraph) return "Nodemap";
   if (instrument.aurum) return "Aurum";
   if (isLumenInstrument(instrument)) return "Lumen";
-  if (instrument.aether || instrument.kind === "wavetable") return "Aether";
   if (instrument.kind === "sampler") return "Sampler";
   if (instrument.kind === "synth") return "Basic";
   return titleCase(instrument.kind);
@@ -1798,7 +1804,6 @@ function formatInstrumentType(instrument: Instrument) {
   if (instrument.aurum) return "Aurum";
   if (instrument.kind === "sampler" || instrument.waveform === "sample") return "Sampler";
   if (isLumenInstrument(instrument)) return "Lumen";
-  if (instrument.aether || instrument.kind === "wavetable") return "Aether";
   if (instrument.kind === "synth") return "Basic";
   return titleCase(instrument.kind);
 }

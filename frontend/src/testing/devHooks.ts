@@ -16,6 +16,7 @@ import {
   TEMPORARY_DS_INSTRUMENT_SET_ID,
   USER_INSTRUMENT_SET_ID,
   createEmptyProject,
+  useAudioFileStore,
   useInstrumentStore,
   usePluginStore,
   useProjectStore,
@@ -69,6 +70,8 @@ const DEV_DRUMPAD_LINKS_LANE_A_ID = "dev-drumpad-links-lane-a";
 const DEV_DRUMPAD_LINKS_LANE_S_ID = "dev-drumpad-links-lane-s";
 const DEV_DRUM_GRID_TRACK_ID = "dev-drum-grid-track";
 const DEV_DRUM_GRID_SEGMENT_ID = "dev-drum-grid-segment";
+const DEV_AUDIO_TUNE_TRACK_ID = "dev-audio-tune-track";
+const DEV_AUDIO_TUNE_SEGMENT_ID = "dev-audio-tune-segment";
 const DEV_NODE_INSTRUMENT_INTERACTION_ID = "dev-node-instrument-interaction-host";
 const USER_PRESET_PREFIX = "user:";
 
@@ -154,6 +157,10 @@ declare global {
       };
       readDrumpadLinksFixtureState: () => DevDrumpadLinksFixtureState;
       installDrumGridFixture: () => {
+        trackId: string;
+        segmentId: string;
+      };
+      installAudioTuneFixture: () => {
         trackId: string;
         segmentId: string;
       };
@@ -1977,6 +1984,47 @@ export function installBeatDevHooks() {
     return { trackId: track.id, segmentId: DEV_DRUM_GRID_SEGMENT_ID };
   };
 
+  const installAudioTuneFixture = () => {
+    const audioFile = createDevWavemapAudioFile();
+    useAudioFileStore.getState().hydrateFiles([audioFile]);
+
+    const project = createEmptyProject();
+    project.id = "dev-audio-tune-project";
+    project.name = "Audio Tune Fixture";
+    project.lengthBeats = 32;
+    project.bpm = 120;
+    const track = project.tracks[0];
+    track.id = DEV_AUDIO_TUNE_TRACK_ID;
+    track.name = "Tuned Sample";
+    track.kind = "audio";
+    track.audioFileId = audioFile.id;
+    track.segments = [{
+      id: DEV_AUDIO_TUNE_SEGMENT_ID,
+      trackId: DEV_AUDIO_TUNE_TRACK_ID,
+      name: "Sample tuned to C5",
+      startBeat: 2,
+      lengthBeats: 8,
+      repeats: 0,
+      layer: 0,
+      payload: {
+        kind: "audio",
+        audioFileId: audioFile.id,
+        gainDb: 0,
+        tunePitch: 72,
+      },
+    }];
+
+    useProjectStore.getState().loadProject(project);
+    useUiStore.setState({
+      openEditors: [],
+      selectedTrackIds: [],
+      selectedSegmentIds: [],
+      selectedTrackEffectAutomationPointKeys: [],
+    });
+    useUiStore.getState().openEditor({ kind: "segment", segmentId: DEV_AUDIO_TUNE_SEGMENT_ID });
+    return { trackId: track.id, segmentId: DEV_AUDIO_TUNE_SEGMENT_ID };
+  };
+
   const readDrumpadLinksFixtureState = (): DevDrumpadLinksFixtureState => {
     const dialog = document.querySelector<HTMLElement>('[role="dialog"]');
     const pathElements = Array.from(document.querySelectorAll<SVGPathElement>("[data-drumpad-link-path]"));
@@ -2020,12 +2068,12 @@ export function installBeatDevHooks() {
     } else {
       useUiStore.getState().openEditor({ kind: "segment", segmentId: fixture.segmentId });
     }
-    await waitForEditorPanel(editor === "track" ? "Aether track automation lanes" : "Aether segment automation lanes");
+    await waitForEditorPanel(editor === "track" ? "Aether track automation lanes" : "Instrument segment automation lanes");
     if (editor === "track") {
       clickPanelButton("Aether track automation lanes", "Macro 1 track automation lane");
       await nextFrame();
     } else {
-      clickPanelButton("Aether segment automation lanes", "Macro 1 segment automation lane");
+      clickPanelButton("Instrument segment automation lanes", "Macro 1 segment automation lane");
       await nextFrame();
     }
     if (editor === "note") {
@@ -2159,19 +2207,19 @@ export function installBeatDevHooks() {
   ): Promise<DevAetherSegmentAutomationDragLaneExercise> => {
     await ensureAetherAutomationTargetLane("segment", target);
     await waitForSegmentAutomationHandle("start");
-    const before = readAutomationPointPanelRows("Aether segment automation points");
+    const before = readAutomationPointPanelRows("Instrument segment automation points");
 
     dragSegmentAutomationHandle("start", startValue);
     await nextFrame();
-    const afterStartDrag = readAutomationPointPanelRows("Aether segment automation points");
+    const afterStartDrag = readAutomationPointPanelRows("Instrument segment automation points");
 
     dragSegmentAutomationHandle("mid", midValue);
     await nextFrame();
-    const afterMidDrag = readAutomationPointPanelRows("Aether segment automation points");
+    const afterMidDrag = readAutomationPointPanelRows("Instrument segment automation points");
 
     dragSegmentAutomationHandle("end", endValue);
     await nextFrame();
-    const afterEndDrag = readAutomationPointPanelRows("Aether segment automation points");
+    const afterEndDrag = readAutomationPointPanelRows("Instrument segment automation points");
 
     return {
       target,
@@ -2184,7 +2232,7 @@ export function installBeatDevHooks() {
         mid: readSegmentAutomationHandleState("mid"),
         end: readSegmentAutomationHandleState("end"),
       },
-      pointPanelText: readPanelState("Aether segment automation points").text,
+      pointPanelText: readPanelState("Instrument segment automation points").text,
     };
   };
 
@@ -2322,7 +2370,7 @@ export function installBeatDevHooks() {
       arrangementLane: readArrangementAutomationLaneState(),
       panels: {
         note: readPanelState("Aether note automation lanes"),
-        segment: readPanelState("Aether segment automation lanes"),
+        segment: readPanelState("Instrument segment automation lanes"),
         track: readPanelState("Aether track automation lanes"),
       },
     };
@@ -2367,6 +2415,7 @@ export function installBeatDevHooks() {
     installDrumpadLinksFixture,
     readDrumpadLinksFixtureState,
     installDrumGridFixture,
+    installAudioTuneFixture,
     openAetherAutomationFixtureEditor,
     readAetherAutomationFixtureState,
     exerciseAetherAutomationPointEditorFlow,
@@ -2384,6 +2433,9 @@ export function installBeatDevHooks() {
   });
   document.addEventListener("beat:install-aurum-editor-fixture", () => {
     installAurumEditorFixture();
+  });
+  document.addEventListener("beat:install-audio-tune-fixture", () => {
+    installAudioTuneFixture();
   });
 
   const fixture = new URLSearchParams(window.location.search).get("beatDevFixture");
@@ -2483,6 +2535,11 @@ export function installBeatDevHooks() {
   } else if (fixture === "drum-grid-selection") {
     window.setTimeout(() => {
       installDrumGridFixture();
+    }, 0);
+  } else if (fixture === "audio-tune") {
+    window.setTimeout(() => {
+      installAudioTuneFixture();
+      document.dispatchEvent(new Event("beat:dev-open-arrangement"));
     }, 0);
   } else if (fixture === "aether-automation-points") {
     window.setTimeout(() => {
@@ -3478,13 +3535,13 @@ function dragEnvelopeHandle(source: "env.1" | "env.2", kind: "attack" | "decay-s
 
 function aetherAutomationPointEditorLabel(editor: DevAetherAutomationPointEditor): string {
   if (editor === "track") return "Aether track automation points";
-  if (editor === "segment") return "Aether segment automation points";
+  if (editor === "segment") return "Instrument segment automation points";
   return "Aether note automation points";
 }
 
 function aetherAutomationLanePanelLabel(editor: DevAetherAutomationPointEditor): string {
   if (editor === "track") return "Aether track automation lanes";
-  if (editor === "segment") return "Aether segment automation lanes";
+  if (editor === "segment") return "Instrument segment automation lanes";
   return "Aether note automation lanes";
 }
 
@@ -3533,7 +3590,7 @@ function readAutomationCurveControlLabel(editor: DevAetherAutomationPointEditor)
   const triggerLabel = editor === "track"
     ? "Aether track automation curve"
     : editor === "segment"
-      ? "Aether segment automation curve"
+      ? "Instrument segment automation curve"
       : "Aether note automation curve";
   const panel = findElementByAriaLabel(aetherAutomationLanePanelLabel(editor));
   const trigger = findElementByAriaLabel(triggerLabel, panel);
@@ -3544,7 +3601,7 @@ async function chooseAutomationCurve(editor: DevAetherAutomationPointEditor, opt
   const triggerLabel = editor === "track"
     ? "Aether track automation curve"
     : editor === "segment"
-      ? "Aether segment automation curve"
+      ? "Instrument segment automation curve"
       : "Aether note automation curve";
   const panel = findElementByAriaLabel(aetherAutomationLanePanelLabel(editor));
   const trigger = findElementByAriaLabel(triggerLabel, panel) as HTMLButtonElement | null;

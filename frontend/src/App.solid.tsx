@@ -1,5 +1,5 @@
 import { createEffect, createMemo, createSignal, onCleanup, onMount, Show } from "solid-js";
-import { appAlert, appConfirm, Block, SectionRibbon } from "./solid-ui";
+import { appAlert, appConfirm, Block, RIBBON_HELP, SectionRibbon } from "./solid-ui";
 import { TimelineMidiPlayback } from "./audio/TimelineMidiPlayback.solid";
 import { LiveMidiExpressionInput } from "./audio/LiveMidiExpressionInput.solid";
 import { startAnalyzerClient } from "./audio/analyzerClient";
@@ -19,7 +19,7 @@ import { redo, undo, useAudioFileStore, useDocumentStore, useInstrumentStore, us
 import { createDefaultLumenDraft, useSynthStore } from "./state/synthStore";
 import { useExportStore } from "./state/exportStore";
 import { useComponentStore } from "./state/components";
-import { projectWithRenderedMidiArpeggiations } from "./state/midiNoteGroups";
+import { projectWithCompiledSegmentEvents } from "./state/segmentEventCompiler";
 import { listAudioFiles, listComponents, listInstruments, listProjects, pruneBlankUntitledProjects, saveAudioFiles, saveComponents, saveInstruments, saveProject } from "./persistence/dexie";
 import { closeCurrentDocumentForHome, createNewDocument, openDocumentFromUserChoice, openRecentDocument, recoverCurrentDocumentFromBackup, saveCurrentDocument } from "./persistence/documentActions";
 import { buildCurrentBeatDocumentFingerprint } from "./persistence/beatDocument";
@@ -33,6 +33,7 @@ import { AudioBusPanel } from "./features/AudioBusPanel/AudioBusPanel.solid";
 import { EditorHost } from "./features/EditorHost/EditorHost.solid";
 import { AppDialogHost } from "./solid-ui/AppDialog";
 import { ModalStackOverlay } from "./solid-ui/Modal";
+import { useModalStack } from "./solid-ui/Modal/modalStack";
 import trackStyles from "./features/Tracks/TrackList.module.css";
 import { SolidUiKitCatalog } from "./design/SolidUiKitCatalog.solid";
 import { UiKitOnePager } from "./design/UiKitOnePager.solid";
@@ -120,6 +121,12 @@ export function App() {
   const documentOpen = createStoreSelector(useDocumentStore, (s) => s.documentOpen);
   const themeContrastLevel = createStoreSelector(useSettingsStore, (s) => s.themeContrastLevel);
   const themeMode = createStoreSelector(useSettingsStore, (s) => s.themeMode);
+  const modalCount = createStoreSelector(useModalStack, (s) => s.stack.length + (s.pendingDirtyClose ? 1 : 0));
+
+  createEffect(() => {
+    if (!isNative()) return;
+    void send({ kind: "app.setModalOpen", open: modalCount() > 0 }).catch(() => undefined);
+  });
   const [showHome, setShowHome] = createSignal(true);
   const showHomeSurface = createMemo(() => showHome() && !documentOpen());
   const [startupReadiness, setStartupReadiness] = createSignal<Record<StartupReadinessKey, boolean>>(initialStartupReadiness(), { equals: false });
@@ -210,6 +217,7 @@ export function App() {
   createEffect(() => {
     document.documentElement.dataset.themeContrast = themeContrastLevel();
     document.documentElement.dataset.theme = themeMode();
+    void send({ kind: "app.setTheme", theme: themeMode() });
   });
 
   createEffect(() => {
@@ -609,7 +617,7 @@ export function App() {
       if (timer) window.clearTimeout(timer);
       timer = window.setTimeout(() => {
         const sourceProject = useProjectStore.getState().project;
-        const project = projectWithRenderedMidiArpeggiations(sourceProject);
+        const project = projectWithCompiledSegmentEvents(sourceProject);
         const instruments = engineInstrumentsForProject(sourceProject, useInstrumentStore.getState().instruments)
           .map((instrument) => structuredClone(instrument));
         const audioFiles = engineAudioFilesForProject(sourceProject, useAudioFileStore.getState().files)
@@ -818,7 +826,7 @@ export function App() {
 function TrackBlock() {
   return (
     <Block framed fill padding="none" className={trackStyles.tracksBlock}>
-      <SectionRibbon title="Tracks" expanded showToggle={false} onToggle={() => undefined} />
+      <SectionRibbon title="Tracks" help={RIBBON_HELP.tracks} expanded showToggle={false} onToggle={() => undefined} />
       <TrackList />
     </Block>
   );

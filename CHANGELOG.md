@@ -2,6 +2,47 @@
 
 All notable Beat changes are tracked here. Dates use local project dates.
 
+## Unreleased
+
+### Added
+
+- Added Split Lanes to Tracks for Drum Sequencer and Drumpad segments, creating
+  one routed child track per lane with linked move, trim, and loop editing until
+  the split clips are ungrouped.
+- Added native-compatible right-click menus across library and arrangement
+  surfaces, including macOS Control-click and keyboard menu access, plus direct
+  New Track actions for audio files and reusable MIDI/drum components.
+- Added an instrument context-menu action that creates a bound track and an
+  empty MIDI or mapped drum-loop segment according to the instrument type.
+- Reworked instrument taxonomy editing into Category and Subcategory controls,
+  with searchable user-defined Tags beside them.
+- Added descriptive information popovers beside core ribbon titles, including
+  accessible multi-page Back/Next guides for workflows that need more than one
+  concise explanation.
+- Added nondestructive Tune To controls for audio/sample segments, with
+  searchable MIDI pitch selection, matching editor/arrangement/export
+  playback, project persistence, tune-aware trim/split behavior, and a compact
+  pitch badge at the segment end.
+
+### Changed
+
+- Unified MIDI notes, drum steps, and drumpad hits behind a cached 960-tick
+  sorted event compiler shared by browser playback, native playback, bounce,
+  and export, with binary-search scheduling for the active time window.
+- Simplified the Drum Sequencer grid by labeling beat starts instead of every
+  subdivision, collapsing per-hit pitch, volume, and lean decorations into one
+  quiet customization marker, and reducing playback and cell-border emphasis.
+- Retired Aether from user-facing instrument workflows: Lumen is now the
+  exposed synth and plugin-fallback engine, while legacy Aether instruments
+  remain playback-compatible but cannot be browsed, selected, created, or
+  opened for editing.
+- Separated audio-bus Sends into its own channel section, added explicit Add
+  and Remove routing controls to Inputs, and changed instrument repository rows
+  to audition on double-click without a per-row play button.
+- Reduced the empty-timeline context menu to Create MIDI, Create Drum
+  Sequencer, and Create Drumpad, removing engine-specific segment types and
+  replacing Aether-specific segment automation wording with Instrument.
+
 ## 0.3.2 - 2026-08-03
 
 ### Added
@@ -22,9 +63,29 @@ All notable Beat changes are tracked here. Dates use local project dates.
   Python audio/OMR runtime locks, and weekly npm, PyPI, and JUCE freshness
   checks; updated compatible frontend packages without crossing major-version
   boundaries.
+- Moved npm, Vite, CMake, JUCE, app-bundle, and release-archive output outside
+  the source workspace while retaining lightweight compatibility paths for
+  existing developer commands.
 
 ### Fixed
 
+- Matched the native window header, controls, border, and startup surface to
+  the selected Dark, Light, or Mellow theme, with native theme persistence
+  across launches.
+- Expanded the arrangement lane viewport to the full available track-panel
+  height so its horizontal scrollbar remains docked to the bottom edge.
+- Changed untinted segment bodies to a true white surface in Light mode while
+  retaining black note and waveform detail.
+- Changed the shared Beat logo to black throughout Light mode, including
+  project cards, editor branding, menus, and startup surfaces.
+- Reduced the arrangement instrument browser scrollbar to a flush 2px rail
+  without a reserved outer gutter.
+- Compressed MIDI segment identity, loop, repeat, color, and instrument controls
+  into one header row with a direct Loop toggle.
+- Fixed piano-roll length resizing compounding while dragged, note moves
+  recentering the viewport, and unclear Light-mode marquee/tool/note selection.
+- Fixed native arrangement playback omitting MIDI instruments selected by
+  individual segments or drum rows when they differ from the track instrument.
 - Fixed a macOS 26 CoreAudio buffer-size mismatch that could corrupt memory and
   crash Beat during startup or the first instrument audition.
 - Fixed mono and not-yet-active output layouts preparing fewer master-effect

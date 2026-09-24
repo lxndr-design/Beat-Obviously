@@ -184,7 +184,8 @@ namespace beat
                                         Beats lengthBeats,
                                         Beats fadeInBeats,
                                         Beats fadeOutBeats,
-                                        float segmentGainDb);
+                                        float segmentGainDb,
+                                        int tunePitch = -1);
         void requestStopAudioPreview(const Id& trackId);
         bool queueRealtimeParameterChange(Id instrumentId,
                                           juce::String parameterId,
@@ -538,6 +539,10 @@ namespace beat
             float audibilityTargetGain { 1.0f };
             int audibilityRampSamplesRemaining { 0 };
             bool midiPreviewTailActive { false };
+            // A track can contain MIDI segments (or drum rows) assigned to
+            // different instruments. Only the primary route owns track-level
+            // audio/sample sources; auxiliary routes render their synth only.
+            bool rendersTrackSources { true };
             std::unique_ptr<juce::Synthesiser> synth;
             static constexpr size_t maxRetiringSynths = 2;
             std::array<std::unique_ptr<juce::Synthesiser>, maxRetiringSynths> retiringSynths;

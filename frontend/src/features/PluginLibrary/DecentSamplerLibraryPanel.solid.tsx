@@ -1,5 +1,5 @@
 import { createSignal, For, Show } from "solid-js";
-import { HoverInfo, Icon, SectionRibbon, SectionRibbonActionButton } from "../../solid-ui";
+import { HoverInfo, Icon, RIBBON_HELP, SectionRibbon, SectionRibbonActionButton } from "../../solid-ui";
 import { usePluginStore, useUiStore } from "../../state/store";
 import { createStoreSelector } from "../../solid-utils/store";
 import { PluginImportModal } from "./PluginImportModal.solid";
@@ -20,6 +20,7 @@ export function DecentSamplerLibraryPanel(props: DecentSamplerLibraryPanelProps)
     <div class={styles.panel}>
       <SectionRibbon
         title="DecentSampler"
+        help={RIBBON_HELP.decentSampler}
         expanded={props.expanded}
         onToggle={props.onToggle}
         showToggle={false}
